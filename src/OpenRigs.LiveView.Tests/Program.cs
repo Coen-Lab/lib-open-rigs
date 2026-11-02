@@ -75,7 +75,7 @@ namespace OpenRigs.LiveView.Tests
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
 
                 Console.WriteLine("Session key:");
-                Check("the session folder's last two names", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_date-2026-10-30T19-57-12\") == "sub-TC002/ses-003B1_date-2026-10-30T19-57-12", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_date-2026-10-30T19-57-12\"));
+                Check("the session folder's last two names", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_2026-10-30T19-57-12\") == "sub-TC002/ses-003B1_2026-10-30T19-57-12", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_2026-10-30T19-57-12\"));
                 var refused = false;
                 try { SessionKey.FromPathPrefix(@"C:\data\TC002\003B1"); } catch (ArgumentException) { refused = true; }
                 Check("a folder not named sub-/ses- is refused", refused, "taken");

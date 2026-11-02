@@ -13,7 +13,7 @@ The `LogController` operator specifies the default parameters used to construct 
 On startup the operator reads three externalized properties — `SubjectId`, `SessionId`, and `Path` — formats the current date, and publishes a single string on the `PathPrefix` subject:
 
 ```
-{Path}\sub-{SubjectId}\ses-{SessionId}_date-{FormattedDate}
+{Path}\sub-{SubjectId}\ses-{SessionId}_{FormattedDate}
 ```
 
 All downstream logging operators subscribe to `PathPrefix` and append their own filename segment (e.g. `_behavior.bin`, `_camera0.avi`).

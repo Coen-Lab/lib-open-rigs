@@ -30,7 +30,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="p1:JsonWriter">
-          <p1:FileName>C:\temp_data\sub-Algernon\ses-001_date-2026-10-01T19-53-48\Schema\Schema_2026-10-01T19-53-48.json</p1:FileName>
+          <p1:FileName>C:\temp_data\sub-Algernon\ses-001_2026-10-01T19-53-48\Schema\Schema_2026-10-01T19-53-48.json</p1:FileName>
           <p1:Suffix>None</p1:Suffix>
           <p1:Buffered>true</p1:Buffered>
           <p1:Overwrite>false</p1:Overwrite>

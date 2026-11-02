@@ -57,7 +57,7 @@
               <Combinator xsi:type="rx:Zip" />
             </Expression>
             <Expression xsi:type="Format">
-              <Format>{0}\sub-{1}\ses-{2}_date-{3}</Format>
+              <Format>{0}\sub-{1}\ses-{2}_{3}</Format>
               <Selector>Item1,Item2,Item3, Item4</Selector>
             </Expression>
             <Expression xsi:type="Combinator">

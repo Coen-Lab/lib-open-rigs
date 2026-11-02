@@ -130,15 +130,15 @@ namespace OpenRigs.Logging.Tests
                 segments[0],
                 $"Expected the subject folder to be named sub-<subject>.{result.Describe()}");
 
-            // LogController lays out the session folder as ses-<session>_date-<datetime>, where the
+            // LogController lays out the session folder as ses-<session>_<datetime> (ucl-open/roadmap#37), where the
             // datetime is a round-trip UTC timestamp with the time separators replaced.
             var sessionFolder = segments[1];
             var sessionMatch = Regex.Match(
                 sessionFolder,
-                $@"^ses-{Regex.Escape(SessionId)}_date-(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}-\d{{2}}-\d{{2}})$");
+                $@"^ses-{Regex.Escape(SessionId)}_(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}-\d{{2}}-\d{{2}})$");
             Assert.IsTrue(
                 sessionMatch.Success,
-                $"Expected the session folder to match ses-{SessionId}_date-<datetime> but found " +
+                $"Expected the session folder to match ses-{SessionId}_<datetime> but found " +
                 $"'{sessionFolder}'.{result.Describe()}");
 
             Assert.IsTrue(

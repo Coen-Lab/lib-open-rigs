@@ -16,7 +16,7 @@ Devices with no recipe, or whose data the workflow does not publish, are skipped
 - `elapsed`: seconds since the session folder appeared (`PathPrefix`, from OpenRigs.Logging), once a second.
 - `liveview`: every 5 s, the workflow running (its path within its repository, the project, origin URL, branch, commit, whether tracked files differ from it) and the streams sent, the devices skipped and why, and any problem with rig.yml. The workflow is found as coen-behaviour-box's session manifest finds it, so the two name the same commit.
 
-Every message carries the rig's name and the session key, `ready` until `PathPrefix` names the session folder and then that folder's last two names (`sub-<SubjectId>/ses-<SessionId>_date-<start>`). A workflow without `PathPrefix` keeps `ready` and sends no `elapsed`.
+Every message carries the rig's name and the session key, `ready` until `PathPrefix` names the session folder and then that folder's last two names (`sub-<SubjectId>/ses-<SessionId>_<start>`). A workflow without `PathPrefix` keeps `ready` and sends no `elapsed`.
 
 ## Changing a Device's Rates in rig.yml
 

@@ -11,7 +11,7 @@ This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (bra
 | [`OpenRigs.HarpDevices`](src/OpenRigs.HarpDevices/README.md) | `RecordHarpDevices` checks every Harp device in rig.yml at Start by its `usbSerial`, and writes each device's registers and register map into each session |
 | [`OpenRigs.LiveView`](src/OpenRigs.LiveView/README.md) | `StreamDevices` streams every device in rig.yml that the workflow publishes, with the workflow's repository and commit |
 | `src/Shared/` | Code compiled into LiveView, Manifest and HarpDevices as internal code, so none depends on another |
-| `local_packages/` | One `.nupkg` per package: the four above, the patched `OpenRigs.Core`, `Devices`, `Logging`, `Streaming`, `Video` `0.1.0-bbox.1`, and `Bonsai.FFmpeg` `0.2.0-uniquepipe` ([`patches/README.md`](patches/README.md), licences in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)) |
+| `local_packages/` | One `.nupkg` per package: the four above, the patched `OpenRigs.Core`, `Devices`, `Video` `0.1.0-bbox.1` and `Logging`, `Streaming` `0.1.0-bbox.2` (session folders `ses-<Session>_<DateTime>`, ucl-open/roadmap#37), and `Bonsai.FFmpeg` `0.2.0-uniquepipe` ([`patches/README.md`](patches/README.md), licences in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)) |
 
 They moved here from coen-openrigs-custom on 2 Nov 2026.
 

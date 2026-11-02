@@ -13,7 +13,7 @@ All data for one session MUST be written under a single session directory:
 ```
 <Root>/
 └── sub-<Subject>/
-    └── ses-<Session>_date-<DateTime>/
+    └── ses-<Session>_<DateTime>/
         ├── <Device>/
         │   ├── <Device>_<DateTime>.<extension>
         │   └── ...
@@ -26,7 +26,7 @@ All data for one session MUST be written under a single session directory:
 |---|---|
 | `<Root>` | Rig-local data root, configured on `LogController` (`Path`). |
 | `sub-<Subject>` | Subject identifier (`SubjectId`). |
-| `ses-<Session>_date-<DateTime>` | Session identifier (`SessionId`) plus the session start time. `<DateTime>` is UTC, ISO 8601 basic form with `:` replaced by `-`, seconds resolution (for example `2026-09-10T13-27-15`). |
+| `ses-<Session>_<DateTime>` | Session identifier (`SessionId`) plus the session start time. `<Session>` is the lab's own, set by its launcher; this spec does not define it. `<DateTime>` is UTC, ISO 8601 basic form with `:` replaced by `-`, seconds resolution (for example `2026-09-10T13-27-15`). |
 | `<Device>` | One directory per logged device or data stream. The name is the logger's `Name` property, up to the first underscore. |
 
 The session directory is the unit of a dataset. Everything needed to interpret the data MUST live inside it (see sections 5 and 6).
@@ -53,11 +53,11 @@ Rules:
 Examples:
 
 ```
-sub-Algernon/ses-001_date-2026-09-10T13-27-15/Behavior/Behavior_2026-09-10T13-00-00.bin
-sub-Algernon/ses-001_date-2026-09-10T13-27-15/Behavior/Behavior_32_2026-09-10T13-00-00.bin
-sub-Algernon/ses-001_date-2026-09-10T13-27-15/Camera0/Camera0_2026-09-10T13-00-00.avi
-sub-Algernon/ses-001_date-2026-09-10T13-27-15/Camera0/Camera0_2026-09-10T13-00-00.csv
-sub-Algernon/ses-001_date-2026-09-10T13-27-15/LickSpout/LickSpout_2026-09-10T14-00-00.csv
+sub-Algernon/ses-001_2026-09-10T13-27-15/Behavior/Behavior_2026-09-10T13-00-00.bin
+sub-Algernon/ses-001_2026-09-10T13-27-15/Behavior/Behavior_32_2026-09-10T13-00-00.bin
+sub-Algernon/ses-001_2026-09-10T13-27-15/Camera0/Camera0_2026-09-10T13-00-00.avi
+sub-Algernon/ses-001_2026-09-10T13-27-15/Camera0/Camera0_2026-09-10T13-00-00.csv
+sub-Algernon/ses-001_2026-09-10T13-27-15/LickSpout/LickSpout_2026-09-10T14-00-00.csv
 ```
 
 ## 3. Chunking (GroupByTime)

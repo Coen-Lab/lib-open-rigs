@@ -2,7 +2,7 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core, Devices, Logging, Streaming, Video 0.1.0-bbox.1
+## OpenRigs.Core, Devices, Video 0.1.0-bbox.1; Logging, Streaming 0.1.0-bbox.2
 
 Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), from this repository's own `src\`: upstream branch `rig-config-resolver` at `3788bfb` (main plus the per-machine config operators `ResolveRigConfigDirectory`, `ReadRigConfig` and `ResolveRigFile`) and two fixes, both reported upstream, which are commits on this repository's `main`:
 
@@ -10,6 +10,8 @@ Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), 
 |---|---|---|
 | `8deeb9c` | `TriggeredSpinnaker` records a cropped frame when the camera's stored region is smaller than the sensor: the region is reset to full frame after binning | ucl-open/ucl-open#66 |
 | `ee4a8a4` | Bonsai crashes when a frame waits in the Zip, because `ChunkData` is read after Spinnaker releases the image: the five chunk fields are copied inside the camera callback. This changes only the `OpenRigs.Devices` `TriggeredSpinnaker` include; the `OpenRigs.Video.TriggeredSpinnaker` operator already copies `FrameID` and `Timestamp` before the Zip | ucl-open/ucl-open#67 |
+
+Logging and Streaming 0.1.0-bbox.2 (2 Nov 2026) also name the session folder `ses-<Session>_<DateTime>`, without `date-`, as agreed on ucl-open/roadmap#37: `LogController` writes it, and `StreamController`'s session key matches it. The time is still UTC. They have a `<Version>` in their `.csproj`, so `scripts\build-package.ps1` builds them.
 
 The packages as committed were built from the same source as patches, in coen-openrigs-custom before it moved here. To rebuild, raise the version (a rebuild is a different file even from the same source, as nupkg hashes are not deterministic), delete the old `.nupkg` files and run:
 
@@ -19,14 +21,14 @@ foreach ($p in 'Core','Devices','Logging','Streaming','Video') {
 }
 ```
 
-SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on 28 Oct 2026; Streaming on 30 Oct 2026):
+SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on 28 Oct 2026; Logging and Streaming bbox.2 on 2 Nov 2026):
 
 ```
 8d08926fadd8bcff1c9450c663ec81a8f11b644bcdbbb7204fdef9d729666ef9  OpenRigs.Core.0.1.0-bbox.1.nupkg
 82ae3d13854ff68010ba59c81d65f6d9be7d0039fc39a2912f3c8ca567c9cbca  OpenRigs.Devices.0.1.0-bbox.1.nupkg
-890852b421dad5438ec67082e61f51785090a7c0e1ec829309c918b11ca18a20  OpenRigs.Logging.0.1.0-bbox.1.nupkg
+78074525e8228158268f6dd302d39595f76ab4bf027f335cc89cbb25ca2a0463  OpenRigs.Logging.0.1.0-bbox.2.nupkg
 26b0e832a0b4bd83adf8533cf62c12f6995b9b8a6761c604cd62b6522661fe2a  OpenRigs.Video.0.1.0-bbox.1.nupkg
-3926eb366c51c4197ac28f6eb8aa338cdd698bc6cc5f60f2335ad1ff16f57f4b  OpenRigs.Streaming.0.1.0-bbox.1.nupkg
+bd7fd1177f3ce29f35c90072eb1ac800e04314bf5a8bf2556a729a79be70c462  OpenRigs.Streaming.0.1.0-bbox.2.nupkg
 ```
 
 `OpenRigs.Streaming` is upstream's `src/OpenRigs.Streaming` at the base commit, unchanged by either patch. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.

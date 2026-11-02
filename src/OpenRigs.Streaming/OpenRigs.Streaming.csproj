@@ -4,6 +4,7 @@
     <Description>OpenRigs Streaming Bonsai library. Streams live experiment telemetry over ZeroMQ, and receives it on a remote machine.</Description>
     <PackageTags>$(PackageTags) Streaming</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
+    <Version>0.1.0-bbox.2</Version>
   </PropertyGroup>
 
   <ItemGroup>
