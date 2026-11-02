@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A console harness, as src\OpenRigs.Manifest.Tests: dotnet run (two dashes)project src\OpenRigs.Control.Tests -->
+  <!-- An XML comment cannot hold two dashes in a row, hence the words above. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
+  </ItemGroup>
+
+</Project>

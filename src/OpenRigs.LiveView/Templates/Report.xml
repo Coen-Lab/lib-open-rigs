@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The workflow running and the devices streamed and skipped, every 5 s, as the liveview stream. -->
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:ReportLiveView">
+          <lv:Streamed>{{Streamed}}</lv:Streamed>
+          <lv:Skipped>{{Skipped}}</lv:Skipped>
+          <lv:Notes>{{Notes}}</lv:Notes>
+          <lv:Interval>PT5S</lv:Interval>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
+        <StreamName>liveview</StreamName>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

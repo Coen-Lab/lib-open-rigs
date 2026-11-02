@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>OpenRigs Control Bonsai library. Holds a workflow in a ready state, answers commands from a controller over ZeroMQ, and releases the session on Go.</Description>
+    <PackageTags>$(PackageTags) Control</PackageTags>
+    <TargetFrameworks>net472</TargetFrameworks>
+    <Version>0.1.0-local.9</Version>
+    <!-- Every public type and member is documented: the summaries are what the Bonsai editor shows. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="**\*.bonsai" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bonsai.Core" Version="2.9.0" />
+    <PackageReference Include="NetMQ" Version="4.0.1.12" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

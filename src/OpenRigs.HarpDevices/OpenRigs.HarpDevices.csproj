@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>OpenRigs HarpDevices Bonsai library. One node, RecordHarpDevices, checks every Harp device in the machine's rig.yml at Start by its board's USB serial, and writes each device's registers (WhoAmI, versions, serials) and register map into each session folder, asking the device for a register dump when the session starts.</Description>
+    <PackageTags>$(PackageTags) Harp Logging</PackageTags>
+    <TargetFrameworks>net472</TargetFrameworks>
+    <Version>0.1.0-local.2</Version>
+    <!-- Every public type and member is documented: the summaries are what the Bonsai editor shows. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- src\OpenRigs.HarpDevices.Tests reads the plan and the USB serial parsing, which are internal. -->
+    <InternalsVisibleTo Include="OpenRigs.HarpDevices.Tests" />
+  </ItemGroup>
+
+  <!-- The subjects published, rig.yml's devices and the JSON writer, read and written as
+       OpenRigs.Manifest does: compiled into each, internal to each. -->
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bonsai.Core" Version="2.9.0" />
+    <PackageReference Include="Bonsai.Harp" Version="3.6.1" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+</Project>

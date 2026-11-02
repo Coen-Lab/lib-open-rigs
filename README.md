@@ -1,5 +1,7 @@
 # open-rigs
 
+> **Coen-Lab/lib-open-rigs** is the Coen Lab's fork: its `main` is what every lab workflow runs. See [`COEN-LAB.md`](COEN-LAB.md).
+
 Repository for the open-rigs ecosystem: shared rig schemas (Python), Bonsai acquisition operators (.NET), and a Copier template used to scaffold new experiment repositories.
 
 Full documentation, including tutorials and API reference, is published at **https://open-rigs.github.io/open-rigs** (deployed on release).

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:p1="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="SubjectId" DisplayName="SubjectId" Description="The subject (mouse) ID." />
+        <Property Name="SessionId" DisplayName="SessionId" Description="The session ID." />
+        <Property Name="ConnectionString" DisplayName="ControlEndpoint" Description="Where the controller connects. @ binds, > connects. Local only by default: the rig agent relays." />
+        <Property Name="Parameters" DisplayName="Parameters" Description="Settings a controller may change until Go, with their defaults; read with ParameterValue." />
+        <Property Name="Commands" DisplayName="Commands" Description="Commands a controller may send while ready or recording; taken with OnCommand." />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:ControlServer">
+          <p1:ConnectionString>@tcp://127.0.0.1:5561</p1:ConnectionString>
+          <p1:SubjectId />
+          <p1:SessionId />
+          <p1:Parameters />
+          <p1:Commands />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:OnGo" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>1</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>SessionGo</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

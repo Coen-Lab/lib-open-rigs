@@ -1,0 +1,55 @@
+# OpenRigs.Manifest
+
+One node, `SessionManifest`, that writes `manifest.json` into each session folder: what ran, from which commit, with which settings and configuration, what it had to leave, how the run ended, and every file it left. A workflow drops it in once, after `LogController`; nothing has to be wired to it.
+
+The format is [`FORMAT.md`](FORMAT.md), version 2. rig-setup's overnight copy (rig-sync) finishes each manifest with sizes and hashes before the session goes to the server. Every manifest names the package and version that wrote it (`writer`, since 0.1.0-local.10).
+
+## What It Finds by Itself
+
+| What | From | Without it |
+|------|------|------------|
+| The session folder | the `PathPrefix` subject, OpenRigs.Logging's `LogController` | The workflow does not build: SessionManifest says to put it after LogController. |
+| Settings at Go | OpenRigs.Control's `SessionControl`: subject, session and every parameter as it stood at Go, and who launched the session, sent Go and stopped it, as the controller named them (`launched_by`, `go_by`, `stopped_by`: `id` and `name`, or null; since 0.1.0-local.5, with Control 0.1.0-local.9) | No `control` section. |
+| How the run ended | OpenRigs.Control's phase when the workflow stops: a run that reported `Finished` is `completed`, even when the controller stops it afterwards (rig-control does, after every run); a controller stop before that is `stopped`, with the stop's reason | `stopped` |
+| Launch | Bonsai's command line: every argument, and each `--property:Name=Value` (or `-p:`) by name | |
+| Source | the workflow file's repository: origin, branch, commit, whether tracked files differ, and when they do which files and a sha256 of `git diff HEAD` (`changed`, `diff_sha256`; since 0.1.0-local.10) | The editor's File, Open passes no file: the working directory's repository, which Bonsai sets to the workflow's folder. |
+| What the session must leave | rig.yml (the one in `ConfigFiles`) and the subjects the workflow publishes, as `StreamDevices` finds devices: each device entry (`camera: box:`, named `Camera-Box`) whose subject is published before this node, as `Camera-Box` or `Camera-Box.Data`, must leave a folder `Camera-Box/` with at least one file, which is where OpenRigs.Logging logs it. With `harp` in `ExpectedFiles` (since 0.1.0-local.8), each Harp device (a `portName` in rig.yml that is not `null`, `BehaviorBoard-Main.Data` published as `HarpMessage`: `src\Shared\HarpRig.cs`, the rule `RecordHarpDevices` uses) must also leave the files OpenRigs.HarpDevices' `RecordHarpDevices` writes, `BehaviorBoard-Main/BehaviorBoard-Main_device.json` and, when a Harp package loaded in the workflow has the kind's WhoAmI (0.1.0-local.9), `BehaviorBoard-Main/BehaviorBoard-Main.yml`, which do not count towards the folder's own file | A note naming each device not expected, and each register map not expected, and why. |
+
+## Expected Files
+
+`files` lists what is in the folder when the run ends, so a device that never wrote anything is simply absent from it. `expected` says what had to be there: each entry with its path, why it is expected, and `found`, the number of files matching it at that write. rig-sync refuses to copy a session whose expected entry left no file, and raises an alarm naming it, as it does for a listed file that has gone. On GEEK-BBOX1 (1 Nov 2026) a run whose board stopped answering at Start left `BehaviorBoard-Main/` with `found: 0`; its `files` had only the camera's two.
+
+## Settings
+
+| Property | Default | |
+|----------|---------|-|
+| `ConfigFiles` | `C:\Coen-Lab-Local\RigConfigs\%COMPUTERNAME%\rig.yml` | The configuration files the workflow runs with, separated by `;`. Each is read **once, at Start**, and named in the manifest by its path and sha256, so the manifest says which file ran even if it is edited during the run. Environment variables are expanded; a relative path is from the workflow's repository (`schemas\session.yml`). A missing file is noted, not an error. It cannot follow a `--property:ConfigRoot` given at launch; when the rig.yml here is not under that ConfigRoot, a note says so. |
+| `ExpectedFiles` | `auto` | What the session must leave, separated by `;`: a path in the session folder, a folder ending in `/`. `auto` stands for each device's folder, found as above; `harp` for each Harp device's record and register map, for a workflow with `RecordHarpDevices` (a word, not found from that node: Bonsai may build `SessionManifest` first, whatever their order in the workflow); `auto;events.csv` adds a file; blank expects nothing. No wildcards: an entry holding `*` or `?` is left out, with a note. |
+| `IngestScript` | blank | The server's ingest script for this kind of data, as the server's registry names it. |
+
+## The Optional Input: the Run
+
+A sequence connected to it is the run: its completion is `completed`, its error is `error` with the error's message, and its elements are counted as `run.items`. Connect one when the run's end is something the controller's phase does not see, such as a Watchdog error on the frames being recorded: the node cannot see an error raised elsewhere in the workflow. Without one, a workflow under SessionControl that stops in any other way (an error elsewhere, the editor's Stop) is recorded as `ended-early`, with a note that Bonsai's output has the cause.
+
+## When It Writes
+
+1. When `PathPrefix` names the folder: `status partial`, `run.outcome running`. It makes the folder if no logger has yet. A write that fails stops the workflow with that error, as any node's error does: a session with no record is the thing to stop for. (Before 0.1.0-local.3 the error was thrown back up the thread that named the folder, ControlServer's after Go, which closed Bonsai with nothing finished.)
+2. When the run ends (the input completes or fails, or the workflow stops): the outcome, the time, and every file then in the folder.
+
+Each write is `manifest.json.tmp`, then a rename over the old one, so no reader sees half a file or none. A workflow stopped before `PathPrefix` (ready mode, no Go) writes nothing: nothing was recorded.
+
+## Things to Know
+
+- **After LogController.** Bonsai knows only the subjects built before a node, so `SessionManifest` goes after the node holding `LogController`, at the same level or inside it.
+- **Its settings live inside it**, in a `SessionManifestSettings` node, as `StreamDevices`' do: Bonsai copies a group when the editor opens a workflow and keeps only its inner workflow. Set them on `SessionManifest`.
+- **Bonsai internals.** Finding `PathPrefix` asks Bonsai's internal build context by reflection, as Bonsai's own `SubscribeSubject` does (written against Bonsai.Core 2.9.0).
+
+## Needs
+
+`Bonsai.Core` and `YamlDotNet`, and in the workflow `OpenRigs.Logging`'s `LogController`. Not `OpenRigs.Control` (since 0.1.0-local.4): when the workflow has SessionControl, the manifest reads its session (`ControlState.Current`) by name, so a workflow can have the manifest without the controller's package. The tests run against the real `ControlState` and fail if a member it reads is renamed there.
+
+## Tested
+
+`dotnet run --project src\OpenRigs.Manifest.Tests` runs the writer, the recorder and the editor's copy of the node against a temporary folder, with no hardware and no Bonsai editor: exit 0 when every check passes.
+
+On GEEK-BBOX1, 1 Nov 2026, in coen-behaviour-box (inside `Logging`, the frames recorded as its input) through rig-control: a 1-min run left `completed`, 3000 items, `control.parameters.RunLengthMins` 1, the `--property` values, rig.yml with its hash, and both device folders found; a controller stop at 20 s left `stopped` with the stop's reason; a run whose board did not answer left `ended-early` and `BehaviorBoard-Main/` found 0, which rig-sync's decision turned into an alarm. Headless with no SessionControl and no hardware: a run input completing gave `completed`, none gave `stopped`, a relative config path resolved from the repository, and a missing one was noted.

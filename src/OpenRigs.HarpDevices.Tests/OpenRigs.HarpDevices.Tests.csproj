@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A console harness, not a test framework, as the other packages': it runs on a rig with
+       nothing installed but the .NET SDK: dotnet run (two dashes)project src\OpenRigs.HarpDevices.Tests -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenRigs.HarpDevices\OpenRigs.HarpDevices.csproj" />
+    <!-- Not a dependency of the package: a real Harp package, whose register map the record finds by WhoAmI. -->
+    <PackageReference Include="Harp.Behavior" Version="0.2.0" />
+  </ItemGroup>
+
+</Project>

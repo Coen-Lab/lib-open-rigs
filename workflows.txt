@@ -1,0 +1,6 @@
+# Lab Bonsai workflows that are not (yet) on rig-setup, kept on the lab's packages by
+# scripts\update-workflows.ps1 as well as every repository rig-setup has, for any profile.
+# One per line: <org>/<repo> as on GitHub, then any branches besides main to keep too,
+# separated by spaces (rig-setup's own repositories take theirs from the branches ticked there).
+# Only a Bonsai project in the open-rigs layout (.bonsai\Bonsai.config and src\main.bonsai at
+# the root) is updated; any other is listed as "not Bonsai".

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>OpenRigs LiveView Bonsai library. One node, StreamDevices, streams every device in the machine's rig.yml that the workflow publishes, at fixed rates per device kind that rig.yml can override, over OpenRigs.Streaming's ports.</Description>
+    <PackageTags>$(PackageTags) Streaming LiveView</PackageTags>
+    <TargetFrameworks>net472</TargetFrameworks>
+    <Version>0.1.0-local.5</Version>
+    <!-- Every public type and member is documented: the summaries are what the Bonsai editor shows. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- The inner workflows StreamDevices builds from. Not .bonsai, so they do not show in the
+       toolbox as includes with {{placeholders}} in them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Templates\*.xml" />
+    <!-- src\OpenRigs.LiveView.Tests reads the plan (LiveViewPlan), which is internal. -->
+    <InternalsVisibleTo Include="OpenRigs.LiveView.Tests" />
+  </ItemGroup>
+
+  <!-- The workflow's commit, the subjects published and rig.yml's devices, read as
+       OpenRigs.Manifest reads them: compiled into both, internal to each. -->
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bonsai.Core" Version="2.9.0" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+</Project>

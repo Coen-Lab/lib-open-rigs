@@ -1,0 +1,150 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Reactive;
+using System.Reactive.Linq;
+using Bonsai;
+using Bonsai.Expressions;
+using OpenRigs.Shared;
+
+namespace OpenRigs.Manifest
+{
+    /// <summary>
+    /// Writes manifest.json into each session folder, with nothing wired to it. At build it finds
+    /// the PathPrefix subject (OpenRigs.Logging's LogController), so it goes after LogController.
+    /// At Start it reads the configuration files and the launch; when PathPrefix names the folder
+    /// it writes the manifest (status partial, outcome running), and again when the run ends.
+    /// One input may be connected, the run: its completion means completed, its error is the
+    /// run's error, and its elements are counted. Without it the end is read from
+    /// OpenRigs.Control's phase when SessionControl is in the workflow.
+    /// </summary>
+    [DefaultProperty(nameof(ConfigFiles))]
+    [TypeDescriptionProvider(typeof(SessionManifestTypeDescriptionProvider))]
+    [WorkflowElementCategory(ElementCategory.Sink)]
+    [Description("Writes manifest.json into the session folder (PathPrefix) when it appears and when the run ends: rig, workflow commit, launch, settings at Go, config files as loaded at Start, outcome and every file. Put it after LogController. An input, if connected, is the run: its completion, error and element count.")]
+    public class SessionManifest : GroupWorkflowBuilder
+    {
+        /// <summary>The subject LogController publishes the session folder's path under.</summary>
+        public const string PathSubject = "PathPrefix";
+
+        /// <summary>Initializes a new instance of the <see cref="SessionManifest"/> class.</summary>
+        public SessionManifest()
+        {
+        }
+
+        /// <summary>
+        /// Initializes a copy with the given inner workflow. Bonsai copies a group by this
+        /// constructor (the editor's working copy, the player's when it shows a layout, every
+        /// save), passing only the Name, Description and inner workflow, so the settings live in
+        /// that workflow (SessionManifestSettings), as StreamDevices' do.
+        /// </summary>
+        /// <param name="workflow">The inner workflow to copy.</param>
+        public SessionManifest(ExpressionBuilderGraph workflow)
+            : base(workflow)
+        {
+        }
+
+        /// <summary>Gets or sets the name of the server's ingest script for this kind of data.</summary>
+        [Description("The name of the server's ingest script for this kind of data, as the server's registry has it. Blank: the server runs nothing but the copy.")]
+        public string IngestScript
+        {
+            get { return Settings.IngestScript; }
+            set { Settings.IngestScript = value; }
+        }
+
+        /// <summary>Gets or sets the configuration files the workflow runs with, separated by ;.</summary>
+        [Description("The configuration files the workflow runs with, separated by ;. Each is read once at Start and copied into the manifest with its sha256, so the manifest has them as loaded. Environment variables are expanded (%COMPUTERNAME%); a relative path is from the workflow's repository. A missing file is noted, not an error.")]
+        public string ConfigFiles
+        {
+            get { return Settings.ConfigFiles; }
+            set { Settings.ConfigFiles = value; }
+        }
+
+        /// <summary>Gets or sets what the session must leave, separated by ;, or auto.</summary>
+        [Description("What the session must leave, separated by ;: a path in the session folder, a folder ending in /. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. rig-sync alarms on an entry that left no file. Blank: nothing expected.")]
+        public string ExpectedFiles
+        {
+            get { return Settings.ExpectedFiles; }
+            set { Settings.ExpectedFiles = value; }
+        }
+
+        SessionManifestSettings Settings
+        {
+            get { return GroupNode.Settings<SessionManifestSettings>(Workflow); }
+        }
+
+        /// <summary>Gets the range of inputs: none, or one, the run.</summary>
+        public override Range<int> ArgumentRange
+        {
+            get { return Range.Create(0, 1); }
+        }
+
+        /// <summary>
+        /// Builds the recorder on PathPrefix and the run. The inner workflow holds only the
+        /// settings and is not built: the node subscribes to PathPrefix itself, as
+        /// SubscribeSubject does, through the enclosing build context.
+        /// </summary>
+        /// <param name="arguments">The run, if one is connected.</param>
+        /// <returns>The manifest's path, once it is written.</returns>
+        public override Expression Build(IEnumerable<Expression> arguments)
+        {
+            var path = GroupNode.Subject(this, PathSubject);
+            if (path == null)
+            {
+                throw new InvalidOperationException("SessionManifest found no " + PathSubject + " subject. It names the session folder and comes from OpenRigs.Logging's LogController: put SessionManifest after LogController, at the same level or below it.");
+            }
+            var pathType = GroupNode.ObservedType(path.Type);
+            if (pathType != typeof(string))
+            {
+                throw new InvalidOperationException("SessionManifest needs " + PathSubject + " to be a string, the session folder's path; this workflow's is " + pathType + ".");
+            }
+            var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles), name => GroupNode.PublishedType(this, name));
+            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, expected));
+            var observablePath = Expression.Convert(path, typeof(IObservable<string>));
+            var run = arguments.FirstOrDefault();
+            if (run == null)
+            {
+                return Expression.Call(recorder, nameof(ManifestRecorder.Process), null, observablePath);
+            }
+            var runType = GroupNode.ObservedType(run.Type);
+            return Expression.Call(recorder, nameof(ManifestRecorder.Process), new[] { runType }, observablePath, run);
+        }
+
+    }
+
+    /// <summary>
+    /// SessionManifest's settings, kept as a node in its inner workflow so that they survive
+    /// Bonsai's copies of the group. Set them on SessionManifest; this node builds to nothing.
+    /// </summary>
+    [Description("SessionManifest's settings (IngestScript, ConfigFiles, ExpectedFiles), kept here so Bonsai's copies of the group keep them. Set them on SessionManifest.")]
+    public class SessionManifestSettings : ZeroArgumentExpressionBuilder
+    {
+        /// <summary>Gets or sets SessionManifest's IngestScript.</summary>
+        public string IngestScript { get; set; }
+
+        /// <summary>Gets or sets SessionManifest's ConfigFiles.</summary>
+        public string ConfigFiles { get; set; } = @"C:\Coen-Lab-Local\RigConfigs\%COMPUTERNAME%\rig.yml";
+
+        /// <summary>Gets or sets SessionManifest's ExpectedFiles.</summary>
+        public string ExpectedFiles { get; set; } = ExpectedPlan.Auto;
+
+        /// <summary>Builds to an empty sequence: the node only holds the settings.</summary>
+        /// <param name="arguments">None.</param>
+        /// <returns>An empty sequence.</returns>
+        public override Expression Build(IEnumerable<Expression> arguments)
+        {
+            return Expression.Constant(Observable.Empty<Unit>(), typeof(IObservable<Unit>));
+        }
+    }
+
+    // SessionManifest's own settings in the Properties panel: its inner workflow externalizes nothing.
+    class SessionManifestTypeDescriptionProvider : ShownPropertiesProvider
+    {
+        public SessionManifestTypeDescriptionProvider()
+            : base("IngestScript", "ConfigFiles", "ExpectedFiles")
+        {
+        }
+    }
+}

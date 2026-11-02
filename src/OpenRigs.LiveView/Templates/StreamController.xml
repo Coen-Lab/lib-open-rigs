@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OpenRigs.Streaming's StreamController (open-rigs 77094a4), with the session key taken from
+     the session folder (PathPrefix, through SessionKey) rather than from a date of its own, as
+     coen-behaviour-box had it inline. StreamDevices removes nodes 1 and 2 when the workflow
+     publishes no PathPrefix, leaving the key "ready". -->
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:zmq="clr-namespace:Bonsai.ZeroMQ;assembly=Bonsai.ZeroMQ"
+                 xmlns:netmq="clr-namespace:NetMQ;assembly=NetMQ"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="StringProperty">
+          <Value>ready</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PathPrefix</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:SessionKey" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="StringProperty">
+          <Value>{{RigId}}</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:CombineLatest" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:DistinctUntilChanged" />
+      </Expression>
+      <Expression xsi:type="rx:ReplaySubject">
+        <Name>StreamIdentity</Name>
+        <rx:BufferSize>1</rx:BufferSize>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="netmq:NetMQMessage">
+        <rx:Name>DataMessage</rx:Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:ObserveOn">
+          <rx:Scheduler>NewThreadScheduler</rx:Scheduler>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zmq:Publisher">
+          <zmq:ConnectionString>@tcp://0.0.0.0:{{DataPort}}</zmq:ConnectionString>
+          <zmq:Topic />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="netmq:NetMQMessage">
+        <rx:Name>VideoMessage</rx:Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:ObserveOn">
+          <rx:Scheduler>NewThreadScheduler</rx:Scheduler>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zmq:Publisher">
+          <zmq:ConnectionString>@tcp://0.0.0.0:{{VideoPort}}</zmq:ConnectionString>
+          <zmq:Topic />
+        </Combinator>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="3" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source2" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="3" To="5" Label="Source2" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

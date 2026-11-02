@@ -1,0 +1,37 @@
+# OpenRigs.HarpDevices
+
+One node, `RecordHarpDevices`, that checks every Harp device on a rig at Start and records it into each session, with nothing typed per device: everything comes from the rig's `rig.yml`. A workflow drops it in once, after its devices and `LogController`, and adds `harp` to `SessionManifest`'s `ExpectedFiles`.
+
+## What It Does for Each Device
+
+A Harp device is a device entry in rig.yml (`behaviorBoard: main:`, named `BehaviorBoard-Main`) with a `portName`, whose data the workflow publishes as `HarpMessage` under `BehaviorBoard-Main.Data`. For each one, the node adds a group to its own inner workflow, remade from rig.yml each time the workflow is built, that:
+
+1. **At Start, checks the board.** The board on `portName` must have the USB serial rig.yml gives it as `usbSerial`: an FTDI chip's (`AB0M7PLB`, every Harp board in the lab) or a Pico's flash id (`E664C856C3913E37`), read as rig-setup's nightly scan reads them, so the value to put in rig.yml is the one the rig's scan (`K:\config\<RIG>\<RIG>_HardwareDetails.json`, `serialPorts`) lists. If it does not, the workflow stops, saying what is plugged in where: `COM3 holds the board AQ03WRBO, but rig.yml behaviorBoard: main: (BehaviorBoard-Main) is the board AB0M7PLB, which is on COM5: correct portName in rig.yml, or put the cables back.` An entry with no `usbSerial` stops it too, giving the line to add.
+2. **When the session folder appears, asks for a register dump** (`RequestRegisterDump`, 0.5 s after `PathPrefix`), on `BehaviorBoard-Main.Commands`, so the session's logs hold every register's value at its start. The dump Bonsai.Harp asks for when it opens the port comes before the session folder exists. It reads OperationControl and writes it back with only `DumpRegisters` set, so the device's other settings stay as they were. With no `.Commands` subject, nothing is asked for and the build notes it. This goes when open-rigs logs the dump itself ([open-rigs#9](https://github.com/open-rigs/open-rigs/issues/9)).
+3. **Writes `BehaviorBoard-Main/BehaviorBoard-Main_device.json`** once that dump has finished: the port, the USB serial, and the registers the device reported in the dump: WhoAmI, hardware, assembly, core and firmware versions, its Harp serial number and device name, and its unique id on a core from 1.12. The dump has finished when FirmwareVersionLow (register 7) has come and then no register for 0.2 s: a board sends each core register followed by one of its own (`0 32 1 33 … 7 39 … 12 44 13 …`, GEEK-BBOX1's on 2 Nov 2026), so the device name (12), Harp serial (13) and unique id (16) come after 7. Before 0.1.0-local.2 the record was written at 7 and took those three from the dump at connection, or left them null. With no dump within 5 s, or none asked for (no `.Commands`), it writes what the device reported when its port opened, with `"dumped": false` and a note saying which.
+4. **Writes `BehaviorBoard-Main/BehaviorBoard-Main.yml`**, the device's register map: the `device.yml` of the Harp package loaded in the workflow whose `WhoAmI` the device reported (`Harp.Behavior` for 1216), so the map is the one that decoded the data. With none loaded, the record says so and no map is written, and `SessionManifest` does not expect one.
+5. **Stops the workflow if the board is of the wrong kind**: when the WhoAmI it reports is not its kind's (`behaviorBoard` 1216, `timestampGeneratorGen3` 1158, `cameraControllerGen2` 1170, `clockSynchronizer` 1152, `stepperDriver` 1130, `hobgoblin` 123, as open-rigs' `devices\harp.py`). Found from the dump at connection, it stops the workflow then, before Go (since 0.1.0-local.2); found from a session's dump, after the record is written. A kind not in that list is recorded with its WhoAmI unchecked.
+6. **Publishes the record's path as `BehaviorBoard-Main.Identity`**, for any node that wants it.
+
+`SessionManifest` (OpenRigs.Manifest 0.1.0-local.8 on) expects these files for each Harp device when its `ExpectedFiles` holds `harp` (`auto;harp`), so rig-sync holds back a session missing one: the record always, the register map only when a loaded Harp package has the kind's WhoAmI (0.1.0-local.9; before, a Lickety Split or any kind with no package was expected to leave a map it never writes, and every one of its sessions was held back). Which entries are Harp devices is one rule, `src\Shared\HarpRig.cs`, compiled into both packages: a `portName` that is not empty or `null`, and `<Name>.Data` published as `HarpMessage`. It is decided from rig.yml and the subjects, not from this node: Bonsai may build `SessionManifest` first, whatever their order in the workflow (a node fed from one built earlier is built sooner, measured 2 Nov 2026), so a subject this node publishes cannot be relied on there.
+
+## Settings
+
+| Property | Default | |
+|----------|---------|-|
+| `ConfigRoot` | `C:\Coen-Lab-Local\RigConfigs` | The root under which each machine has its own `<MACHINE-NAME>\rig.yml`, as `StreamDevices`' setting. Read when the workflow is built. |
+
+## Things to Know
+
+- **Name the command subject `<Name>.Commands`.** The OpenRigs.Devices includes take it as `CommandsSubjectName`; a workflow that names it otherwise gets no dump at the session's start.
+- **After the devices.** Bonsai knows only the subjects built before a node, so the node goes after the groups holding the devices and `LogController`.
+- **Its settings live inside it**, as `StreamDevices`' and `SessionManifest`'s do: Bonsai copies a group when the editor opens a workflow and keeps only its inner workflow.
+- **Windows only.** The USB serial is read with WMI and cfgmgr32, and each port's name from the registry's `Device Parameters\PortName`, as rig-setup reads it (since 0.1.0-local.2; the display name's `(COM3)` when there is none).
+
+## Needs
+
+`Bonsai.Core`, `Bonsai.Harp` and `YamlDotNet`; in the workflow, a Harp package for each kind of board (its register map), `OpenRigs.Logging`'s `LogController` and the devices' subjects as above.
+
+## Tested
+
+`dotnet run --project src\OpenRigs.HarpDevices.Tests` checks the USB serial parsing on the ids rig-setup's scan met (an FTDI chip, a Pico, an id Windows made up, a motherboard COM1) and this machine's own ports, the board check's every refusal, the record and register map from fake device messages (the values GEEK-BBOX1's board reported on 2 Nov 2026), a dump in that board's interleaved order recorded whole, the timeout, no dump asked for, a board of the wrong kind before and after Go, a `portName: null`, the dump request, the plan from a rig.yml, and a workflow built with the node in it, a node after it subscribing to `.Identity`, through the editor's copy, a save and a reload: exit 0 when every check passes. coen-behaviour-box's `check-workflow.ps1` builds its whole workflow with it against a filled-in rig.yml. Not yet run on a rig.
