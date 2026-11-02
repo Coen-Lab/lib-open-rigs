@@ -17,23 +17,30 @@ namespace OpenRigs.Video
             Binning = 1;
         }
 
-        // The open camera, so a new exposure or gain (a PropertyMapping while ready) is written
-        // to it straight away; null until Configure, and when the camera is closed.
-        readonly object gate = new object();
-        IManagedCamera openCamera;
-        double exposureTime;
-        double gain;
+        // SpinnakerCapture opens and configures the camera on a MemberwiseClone of this node, while
+        // a PropertyMapping sets this node itself. Exposure, gain and the open camera live in one
+        // object both share, so a new exposure or gain while ready is written to the camera
+        // straight away, and one set while the camera opens is the one it opens with.
+        class LiveSettings
+        {
+            public double ExposureTime;
+            public double Gain;
+            // Null until Configure, and when the camera is closed.
+            public IManagedCamera Camera;
+        }
+
+        readonly LiveSettings live = new LiveSettings();
 
         [Description("The duration of each individual exposure, in microseconds. In general, this should be 1 / frameRate - 1 millisecond to prepare for next trigger. Taken live by an open camera.")]
         public double ExposureTime
         {
-            get { return exposureTime; }
+            get { return live.ExposureTime; }
             set
             {
-                lock (gate)
+                lock (live)
                 {
-                    exposureTime = value;
-                    if (IsOpen()) openCamera.ExposureTime.Value = value;
+                    live.ExposureTime = value;
+                    if (IsOpen()) live.Camera.ExposureTime.Value = value;
                 }
             }
         }
@@ -41,13 +48,13 @@ namespace OpenRigs.Video
         [Description("The gain of the sensor. Taken live by an open camera.")]
         public double Gain
         {
-            get { return gain; }
+            get { return live.Gain; }
             set
             {
-                lock (gate)
+                lock (live)
                 {
-                    gain = value;
-                    if (IsOpen()) openCamera.Gain.Value = value;
+                    live.Gain = value;
+                    if (IsOpen()) live.Camera.Gain.Value = value;
                 }
             }
         }
@@ -57,15 +64,15 @@ namespace OpenRigs.Video
 
         bool IsOpen()
         {
-            return openCamera != null && openCamera.IsInitialized();
+            return live.Camera != null && live.Camera.IsInitialized();
         }
 
         protected override void Configure(IManagedCamera camera)
         {
-            lock (gate)
+            lock (live)
             {
                 ConfigureCamera(camera);
-                openCamera = camera;
+                live.Camera = camera;
             }
             base.Configure(camera);
         }
@@ -100,9 +107,12 @@ namespace OpenRigs.Video
 
         public IObservable<Timestamped<VideoDataFrame>> Generate<TPayload>(IObservable<Timestamped<TPayload>> source)
         {
-            var frames = Generate().Finally(() => { lock (gate) openCamera = null; });
+            var frames = Generate().Finally(() => { lock (live) live.Camera = null; });
             return frames
-                .Select(frame => new VideoDataFrame(frame.Image, frame.ChunkData.FrameID, frame.ChunkData.Timestamp))
+                // In the camera's callback, before Spinnaker releases the chunk data: the exposure
+                // and gain each frame was taken with, as the camera reports them.
+                .Select(frame => new VideoDataFrame(frame.Image, new VideoChunkData(
+                    frame.ChunkData.FrameID, frame.ChunkData.Timestamp, frame.ChunkData.ExposureTime, frame.ChunkData.Gain)))
                 .FillGaps(frame => frame.ChunkData.FrameID, (previous, current) => (int)(current - previous - 1))
                 .Zip(source, (frame, payload) => Timestamped.Create(frame, payload.Seconds))
                 .Where(timestamped => timestamped.Value != null);
