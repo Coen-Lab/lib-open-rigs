@@ -35,6 +35,11 @@ namespace OpenRigs.Video
             camera.BinningVerticalMode.Value = BinningVerticalModeEnums.Sum.ToString();
             camera.BinningHorizontal.Value = Binning;
             camera.BinningVertical.Value = Binning;
+            // Binning does not resize the region; reset it to the full sensor (offsets first)
+            camera.OffsetX.Value = 0;
+            camera.OffsetY.Value = 0;
+            camera.Width.Value = camera.Width.Max;
+            camera.Height.Value = camera.Height.Max;
             camera.AcquisitionFrameRateEnable.Value = false;
             camera.TriggerMode.Value = TriggerModeEnums.On.ToString();
             camera.TriggerSelector.Value = TriggerSelectorEnums.FrameStart.ToString();
