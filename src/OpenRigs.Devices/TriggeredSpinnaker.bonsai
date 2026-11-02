@@ -3,6 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:p1="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
                  xmlns:spk="clr-namespace:Bonsai.Spinnaker;assembly=Bonsai.Spinnaker"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns="https://bonsai-rx.org/2018/workflow">
@@ -23,6 +24,15 @@
           <p1:Gain>0</p1:Gain>
           <p1:Binning>1</p1:Binning>
         </Combinator>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>new(
+Image as Image,
+new(ChunkData.FrameID as FrameID,
+ChunkData.Timestamp as Timestamp,
+ChunkData.ExposureTime as ExposureTime,
+ChunkData.Width as Width,
+ChunkData.Height as Height) as ChunkData)</scr:Expression>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Name" DisplayName="CameraTriggerEventsSubjectName" Description="The name of the subject carrying trigger events from a camera controller or behavior board. " Category="Subjects" />
@@ -48,13 +58,14 @@
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
-      <Edge From="1" To="5" Label="Source1" />
-      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="6" Label="Source1" />
       <Edge From="3" To="4" Label="Source1" />
-      <Edge From="4" To="5" Label="Source2" />
-      <Edge From="5" To="6" Label="Source1" />
-      <Edge From="6" To="8" Label="Source1" />
-      <Edge From="7" To="8" Label="Source2" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source2" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="9" Label="Source1" />
+      <Edge From="8" To="9" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
