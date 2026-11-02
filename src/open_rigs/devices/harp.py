@@ -24,6 +24,9 @@ class TimerFrequency(StrEnum):
 class HarpDevice(BaseSchema):
     who_am_i: ClassVar[int] = Field(description="The unique identifier for the device type.")
     port_name: str = Field(examples=["COM"], description="The name of the device serial port.")
+    usb_serial: str | None = Field(
+        default=None, description="The USB serial number of the board on port_name, which tells it from others of its kind."
+    )
 
 
 class HarpClockSynchronizer(HarpDevice):
