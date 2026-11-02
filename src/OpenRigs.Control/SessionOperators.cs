@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Reactive.Linq;
 using Bonsai;
@@ -42,6 +43,79 @@ namespace OpenRigs.Control
         {
             var name = Name ?? "";
             return source.Where(e => e.Kind == ControlEventKind.Command && e.Name == name).Select(e => e.Arguments ?? "");
+        }
+    }
+
+    /// <summary>
+    /// Passes each new value of one declared parameter through, as a controller sets it before
+    /// Go, for a setting the hardware takes live. Emits nothing until the first set: start the
+    /// hardware from its own setting, which ParameterDefault reports.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    [Description("Passes each new value of the named parameter through, as a controller sets it before Go.")]
+    public class OnParameterSet
+    {
+        /// <summary>Gets or sets the parameter's name.</summary>
+        [Description("The parameter's name, as declared on ControlServer.")]
+        public string Name { get; set; }
+
+        /// <summary>Passes each new value of the named parameter through.</summary>
+        /// <param name="source">ControlServer's events.</param>
+        /// <returns>The parameter's value, each time a controller sets it.</returns>
+        public IObservable<string> Process(IObservable<ControlEvent> source)
+        {
+            var name = Name ?? "";
+            return source.Where(e => e.Kind == ControlEventKind.Set && e.Name == name).Select(e => e.Arguments ?? "");
+        }
+    }
+
+    /// <summary>
+    /// Sets a declared parameter's value from the workflow (a rig setting) before Go, unless a
+    /// controller has set it, so the controller shows the value the hardware starts with.
+    /// Passes every element through.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Sink)]
+    [Description("Sets the named parameter's value from each element before Go, unless a controller has set it, passing the element through.")]
+    public class ParameterDefault
+    {
+        /// <summary>Gets or sets the parameter's name.</summary>
+        [Description("The parameter's name, as declared on ControlServer.")]
+        public string Name { get; set; }
+
+        /// <summary>Sets the parameter's value from each element, passing the element through.</summary>
+        /// <typeparam name="T">The type of the elements.</typeparam>
+        /// <param name="source">The workflow's own values.</param>
+        /// <returns>The same elements.</returns>
+        public IObservable<T> Process<T>(IObservable<T> source)
+        {
+            var name = Name ?? "";
+            return source.Do(value => ControlState.Require("ParameterDefault").SetDefault(name, Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""));
+        }
+    }
+
+    /// <summary>
+    /// Sets the highest value a controller may give a declared parameter, from the workflow at
+    /// run time, so a value the hardware cannot take is refused at set with the reason rather
+    /// than stopping the workflow. Passes every element through.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Sink)]
+    [Description("Sets the named parameter's maximum from each element, passing the element through.")]
+    public class ParameterMaximum
+    {
+        /// <summary>Gets or sets the parameter's name.</summary>
+        [Description("The parameter's name, as declared on ControlServer.")]
+        public string Name { get; set; }
+
+        /// <summary>Sets the parameter's maximum from each element, passing the element through.</summary>
+        /// <param name="source">The highest values.</param>
+        /// <returns>The same elements.</returns>
+        public IObservable<double> Process(IObservable<double> source)
+        {
+            var name = Name ?? "";
+            return source.Do(maximum => ControlState.Require("ParameterMaximum").SetMaximum(name, maximum));
         }
     }
 

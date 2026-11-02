@@ -17,16 +17,60 @@ namespace OpenRigs.Video
             Binning = 1;
         }
 
-        [Description("The duration of each individual exposure, in microseconds. In general, this should be 1 / frameRate - 1 millisecond to prepare for next trigger.")]
-        public double ExposureTime { get; set; }
+        // The open camera, so a new exposure or gain (a PropertyMapping while ready) is written
+        // to it straight away; null until Configure, and when the camera is closed.
+        readonly object gate = new object();
+        IManagedCamera openCamera;
+        double exposureTime;
+        double gain;
 
-        [Description("The gain of the sensor.")]
-        public double Gain { get; set; }
+        [Description("The duration of each individual exposure, in microseconds. In general, this should be 1 / frameRate - 1 millisecond to prepare for next trigger. Taken live by an open camera.")]
+        public double ExposureTime
+        {
+            get { return exposureTime; }
+            set
+            {
+                lock (gate)
+                {
+                    exposureTime = value;
+                    if (IsOpen()) openCamera.ExposureTime.Value = value;
+                }
+            }
+        }
 
-        [Description("The size of the binning area of the sensor, e.g. a binning size of 2 specifies a 2x2 binning region.")]
+        [Description("The gain of the sensor. Taken live by an open camera.")]
+        public double Gain
+        {
+            get { return gain; }
+            set
+            {
+                lock (gate)
+                {
+                    gain = value;
+                    if (IsOpen()) openCamera.Gain.Value = value;
+                }
+            }
+        }
+
+        [Description("The size of the binning area of the sensor, e.g. a binning size of 2 specifies a 2x2 binning region. Taken only when the camera opens.")]
         public int Binning { get; set; }
 
+        bool IsOpen()
+        {
+            return openCamera != null && openCamera.IsInitialized();
+        }
+
         protected override void Configure(IManagedCamera camera)
+        {
+            lock (gate)
+            {
+                ConfigureCamera(camera);
+                openCamera = camera;
+            }
+            base.Configure(camera);
+        }
+
+        void ConfigureCamera(IManagedCamera camera)
         {
             try { camera.AcquisitionStop.Execute(); }
             catch { }
@@ -52,12 +96,11 @@ namespace OpenRigs.Video
             camera.DeviceLinkThroughputLimit.Value = camera.DeviceLinkThroughputLimit.Max;
             camera.GainAuto.Value = GainAutoEnums.Off.ToString();
             camera.Gain.Value = Gain;
-            base.Configure(camera);
         }
 
         public IObservable<Timestamped<VideoDataFrame>> Generate<TPayload>(IObservable<Timestamped<TPayload>> source)
         {
-            var frames = Generate();
+            var frames = Generate().Finally(() => { lock (gate) openCamera = null; });
             return frames
                 .Select(frame => new VideoDataFrame(frame.Image, frame.ChunkData.FrameID, frame.ChunkData.Timestamp))
                 .FillGaps(frame => frame.ChunkData.FrameID, (previous, current) => (int)(current - previous - 1))

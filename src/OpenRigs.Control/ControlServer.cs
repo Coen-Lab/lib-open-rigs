@@ -163,21 +163,25 @@ namespace OpenRigs.Control
         /// <summary>The session was released, once.</summary>
         Go,
         /// <summary>A declared command, each time it is sent.</summary>
-        Command
+        Command,
+        /// <summary>A parameter's new value, each time a controller sets one before Go.</summary>
+        Set
     }
 
     /// <summary>
-    /// An event from the controller: Go, with the parameters as they stood, or a declared command.
+    /// An event from the controller: Go, with the parameters as they stood, a declared command,
+    /// or a parameter set.
     /// </summary>
     public class ControlEvent
     {
-        /// <summary>Gets or sets whether this is Go or a command.</summary>
+        /// <summary>Gets or sets whether this is Go, a command or a set.</summary>
         public ControlEventKind Kind { get; set; }
 
-        /// <summary>Gets or sets the command's name; "go" for Go.</summary>
+        /// <summary>Gets or sets the command's or parameter's name; "go" for Go.</summary>
         public string Name { get; set; }
 
-        /// <summary>Gets or sets the command's arguments as the controller sent them; empty for Go.</summary>
+        /// <summary>Gets or sets the command's arguments or the parameter's new value as the
+        /// controller sent them; empty for Go.</summary>
         public string Arguments { get; set; }
 
         /// <summary>Gets or sets the subject ID, from ControlServer.</summary>
@@ -192,12 +196,13 @@ namespace OpenRigs.Control
         /// <summary>Gets or sets when the event was sent, in UTC.</summary>
         public DateTime Time { get; set; }
 
-        /// <summary>The event in one line: Go with its parameters, or the command and its arguments.</summary>
+        /// <summary>The event in one line: Go with its parameters, the command and its arguments,
+        /// or the parameter and its new value.</summary>
         /// <returns>The line.</returns>
         public override string ToString()
         {
-            return Kind == ControlEventKind.Go
-                ? "Go " + string.Join(", ", Parameters.Select(p => p.Key + "=" + p.Value))
+            return Kind == ControlEventKind.Go ? "Go " + string.Join(", ", Parameters.Select(p => p.Key + "=" + p.Value))
+                : Kind == ControlEventKind.Set ? "Set " + Name + "=" + Arguments
                 : "Command " + Name + " " + Arguments;
         }
     }
@@ -316,6 +321,47 @@ namespace OpenRigs.Control
         internal T Locked<T>(Func<T> read)
         {
             lock (gate) { return read(); }
+        }
+
+        // The parameters a controller has set: the workflow's own default no longer replaces them.
+        internal readonly HashSet<string> SetByController = new HashSet<string>();
+
+        /// <summary>The named declared parameter; an error naming the declared ones if there is none.</summary>
+        /// <param name="name">The parameter's name.</param>
+        /// <param name="operatorName">The operator asking, named in the error.</param>
+        /// <returns>The parameter.</returns>
+        internal Parameter RequireParameter(string name, string operatorName)
+        {
+            var parameter = Parameters.FirstOrDefault(p => p.Name == name);
+            if (parameter == null)
+            {
+                var declared = Parameters.Count == 0 ? "none" : string.Join(", ", Parameters.Select(p => p.Name));
+                throw new ArgumentException(operatorName + ": no parameter named '" + name + "' was declared on ControlServer. Declared: " + declared + ".");
+            }
+            return parameter;
+        }
+
+        /// <summary>Sets a parameter's value from the workflow (a rig setting), unless a controller
+        /// has set it or Go has been taken, so status shows the value the hardware uses.</summary>
+        /// <param name="name">The parameter's name.</param>
+        /// <param name="value">The value, as text.</param>
+        public void SetDefault(string name, string value)
+        {
+            var parameter = RequireParameter(name, "ParameterDefault");
+            lock (gate)
+            {
+                if (!GoRequested && !SetByController.Contains(name)) parameter.Value = value;
+            }
+        }
+
+        /// <summary>Sets the highest value a controller's set may give a parameter, as the
+        /// workflow learns it (an exposure that must fit the trigger period).</summary>
+        /// <param name="name">The parameter's name.</param>
+        /// <param name="maximum">The highest value.</param>
+        public void SetMaximum(string name, double maximum)
+        {
+            var parameter = RequireParameter(name, "ParameterMaximum");
+            lock (gate) { parameter.Maximum = maximum; }
         }
 
         internal JObject Status()
@@ -472,9 +518,25 @@ namespace OpenRigs.Control
                     var parameter = state.Parameters.FirstOrDefault(p => p.Name == name);
                     if (parameter == null)
                         return Refuse("no parameter named '" + name + "'; this workflow declares: " + Names(state.Parameters.Select(p => p.Name)));
-                    var refusal = parameter.Refusal(value);
+                    // Under the lock: ParameterMaximum may move the limit from the workflow's thread.
+                    var refusal = state.Locked(() => parameter.Refusal(value));
                     if (refusal != null) return Refuse(refusal);
-                    state.Locked(() => parameter.Value = value);
+                    state.Locked(() =>
+                    {
+                        parameter.Value = value;
+                        return state.SetByController.Add(name);
+                    });
+                    // Emitted so a setting the hardware takes live (exposure) follows it while ready.
+                    emit = new ControlEvent
+                    {
+                        Kind = ControlEventKind.Set,
+                        Name = name,
+                        Arguments = value,
+                        SubjectId = state.SubjectId,
+                        SessionId = state.SessionId,
+                        Parameters = state.Locked(() => state.Parameters.ToDictionary(p => p.Name, p => p.Value)),
+                        Time = DateTime.UtcNow
+                    };
                     return Ok();
                 }
 
