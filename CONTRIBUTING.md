@@ -32,6 +32,6 @@ Imperative subject under 72 characters (`Fix timer to use harp time, not uptime`
 
 ## AI-assisted contributions
 
-- Say so in one line at the top of the issue or PR, and keep the tool's `Co-Authored-By` trailer on commits.
+- Say so in one line at the top of the issue or PR. Leave the tool's `Co-Authored-By` trailer off commits: you are the author and answer for the change.
 - You have read every line and can defend it in review. If you can't explain a change, take it out.
 - Same length and format as everything else here: no confidence scores, badges or emoji headings, and no lists of possible causes or alternative designs. Say what was tested and what wasn't.
