@@ -209,15 +209,20 @@ if (-not (Test-Path $Manifest)) { throw "Cannot read rig-setup's manifest at $Ma
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
-$entries = @((Get-Content $RepoList -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }) } }) +
-    @((Get-Content $Manifest -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }) } }) +
+# A workflows.txt line with !main leaves main alone and keeps only the branches named: a
+# workflow whose main runs live experiments while a branch moves to open-rigs (av-dome).
+$entries = @((Get-Content $RepoList -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $false } }) +
+    @((Get-Content $Manifest -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $false } }) +
     @(Get-Content $Extra | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object {
-        $slug, $rest = $_ -split '\s+'; [pscustomobject]@{ Url = "https://github.com/$slug.git"; Branches = @($rest | Where-Object { $_ }) } })
+        $slug, $rest = $_ -split '\s+'
+        [pscustomobject]@{ Url = "https://github.com/$slug.git"; Branches = @($rest | Where-Object { $_ -and $_ -ne '!main' }); SkipMain = '!main' -in $rest } })
 $clones = @(); $listed = @{}
 foreach ($e in $entries) {
     $c = Get-Clone $e.Url; $k = $c.Slug.ToLower()
-    if (-not $listed.ContainsKey($k)) { $listed[$k] = $c; $c | Add-Member Branches @(); $clones += $c }
+    if (-not $listed.ContainsKey($k)) { $listed[$k] = $c; $c | Add-Member Branches @(); $c | Add-Member SkipMain $true; $clones += $c }
     $listed[$k].Branches = @($listed[$k].Branches + $e.Branches | Where-Object { $_ -ne 'main' } | Sort-Object -Unique)
+    # Any list that wants main (rig-setup's always do) keeps it.
+    $listed[$k].SkipMain = $listed[$k].SkipMain -and $e.SkipMain
 }
 
 # The packages the lab packages depend on, as the reference workflow's main has them: its
@@ -388,7 +393,7 @@ try {
         try { Sync-Repo $clone } catch { $rows += [pscustomobject]@{ Workflow = $clone.Slug; Result = 'FAILED'; Detail = "$($_.Exception.Message)" }; continue }
         $branches = @(Invoke-Git $clone.Dir for-each-ref '--format=%(refname:strip=3)' refs/remotes/origin | Where-Object { $_ -and $_ -ne 'HEAD' })
         if ('main' -notin $branches) { $rows += [pscustomobject]@{ Workflow = $clone.Slug; Result = 'FAILED'; Detail = 'has no main branch on GitHub' }; continue }
-        foreach ($branch in @('main') + @($clone.Branches)) {
+        foreach ($branch in @(if (-not $clone.SkipMain) { 'main' }) + @($clone.Branches)) {
             if ($branch -notin $branches) { $rows += [pscustomobject]@{ Workflow = "$($clone.Slug)@$branch"; Result = 'FAILED'; Detail = "ticked in rig-setup, but GitHub has no branch $branch" }; continue }
             try { $dir = Set-Branch $clone.Dir $branch }
             catch { $rows += [pscustomobject]@{ Workflow = "$($clone.Slug)@$branch"; Result = 'FAILED'; Detail = "$($_.Exception.Message)" }; continue }

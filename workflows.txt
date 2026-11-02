@@ -2,5 +2,8 @@
 # scripts\update-workflows.ps1 as well as every repository rig-setup has, for any profile.
 # One per line: <org>/<repo> as on GitHub, then any branches besides main to keep too,
 # separated by spaces (rig-setup's own repositories take theirs from the branches ticked there).
+# !main among them leaves main alone, for a workflow whose main runs live experiments while a
+# branch moves to open-rigs: ucl-open/av-dome !main open-rigs-integration
+# (ignored when rig-setup also lists the repository, since a rig runs its main).
 # Only a Bonsai project in the open-rigs layout (.bonsai\Bonsai.config and src\main.bonsai at
 # the root) is updated; any other is listed as "not Bonsai".
