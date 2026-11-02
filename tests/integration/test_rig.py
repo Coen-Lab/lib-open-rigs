@@ -26,3 +26,10 @@ def test_rig_validate():
         screen=Screen(),
     )
     assert rig.root_path == "data"
+    assert rig.rig_id is None
+
+
+def test_rig_id():
+    rig = Rig.model_validate({"rootPath": "data", "rigId": "B1"})
+    assert rig.rig_id == "B1"
+    assert rig.model_dump(by_alias=True)["rigId"] == "B1"
