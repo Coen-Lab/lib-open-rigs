@@ -209,9 +209,10 @@ if (-not (Test-Path $Manifest)) { throw "Cannot read rig-setup's manifest at $Ma
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
-# A workflows.txt line with !main leaves main alone and keeps only the branches named: a
-# workflow whose main runs live experiments while a branch moves to open-rigs (av-dome).
-$entries = @((Get-Content $RepoList -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $false } }) +
+# Main is left alone for a workflow whose main runs live experiments while a branch moves to
+# open-rigs (av-dome): Lab Packages On Main unticked in rig-setup's Repos menu
+# ("labPackagesMain": false on its entry), or !main on its workflows.txt line.
+$entries = @((Get-Content $RepoList -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $_.labPackagesMain -eq $false } }) +
     @((Get-Content $Manifest -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $false } }) +
     @(Get-Content $Extra | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object {
         $slug, $rest = $_ -split '\s+'
@@ -221,7 +222,7 @@ foreach ($e in $entries) {
     $c = Get-Clone $e.Url; $k = $c.Slug.ToLower()
     if (-not $listed.ContainsKey($k)) { $listed[$k] = $c; $c | Add-Member Branches @(); $c | Add-Member SkipMain $true; $clones += $c }
     $listed[$k].Branches = @($listed[$k].Branches + $e.Branches | Where-Object { $_ -ne 'main' } | Sort-Object -Unique)
-    # Any list that wants main (rig-setup's always do) keeps it.
+    # Any entry that wants main keeps it.
     $listed[$k].SkipMain = $listed[$k].SkipMain -and $e.SkipMain
 }
 

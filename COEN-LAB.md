@@ -17,7 +17,7 @@ They moved here from coen-openrigs-custom on 2 Nov 2026.
 
 ## Every lab workflow runs this
 
-A lab workflow is any repository on [rig-setup](https://github.com/Coen-Lab/rig-setup), for any profile, or in [`workflows.txt`](workflows.txt), that is a Bonsai project in the open-rigs layout (`.bonsai\Bonsai.config` and `src\main.bonsai`). `scripts\update-workflows.ps1` keeps each one's `main`, and each branch ticked for it in rig-setup (or named after it in `workflows.txt`, where `!main` leaves `main` alone), on this repository:
+A lab workflow is any repository on [rig-setup](https://github.com/Coen-Lab/rig-setup), for any profile, or in [`workflows.txt`](workflows.txt), that is a Bonsai project in the open-rigs layout (`.bonsai\Bonsai.config` and `src\main.bonsai`). `scripts\update-workflows.ps1` keeps each one's `main`, and each branch ticked for it in rig-setup (or named after it in `workflows.txt`). Unticking Lab Packages On Main on the repo's right-click menu in rig-setup, or `!main` in `workflows.txt`, leaves `main` alone, on this repository:
 
 - every package in `local_packages\` at the version here, with what it depends on as coen-behaviour-box's `Bonsai.config` has it, and the `../local_packages/` NuGet source;
 - open-rigs (Python) from this repository: an `open-rigs` git source in `pyproject.toml` is pinned to the last commit here that changed `src\`, `pyproject.toml` or `local_packages\`, `uv.lock` is relocked, and `regenerate-schemas` is run if the workflow has it. The schema and the Bonsai packages then come from the same commit.
