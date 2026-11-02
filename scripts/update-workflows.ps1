@@ -7,7 +7,7 @@ param(
     # writes on the share, and its own manifest's. Every one that is a Bonsai project
     # (rig-setup's rule: .bonsai\Bonsai.config and src\main.bonsai) is a lab workflow here.
     [string]$RepoList = 'K:\config\profile-repos.json',
-    [string]$Manifest = 'C:\Github\Coen-Lab\rig-setup\manifest.json',
+    [string]$Manifest = 'C:\Github\Coen-Lab\rig-setup\rig-setup-rules.json',
     # Lab workflows not (yet) on rig-setup: workflows.txt here, one GitHub <org>/<repo> a line.
     [string]$Extra = '',
     # The workflow whose Bonsai.config, written by Bonsai's own package manager and run on a
@@ -205,7 +205,7 @@ if (-not $mine) {
 
 # rig-setup's repos for every profile, then workflows.txt, each repository once.
 if (-not (Test-Path $RepoList)) { throw "Cannot read rig-setup's repo list at $RepoList (is the lab share mapped?)." }
-if (-not (Test-Path $Manifest)) { throw "Cannot read rig-setup's manifest at $Manifest." }
+if (-not (Test-Path $Manifest)) { throw "Cannot read rig-setup's rules at $Manifest." }
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
