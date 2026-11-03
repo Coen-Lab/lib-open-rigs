@@ -190,8 +190,8 @@ $source = (Invoke-Git $repo rev-parse --short HEAD) | Select-Object -First 1
 # The commit every workflow's open-rigs Python package is pinned to: the last one here that
 # changed what the workflows run (src\, pyproject.toml, local_packages\), so the schema and the
 # Bonsai packages come from the same open-rigs and a docs or scripts commit moves no pin (a
-# README under src\ included: 1e7ed99 moved every workflow's pin for one).
-$pin = (Invoke-Git $repo log -1 --format=%H -- src ':!src/**/*.md' pyproject.toml local_packages) | Select-Object -First 1
+# README or a test project under src\ included: 1e7ed99 moved every workflow's pin for one).
+$pin = (Invoke-Git $repo log -1 --format=%H -- src ':!src/**/*.md' ':!src/*.Tests/**' pyproject.toml local_packages) | Select-Object -First 1
 $pinLine = "open-rigs = {git = `"https://github.com/Coen-Lab/lib-open-rigs`", rev = `"$pin`"}"
 
 # One run at a time: push.ps1's and the hourly one share the clones. A run already going may
