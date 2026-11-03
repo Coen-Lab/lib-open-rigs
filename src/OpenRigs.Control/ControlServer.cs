@@ -473,13 +473,25 @@ namespace OpenRigs.Control
                 while (!cancel.IsCancellationRequested)
                 {
                     string text;
-                    if (!socket.TryReceiveFrameString(TimeSpan.FromMilliseconds(100), out text)) continue;
                     Exception stop = null;
                     ControlEvent emit = null;
                     JObject reply;
-                    try { reply = Handle(text, state, out emit, out stop); }
-                    catch (Exception error) { reply = Refuse(error.Message); }
-                    socket.SendFrame(reply.ToString(Newtonsoft.Json.Formatting.None));
+                    // The socket's own errors end the sequence through the observer, as the
+                    // bind does: unhandled on this thread they would end Bonsai with no file
+                    // closed. The OnNext below stays outside, so a throw from a downstream
+                    // node is fixed in that node.
+                    try
+                    {
+                        if (!socket.TryReceiveFrameString(TimeSpan.FromMilliseconds(100), out text)) continue;
+                        try { reply = Handle(text, state, out emit, out stop); }
+                        catch (Exception error) { reply = Refuse(error.Message); }
+                        socket.SendFrame(reply.ToString(Newtonsoft.Json.Formatting.None));
+                    }
+                    catch (Exception error)
+                    {
+                        observer.OnError(error);
+                        return;
+                    }
                     // After the reply: everything downstream of Go (the session folder, file
                     // writers, anything that waits) runs on this thread, and a reply held
                     // behind it reads to the controller as a workflow that did not answer.
@@ -545,10 +557,28 @@ namespace OpenRigs.Control
                     var phase = state.Locked(() => state.Phase);
                     if (phase != SessionPhase.Ready)
                         return Refuse("not ready (phase " + phase + ")");
-                    if (state.Locked(() => state.GoRequested))
-                        return Refuse("Go has already been requested");
-                    var parameters = state.Locked(() => state.Parameters.ToDictionary(p => p.Name, p => p.Value));
-                    state.GoRequested = true;
+                    // One lock: the snapshot, the check and GoRequested, so a ParameterDefault
+                    // or ParameterMaximum landing between them cannot show Go a value it did not
+                    // take. A value set before the workflow learned the limit (ParameterMaximum
+                    // from the open camera) is refused here, naming it, rather than recorded.
+                    string outOfRange = null;
+                    Dictionary<string, string> parameters = null;
+                    var refused = state.Locked(() =>
+                    {
+                        if (state.GoRequested) return "Go has already been requested";
+                        foreach (var p in state.Parameters)
+                        {
+                            // An empty value is one nothing set (coen-behaviour-box's ExposureTime and
+                            // Gain until rig.yml fills them): the workflow's own default, as before.
+                            if (string.IsNullOrEmpty(p.Value)) continue;
+                            outOfRange = p.Refusal(p.Value);
+                            if (outOfRange != null) return outOfRange + "; set it again";
+                        }
+                        parameters = state.Parameters.ToDictionary(p => p.Name, p => p.Value);
+                        state.GoRequested = true;
+                        return null;
+                    });
+                    if (refused != null) return Refuse(refused);
                     // Named on Go, the moment the session becomes a record: the workflow was
                     // started by whoever launched it, and is released by whoever sends this.
                     state.LaunchedBy = Person.From(request["launched_by"]);

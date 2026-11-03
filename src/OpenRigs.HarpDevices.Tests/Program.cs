@@ -195,6 +195,24 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
+                    // 0.1.0-local.3: a board that reported no WhoAmI still leaves the map the manifest
+                    // expects for its kind (audit, 3 Nov 2026: the session was held back every night).
+                    var messages = new Subject<HarpMessage>();
+                    var path = new Subject<string>();
+                    Exception error = null;
+                    using (Recorder().Process(messages, path).Subscribe(_ => { }, ex => error = ex))
+                    {
+                        foreach (var m in Board(1216).Where(m => m.Address != WhoAmI.Address)) messages.OnNext(m);
+                        var silent = Path.Combine(root, "ses-silent");
+                        path.OnNext(silent);
+                        Thread.Sleep(1800);
+                        var json = File.ReadAllText(Path.Combine(silent, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
+                        var map = Path.Combine(silent, "BehaviorBoard-Main", "BehaviorBoard-Main.yml");
+                        Check("a board that reported no WhoAmI gets the map of the kind rig.yml names, and the record says so",
+                            error == null && json.Contains("\"who_am_i\": null") && File.Exists(map) && File.ReadAllText(map).Contains("whoAmI: 1216") && json.Contains("reported no WhoAmI"), error == null ? json : error.Message);
+                    }
+                }
+                {
                     // L2: a board of the wrong kind is found from the dump at connection, before Go.
                     var messages = new Subject<HarpMessage>();
                     Exception error = null;

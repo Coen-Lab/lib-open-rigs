@@ -102,6 +102,16 @@ namespace OpenRigs.Control.Tests
                 Console.WriteLine("Go:");
                 Check("Go is refused before Ready", !Ok(Ask(socket, new { cmd = "go" })), "taken");
                 state.SetPhase(SessionPhase.Ready);
+                // 0.1.0-local.11: a value taken before the workflow learned the limit is refused at Go, not recorded.
+                Check("a set within the limit as it stands is taken", Ok(Ask(socket, new { cmd = "set", name = "RewardUl", value = "4" })), "refused");
+                new ParameterMaximum { Name = "RewardUl" }.Process(Observable.Return(3.0)).Wait();
+                var stale = Ask(socket, new { cmd = "go" });
+                Check("Go is refused while a value is above a maximum learned after it, naming it", !Ok(stale) && ((string)stale["why"]).Contains("RewardUl must be") && ((string)stale["why"]).Contains("from 0 to 3") && ((string)stale["why"]).Contains("'4' is not"), stale.ToString());
+                Check("... and not requested", !state.GoRequested, "requested");
+                // A parameter with limits that nothing has set (coen-behaviour-box's ExposureTime until rig.yml fills it) does not block Go.
+                state.Parameters.Add(new Parameter { Name = "Blank", Value = "", Description = "", Minimum = 1, Maximum = 2 });
+                Check("an empty value is refused as a set", new Parameter { Name = "Blank", Minimum = 1, Maximum = 2 }.Refusal("") != null, "taken");
+                Check("set again within it, Go goes on", Ok(Ask(socket, new { cmd = "set", name = "RewardUl", value = "2" })), "refused");
                 Check("Go is taken once Ready", Ok(Ask(socket, new { cmd = "go", by = new { id = "JoB", name = "Jo Bloggs" }, launched_by = new { id = "PipC", name = "Pip Coen" } })), "refused");
                 // 0.1.0-local.9: who launched and released the session, for the manifest.
                 Check("Go keeps who launched the session and who sent it", state.LaunchedBy?.ToString() == "Pip Coen (PipC)" && state.GoBy?.ToString() == "Jo Bloggs (JoB)", state.LaunchedBy + " / " + state.GoBy);

@@ -184,6 +184,14 @@ namespace OpenRigs.HarpDevices
             var whoAmI = U16(registers, WhoAmI.Address);
             var map = whoAmI.HasValue ? RegisterMaps.Find(whoAmI.Value) : null;
             if (whoAmI.HasValue && map == null) notes.Add("No Harp package loaded in this workflow decodes WhoAmI " + whoAmI.Value + ", so its register map is not written.");
+            if (!whoAmI.HasValue && ExpectedWhoAmI != 0)
+            {
+                // The manifest expects the map from rig.yml's kind (HarpRig.RegisterMapFor), so a
+                // board that reported no WhoAmI must not hold the session back every night: the
+                // kind's map, said to be so. A board of another kind would have stopped the workflow.
+                map = RegisterMaps.Find(ExpectedWhoAmI);
+                if (map != null) notes.Add("The device reported no WhoAmI, so the register map written is the one for the kind rig.yml names (WhoAmI " + ExpectedWhoAmI + ").");
+            }
 
             var folder = Path.Combine(pathPrefix, Name);
             Directory.CreateDirectory(folder);

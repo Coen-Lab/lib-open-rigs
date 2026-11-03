@@ -1,5 +1,20 @@
 # Backlog
 
+## Audit 2026-11-03, evening (/audit-rigs, set A again)
+
+Changed (Control 0.1.0-local.11, HarpDevices 0.1.0-local.3; Pip: "Implement everything recommended as you go"):
+
+- `ControlServer`: Go takes its parameter snapshot, checks every value against the limits as they stand and sets `GoRequested` under one lock (the gap a `ParameterDefault` could land in, deferred this morning), and refuses Go, naming the parameter, while a value set before `ParameterMaximum` lowered the limit is out of range (probed: Exposure 10000 set, maximum 5000 learned, Go recorded 10000; an empty value, one nothing set, is left to the workflow's default as before, since coen-behaviour-box's ExposureTime and Gain are empty until rig.yml fills them); the socket's own receive and send errors end the sequence through the observer, as a failed bind does, where unhandled on the server's thread they ended Bonsai with no file closed. The downstream `OnNext` stays outside the catch, so a throw in a node is fixed in that node.
+- `RecordHarpDevice`: a board that reported no WhoAmI at all gets the map of the kind rig.yml names, with a note, since the manifest expects that map from rig.yml's kind (`HarpRig.RegisterMapFor`) and the session was held back every night otherwise; a board of another kind stops the workflow before this.
+- `FORMAT.md`: `run.items` is `null` in every `running` write (so a manifest rig-sync finishes as `killed` keeps `null`); the example session folder has its project level.
+- `scripts\hourly.ps1` holds the hourly task's body, and `schedule.ps1` registers a task that runs it, so a change to the run arrives with a pull: PIPOFFICERIG's task still ran the 2 Nov registration, with no failed-run log and success whatever happened; registered again on PIPOFFICERIG at about 19:50 on 3 Nov 2026 (first run 20:00, which stopped on this repo's unpushed commits, as it should). The morning's claim that the task's exit code reaches Task Scheduler's history was wrong: `conhost --headless` reports 0 whatever the code (measured), so `update-workflows-failed.log` is the record of a failure.
+- COEN-LAB.md: only B1 is in a rig.yml; the dome, opto and acute codes are planned.
+
+Not changed, do not raise again without new information:
+
+- Work downstream of Go, a set or a command on the request thread (a stop sent meanwhile waits): see rig-control's BACKLOG; the README says so.
+- A comment at `LiveViewPlan.cs:138` saying the stream's `RigId` is the machine name on purpose (rig.yml's `rigId` is `B1`; the live view subscribes by machine): a comment in `src\` moves every workflow's open-rigs pin; with the next LiveView change.
+
 ## Audit 2026-11-03 (/audit-rigs, set A)
 
 Changed (tests, docs and scripts; no package raised): the Manifest tests named every session folder the old `_date-` way, so `SessionSection` was never tested on the name rigs write since badd9ca (both forms checked now, with `session.id`, `subject` and `started`); `FORMAT.md` says `ended-early` carries a sentence in `error`, and its example launch is a rig's (`C:\Github\Coen-Lab`, `--start`); the schedule's task ends with the script's exit code and keeps every failed run in `update-workflows-failed.log` (the hourly log was overwritten and the task read as succeeded while av-dome's setup had failed every hour since 2 Nov); the open-rigs pin ignores a README under `src\` (1e7ed99 moved every workflow's pin for one); the setup-gap message names a NuGet token the machine lacks as a cause; docs that still said `Video 0.1.0-bbox.1`, "Lab Packages On Main" (rig-setup's tick is Leave Main Alone, inverted, since 5a8b6c4) and `desk-personal` for PIPOFFICERIG.

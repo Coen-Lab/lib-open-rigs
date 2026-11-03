@@ -4,7 +4,7 @@ This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (bra
 
 | On `main` | What it is |
 |---|---|
-| `src/open_rigs/core/rig.py` | `rig_id` (`rigId` in rig.yml): optional, the rig's code (B1 GEEK-BBOX1, D1 and D2 the green domes, O1 and O2 the blue opto rigs, A1 PINK-ACUTE), the end of every session ID |
+| `src/open_rigs/core/rig.py` | `rig_id` (`rigId` in rig.yml): optional, the rig's code (B1 GEEK-BBOX1, in its rig.yml; D1 and D2 for the green domes, O1 and O2 the blue opto rigs and A1 PINK-ACUTE are planned, since those rigs keep no rig.yml rig-control reads yet), the end of every session ID |
 | `src/open_rigs/rigs/` | One rig schema per kind of rig (`behaviour_box.py`: `BehaviourBoxRig`), with no `version`: the keys tell whether a workflow takes a rig's file, and rig-setup's rig.yml row checks them. Every workflow for that kind of rig imports it in its `rig.py` instead of defining its own, so all of them read the same `rig.yml` and a second workflow on a rig can run. It holds hardware only; settings of one experiment go in that workflow's task schema. Lab-only |
 | `8deeb9c`, `ee4a8a4` | `TriggeredSpinnaker` fixes, ucl-open/ucl-open#66 and #67 ([`patches/README.md`](patches/README.md)) |
 | [`OpenRigs.Control`](src/OpenRigs.Control/README.md) | Holds a workflow ready (hardware armed, live view streaming, nothing recorded), answers [rig-control](https://github.com/Coen-Lab/rig-control) over ZeroMQ, and releases the session on Go |
@@ -25,7 +25,7 @@ A lab workflow is any repository on [rig-setup](https://github.com/Coen-Lab/rig-
 
 A branch that changed is checked with its own `scripts\check-workflow.ps1` (else `scripts\check-bonsai.ps1` here) after its Bonsai setup. If the check passes, what the script wrote is committed and pushed; rig-setup's 30-minute update takes `main` to the rigs. If it fails, nothing is committed and the table at the end names the branch and why; the next run tries again. It works in clones of its own under `%LOCALAPPDATA%\lib-open-rigs\clones`, so nobody's working copy is touched.
 
-It runs after every push with `scripts\push.ps1`, and hourly on PIPOFFICERIG (`scripts\schedule.ps1`; log in `%LOCALAPPDATA%\lib-open-rigs\update-workflows.log`, every failed run's kept in `update-workflows-failed.log` beside it). The checks build workflows and run their operators offline, but a workflow that loads `Bonsai.Spinnaker` needs the Spinnaker SDK, so this runs on a lab machine, not in CI.
+It runs after every push with `scripts\push.ps1`, and hourly on PIPOFFICERIG (`scripts\schedule.ps1` registers the task, which runs `scripts\hourly.ps1`, so a change to the run needs no new registration; log in `%LOCALAPPDATA%\lib-open-rigs\update-workflows.log`, every failed run's kept in `update-workflows-failed.log` beside it). The checks build workflows and run their operators offline, but a workflow that loads `Bonsai.Spinnaker` needs the Spinnaker SDK, so this runs on a lab machine, not in CI.
 
 ## Changing a lab package
 

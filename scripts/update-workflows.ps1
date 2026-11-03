@@ -16,7 +16,7 @@ param(
 )
 # Keeps every lab Bonsai workflow on the lab's packages, on main and on each branch ticked for
 # it in rig-setup: every package in local_packages\ here, at the version here, with what they
-# depend on. Run by scripts\push.ps1 after each push here, and hourly (scripts\schedule.ps1),
+# depend on. Run by scripts\push.ps1 after each push here, and hourly (scripts\hourly.ps1, the task scripts\schedule.ps1 registers),
 # so a repository added with rig-setup's Repos button, or a branch ticked there, gets them
 # unasked.
 #
