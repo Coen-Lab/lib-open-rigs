@@ -8,6 +8,8 @@ namespace OpenRigs.Logging.Tests
     /// <summary>
     /// Logs a timestamped record with string, integer, boolean and nullable fields through LogData
     /// with an empty Selector, the way a rig logs a flat row of trial settings.
+    /// Unlike LogDataTests, which logs numeric fields through an explicit Selector, this covers
+    /// header naming for string fields and how booleans and nulls are written.
     /// </summary>
     [TestClass]
     public class LogDataRecordTests : LoggingTestBase
