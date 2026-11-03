@@ -13,13 +13,13 @@ A Harp device is a device entry in rig.yml (`behaviorBoard: main:`, named `Behav
 5. **Stops the workflow if the board is of the wrong kind**: when the WhoAmI it reports is not its kind's (`behaviorBoard` 1216, `timestampGeneratorGen3` 1158, `cameraControllerGen2` 1170, `clockSynchronizer` 1152, `stepperDriver` 1130, `hobgoblin` 123, as open-rigs' `devices\harp.py`). Found from the dump at connection, it stops the workflow then, before Go (since 0.1.0-local.2); found from a session's dump, after the record is written. A kind not in that list is recorded with its WhoAmI unchecked.
 6. **Publishes the record's path as `BehaviorBoard-Main.Identity`**, for any node that wants it.
 
-`SessionManifest` (OpenRigs.Manifest 0.1.0-local.8 on) expects these files for each Harp device when its `ExpectedFiles` holds `harp` (`auto;harp`), so rig-sync holds back a session missing one: the record always, the register map only when a loaded Harp package has the kind's WhoAmI (0.1.0-local.9; before, a Lickety Split or any kind with no package was expected to leave a map it never writes, and every one of its sessions was held back). Which entries are Harp devices is one rule, `src\Shared\HarpRig.cs`, compiled into both packages: a `portName` that is not empty or `null`, and `<Name>.Data` published as `HarpMessage`. It is decided from rig.yml and the subjects, not from this node: Bonsai may build `SessionManifest` first, whatever their order in the workflow (a node fed from one built earlier is built sooner, measured 2 Nov 2026), so a subject this node publishes cannot be relied on there.
+`SessionManifest` (OpenRigs.Manifest 0.1.0-local.8 on) expects these files for each Harp device when its `ExpectedFiles` holds `harp` (`auto;harp`), so rig-sync holds back a completed session missing one (a run that ended any other way is copied with a note and an alarm): the record always, the register map only when a loaded Harp package has the kind's WhoAmI (0.1.0-local.9; before, a Lickety Split or any kind with no package was expected to leave a map it never writes, and every one of its sessions was held back). Which entries are Harp devices is one rule, `src\Shared\HarpRig.cs`, compiled into both packages: a `portName` that is not empty or `null`, and `<Name>.Data` published as `HarpMessage`. It is decided from rig.yml and the subjects, not from this node: Bonsai may build `SessionManifest` first, whatever their order in the workflow (a node fed from one built earlier is built sooner, measured 2 Nov 2026), so a subject this node publishes cannot be relied on there.
 
 ## Settings
 
 | Property | Default | |
 |----------|---------|-|
-| `ConfigRoot` | `C:\Coen-Lab-Local\RigConfigs` | The root under which each machine has its own `<MACHINE-NAME>\rig.yml`, as `StreamDevices`' setting. Read when the workflow is built. |
+| `ConfigRoot` | `C:\Coen-Lab-Local\RigConfigs` | The root under which each machine has its own `<MACHINE-NAME>\rig.yml`, as `StreamDevices`' setting (the same default from LiveView 0.1.0-local.9). Can be mapped from a workflow property (0.1.0-local.5 on). Read when the workflow is built. |
 
 ## Things to Know
 

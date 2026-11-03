@@ -114,6 +114,13 @@ function Get-SetupGap([string]$Dir) {
     @([regex]::Matches($config, '<Package id="([^"]+)" version="([^"]+)"') | ForEach-Object { "$($_.Groups[1].Value).$($_.Groups[2].Value)" } |
         Where-Object { -not (Test-Path (Join-Path $bonsai "Packages\$_")) -and -not (Test-Path (Join-Path $bonsai "Packages\$_.0")) })
 }
+# A package's folder under a Packages folder, by the same rule: <id>.<version>, or with the
+# fourth part NuGet adds when that is the one there.
+function Get-PackageFolder([string]$Packages, [string]$Id, [string]$Version) {
+    $dir = Join-Path $Packages "$Id.$Version"
+    if (-not (Test-Path $dir) -and (Test-Path "$dir.0")) { return "$dir.0" }
+    $dir
+}
 # A folder not set up here gets its Bonsai and packages, as rig-setup does: from a copy of
 # main's packages when there is one, so the restore fetches only what differs. Judged by what
 # the setup leaves, not by .bonsai\Packages existing: a setup killed halfway, or one that found
@@ -202,7 +209,7 @@ $pinLine = "open-rigs = {git = `"https://github.com/Coen-Lab/lib-open-rigs`", re
 $mutex = New-Object Threading.Mutex($false, 'Global\lib-open-rigs-update-workflows')
 try { $mine = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $mine = $true }
 if (-not $mine) {
-    # Less than the hourly task's one-hour limit (schedule.ps1), so a wait that runs out says so
+    # Well inside the hourly task's three-hour limit (schedule.ps1), so a wait that runs out says so
     # here rather than being stopped by Task Scheduler with nothing logged.
     "Another run of update-workflows.ps1 is going; waiting for it to finish (at most 40 minutes)..."
     try { $mine = $mutex.WaitOne([TimeSpan]::FromMinutes(40)) } catch [Threading.AbandonedMutexException] { $mine = $true }
@@ -254,7 +261,7 @@ while ($queue.Count) {
     else {
         $v = Get-ConfigVersion $refConfig $id
         if (-not $v) { continue }
-        $spec = Get-ChildItem (Join-Path $refPackages "$id.$v") -Filter '*.nuspec' -ErrorAction SilentlyContinue | Select-Object -First 1
+        $spec = Get-ChildItem (Get-PackageFolder $refPackages $id $v) -Filter '*.nuspec' -ErrorAction SilentlyContinue | Select-Object -First 1
         if (-not $spec) { throw "The reference workflow lists $id $v but has no .bonsai\Packages\$id.${v}." }
         $nuspec = [xml](Get-Content $spec.FullName -Raw)
         $prefix = [regex]::Escape("Packages/$id.$v/")
@@ -319,8 +326,8 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
             foreach ($id in $missing) {
                 $d = $dependencies[$id]
                 foreach ($l in $d.Lines) { $text = Add-ConfigLine $text $l.Section $l.Line }
-                $from = Join-Path $refPackages "$id.$($d.Version)"
-                if (-not (Test-Path (Join-Path $unpacked "$id.$($d.Version)"))) { Copy-Item $from $unpacked -Recurse }
+                $from = Get-PackageFolder $refPackages $id $d.Version
+                if (-not (Test-Path (Get-PackageFolder $unpacked $id $d.Version))) { Copy-Item $from $unpacked -Recurse }
                 $changes += "added $id $($d.Version)"
             }
             # Bonsai refuses a Bonsai.config that is not well-formed XML; never leave one.
@@ -402,7 +409,9 @@ try {
         if ('main' -notin $branches) { $rows += [pscustomobject]@{ Workflow = $clone.Slug; Result = 'FAILED'; Detail = 'has no main branch on GitHub' }; continue }
         if ($clone.SkipMain -and -not $clone.Branches) { $rows += [pscustomobject]@{ Workflow = $clone.Slug; Result = 'not kept'; Detail = 'main left alone and no branch ticked: nothing of this repo is kept on the lab''s packages' } }
         foreach ($branch in @(if (-not $clone.SkipMain) { 'main' }) + @($clone.Branches)) {
-            if ($branch -notin $branches) { $rows += [pscustomobject]@{ Workflow = "$($clone.Slug)@$branch"; Result = 'FAILED'; Detail = "ticked in rig-setup, but GitHub has no branch $branch" }; continue }
+            # Merged or deleted: rig-setup reads the same tick as nothing to clone (ok), and Repos
+            # takes it off at its next save, so it is not a failure every hour until then.
+            if ($branch -notin $branches) { $rows += [pscustomobject]@{ Workflow = "$($clone.Slug)@$branch"; Result = 'gone'; Detail = "ticked in rig-setup, but GitHub has no branch $branch (merged or deleted); Repos takes it off at its next save" }; continue }
             try { $dir = Set-Branch $clone.Dir $branch }
             catch { $rows += [pscustomobject]@{ Workflow = "$($clone.Slug)@$branch"; Result = 'FAILED'; Detail = "$($_.Exception.Message)" }; continue }
             # Its progress lines are printed; its row is the one object it returns.
@@ -425,6 +434,6 @@ try {
 } finally { $mutex.ReleaseMutex() }
 
 "`n" + ($rows | Format-Table -AutoSize -Wrap | Out-String).TrimEnd()
-$bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai', 'not kept' })
+$bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai', 'not kept', 'gone' })
 if ($bad) { "`n$($bad.Count) of $($rows.Count) branches are not on the lab's packages."; exit 1 }
 "`nEvery lab Bonsai workflow is on the lab's packages, on main and every ticked branch."

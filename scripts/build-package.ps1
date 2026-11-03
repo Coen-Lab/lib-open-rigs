@@ -23,8 +23,10 @@ $name = "$id.$version.nupkg"
 # NuGet caches a package by id and version, on this machine and on every rig, so a rebuilt
 # package under a version already committed would be ignored wherever the old one is cached.
 # (git's "did not match" on stderr would stop this script under 'Stop', so it runs under 'Continue'.)
-& { $ErrorActionPreference = 'Continue'; & git -C $repo ls-files --error-unmatch "local_packages/$name" 2>&1 | Out-Null }
-if ($LASTEXITCODE -eq 0) { throw "$name is already committed. Raise <Version> in src\$Package\$Package.csproj before building." }
+# Committed at any time, not only now: a version set back by hand names a file an older commit
+# held and a rig may have cached (audit-rigs set C).
+$was = & git -C $repo log --all -1 --format=%h -- "local_packages/$name"
+if ($was) { throw "$name was committed before ($was). Raise <Version> in src\$Package\$Package.csproj before building." }
 
 "Packing $id $version..."
 # open-rigs' build stamps 42.42.42-dev0 on any package not given its version on the command line.

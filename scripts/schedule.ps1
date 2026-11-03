@@ -12,7 +12,9 @@ $hourly = Join-Path $PSScriptRoot 'hourly.ps1'
 # conhost --headless runs the console with no window at all; -WindowStyle Hidden still flashes one.
 $action = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$hourly`""
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddHours((Get-Date).Hour + 1) -RepetitionInterval (New-TimeSpan -Hours 1)
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+# Three hours: a run may wait 40 minutes for another, then set up Bonsai for a new repo or
+# branch at up to 20 minutes each; a run stopped by the limit writes no failed log.
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 3)
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive
 Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
 "Registered '$name': every hour from $($trigger.StartBoundary), running $hourly"

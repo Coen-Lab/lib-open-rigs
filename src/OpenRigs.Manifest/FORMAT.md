@@ -89,7 +89,8 @@ A manifest after the finishing step, from a session on GEEK-BBOX1 (`files` cut t
     "by": "rig-sync",
     "commit": "4f2a...",
     "at": "2026-10-31T03:04:11Z",
-    "missing": []
+    "missing": [],
+    "unmet": []
   }
 }
 ```
@@ -121,7 +122,8 @@ Written by the workflow:
 Written by the finishing step:
 
 - `files[]`: `size` and `mtime` replaced and `sha256` filled in for every listed file; a file in the folder that the workflow did not list is added with `"expected": false`.
-- `completed`: `by` (the tool), `commit` (since 2 Nov 2026: the tool's own commit, `null` when it could not be read), `at`, and `missing`, the listed paths not found, which is empty on a `complete` manifest.
+- `completed`: `by` (the tool), `commit` (since 2 Nov 2026: the tool's own commit, `null` when it could not be read), `at`, and `missing`, the listed paths not found, which is empty on a `complete` manifest. Since 3 Nov 2026, `unmet`: the `expected` paths with no file, `[]` when every one was met. It can be non-empty on a `complete` manifest: a run whose `outcome` is not `completed` is finished without what it never wrote (rig-setup `docs/manifests.md`), so a reader wanting a full session checks `run.outcome` and `completed.unmet`, not `status` alone.
+- `expected[].found`: recounted by the finishing step from the copied folder, so it agrees with `completed.unmet` (the workflow's count is from its last write, which for a killed run is its first).
 
 Written by the server:
 

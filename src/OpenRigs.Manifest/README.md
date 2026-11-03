@@ -17,7 +17,7 @@ The format is [`FORMAT.md`](FORMAT.md), version 2. rig-setup's overnight copy (r
 
 ## Expected Files
 
-`files` lists what is in the folder when the run ends, so a device that never wrote anything is simply absent from it. `expected` says what had to be there: each entry with its path, why it is expected, and `found`, the number of files matching it at that write. rig-sync refuses to copy a session whose expected entry left no file, and raises an alarm naming it, as it does for a listed file that has gone. On GEEK-BBOX1 (1 Nov 2026) a run whose board stopped answering at Start left `BehaviorBoard-Main/` with `found: 0`; its `files` had only the camera's two.
+`files` lists what is in the folder when the run ends, so a device that never wrote anything is simply absent from it. `expected` says what had to be there: each entry with its path, why it is expected, and `found`, the number of files matching it at that write. rig-sync refuses to copy a `completed` session whose expected entry left no file, and raises an alarm naming it, as it does for a listed file that has gone; a run that ended any other way is copied without what it never wrote, named in `completed.unmet` and a note, with an alarm (rig-setup `docs/manifests.md`). On GEEK-BBOX1 (1 Nov 2026) a run whose board stopped answering at Start left `BehaviorBoard-Main/` with `found: 0`; its `files` had only the camera's two.
 
 ## Settings
 

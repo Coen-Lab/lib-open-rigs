@@ -239,7 +239,7 @@ namespace OpenRigs.LiveView
     public class StreamDevicesSettings : ZeroArgumentExpressionBuilder
     {
         /// <summary>Gets or sets StreamDevices' ConfigRoot.</summary>
-        public string ConfigRoot { get; set; }
+        public string ConfigRoot { get; set; } = @"C:\Coen-Lab-Local\RigConfigs";
 
         /// <summary>Gets or sets StreamDevices' DataPort.</summary>
         public int DataPort { get; set; } = 5556;
