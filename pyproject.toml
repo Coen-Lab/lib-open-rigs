@@ -14,6 +14,9 @@ dependencies = [
     "swc-aeon>=0.2.0",
 ]
 
+[project.scripts]
+regenerate-calibration = "open_rigs._generators.calibration:main"
+
 [dependency-groups]
 dev = [
   "pandas-stubs",

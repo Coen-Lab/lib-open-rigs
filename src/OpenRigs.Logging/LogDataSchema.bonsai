@@ -1,52 +1,100 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:p1="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Writes serialized text, such as a configuration snapshot from SerializeToJson, to its own file in the session folder: Name\Name_date.json under PathPrefix. The write waits for both the text and the session path, so the file name is resolved before the file is opened.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
         <Name>Source1</Name>
       </Expression>
-      <Expression xsi:type="Unit" />
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:Timestamp" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PathPrefix</Name>
       </Expression>
-      <Expression xsi:type="MemberSelector">
-        <Selector>Timestamp.UtcDateTime</Selector>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Name" />
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:FormatFileName.bonsai">
-        <Name>Schema</Name>
-        <Extension>json</Extension>
-      </Expression>
-      <Expression xsi:type="PropertyMapping">
-        <PropertyMappings>
-          <Property Name="FileName" />
-        </PropertyMappings>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:JsonWriter">
-          <p1:FileName>C:\temp_data\sub-Algernon\ses-001_date-2026-10-01T19-53-48\Schema\Schema_2026-10-01T19-53-48.json</p1:FileName>
-          <p1:Suffix>None</p1:Suffix>
-          <p1:Buffered>true</p1:Buffered>
-          <p1:Overwrite>false</p1:Overwrite>
-        </Combinator>
+      <Expression xsi:type="rx:SelectMany">
+        <Name>WriteSchema</Name>
+        <Description>Runs once the text and the session path are both available. The file name is formatted and mapped onto the writer before the writer subscribes, which is when a file sink reads its path.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Take">
+                <rx:Count>1</rx:Count>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="rx:AsyncSubject">
+              <Name>Element</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Element</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Timestamp" />
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Timestamp.UtcDateTime</Selector>
+            </Expression>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="Name" />
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:FormatFileName.bonsai">
+              <Name>Schema</Name>
+              <Extension>json</Extension>
+            </Expression>
+            <Expression xsi:type="PropertyMapping">
+              <PropertyMappings>
+                <Property Name="FileName" />
+              </PropertyMappings>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Element</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Item1</Selector>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:JsonWriter">
+                <p1:FileName>Schema.json</p1:FileName>
+                <p1:Suffix>None</p1:Suffix>
+                <p1:Buffered>true</p1:Buffered>
+                <p1:Overwrite>false</p1:Overwrite>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="4" To="5" Label="Source1" />
+            <Edge From="5" To="7" Label="Source1" />
+            <Edge From="6" To="7" Label="Source2" />
+            <Edge From="7" To="8" Label="Source1" />
+            <Edge From="8" To="11" Label="Source2" />
+            <Edge From="9" To="10" Label="Source1" />
+            <Edge From="10" To="11" Label="Source1" />
+            <Edge From="11" To="12" Label="Source1" />
+          </Edges>
+        </Workflow>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
     </Nodes>
     <Edges>
-      <Edge From="0" To="7" Label="Source1" />
-      <Edge From="1" To="2" Label="Source1" />
-      <Edge From="2" To="3" Label="Source1" />
-      <Edge From="3" To="5" Label="Source1" />
-      <Edge From="4" To="5" Label="Source2" />
-      <Edge From="5" To="6" Label="Source1" />
-      <Edge From="6" To="7" Label="Source2" />
-      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="0" To="2" Label="Source1" />
+      <Edge From="1" To="2" Label="Source2" />
+      <Edge From="2" To="4" Label="Source1" />
+      <Edge From="3" To="4" Label="Source2" />
+      <Edge From="4" To="5" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

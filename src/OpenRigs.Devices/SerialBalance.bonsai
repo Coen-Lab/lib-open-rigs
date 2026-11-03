@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:uoc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A serial balance for the platform's dispense calibration. Input is the SerialBalance settings (the balance block of a DispenseCalibration file). Opens the port given by PortName, tares the balance after its boot delay, requests a reading every print period, parses each line into a WeightMeasurement and publishes it on ReadingsSubjectName, which OpenRigs.Core:DispenseCalibration.bonsai subscribes to. Built on OpenRigs.Devices:SerialDevice.bonsai, whose BalanceMessages and BalanceCommands subjects stay available.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="PortName" Description="The balance's serial port. Set at run time: the balance is plugged in only to calibrate and the committed settings leave it as COMx." Category="Connection" />
+        <Property Name="BaudRate" Description="The balance's baud rate, 9600 for an Ohaus-style balance." Category="Connection" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SerialDevice.bonsai">
+        <BaudRate>9600</BaudRate>
+        <NewLine>\r\n</NewLine>
+        <Name>Balance</Name>
+        <PortName>COMx</PortName>
+        <SerialMessagesSubjectName>BalanceMessages</SerialMessagesSubjectName>
+        <SerialCommandsSubjectName>BalanceCommands</SerialCommandsSubjectName>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="uoc:PollBalance" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>BalanceCommands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BalanceMessages</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="UnitSuffix" Selector="UnitSuffix" />
+          <Property Name="UnstableMarker" Selector="UnstableMarker" />
+          <Property Name="Ignore" Selector="Ignore" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="uoc:ParseBalanceReading">
+          <uoc:UnitSuffix>g</uoc:UnitSuffix>
+          <uoc:UnstableMarker>?</uoc:UnstableMarker>
+          <uoc:Ignore>ES</uoc:Ignore>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="ReadingsSubjectName" Description="The subject this balance publishes its WeightMeasurement readings on." Category="Subjects" />
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>BalanceReading</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="3" Label="Source1" />
+      <Edge From="0" To="6" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="5" To="7" Label="Source1" />
+      <Edge From="6" To="7" Label="Source2" />
+      <Edge From="7" To="9" Label="Source1" />
+      <Edge From="8" To="9" Label="Source2" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

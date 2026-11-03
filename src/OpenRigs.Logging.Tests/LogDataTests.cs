@@ -11,7 +11,7 @@ namespace OpenRigs.Logging.Tests
     [TestClass]
     public class LogDataTests : LoggingTestBase
     {
-        static readonly string[] ExpectedHeader = { "Seconds", "Value.X", "Value.Y", "Value.Z" };
+        static readonly string[] ExpectedHeader = { "Seconds", "X", "Y", "Z" };
 
         protected override string WorkflowFileName => "LogDataTest.bonsai";
 

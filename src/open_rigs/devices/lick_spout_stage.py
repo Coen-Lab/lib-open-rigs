@@ -99,11 +99,11 @@ class StageAxisMapping(BaseSchema):
         Board B: base_transverse(0)
     """
 
-    left_elevation: MotorAddress = Field(default_factory=lambda: MotorAddress(board="a", motor=0))
-    right_elevation: MotorAddress = Field(default_factory=lambda: MotorAddress(board="a", motor=1))
-    right_radial: MotorAddress = Field(default_factory=lambda: MotorAddress(board="a", motor=2))
-    left_radial: MotorAddress = Field(default_factory=lambda: MotorAddress(board="a", motor=3))
-    base_transverse: MotorAddress = Field(default_factory=lambda: MotorAddress(board="b", motor=0))
+    left_elevation: MotorAddress = Field(default=MotorAddress(board="a", motor=0))
+    right_elevation: MotorAddress = Field(default=MotorAddress(board="a", motor=1))
+    right_radial: MotorAddress = Field(default=MotorAddress(board="a", motor=2))
+    left_radial: MotorAddress = Field(default=MotorAddress(board="a", motor=3))
+    base_transverse: MotorAddress = Field(default=MotorAddress(board="b", motor=0))
 
 
 class HarpLickSpoutStage(BaseSchema):
@@ -115,6 +115,6 @@ class HarpLickSpoutStage(BaseSchema):
     driver_a: HarpStepperDriver = Field(description="Primary StepperDriver board.")
     driver_b: HarpStepperDriver = Field(description="Secondary StepperDriver board.")
     axis_mapping: StageAxisMapping = Field(
-        default_factory=StageAxisMapping,
+        default=StageAxisMapping(),
         description="Maps each stage axis to its board and motor index.",
     )

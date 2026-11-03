@@ -17,9 +17,9 @@ The Behavior Board (`who_am_i = 1216`) is a Harp board commonly used as an I/O h
 
 Sub-modules:
 
-- `PulseController`: `active_pulses` (list of `DO1`/`DO2`/`DO3` lines enabled), `pulse_widths` (pulse width per line in microseconds).
+- `PulseController`: `output_pulse_enable` (the `DO1`/`DO2`/`DO3` lines enabled) and `outputs`, one entry per line saying what drives its pulse width: a `FixedPulse` with `pulse_width_ms` set in the rig configuration, or a `CalibratedPulse` naming the calibration curve that converts a requested quantity, such as a reward volume, to a width at run time. All three lines are listed; an unused line is a `FixedPulse` of width 0.
 - `CameraTriggerController`: `trigger0_frequency` and `trigger1_frequency` (Hz) for `CameraOutput0` and `CameraOutput1`.
-- `RunningWheel`: `counts_per_revolution` and `wheel_diameter`.
+- `RunningWheel`: `counts_per_rev` and `wheel_diameter_mm`.
 
 ### Configuration example
 
@@ -28,9 +28,12 @@ In your `rig.py`:
 ```python
 from open_rigs.devices import (
     BehaviorBoard,
-    PulseController,
-    PulseWidths,
+    CalibratedPulse,
     CameraTriggerController,
+    FixedPulse,
+    PulseController,
+    PulseOutput,
+    PulseOutputs,
     RunningWheel,
 )
 
@@ -39,14 +42,17 @@ class Rig(...):
     behavior_board: BehaviorBoard = BehaviorBoard(
         port_name="COM5",
         pulse_controller=PulseController(
-            active_pulses=["DO1", "DO2"],
-            pulse_widths=PulseWidths(PulseDO1=50, PulseDO2=50, PulseDO3=0),
+            outputs=PulseOutputs(
+                DO1=PulseOutput(CalibratedPulse(artefact="calibration/valve-DO1.json")),
+                DO2=PulseOutput(CalibratedPulse(artefact="calibration/valve-DO2.json")),
+                DO3=PulseOutput(FixedPulse(pulse_width_ms=5)),
+            ),
         ),
         camera_trigger_controller=CameraTriggerController(
             trigger0_frequency=50,
             trigger1_frequency=50,
         ),
-        running_wheel=RunningWheel(counts_per_revolution=1024, wheel_diameter=0.20),
+        running_wheel=RunningWheel(counts_per_rev=1024, wheel_diameter_mm=200),
     )
 ```
 
@@ -70,7 +76,14 @@ Sub-operators are nested workflows within the Behavior Board that interface with
 ![PulseController](~/assets/workflows/devices/BehaviorBoard/PulseController.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/PulseController.bonsai"}
 :::
 
-Generates pulses on the digital output lines listed in `active_pulses`, with widths configured by `pulse_widths`. Used to drive valves and other on/off actuators in response to commands on its input subject.
+Generates pulses on the digital output lines listed in `output_pulse_enable`. Used to drive valves and other on/off actuators in response to commands on its input subjects.
+
+Two trigger subjects, one per kind of line:
+
+- `TriggerPulse` (`int`, the DO line) for a `FixedPulse` line. Its width is written once at startup from the `PulseDO1`, `PulseDO2` and `PulseDO3` properties, which the rig maps from its configuration, and each trigger only sets the line.
+- `TriggerCalibratedPulse` (`Tuple<int, int>`, the DO line 1 to 3 and the width in milliseconds) for a `CalibratedPulse` line. Each trigger writes the width to that line's `PulseDO` register and then sets the line, in that order on the same command subject, so the board applies the new width before it fires. The width comes from the calibration curve lookup in `OpenRigs.Core` at trial time; nothing about it is stored in the rig configuration or the workflow.
+
+Both subject names are externalized, so a rig can rename them to match its own.
 
 ### CameraTriggerController
 
@@ -86,7 +99,7 @@ Emits camera trigger pulses on `CameraOutput0` and `CameraOutput1` at the config
 ![RunningWheel](~/assets/workflows/devices/BehaviorBoard/RunningWheel.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/RunningWheel.bonsai"}
 :::
 
-Reads the rotary encoder and converts counts into wheel speed and distance using `counts_per_revolution` and `wheel_diameter` from the rig configuration.
+Reads the rotary encoder and converts counts into wheel speed and distance using `counts_per_rev` and `wheel_diameter_mm` from the rig configuration.
 
 ### Timestamps
 

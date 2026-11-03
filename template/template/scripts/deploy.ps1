@@ -1,3 +1,9 @@
+param(
+    # Root of the per-machine rig configuration directories. The rig workflow reads
+    # <ConfigRoot>\<MACHINE-NAME>\rig.yml and calibration artefacts beside it.
+    [string]$ConfigRoot = "C:\RigConfigs"
+)
+
 $scriptPath = $MyInvocation.MyCommand.Path
 $scriptDirectory = Split-Path -Parent $scriptPath
 Set-Location (Split-Path -Parent $scriptDirectory)
@@ -37,6 +43,25 @@ Write-Output "Generating C# classes (namespace: $namespace, serializers: json ya
 Push-Location .\src\Extensions
 &dotnet bonsai.sgen $schemaFile.FullName --namespace $namespace --serializer json --serializer yaml
 Pop-Location
+
+Write-Output "Writing the rig configuration template..."
+&uv run python examples/rig.py
+
+# Same name the rig workflow resolves at startup (Environment.MachineName).
+$machineDirectory = Join-Path $ConfigRoot ([Environment]::MachineName)
+Write-Output "Preparing the rig configuration directory $machineDirectory..."
+New-Item -ItemType Directory -Path (Join-Path $machineDirectory "calibration") -Force | Out-Null
+$rigConfig = Join-Path $machineDirectory "rig.yml"
+if (Test-Path -Path $rigConfig) {
+    Write-Output "Keeping the existing $rigConfig"
+} else {
+    # The template's $schema path is relative to config\; point the copy at this checkout instead.
+    $schemaDirectory = (Resolve-Path ".\src\DataSchemas").Path -replace "\\", "/"
+    $text = [IO.File]::ReadAllText((Resolve-Path ".\config\rig-template.yml").Path)
+    $text = $text.Replace('$schema=../src/DataSchemas/', '$schema=' + $schemaDirectory + '/')
+    [IO.File]::WriteAllText($rigConfig, $text)
+    Write-Output "Created $rigConfig from config\rig-template.yml; fill in this rig's values there."
+}
 
 if (-not (Test-Path -Path src\DataSchemas)) {
     New-Item -ItemType Directory -Path src\DataSchemas | Out-Null

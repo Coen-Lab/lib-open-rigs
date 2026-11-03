@@ -5,12 +5,16 @@ from open_rigs.devices.arduino import (
 )
 from open_rigs.devices.behavior_board import (
     CameraTriggerController,
-    PulseWidths,
+    FixedPulse,
+    CalibratedPulse,
+    PulseOutput,
+    PulseOutputs,
     PulseController,
     RunningWheel,
     BehaviorBoard,
 )
 from open_rigs.devices.serial import SerialDevice
+from open_rigs.devices.serial_balance import SerialBalance
 from open_rigs.devices.lickety_split import LicketySplit
 from open_rigs.devices.lick_spout_stage import (
     LickSpoutStageDriver,
@@ -35,7 +39,10 @@ __all__ = [
     "LedController",
     "LedDriver",
     "CameraTriggerController",
-    "PulseWidths",
+    "FixedPulse",
+    "CalibratedPulse",
+    "PulseOutput",
+    "PulseOutputs",
     "PulseController",
     "RunningWheel",
     "BehaviorBoard",
@@ -44,6 +51,7 @@ __all__ = [
     "MotorAddress",
     "StageAxisMapping",
     "SerialDevice",
+    "SerialBalance",
     "LicketySplit",
     "LickSpoutStageDriver",
     "HarpLickSpoutStage",

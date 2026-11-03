@@ -1,3 +1,7 @@
+- name: OpenRigs.Core
+  items:
+  - name: Rig Configuration
+    href: OpenRigs.Core/rig-config.md
 - name: OpenRigs.Devices
   items:
   - name: Arduino LED Driver

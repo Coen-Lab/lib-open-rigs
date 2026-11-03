@@ -1,7 +1,10 @@
 from enum import StrEnum
 from typing import ClassVar, Literal
 from pydantic import Field
+from pydantic.json_schema import JsonSchemaValue
 from swc.aeon.schema import BaseSchema
+
+from open_rigs.core.base import bind_typename
 
 
 class TimerFrequency(StrEnum):
@@ -11,6 +14,11 @@ class TimerFrequency(StrEnum):
     Timer200Hz = "Timer200Hz"
     Timer500Hz = "Timer500Hz"
     Timer1000Hz = "Timer1000Hz"
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema, handler) -> JsonSchemaValue:
+        """Binds the device's own enum, so generated properties can be assigned it directly."""
+        return bind_typename(handler(core_schema), "Harp.TimestampGeneratorGen3.TimerRate")
 
 
 class HarpDevice(BaseSchema):
