@@ -26,7 +26,7 @@ $stale = @(Get-ChildItem (Join-Path $repo 'src') -Directory | ForEach-Object {
     $xml = [xml](Get-Content $project -Raw)
     $version = $xml.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
     if (-not $version) { return }
-    $inputs = @("src/$($_.Name)", ":!src/$($_.Name)/**/*.md") + @($xml.Project.ItemGroup.Compile.Include | Where-Object { $_ -match '^\.\.\\([^\\]+)\\' } |
+    $inputs = @("src/$($_.Name)", ":!src/$($_.Name)/*.md") + @($xml.Project.ItemGroup.Compile.Include | Where-Object { $_ -match '^\.\.\\([^\\]+)\\' } |
         ForEach-Object { "src/$($Matches[1])" } | Sort-Object -Unique)
     $built = git -C $repo log -1 --format=%H -- "local_packages/$($_.Name).$version.nupkg"
     $changed = git -C $repo log -1 --format=%H -- @inputs
