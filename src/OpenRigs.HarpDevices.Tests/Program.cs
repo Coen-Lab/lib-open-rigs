@@ -312,6 +312,24 @@ namespace OpenRigs.HarpDevices.Tests
                     Check("its ConfigRoot survives the editor's copy, a save and a reload", node.ConfigRoot == config, node.ConfigRoot);
                     var rebuilt = Error(() => builder.Workflow.Build());
                     Check("... and the reloaded workflow builds", rebuilt == null, rebuilt);
+
+                    // A workflow property mapped onto it, as coen-behaviour-box's ConfigRoot: Bonsai's build
+                    // refused one while the generated inner workflow externalized nothing (3 Nov 2026).
+                    var mappedXml = xml.Replace("</Nodes><Edges /></Workflow>\n</WorkflowBuilder>",
+                        "<Expression xsi:type=\"ExternalizedMapping\"><Property Name=\"ConfigRoot\" /></Expression>" +
+                        "</Nodes><Edges><Edge From=\"4\" To=\"2\" Label=\"Source1\" /></Edges></Workflow>\n</WorkflowBuilder>");
+                    WorkflowBuilder mapped;
+                    using (var reader = XmlReader.Create(new StringReader(mappedXml))) mapped = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+                    var mappedBuilt = Error(() => mapped.Workflow.Build());
+                    Check("a workflow property mapped onto it builds", mappedBuilt == null, mappedBuilt);
+                    var moved = Path.Combine(root, "moved");
+                    mapped.Workflow.SetWorkflowProperty("ConfigRoot", moved);
+                    var mappedNode = mapped.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<RecordHarpDevices>().Single();
+                    Check("... and setting it, as --property does, moves the node's ConfigRoot", mappedNode.ConfigRoot == moved, mappedNode.ConfigRoot);
+                    var mappedCopy = new WorkflowBuilder(mapped.Workflow.ToInspectableGraph().FromInspectableGraph());
+                    var mappedCopyNode = mappedCopy.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<RecordHarpDevices>().Single();
+                    var innerMappings = mappedCopyNode.Workflow.Count(n => ExpressionBuilder.Unwrap(n.Value) is ExternalizedMappingBuilder);
+                    Check("... and the editor's copy keeps one inner mapping, not two", innerMappings == 1, innerMappings + " mappings");
                 }
             }
             finally

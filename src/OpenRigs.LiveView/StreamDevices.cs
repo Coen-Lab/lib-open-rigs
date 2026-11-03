@@ -33,6 +33,7 @@ namespace OpenRigs.LiveView
         /// <summary>Initializes a new instance of the <see cref="StreamDevices"/> class.</summary>
         public StreamDevices()
         {
+            GroupNode.Externalize(Workflow, Settings, "ConfigRoot");
         }
 
         /// <summary>
@@ -46,6 +47,7 @@ namespace OpenRigs.LiveView
         public StreamDevices(ExpressionBuilderGraph workflow)
             : base(workflow)
         {
+            GroupNode.Externalize(Workflow, Settings, "ConfigRoot");
         }
 
         /// <summary>Gets or sets the root under which each machine has its own configuration directory.</summary>
@@ -143,7 +145,8 @@ namespace OpenRigs.LiveView
             var inspectable = workflow.Any(node => node.Value is InspectBuilder);
             foreach (var node in workflow.ToList())
             {
-                if (GroupNode.Unwrap(node.Value) != settings) workflow.Remove(node);
+                var kept = GroupNode.Unwrap(node.Value);
+                if (kept != settings && !(kept is ExternalizedMappingBuilder)) workflow.Remove(node);
             }
             var group = new ExpressionBuilderGraph();
             group.Add(Group("LiveView", "Made from this machine's rig.yml each time the workflow is built; edits here are lost.", content));
@@ -254,7 +257,7 @@ namespace OpenRigs.LiveView
     }
 
     // StreamDevices' own settings in the Properties panel and to an ExternalizedMapping: its inner
-    // workflow is generated and externalizes nothing.
+    // workflow is generated and externalizes only ConfigRoot, for a workflow property to be mapped onto it.
     class StreamDevicesTypeDescriptionProvider : ShownPropertiesProvider
     {
         public StreamDevicesTypeDescriptionProvider()

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using Bonsai.Dag;
 using Bonsai.Expressions;
 
 namespace OpenRigs.Shared
@@ -73,6 +74,31 @@ namespace OpenRigs.Shared
             var added = new T();
             workflow.Add(added);
             return added;
+        }
+
+        /// <summary>
+        /// Externalizes properties of a group's settings node in its inner workflow, so a workflow
+        /// property can be mapped onto the group (--property:ConfigRoot reaching every node that reads
+        /// rig.yml). Bonsai's build looks a mapping onto a group up among its inner workflow's
+        /// externalized properties, and a generated workflow had none: "The specified property
+        /// 'ConfigRoot' was not found in the nested workflow" (coen-behaviour-box, 3 Nov 2026). Added
+        /// once, beside the settings; the group's Generate keeps it.
+        /// </summary>
+        public static void Externalize(ExpressionBuilderGraph workflow, ExpressionBuilder settings, params string[] names)
+        {
+            Node<ExpressionBuilder, ExpressionBuilderArgument> target = null;
+            foreach (var node in workflow)
+            {
+                var builder = Unwrap(node.Value);
+                if (builder is ExternalizedMappingBuilder) return;
+                if (builder == settings) target = node;
+            }
+            if (target == null) return;
+            var mapping = new ExternalizedMappingBuilder();
+            foreach (var name in names) mapping.ExternalizedProperties.Add(new ExternalizedMapping { Name = name });
+            var inspectable = workflow.Any(node => node.Value is InspectBuilder);
+            var added = workflow.Add(inspectable ? (ExpressionBuilder)new InspectBuilder(mapping) : mapping);
+            workflow.AddEdge(added, target, new ExpressionBuilderArgument(0));
         }
 
         /// <summary>A node as built, from under the editor's InspectBuilder and any DisableBuilder.</summary>
