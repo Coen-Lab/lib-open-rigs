@@ -54,8 +54,9 @@ namespace OpenRigs.Shared
 
         /// <summary>
         /// The register map a device of this kind gets: null when the kind's WhoAmI is not known,
-        /// or no Harp package loaded decodes it, and then why in <paramref name="why"/>. A record
-        /// writes &lt;Name&gt;.yml exactly when this is not null, and the manifest expects it then.
+        /// or no Harp package loaded decodes it, and then why in <paramref name="why"/>. The
+        /// manifest expects &lt;Name&gt;.yml exactly when this is not null; a record of a board of
+        /// the right kind writes it then (<see cref="MapToWrite"/>).
         /// </summary>
         public static RegisterMap RegisterMapFor(string kind, out string why)
         {
@@ -68,6 +69,17 @@ namespace OpenRigs.Shared
             var map = RegisterMaps.Find(whoAmI);
             why = map == null ? "no Harp package loaded in this workflow decodes WhoAmI " + whoAmI + " (" + kind + ")" : null;
             return map;
+        }
+
+        /// <summary>
+        /// The register map a record writes: the one for the WhoAmI the board reported, else, for
+        /// a board that reported none, the one for the WhoAmI its kind expects (0 for none), so
+        /// the record meets what <see cref="RegisterMapFor"/> told the manifest to expect.
+        /// </summary>
+        public static RegisterMap MapToWrite(int? reported, int expected)
+        {
+            if (reported.HasValue) return RegisterMaps.Find(reported.Value);
+            return expected != 0 ? RegisterMaps.Find(expected) : null;
         }
 
         /// <summary>A setting's text, null when rig.yml has none or leaves it empty (usbSerial: null).</summary>

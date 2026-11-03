@@ -135,6 +135,8 @@ namespace OpenRigs.LiveView
         public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType)
         {
             var plan = new LiveViewPlan();
+            // The machine name, not rig.yml's two-letter rigId, on purpose: the live-view windows
+            // find a rig's streams by the machine they connect to, and rig.yml is read by it too.
             plan.RigId = Environment.GetEnvironmentVariable("COMPUTERNAME") ?? Environment.MachineName;
             var pathPrefix = publishedType("PathPrefix");
             plan.HasSessionFolder = pathPrefix == typeof(string);
@@ -209,6 +211,8 @@ namespace OpenRigs.LiveView
             {
                 var key = RigDevices.Scalar(entry.Key);
                 var value = RigDevices.Scalar(entry.Value);
+                // A setting left null (rate: null, as model_dump writes it) keeps its default.
+                if (value == null || value == "null" || value == "~" || value.Length == 0) continue;
                 double number;
                 bool flag;
                 switch (key)

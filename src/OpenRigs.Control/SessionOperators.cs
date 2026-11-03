@@ -197,7 +197,7 @@ namespace OpenRigs.Control
         public IObservable<T> Process<T>(IObservable<T> source)
         {
             var name = Name ?? "";
-            return source.Do(value => ControlState.Require("ReportMetric").SetMetric(name, value == null ? "" : value.ToString()));
+            return source.Do(value => ControlState.Require("ReportMetric").SetMetric(name, Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""));
         }
     }
 }

@@ -130,8 +130,13 @@ namespace OpenRigs.Control.Tests
                 Check("a declared command is taken while recording", Ok(Ask(socket, new { cmd = "command", name = "reward", args = "5" })), "refused");
                 Check("an undeclared one is refused", !Ok(Ask(socket, new { cmd = "command", name = "flash" })), "taken");
                 state.SetPhase(SessionPhase.Ready);
+                var culture = Thread.CurrentThread.CurrentCulture;
+                Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+                try { new ReportMetric { Name = "water_ml" }.Process(Observable.Return(0.25)).Wait(); }
+                finally { Thread.CurrentThread.CurrentCulture = culture; }
                 var status = Ask(socket, new { cmd = "status" });
                 Check("status reports the phase, which only moves forward", (string)status["phase"] == "Recording", (string)status["phase"]);
+                Check("a metric is reported in the invariant culture, whatever the rig's", (string)status["metrics"]["water_ml"] == "0.25", status["metrics"]?.ToString());
 
                 Console.WriteLine("Stop:");
                 var watch = Stopwatch.StartNew();

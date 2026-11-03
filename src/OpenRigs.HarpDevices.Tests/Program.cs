@@ -273,6 +273,9 @@ namespace OpenRigs.HarpDevices.Tests
                 Check("a camera is not a serial device and is passed over", !plan.Notes.Any(n => n.StartsWith("Camera-Box")), string.Join(" | ", plan.Notes));
                 // H1/M1: the same rule as OpenRigs.Manifest's (src\Shared\HarpRig.cs), whose tests hold the same entry.
                 Check("... as is a portName: null, though its data is HarpMessage", !plan.Recorded.Any(d => d.Name == "BehaviorBoard-Idle") && !plan.Notes.Any(n => n.StartsWith("BehaviorBoard-Idle")), string.Join(" | ", plan.Notes));
+                var wrongCommands = HarpDevicePlan.Create(config, n => n == "BehaviorBoard-Main.Commands" ? typeof(string) : published(n));
+                Check("Commands of another type asks for no dump, and is noted", !wrongCommands.Recorded.First(d => d.Name == "BehaviorBoard-Main").HasCommands
+                    && wrongCommands.Notes.Any(n => n.Contains("BehaviorBoard-Main.Commands is String, not HarpMessage")), string.Join(" | ", wrongCommands.Notes));
                 var noFolder = HarpDevicePlan.Create(config, n => n == "PathPrefix" ? null : published(n));
                 Check("no PathPrefix records nothing, and says so", noFolder.Recorded.Count == 0 && noFolder.Notes.Any(n => n.Contains("PathPrefix")), string.Join(" | ", noFolder.Notes));
 

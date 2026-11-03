@@ -68,6 +68,8 @@ namespace OpenRigs.LiveView.Tests
                 var camera = bad.Streamed.Single();
                 Check("a bad rate or width is noted and the default kept", camera.Rate == 5 && camera.Width == 320 && bad.Notes.Count(n => n.Contains("rate 'fast'") || n.Contains("width '100.5'")) == 2, string.Join(" | ", bad.Notes));
                 Check("an unknown liveView setting is noted", bad.Notes.Any(n => n.Contains("no setting 'colour'")), string.Join(" | ", bad.Notes));
+                var nulls = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: null\n      rate: null\n      width: ~\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                Check("a liveView setting left null keeps its default, unnoted", nulls.Streamed.Single().Rate == 5 && !nulls.Notes.Any(), string.Join(" | ", nulls.Notes));
                 Check("data that is the image itself is streamed as it is", camera.ImagePath == "it", camera.ImagePath);
                 var wrong = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n", name => name == "BehaviorBoard-Main.Data" ? typeof(string) : null);
                 Check("a board whose data is not HarpMessage is skipped, saying why", wrong.Skipped.Any(s => s.Contains("is not HarpMessage")), string.Join(" | ", wrong.Skipped));

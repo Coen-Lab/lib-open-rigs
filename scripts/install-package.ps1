@@ -70,8 +70,10 @@ $entries = @(
 $isNew = $text -notmatch $entries[0][1]
 foreach ($entry in $entries) {
     $section, $pattern, $line = $entry
+    # -match ignores case, so Replace must too: an entry Bonsai wrote as openrigs.control (av-dome's
+    # tr-open-rigs branch) is rewritten in the lab's casing, not matched and then left alone.
     if ($text -match $pattern) {
-        $text = [regex]::Replace($text, $pattern, $line.Replace('$', '$$'))
+        $text = [regex]::Replace($text, $pattern, $line.Replace('$', '$$'), 'IgnoreCase')
     } elseif ($isNew) {
         # Alphabetical among its section's entries: the last line whose id sorts before ours.
         $lines = $text -split $nl
@@ -96,7 +98,7 @@ Get-ChildItem $Environment -Recurse -File -Filter '*.csproj' |
         $bom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
         $text = [IO.File]::ReadAllText($_.FullName)
         if ($text -match $reference) {
-            $updated = [regex]::Replace($text, $reference, "`${1}$version`${2}")
+            $updated = [regex]::Replace($text, $reference, "`${1}$version`${2}", 'IgnoreCase')
             if ($updated -ne $text) {
                 [IO.File]::WriteAllText($_.FullName, $updated, (New-Object Text.UTF8Encoding($bom)))
                 "    $($_.FullName.Substring($Environment.TrimEnd('\').Length + 1)): PackageReference $version"

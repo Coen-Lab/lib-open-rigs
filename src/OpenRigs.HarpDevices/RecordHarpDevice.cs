@@ -182,16 +182,12 @@ namespace OpenRigs.HarpDevices
                 : "No register dump came within " + DumpTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture) + " s of the session folder appearing: these are the registers the device reported when its port opened.");
 
             var whoAmI = U16(registers, WhoAmI.Address);
-            var map = whoAmI.HasValue ? RegisterMaps.Find(whoAmI.Value) : null;
+            // A board that reported no WhoAmI gets its kind's map, said to be so, so the session is
+            // not held back every night. A board of another kind would have stopped the workflow.
+            var map = HarpRig.MapToWrite(whoAmI, ExpectedWhoAmI);
             if (whoAmI.HasValue && map == null) notes.Add("No Harp package loaded in this workflow decodes WhoAmI " + whoAmI.Value + ", so its register map is not written.");
-            if (!whoAmI.HasValue && ExpectedWhoAmI != 0)
-            {
-                // The manifest expects the map from rig.yml's kind (HarpRig.RegisterMapFor), so a
-                // board that reported no WhoAmI must not hold the session back every night: the
-                // kind's map, said to be so. A board of another kind would have stopped the workflow.
-                map = RegisterMaps.Find(ExpectedWhoAmI);
-                if (map != null) notes.Add("The device reported no WhoAmI, so the register map written is the one for the kind rig.yml names (WhoAmI " + ExpectedWhoAmI + ").");
-            }
+            else if (!whoAmI.HasValue && map != null) notes.Add("The device reported no WhoAmI, so the register map written is the one for the kind rig.yml names (WhoAmI " + ExpectedWhoAmI + ").");
+            else if (!whoAmI.HasValue) notes.Add("The device reported no WhoAmI, and no Harp package loaded in this workflow decodes its kind's (" + ExpectedWhoAmI + "), so no register map is written.");
 
             var folder = Path.Combine(pathPrefix, Name);
             Directory.CreateDirectory(folder);

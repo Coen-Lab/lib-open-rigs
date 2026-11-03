@@ -7,7 +7,7 @@ param(
     # writes on the share, and its own rules file's (rig-setup-rules.json). Every one that is a Bonsai project
     # (rig-setup's rule: .bonsai\Bonsai.config and src\main.bonsai) is a lab workflow here.
     [string]$RepoList = 'K:\config\profile-repos.json',
-    [string]$Manifest = 'C:\Github\Coen-Lab\rig-setup\rig-setup-rules.json',
+    [string]$Rules = 'C:\Github\Coen-Lab\rig-setup\rig-setup-rules.json',
     # Lab workflows not (yet) on rig-setup: workflows.txt here, one GitHub <org>/<repo> a line.
     [string]$Extra = '',
     # The workflow whose Bonsai.config, written by Bonsai's own package manager and run on a
@@ -70,8 +70,9 @@ function Get-Dependencies([xml]$Nuspec) {
     $groups = @($deps.group | Where-Object { $_ -and ($_.targetFramework -match '^(\.NETFramework|net4)' -or -not $_.targetFramework) })
     @($groups | ForEach-Object { $_.dependency } | Where-Object { $_ } | ForEach-Object { $_.id }) + @($deps.dependency | Where-Object { $_ } | ForEach-Object { $_.id })
 }
+# Ids in any case: Bonsai writes the case it was given (av-dome's tr-open-rigs branch has openrigs.*).
 function Get-ConfigVersion([string]$Text, [string]$Id) {
-    $m = [regex]::Match($Text, "<Package id=`"$([regex]::Escape($Id))`" version=`"([^`"]+)`"")
+    $m = [regex]::Match($Text, "<Package id=`"$([regex]::Escape($Id))`" version=`"([^`"]+)`"", 'IgnoreCase')
     if ($m.Success) { $m.Groups[1].Value } else { '' }
 }
 function Get-Clone([string]$Url) {
@@ -179,11 +180,13 @@ foreach ($f in Get-ChildItem $local -File -Filter '*.nupkg') {
 $null = Invoke-Git $repo fetch -q
 if ([int](Invoke-Git $repo rev-list --count '@{u}..HEAD')) { throw "lib-open-rigs has unpushed commits. Push them first (scripts\push.ps1)." }
 if (Invoke-Git $repo status --porcelain -- local_packages) { throw "local_packages\ here has uncommitted changes. Commit and push them first." }
+# These scripts run against every workflow, so an edit not yet pushed would too.
+if (Invoke-Git $repo status --porcelain -- scripts) { throw "scripts\ here has uncommitted changes. Commit and push them first." }
 if ([int](Invoke-Git $repo rev-list --count 'HEAD..@{u}')) {
     if (Invoke-Git $repo status --porcelain) { throw "lib-open-rigs is behind GitHub and has local changes. Commit or discard them first." }
     $null = Invoke-Git $repo merge --ff-only -q '@{u}'
     "lib-open-rigs brought up to date with GitHub; running the updated script."
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path -Work $Work -RepoList $RepoList -Manifest $Manifest -Extra $Extra -Reference $Reference
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path -Work $Work -RepoList $RepoList -Rules $Rules -Extra $Extra -Reference $Reference
     exit $LASTEXITCODE
 }
 $source = (Invoke-Git $repo rev-parse --short HEAD) | Select-Object -First 1
@@ -199,14 +202,16 @@ $pinLine = "open-rigs = {git = `"https://github.com/Coen-Lab/lib-open-rigs`", re
 $mutex = New-Object Threading.Mutex($false, 'Global\lib-open-rigs-update-workflows')
 try { $mine = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $mine = $true }
 if (-not $mine) {
-    "Another run of update-workflows.ps1 is going; waiting for it to finish (at most an hour)..."
-    try { $mine = $mutex.WaitOne([TimeSpan]::FromHours(1)) } catch [Threading.AbandonedMutexException] { $mine = $true }
-    if (-not $mine) { throw "The other run of update-workflows.ps1 has held the clones for an hour; nothing done. The next hourly run tries again." }
+    # Less than the hourly task's one-hour limit (schedule.ps1), so a wait that runs out says so
+    # here rather than being stopped by Task Scheduler with nothing logged.
+    "Another run of update-workflows.ps1 is going; waiting for it to finish (at most 40 minutes)..."
+    try { $mine = $mutex.WaitOne([TimeSpan]::FromMinutes(40)) } catch [Threading.AbandonedMutexException] { $mine = $true }
+    if (-not $mine) { throw "The other run of update-workflows.ps1 has held the clones for 40 minutes; nothing done. The next hourly run tries again." }
 }
 
 # rig-setup's repos for every profile, then workflows.txt, each repository once.
 if (-not (Test-Path $RepoList)) { throw "Cannot read rig-setup's repo list at $RepoList (is the lab share mapped?)." }
-if (-not (Test-Path $Manifest)) { throw "Cannot read rig-setup's rules at $Manifest." }
+if (-not (Test-Path $Rules)) { throw "Cannot read rig-setup's rules at $Rules." }
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
@@ -214,7 +219,7 @@ if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 # open-rigs (av-dome): Leave Main Alone ticked in rig-setup's Repos menu
 # ("labPackagesMain": false on its entry), or !main on its workflows.txt line.
 $entries = @((Get-Content $RepoList -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $_.labPackagesMain -eq $false } }) +
-    @((Get-Content $Manifest -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $false } }) +
+    @((Get-Content $Rules -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $false } }) +
     @(Get-Content $Extra | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object {
         $slug, $rest = $_ -split '\s+'
         [pscustomobject]@{ Url = "https://github.com/$slug.git"; Branches = @($rest | Where-Object { $_ -and $_ -ne '!main' }); SkipMain = '!main' -in $rest } })
@@ -395,6 +400,7 @@ try {
         try { Sync-Repo $clone } catch { $rows += [pscustomobject]@{ Workflow = $clone.Slug; Result = 'FAILED'; Detail = "$($_.Exception.Message)" }; continue }
         $branches = @(Invoke-Git $clone.Dir for-each-ref '--format=%(refname:strip=3)' refs/remotes/origin | Where-Object { $_ -and $_ -ne 'HEAD' })
         if ('main' -notin $branches) { $rows += [pscustomobject]@{ Workflow = $clone.Slug; Result = 'FAILED'; Detail = 'has no main branch on GitHub' }; continue }
+        if ($clone.SkipMain -and -not $clone.Branches) { $rows += [pscustomobject]@{ Workflow = $clone.Slug; Result = 'not kept'; Detail = 'main left alone and no branch ticked: nothing of this repo is kept on the lab''s packages' } }
         foreach ($branch in @(if (-not $clone.SkipMain) { 'main' }) + @($clone.Branches)) {
             if ($branch -notin $branches) { $rows += [pscustomobject]@{ Workflow = "$($clone.Slug)@$branch"; Result = 'FAILED'; Detail = "ticked in rig-setup, but GitHub has no branch $branch" }; continue }
             try { $dir = Set-Branch $clone.Dir $branch }
@@ -419,6 +425,6 @@ try {
 } finally { $mutex.ReleaseMutex() }
 
 "`n" + ($rows | Format-Table -AutoSize -Wrap | Out-String).TrimEnd()
-$bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai' })
+$bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai', 'not kept' })
 if ($bad) { "`n$($bad.Count) of $($rows.Count) branches are not on the lab's packages."; exit 1 }
 "`nEvery lab Bonsai workflow is on the lab's packages, on main and every ticked branch."
