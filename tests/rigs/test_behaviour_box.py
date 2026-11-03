@@ -17,6 +17,11 @@ def test_named_entries():
     assert rig.camera["box"].live_view is None
 
 
+def test_no_version():
+    assert "version" not in BehaviourBoxRig.model_fields
+    assert "version" not in BehaviourBoxRig.model_validate(RIG).model_dump(by_alias=True)
+
+
 def test_usb_serial_required():
     with pytest.raises(ValidationError):
         BehaviourBoxRig.model_validate({**RIG, "behaviorBoard": {"main": {"portName": "COM3"}}})

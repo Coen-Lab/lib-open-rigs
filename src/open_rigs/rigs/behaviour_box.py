@@ -1,4 +1,4 @@
-from typing import Dict, Literal, Optional
+from typing import Dict, Optional
 
 from pydantic import Field
 from swc.aeon.schema import BaseSchema
@@ -39,9 +39,12 @@ class SpinnakerCamera(_SpinnakerCamera):
 # does not ask for is ignored, a name it asks for and does not find stops it at startup. The
 # name in the data is the kind and the entry joined by a hyphen: behaviorBoard: main: is
 # BehaviorBoard-Main. Settings of one experiment belong in that workflow's task schema.
+#
+# No version (Pip, 3 Nov 2026): a rig's rig.yml is written once at deploy and is then the rig's,
+# so a version in it went stale at every change while nothing read it. Whether a workflow takes
+# the file is told by its keys instead: the workflow refuses any key its classes lack, and
+# rig-setup's rig.yml row names each one a clone on the rig would refuse.
 class BehaviourBoxRig(Rig):
-    # The rig schema's own version, raised when a key is added, removed or renamed.
-    version: Literal["0.1.0"] = "0.1.0"
     behavior_board: Dict[str, BehaviorBoard] = Field(
         description="Harp Behavior boards by name, such as main (BehaviorBoard-Main): serial port, camera trigger on Trigger0 and running wheel on encoder port 2."
     )
