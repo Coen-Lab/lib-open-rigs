@@ -1,5 +1,23 @@
 # Backlog
 
+## Audit 2026-11-03, night (/audit-rigs, set B)
+
+Changed (Control 0.1.0-local.12, HarpDevices 0.1.0-local.4, LiveView 0.1.0-local.7; Manifest stays local.10; Pip: "Implement everything recommended as you go"):
+
+- A failed hourly run lived only in `%LOCALAPPDATA%\lib-open-rigs\update-workflows-failed.log`: `scripts\hourly.ps1` copies it to `K:\config\<MACHINE>\<MACHINE>_WorkflowsFailed.txt` and deletes that after a passing run; rig-setup's Machines window shows it.
+- `update-workflows.ps1` refuses to run with uncommitted `scripts\` edits (they ran against every workflow); matches package ids in any case (av-dome's `tr-open-rigs` branch writes `openrigs.*`), in `Get-ConfigVersion`, the missing check and `install-package.ps1`'s rewrite, which writes the lab's casing; waits at most 40 min for the lock, under the task's 1 h limit; prints a `not kept` row for a repo with main left alone and no branch ticked; `-Manifest` is `-Rules`.
+- `ReportMetric` formats in the invariant culture, as `ParameterDefault` does (a rig in another culture wrote `0,5`).
+- `HarpRig.MapToWrite` is the one rule for which register map a record writes (reported WhoAmI first, else rig.yml's kind); `RecordHarpDevice` uses it and notes when neither decodes; `HarpDevicePlan` notes a Commands subject that is not HarpMessage, so no dump is asked for.
+- `LiveViewPlan` keeps the default for a `liveView` setting left null (`null`, `~` or empty, as `model_dump` writes it); the `RigId` comment at :138 went in with it.
+- Docs: the HarpDevices README says it has run on GEEK-BBOX1 since 2 Nov 2026; COEN-LAB.md says how the hourly task reaches `K:\config\profile-repos.json` on PIPOFFICERIG and where a failed run goes.
+
+Not changed, do not raise again without new information:
+
+- `expected: false` renamed `listed`: FORMAT.md defines it, and rig-sync and the Manifest tests read it.
+- Boards in the flat `RigConfigs\<M>.yml` layout: the approved-names check flags the older layout, and a Shared change raises three packages.
+- `UsbSerials.cs:35` falling back to the port name: weighed in set B's verification and left as it is.
+- The version labels in Manifest's comments: a comment in `src\` moves the open-rigs pin; no Manifest raise this round.
+
 ## Audit 2026-11-03, evening (/audit-rigs, set A again)
 
 Changed (Control 0.1.0-local.11, HarpDevices 0.1.0-local.3; Pip: "Implement everything recommended as you go"):
