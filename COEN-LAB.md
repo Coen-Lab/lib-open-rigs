@@ -11,20 +11,20 @@ This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (bra
 | [`OpenRigs.HarpDevices`](src/OpenRigs.HarpDevices/README.md) | `RecordHarpDevices` checks every Harp device in rig.yml at Start by its `usbSerial`, and writes each device's registers and register map into each session |
 | [`OpenRigs.LiveView`](src/OpenRigs.LiveView/README.md) | `StreamDevices` streams every device in rig.yml that the workflow publishes, with the workflow's repository and commit |
 | `src/Shared/` | Code compiled into LiveView, Manifest and HarpDevices as internal code, so none depends on another |
-| `local_packages/` | One `.nupkg` per package: the four above, the patched `OpenRigs.Core`, `Devices`, `Video` `0.1.0-bbox.1` and `Logging`, `Streaming` `0.1.0-bbox.2` (session folders `ses-<Session>_<DateTime>`, ucl-open/roadmap#37), and `Bonsai.FFmpeg` `0.2.0-uniquepipe` ([`patches/README.md`](patches/README.md), licences in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)) |
+| `local_packages/` | One `.nupkg` per package: the four above, the patched `OpenRigs.Core`, `Devices` `0.1.0-bbox.1`, `Logging`, `Streaming` `0.1.0-bbox.2` (session folders `ses-<Session>_<DateTime>`, ucl-open/roadmap#37) and `Video` `0.1.0-bbox.3` (`ExposureTime` and `Gain` taken live by the open camera), and `Bonsai.FFmpeg` `0.2.0-uniquepipe` ([`patches/README.md`](patches/README.md), licences in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)) |
 
 They moved here from coen-openrigs-custom on 2 Nov 2026.
 
 ## Every lab workflow runs this
 
-A lab workflow is any repository on [rig-setup](https://github.com/Coen-Lab/rig-setup), for any profile, or in [`workflows.txt`](workflows.txt), that is a Bonsai project in the open-rigs layout (`.bonsai\Bonsai.config` and `src\main.bonsai`). `scripts\update-workflows.ps1` keeps each one's `main`, and each branch ticked for it in rig-setup (or named after it in `workflows.txt`). Unticking Lab Packages On Main on the repo's right-click menu in rig-setup, or `!main` in `workflows.txt`, leaves `main` alone, on this repository:
+A lab workflow is any repository on [rig-setup](https://github.com/Coen-Lab/rig-setup), for any profile, or in [`workflows.txt`](workflows.txt), that is a Bonsai project in the open-rigs layout (`.bonsai\Bonsai.config` and `src\main.bonsai`). `scripts\update-workflows.ps1` keeps each one's `main`, and each branch ticked for it in rig-setup (or named after it in `workflows.txt`). Ticking Leave Main Alone on the repo's right-click menu in rig-setup's Repos, or `!main` in `workflows.txt`, leaves `main` alone, on this repository:
 
 - every package in `local_packages\` at the version here, with what it depends on as coen-behaviour-box's `Bonsai.config` has it, and the `../local_packages/` NuGet source;
 - open-rigs (Python) from this repository: an `open-rigs` git source in `pyproject.toml` is pinned to the last commit here that changed `src\`, `pyproject.toml` or `local_packages\`, `uv.lock` is relocked, and `regenerate-schemas` is run if the workflow has it. The schema and the Bonsai packages then come from the same commit.
 
 A branch that changed is checked with its own `scripts\check-workflow.ps1` (else `scripts\check-bonsai.ps1` here) after its Bonsai setup. If the check passes, what the script wrote is committed and pushed; rig-setup's 30-minute update takes `main` to the rigs. If it fails, nothing is committed and the table at the end names the branch and why; the next run tries again. It works in clones of its own under `%LOCALAPPDATA%\lib-open-rigs\clones`, so nobody's working copy is touched.
 
-It runs after every push with `scripts\push.ps1`, and hourly on PIPOFFICERIG (`scripts\schedule.ps1`; log in `%LOCALAPPDATA%\lib-open-rigs\update-workflows.log`). The checks build workflows and run their operators offline, but a workflow that loads `Bonsai.Spinnaker` needs the Spinnaker SDK, so this runs on a lab machine, not in CI.
+It runs after every push with `scripts\push.ps1`, and hourly on PIPOFFICERIG (`scripts\schedule.ps1`; log in `%LOCALAPPDATA%\lib-open-rigs\update-workflows.log`, every failed run's kept in `update-workflows-failed.log` beside it). The checks build workflows and run their operators offline, but a workflow that loads `Bonsai.Spinnaker` needs the Spinnaker SDK, so this runs on a lab machine, not in CI.
 
 ## Changing a lab package
 

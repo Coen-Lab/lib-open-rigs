@@ -35,7 +35,7 @@ A manifest after the finishing step, from a session on GEEK-BBOX1 (`files` cut t
   "source": {
     "workflow": "src\\main.bonsai",
     "repo": "https://github.com/ucl-open/coen-behaviour-box.git",
-    "root": "C:\\Coen-Lab-Local\\Repos\\coen-behaviour-box",
+    "root": "C:\\Github\\Coen-Lab\\coen-behaviour-box",
     "branch": "main",
     "commit": "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
     "dirty": true,
@@ -44,7 +44,7 @@ A manifest after the finishing step, from a session on GEEK-BBOX1 (`files` cut t
     "bonsai": "2.9.0"
   },
   "launch": {
-    "arguments": ["C:\\Coen-Lab-Local\\Repos\\coen-behaviour-box\\src\\main.bonsai", "--no-editor", "--property:SubjectId=TC002", "--property:SessionId=003B1"],
+    "arguments": ["C:\\Github\\Coen-Lab\\coen-behaviour-box\\src\\main.bonsai", "--start", "--property:SubjectId=TC002", "--property:SessionId=003B1"],
     "properties": { "SubjectId": "TC002", "SessionId": "003B1" }
   },
   "control": {
@@ -113,7 +113,7 @@ Written by the workflow:
 - `launch`: Bonsai's command line, `arguments` as given (Bonsai's own relaunch arguments left out) and `properties`, each `--property:Name=Value` (or `-p:`) by name; a name given twice, in any case, is one key with the later value.
 - `control`: the session controller's settings at Go (OpenRigs.Control): `subject_id`, `session_id`, `go` (UTC) and `parameters`, each name to its value as text, and who ran it as the controller named them: `launched_by`, `go_by` and `stopped_by` (`null` for the controller's own stop after the run finished), each `{ "id", "name" }`, `id` empty when the controller gave a name alone, or `null` when it named nobody. `control` is `null` when the workflow has no session controller.
 - `config_files`: each file the node's `ConfigFiles` names, read once at Start: `path` (absolute) and `sha256`, or `missing: true` and `why`. Which file ran, not what was in it: the settings themselves are the workflow's to log into the session, as the Open Rigs logging spec's settings JSON (section 6).
-- `run`: `outcome` is `running` until the run ends, then `completed` (the run's sequence completed, or with no run sequence the session controller's phase reached Finished, even if the controller then stopped the workflow), `stopped` (stopped before that: with a session controller, only by the controller's stop, its reason in `stop_reason`), `ended-early` (with a session controller: the workflow ended before Finished and without a stop, from an error elsewhere or the editor's Stop) or `error` (the run sequence failed, `error` carrying the message). `started` and `ended` UTC, `seconds` between them, `items` the number of elements the run sequence produced, `null` when none was connected.
+- `run`: `outcome` is `running` until the run ends, then `completed` (the run's sequence completed, or with no run sequence the session controller's phase reached Finished, even if the controller then stopped the workflow), `stopped` (stopped before that: with a session controller, only by the controller's stop, its reason in `stop_reason`), `ended-early` (with a session controller: the workflow ended before Finished and without a stop, from an error elsewhere or the editor's Stop; `error` carries a sentence saying so) or `error` (the run sequence failed, `error` carrying the message). `started` and `ended` UTC, `seconds` between them, `items` the number of elements the run sequence produced, `null` when none was connected.
 - `expected`: what the session had to leave, whether or not it was ever written: `path` (a file, or a folder ending `/` that must hold at least one file no other entry names, so a device's register map never stands in for its data), `why`, and `found`, how many files matched it at that write. By default one folder per device entry in rig.yml (`kind: instance:`, named `<Kind>-<Instance>`) whose subject the workflow publishes; with `harp` in `ExpectedFiles`, also each Harp device's `<Name>/<Name>_device.json` and `<Name>/<Name>.yml`. `files` lists only what existed at the run's end, so a device that wrote nothing shows only here.
 - `files[].closed`: `true` when the workflow could open the file exclusively, so its size was final; `false` when another process still held it (a video writer closing its file).
 - `notes`: sentences on what the node could not find or decided (a config file missing, a device not expected and why, no session controller).

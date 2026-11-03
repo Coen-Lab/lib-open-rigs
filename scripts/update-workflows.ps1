@@ -4,7 +4,7 @@ param(
     # exactly what GitHub has at every run.
     [string]$Work = (Join-Path $env:LOCALAPPDATA 'lib-open-rigs\clones'),
     # rig-setup's lists of the lab's repositories, every profile's: the ones its Repos button
-    # writes on the share, and its own manifest's. Every one that is a Bonsai project
+    # writes on the share, and its own rules file's (rig-setup-rules.json). Every one that is a Bonsai project
     # (rig-setup's rule: .bonsai\Bonsai.config and src\main.bonsai) is a lab workflow here.
     [string]$RepoList = 'K:\config\profile-repos.json',
     [string]$Manifest = 'C:\Github\Coen-Lab\rig-setup\rig-setup-rules.json',
@@ -137,7 +137,7 @@ function Initialize-Bonsai([string]$Dir, [string]$From) {
         if (-not $restore.WaitForExit([int][math]::Max(0, ($deadline - (Get-Date)).TotalMilliseconds))) { $restore.Kill() }
     }
     $gap = @(Get-SetupGap $Dir)
-    if ($gap) { throw "Bonsai setup left $($gap.Count) missing, first $($gap[0]) (no network, or a Bonsai.config Bonsai cannot read)" }
+    if ($gap) { throw "Bonsai setup left $($gap.Count) missing, first $($gap[0]) (no network, a NuGet.config wanting a token this machine does not hold, or a Bonsai.config Bonsai cannot read)" }
     # A Bonsai.exe newer than Bonsai.config upgrades the environment as it restores; that is
     # never this script's to commit.
     if (Invoke-Git $Dir status --porcelain) { throw "Bonsai's setup changed tracked files ($((Invoke-Git $Dir status --porcelain) -join ', ')); nothing done" }
@@ -189,8 +189,9 @@ if ([int](Invoke-Git $repo rev-list --count 'HEAD..@{u}')) {
 $source = (Invoke-Git $repo rev-parse --short HEAD) | Select-Object -First 1
 # The commit every workflow's open-rigs Python package is pinned to: the last one here that
 # changed what the workflows run (src\, pyproject.toml, local_packages\), so the schema and the
-# Bonsai packages come from the same open-rigs and a docs or scripts commit moves no pin.
-$pin = (Invoke-Git $repo log -1 --format=%H -- src pyproject.toml local_packages) | Select-Object -First 1
+# Bonsai packages come from the same open-rigs and a docs or scripts commit moves no pin (a
+# README under src\ included: 1e7ed99 moved every workflow's pin for one).
+$pin = (Invoke-Git $repo log -1 --format=%H -- src ':!src/**/*.md' pyproject.toml local_packages) | Select-Object -First 1
 $pinLine = "open-rigs = {git = `"https://github.com/Coen-Lab/lib-open-rigs`", rev = `"$pin`"}"
 
 # One run at a time: push.ps1's and the hourly one share the clones. A run already going may
@@ -210,7 +211,7 @@ if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
 # Main is left alone for a workflow whose main runs live experiments while a branch moves to
-# open-rigs (av-dome): Lab Packages On Main unticked in rig-setup's Repos menu
+# open-rigs (av-dome): Leave Main Alone ticked in rig-setup's Repos menu
 # ("labPackagesMain": false on its entry), or !main on its workflows.txt line.
 $entries = @((Get-Content $RepoList -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $_.labPackagesMain -eq $false } }) +
     @((Get-Content $Manifest -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $false } }) +

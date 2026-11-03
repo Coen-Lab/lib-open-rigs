@@ -2,7 +2,7 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core, Devices, Video 0.1.0-bbox.1; Logging, Streaming 0.1.0-bbox.2
+## OpenRigs.Core, Devices 0.1.0-bbox.1; Logging, Streaming 0.1.0-bbox.2; Video 0.1.0-bbox.3
 
 Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), from this repository's own `src\`: upstream branch `rig-config-resolver` at `3788bfb` (main plus the per-machine config operators `ResolveRigConfigDirectory`, `ReadRigConfig` and `ResolveRigFile`) and two fixes, both reported upstream, which are commits on this repository's `main`:
 
@@ -13,21 +13,23 @@ Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), 
 
 Logging and Streaming 0.1.0-bbox.2 (2 Nov 2026) also name the session folder `ses-<Session>_<DateTime>`, without `date-`, as agreed on ucl-open/roadmap#37: `LogController` writes it, and `StreamController`'s session key matches it. The time is still UTC. They have a `<Version>` in their `.csproj`, so `scripts\build-package.ps1` builds them.
 
-The packages as committed were built from the same source as patches, in coen-openrigs-custom before it moved here. To rebuild, raise the version (a rebuild is a different file even from the same source, as nupkg hashes are not deterministic), delete the old `.nupkg` files and run:
+Video 0.1.0-bbox.3 (2 Nov 2026, a92cde7 and 19e39cb) is a lab change rather than a patch: a new `ExposureTime` or `Gain` goes to the open camera, and `VideoChunkData` carries both per frame. It has a `<Version>` in its `.csproj`, so `scripts\build-package.ps1` builds it.
+
+Core and Devices as committed were built from the same source as patches, in coen-openrigs-custom before it moved here. To rebuild them, raise the version (a rebuild is a different file even from the same source, as nupkg hashes are not deterministic), delete the old `.nupkg` files and run:
 
 ```powershell
-foreach ($p in 'Core','Devices','Logging','Streaming','Video') {
+foreach ($p in 'Core','Devices') {
     dotnet pack "src/OpenRigs.$p/OpenRigs.$p.csproj" -c Release -p:Version=0.1.0-bbox.2 -o local_packages
 }
 ```
 
-SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on 28 Oct 2026; Logging and Streaming bbox.2 on 2 Nov 2026):
+SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on 28 Oct 2026; Logging and Streaming bbox.2 and Video bbox.3 on 2 Nov 2026):
 
 ```
 8d08926fadd8bcff1c9450c663ec81a8f11b644bcdbbb7204fdef9d729666ef9  OpenRigs.Core.0.1.0-bbox.1.nupkg
 82ae3d13854ff68010ba59c81d65f6d9be7d0039fc39a2912f3c8ca567c9cbca  OpenRigs.Devices.0.1.0-bbox.1.nupkg
 78074525e8228158268f6dd302d39595f76ab4bf027f335cc89cbb25ca2a0463  OpenRigs.Logging.0.1.0-bbox.2.nupkg
-26b0e832a0b4bd83adf8533cf62c12f6995b9b8a6761c604cd62b6522661fe2a  OpenRigs.Video.0.1.0-bbox.1.nupkg
+d961f3e80cb45e68cf4846d54f0c6a2fa1a67c142ee17363c0acf5fc46b01c65  OpenRigs.Video.0.1.0-bbox.3.nupkg
 bd7fd1177f3ce29f35c90072eb1ac800e04314bf5a8bf2556a729a79be70c462  OpenRigs.Streaming.0.1.0-bbox.2.nupkg
 ```
 

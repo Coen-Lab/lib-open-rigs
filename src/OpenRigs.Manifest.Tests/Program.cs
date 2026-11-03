@@ -73,7 +73,8 @@ namespace OpenRigs.Manifest.Tests
         // One session with no run input: the folder appears, then whatever the controller does, then the workflow ends.
         static string Session(string root, string name, ControlState control, Action<ControlState> during)
         {
-            var folder = Path.Combine(root, "sub-TC002", "ses-" + name + "_date-2026-10-30T19-57-12");
+            // The folder as the patched Logging package names it (ses-<Session>_<DateTime>, badd9ca).
+            var folder = Path.Combine(root, "sub-TC002", "ses-" + name + "_2026-10-30T19-57-12");
             var path = new Subject<string>();
             var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
             var subscription = recorder.Process(path).Subscribe(_ => { }, _ => { });
@@ -136,6 +137,7 @@ namespace OpenRigs.Manifest.Tests
                 Console.WriteLine("How the run ended, with no run input:");
                 var finishedThenStopped = Session(root, "a", Controller(), c => { c.SetPhase(SessionPhase.Finished); Stop(c, "run finished"); });
                 Check("a run that finished, then was stopped by rig-control, is completed", Field(finishedThenStopped, "run.outcome") == "completed", Field(finishedThenStopped, "run.outcome"));
+                Check("... in a folder named ses-<Session>_<DateTime>, its session read from the name", Field(finishedThenStopped, "session.id") == "a" && Field(finishedThenStopped, "session.subject") == "TC002" && Field(finishedThenStopped, "session.started") == "2026-10-30T19:57:12Z", Field(finishedThenStopped, "session.id") + " " + Field(finishedThenStopped, "session.started"));
                 Check("... with no stop reason", Field(finishedThenStopped, "run.stop_reason") == "null", Field(finishedThenStopped, "run.stop_reason"));
                 var finished = Session(root, "b", Controller(), c => c.SetPhase(SessionPhase.Finished));
                 Check("a run that finished is completed", Field(finished, "run.outcome") == "completed", Field(finished, "run.outcome"));
@@ -203,6 +205,7 @@ namespace OpenRigs.Manifest.Tests
                     path.OnNext(folder);
                     var text = File.ReadAllText(Path.Combine(folder, ManifestWriter.FileName));
                     Check("... and is written completed, with its items, when the folder appears", Field(text, "run.outcome") == "completed" && Field(text, "run.items") == "2", Field(text, "run.outcome") + " " + Field(text, "run.items"));
+                    Check("... and the older ses-<Session>_date-<DateTime> name is still read", Field(text, "session.id") == "f" && Field(text, "session.started") == "2026-10-30T19:57:12Z", Field(text, "session.id") + " " + Field(text, "session.started"));
                     Check("... and the node completes", completed, "no OnCompleted");
                     subscription.Dispose();
                 }

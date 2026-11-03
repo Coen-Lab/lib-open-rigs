@@ -4,7 +4,7 @@
 # separated by spaces (rig-setup's own repositories take theirs from the branches ticked there).
 # !main among them leaves main alone, for a workflow whose main runs live experiments while a
 # branch moves to open-rigs: ucl-open/av-dome !main open-rigs-integration
-# A repository in rig-setup's Repos list does the same with Lab Packages On Main unticked on
-# its right-click menu; a !main here is ignored while that is ticked.
+# A repository in rig-setup's Repos list does the same with Leave Main Alone ticked on its
+# right-click menu; a !main here is ignored while that is unticked.
 # Only a Bonsai project in the open-rigs layout (.bonsai\Bonsai.config and src\main.bonsai at
 # the root) is updated; any other is listed as "not Bonsai".
