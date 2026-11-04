@@ -1,6 +1,6 @@
 # OpenRigs.LiveView
 
-One node, `StreamDevices`, that streams every device a rig has to the live view, at fixed rates, from the rig's own configuration. A workflow drops it in once, as its last node, and sets `ConfigRoot`; nothing else is wired to it.
+One node, `StreamDevices`, that streams every device a rig has to the live view, at fixed rates, from the rig's own configuration. A workflow drops it in once, as its last node, and leaves `ConfigRoot` at its default; nothing else is wired to it.
 
 ## What It Does
 
@@ -14,7 +14,7 @@ When the workflow is built, `StreamDevices` reads `<ConfigRoot>\<MACHINE-NAME>\r
 Devices with no recipe, or whose data the workflow does not publish, are skipped. A `behaviorBoard` is streamed only when it is a Harp device by the rule `RecordHarpDevices` records by and `SessionManifest` expects by (`src\Shared\HarpRig.cs`: a `portName` that is not empty or `null`, and `<Name>.Data` published as `HarpMessage`), since 0.1.0-local.12; before, a board with `portName: null` was streamed though nothing recorded it. As well as the devices it sends:
 
 - `elapsed`: seconds since the session folder appeared (`PathPrefix`, from OpenRigs.Logging), once a second.
-- `liveview`: every 5 s, the workflow running (its path within its repository, the project, origin URL, branch, commit, whether tracked files differ from it) and the streams sent, the devices skipped and why, and any problem with rig.yml. The workflow is found as coen-behaviour-box's session manifest finds it, so the two name the same commit.
+- `liveview`: every 5 s, the workflow running (its path within its repository, the project, origin URL, branch, commit, whether tracked files differ from it) and the streams sent, the devices skipped and why, and any problem with rig.yml. The workflow is found as OpenRigs.Manifest's `SessionManifest` finds it (both compile `src\Shared\WorkflowFile.cs`), so the two name the same commit.
 
 Every message carries the rig's name (the stream header's `rigId`, which is the machine name, not rig.yml's two-character `rigId`, since the live-view windows find a rig's streams by the machine they connect to) and the session key, `ready` until `PathPrefix` names the session folder and then that folder's last two names (`sub-<SubjectId>/ses-<SessionId>_<start>`). A workflow without `PathPrefix` keeps `ready` and sends no `elapsed`.
 

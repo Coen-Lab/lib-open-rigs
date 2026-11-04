@@ -28,6 +28,13 @@ namespace OpenRigs.HarpDevices.Tests
             if (!ok) failed++;
         }
 
+        // Polled, never a fixed sleep (audit-rigs set B, L2-L2): a record written on the Rx timer
+        // thread is waited for up to a bound, so a slow machine passes and a fast one does not wait.
+        static void WaitFor(Func<bool> done, int ms = 3000)
+        {
+            for (var w = Stopwatch.StartNew(); !done() && w.ElapsedMilliseconds < ms;) Thread.Sleep(10);
+        }
+
         static string Error(Action action)
         {
             try { action(); return null; }
@@ -135,7 +142,7 @@ namespace OpenRigs.HarpDevices.Tests
                         path.OnNext(session);
                         foreach (var m in Board(1216)) messages.OnNext(m);  // the dump asked for
                         Check("waits until the dump has finished", written.Count == 0, written.Count.ToString());
-                        Thread.Sleep(400);
+                        WaitFor(() => written.Count > 0 || error != null);
                         var json = File.ReadAllText(Path.Combine(session, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
                         Check("writes <Name>/<Name>_device.json when the dump has come", written.Count == 1 && error == null, written.Count + " " + error);
                         Check("... with the board's versions and serials", json.Contains("\"who_am_i\": 1216") && json.Contains("\"firmware\": \"3.1\"") && json.Contains("\"hardware\": \"1.2\"") && json.Contains("\"core\": \"1.11\"")
@@ -146,7 +153,7 @@ namespace OpenRigs.HarpDevices.Tests
 
                         var quiet = Path.Combine(root, "ses-2");
                         path.OnNext(quiet);
-                        Thread.Sleep(1800);
+                        WaitFor(() => written.Count > 1 || error != null);
                         var late = File.ReadAllText(Path.Combine(quiet, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
                         Check("no dump within the timeout writes what the board reported at connection, and says so", late.Contains("\"dumped\": false") && late.Contains("\"who_am_i\": 1216") && late.Contains("No register dump came"), late);
                     }
@@ -160,7 +167,7 @@ namespace OpenRigs.HarpDevices.Tests
                         var session = Path.Combine(root, "ses-3");
                         path.OnNext(session);
                         foreach (var m in Board(1158)) messages.OnNext(m);
-                        Thread.Sleep(400);
+                        WaitFor(() => error != null);
                         Check("a board of another kind stops the workflow, naming it", error != null && error.Message.Contains("WhoAmI 1158") && error.Message.Contains("reports 1216"), error == null ? "no error" : error.Message);
                         Check("... after recording it", File.Exists(Path.Combine(session, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json")), "no record");
                     }
@@ -175,7 +182,7 @@ namespace OpenRigs.HarpDevices.Tests
                         var session = Path.Combine(root, "ses-4");
                         path.OnNext(session);
                         foreach (var m in Interleaved(1216)) messages.OnNext(m);  // no dump at connection
-                        Thread.Sleep(400);
+                        WaitFor(() => written.Count > 0);
                         var json = written.Count == 1 ? File.ReadAllText(written[0]) : "";
                         Check("a dump with the core's registers after 7 is recorded whole", json.Contains("\"device_name\": \"Behavior\"") && json.Contains("\"harp_serial\": 65535")
                             && json.Contains("\"uid\": \"0102030405060708090a0b0c0d0e0f10\"") && json.Contains("\"dumped\": true"), written.Count + " " + json);
@@ -209,8 +216,9 @@ namespace OpenRigs.HarpDevices.Tests
                         foreach (var m in Board(1216).Where(m => m.Address != WhoAmI.Address)) messages.OnNext(m);
                         var silent = Path.Combine(root, "ses-silent");
                         path.OnNext(silent);
-                        Thread.Sleep(1800);
-                        var json = File.ReadAllText(Path.Combine(silent, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
+                        var silentRecord = Path.Combine(silent, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json");
+                        WaitFor(() => File.Exists(silentRecord) || error != null);
+                        var json = File.ReadAllText(silentRecord);
                         var map = Path.Combine(silent, "BehaviorBoard-Main", "BehaviorBoard-Main.yml");
                         Check("a board that reported no WhoAmI gets the map of the kind rig.yml names, and the record says so",
                             error == null && json.Contains("\"who_am_i\": null") && File.Exists(map) && File.ReadAllText(map).Contains("whoAmI: 1216") && json.Contains("reported no WhoAmI"), error == null ? json : error.Message);

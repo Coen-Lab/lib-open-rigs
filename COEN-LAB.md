@@ -4,7 +4,7 @@ This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (bra
 
 | On `main` | What it is |
 |---|---|
-| `src/open_rigs/core/rig.py` | `rig_id` (`rigId` in rig.yml): optional, the rig's code (B1 GEEK-BBOX1, in its rig.yml; D1 and D2 for the green domes, O1 and O2 the blue opto rigs and A1 PINK-ACUTE are planned, since those rigs keep no rig.yml rig-control reads yet), the end of every session ID |
+| `src/open_rigs/core/rig.py` | `rig_id` (`rigId` in rig.yml): optional, the rig's code (B1 GEEK-BBOX1 and D1 GREEN-DOME-1, in their rig.yml, the dome's the one av-dome's `pip/main-switchover` reads since 4 Nov 2026; D2 GREEN-DOME-2, O1 and O2 the blue opto rigs and A1 PINK-ACUTE are planned, since those rigs keep no rig.yml rig-control reads yet), the end of every session ID |
 | `src/open_rigs/rigs/` | One rig schema per kind of rig (`behaviour_box.py`: `BehaviourBoxRig`), with no `version`: the keys tell whether a workflow takes a rig's file, and rig-setup's rig.yml row checks them. Every workflow for that kind of rig imports it in its `rig.py` instead of defining its own, so all of them read the same `rig.yml` and a second workflow on a rig can run. It holds hardware only; settings of one experiment go in that workflow's task schema. Lab-only |
 | `8deeb9c`, `ee4a8a4` | `TriggeredSpinnaker` fixes, ucl-open/ucl-open#66 and #67 ([`patches/README.md`](patches/README.md)) |
 | [`OpenRigs.Control`](src/OpenRigs.Control/README.md) | Holds a workflow ready (hardware armed, live view streaming, nothing recorded), answers [rig-control](https://github.com/Coen-Lab/rig-control) over ZeroMQ, and releases the session on Go |
