@@ -35,6 +35,10 @@
     href: OpenRigs.Logging/log-controller.md
   - name: Log Data
     href: OpenRigs.Logging/log-data.md
+  - name: Log Trial
+    href: OpenRigs.Logging/log-trial.md
+  - name: Log Async
+    href: OpenRigs.Logging/log-async.md
   - name: Log Harp Device
     href: OpenRigs.Logging/log-harp-device.md
   - name: Log Video
