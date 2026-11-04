@@ -258,17 +258,20 @@ namespace OpenRigs.HarpDevices.Tests
                 File.WriteAllText(Path.Combine(config, Environment.MachineName, "rig.yml"),
                     "behaviorBoard:\n  main:\n    portName: COM3\n    usbSerial: AB0M7PLB\n  spare:\n    portName: COM9\n  idle:\n    portName: null\n" +
                     "licketySplit:\n  left:\n    portName: COM4\n    usbSerial: E664C856C3913E37\n" +
+                    "soundCard:\n  main:\n    portName: COM6\n" +
                     "camera:\n  box:\n    serialNumber: '1'\nrootPath: C:\\data\n");
                 Func<string, Type> published = n =>
                     n == "PathPrefix" ? typeof(string)
-                    : n == "BehaviorBoard-Main.Data" || n == "BehaviorBoard-Main.Commands" || n == "LicketySplit-Left.Data" || n == "BehaviorBoard-Idle.Data" ? typeof(HarpMessage)
+                    : n == "BehaviorBoard-Main.Data" || n == "BehaviorBoard-Main.Commands" || n == "LicketySplit-Left.Data" || n == "SoundCard-Main.Data" || n == "BehaviorBoard-Idle.Data" ? typeof(HarpMessage)
                     : n == "Camera-Box.Data" ? typeof(object) : null;
                 var plan = HarpDevicePlan.Create(config, published);
                 var main = plan.Recorded.FirstOrDefault(d => d.Name == "BehaviorBoard-Main");
-                Check("records each serial device the workflow publishes as HarpMessage", string.Join(",", plan.Recorded.Select(d => d.Name)) == "BehaviorBoard-Main,LicketySplit-Left", string.Join(",", plan.Recorded.Select(d => d.Name)));
+                Check("records each serial device the workflow publishes as HarpMessage", string.Join(",", plan.Recorded.Select(d => d.Name)) == "BehaviorBoard-Main,LicketySplit-Left,SoundCard-Main", string.Join(",", plan.Recorded.Select(d => d.Name)));
                 Check("... with rig.yml's port and USB serial, its kind's WhoAmI, and its commands", main != null && main.PortName == "COM3" && main.UsbSerial == "AB0M7PLB" && main.ExpectedWhoAmI == 1216 && main.HasCommands, main == null ? "none" : main.ToString());
                 var left = plan.Recorded.FirstOrDefault(d => d.Name == "LicketySplit-Left");
-                Check("a kind with no known WhoAmI is recorded unchecked, and noted", left != null && left.ExpectedWhoAmI == 0 && !left.HasCommands && plan.Notes.Any(n => n.Contains("no WhoAmI is known for licketySplit")), string.Join(" | ", plan.Notes));
+                Check("a Lickety Split is checked against WhoAmI 1400", left != null && left.ExpectedWhoAmI == 1400 && !plan.Notes.Any(n => n.Contains("licketySplit")), left == null ? "none" : left.ToString());
+                var soundCard = plan.Recorded.FirstOrDefault(d => d.Name == "SoundCard-Main");
+                Check("a kind with no known WhoAmI is recorded unchecked, and noted", soundCard != null && soundCard.ExpectedWhoAmI == 0 && !soundCard.HasCommands && plan.Notes.Any(n => n.Contains("no WhoAmI is known for soundCard")), string.Join(" | ", plan.Notes));
                 Check("a device the workflow does not publish is noted", plan.Notes.Any(n => n.StartsWith("BehaviorBoard-Spare")), string.Join(" | ", plan.Notes));
                 Check("a camera is not a serial device and is passed over", !plan.Notes.Any(n => n.StartsWith("Camera-Box")), string.Join(" | ", plan.Notes));
                 // H1/M1: the same rule as OpenRigs.Manifest's (src\Shared\HarpRig.cs), whose tests hold the same entry.

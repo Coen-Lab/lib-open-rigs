@@ -17,7 +17,7 @@ namespace OpenRigs.Shared
 
         /// <summary>
         /// Each kind of Harp device rig.yml may hold, to the WhoAmI its boards report. The same
-        /// numbers as open-rigs' devices\harp.py, where the kinds' settings are defined; the
+        /// numbers as open-rigs' devices\harp.py and devices\lickety_split.py, where the kinds' settings are defined; the
         /// kinds are named as the rig schemas name their fields (behavior_board is behaviorBoard).
         /// A kind not here is recorded with its WhoAmI unchecked.
         /// </summary>
@@ -29,6 +29,7 @@ namespace OpenRigs.Shared
             { "clockSynchronizer", 1152 },
             { "stepperDriver", 1130 },
             { "hobgoblin", 123 },
+            { "licketySplit", 1400 },
         };
 
         /// <summary>

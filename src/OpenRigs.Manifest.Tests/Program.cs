@@ -275,13 +275,13 @@ namespace OpenRigs.Manifest.Tests
                 // uses (a portName: null is none), and the register map is expected only when a loaded package decodes the kind.
                 var harpYml = Path.Combine(root, "harp-rig.yml");
                 File.WriteAllText(harpYml, "behaviorBoard:\n  main:\n    portName: COM3\n  idle:\n    portName: null\n" +
-                    "licketySplit:\n  left:\n    portName: COM4\nclockSynchronizer:\n  sync:\n    portName: COM5\ncamera:\n  box:\n    serialNumber: '1'\n");
+                    "soundCard:\n  main:\n    portName: COM4\nclockSynchronizer:\n  sync:\n    portName: COM5\ncamera:\n  box:\n    serialNumber: '1'\n");
                 var harpMessage = typeof(Bonsai.Harp.HarpMessage);
                 Func<string, Type> harpPublished = n => n.EndsWith(".Data") && !n.StartsWith("Camera") ? harpMessage : n == "Camera-Box" || n == "Camera-Box.Data" ? typeof(object) : null;
                 var unloaded = ExpectedPlan.Create("harp", harpYml, harpPublished);
                 var unloadedPaths = string.Join(", ", unloaded.Entries.Select(e => e.Path));
-                Check("harp expects each Harp device's record, and no register map no loaded package decodes", unloadedPaths == "BehaviorBoard-Main/BehaviorBoard-Main_device.json, LicketySplit-Left/LicketySplit-Left_device.json, ClockSynchronizer-Sync/ClockSynchronizer-Sync_device.json", unloadedPaths);
-                Check("... noting why each map is not expected", unloaded.Notes.Any(n => n.StartsWith("BehaviorBoard-Main/BehaviorBoard-Main.yml") && n.Contains("decodes WhoAmI 1216")) && unloaded.Notes.Any(n => n.StartsWith("LicketySplit-Left/LicketySplit-Left.yml") && n.Contains("no WhoAmI is known for licketySplit")), string.Join(" | ", unloaded.Notes));
+                Check("harp expects each Harp device's record, and no register map no loaded package decodes", unloadedPaths == "BehaviorBoard-Main/BehaviorBoard-Main_device.json, SoundCard-Main/SoundCard-Main_device.json, ClockSynchronizer-Sync/ClockSynchronizer-Sync_device.json", unloadedPaths);
+                Check("... noting why each map is not expected", unloaded.Notes.Any(n => n.StartsWith("BehaviorBoard-Main/BehaviorBoard-Main.yml") && n.Contains("decodes WhoAmI 1216")) && unloaded.Notes.Any(n => n.StartsWith("SoundCard-Main/SoundCard-Main.yml") && n.Contains("no WhoAmI is known for soundCard")), string.Join(" | ", unloaded.Notes));
                 Check("a portName: null is not a Harp device, and not noted", !unloadedPaths.Contains("Idle") && !unloaded.Notes.Any(n => n.Contains("Idle")), unloadedPaths + " | " + string.Join(" | ", unloaded.Notes));
                 Console.WriteLine("        loaded " + LoadBehavior());
                 var harp = ExpectedPlan.Create("auto;harp", harpYml, harpPublished);
