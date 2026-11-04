@@ -72,7 +72,16 @@ Remove-Item $bin -Recurse -Force -ErrorAction SilentlyContinue
 $extensions = Join-Path $Repo 'src\Extensions.csproj'
 if (Test-Path $extensions) {
     "1. Compiling src\Extensions as C# 5..."
-    $log = & { $ErrorActionPreference = 'Continue'; & dotnet build $extensions -o $bin -nologo -v q -p:LangVersion=5 `
+    # Bonsai compiles the Extensions folder beside each workflow with that folder's own
+    # Extensions.csproj, so a folder under src with a project of its own is not part of this
+    # build (av-dome's GammaCalibrationFromBonvision needs MathNet, which src's project does
+    # not list; 4 Nov 2026). Setting the property replaces the SDK's hidden-folder exclude, so
+    # that is kept. Quoted as \"...\" for Windows PowerShell 5.1, which runs this script.
+    $src = Join-Path $Repo 'src'
+    $nested = @(Get-ChildItem $src -Recurse -Filter *.csproj | Where-Object { $_.DirectoryName -ne $src } |
+        ForEach-Object { ($_.DirectoryName.Substring($src.Length + 1) -replace '\\', '/') + '/**' } | Select-Object -Unique)
+    $exclude = '-p:DefaultItemExcludesInProjectFolder=\"' + ((@('**/.*/**') + $nested) -join ';') + '\"'
+    $log = & { $ErrorActionPreference = 'Continue'; & dotnet build $extensions -o $bin -nologo -v q -p:LangVersion=5 $exclude `
         --source https://api.nuget.org/v3/index.json --source (Join-Path $Repo 'local_packages') 2>&1 | ForEach-Object { "$_" } }
     if ($LASTEXITCODE -ne 0) { $log | Where-Object { $_ -match 'error' } | Select-Object -Unique | ForEach-Object { "  $_" }; "  FAILED"; exit 1 }
     "  ok"
