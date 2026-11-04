@@ -56,7 +56,7 @@ namespace OpenRigs.HarpDevices
                 return plan;
             }
             string problem;
-            var devices = RigDevices.Read(Path.Combine(Environment.ExpandEnvironmentVariables(configRoot), Environment.MachineName, "rig.yml"), out problem);
+            var devices = RigDevices.Read(RigDevices.PathFor(configRoot), out problem);
             if (devices == null)
             {
                 plan.Notes.Add(problem);

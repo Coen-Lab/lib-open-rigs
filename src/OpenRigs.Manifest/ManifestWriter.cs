@@ -134,6 +134,13 @@ namespace OpenRigs.Manifest
             return manifestPath;
         }
 
+        /// <summary>A running write again, once the controller's stop has come: the stop's reason and who sent it are on disk even if the workflow is killed before its end. A Begin that never happened, or failed, writes nothing.</summary>
+        public void Stopping(ControlSession control)
+        {
+            if (manifestPath == null) return;
+            Write(new RunEnd(RunEnd.Running, null), null, control, null);
+        }
+
         /// <summary>The second write, with the outcome. A Begin that never happened, or failed, writes nothing.</summary>
         public void Finish(RunEnd end, long? items, ControlSession control)
         {
@@ -162,7 +169,8 @@ namespace OpenRigs.Manifest
             run.Add("seconds", ended.HasValue ? (object)Math.Round((ended.Value - started).TotalSeconds, 1) : null);
             run.Add("items", items);
             run.Add("error", end.Error);
-            run.Add("stop_reason", end.Outcome == RunEnd.Stopped && control != null ? control.StopReason : null);
+            // A running write carries the stop too: rig-control kills a workflow slow to stop, and that write is then the last.
+            run.Add("stop_reason", (end.Outcome == RunEnd.Stopped || end.Outcome == RunEnd.Running) && control != null ? control.StopReason : null);
             doc.Add("run", run);
             var files = FilesSection(folder);
             doc.Add("expected", ExpectedSection(expected, files));

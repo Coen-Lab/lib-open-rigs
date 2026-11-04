@@ -32,7 +32,9 @@ $started = UtcNow
     # On main, following origin/main, which update-workflows' checks read as @{u}.
     git -C $self checkout -q -f -B main origin/main 2>&1 | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0) { "Stopped: could not set $self to origin/main."; 'Exit 1'; return }
-    & (Join-Path $self 'scripts\update-workflows.ps1')
+    # A child, as push.ps1 runs it: called in this process, a script that does not parse left
+    # $LASTEXITCODE at git's 0, and the run was recorded as a pass (audit-rigs set B, 4 Nov 2026).
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $self 'scripts\update-workflows.ps1') 2>&1 | ForEach-Object { "$_" }
     'Exit ' + $LASTEXITCODE
 } *> $log
 $code = $LASTEXITCODE
@@ -46,7 +48,8 @@ try {
 } catch { Add-Content -LiteralPath $log -Value "Could not update ${shared}: $($_.Exception.Message)" }
 # Every run, passed or not, so a task that stopped running is seen too: it runs only while Pip is
 # signed in here, and the task's history reads 0 whatever happened. rig-setup's rig-status report
-# reads this file and flags it when finished is over 3 h old or exitCode is not 0 (audit-rigs set A,
+# and Machines window read this file and flag it when exitCode is not 0 or finished is over 3 h
+# old, and ClaudioVisual's rig health DM when finished is over a day old (audit-rigs sets A and B,
 # 4 Nov 2026). lastPass is this run's finish when it passed, else kept from the last file.
 $machine = $env:COMPUTERNAME
 $statusDir = "K:\config\$machine"

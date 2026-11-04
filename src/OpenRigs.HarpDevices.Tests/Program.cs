@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
@@ -139,6 +140,7 @@ namespace OpenRigs.HarpDevices.Tests
                         Check("writes <Name>/<Name>_device.json when the dump has come", written.Count == 1 && error == null, written.Count + " " + error);
                         Check("... with the board's versions and serials", json.Contains("\"who_am_i\": 1216") && json.Contains("\"firmware\": \"3.1\"") && json.Contains("\"hardware\": \"1.2\"") && json.Contains("\"core\": \"1.11\"")
                             && json.Contains("\"harp_serial\": 65535") && json.Contains("\"usb_serial\": \"AB0M7PLB\"") && json.Contains("\"device_name\": \"Behavior\"") && json.Contains("\"uid\": null") && json.Contains("\"dumped\": true"), json);
+                        Check("... with no note that the kind was checked late, as WhoAmI came at connection", !json.Contains("checked only after the session started"), json);
                         var map = Path.Combine(session, "BehaviorBoard-Main", "BehaviorBoard-Main.yml");
                         Check("... and the register map of the Harp package with its WhoAmI", File.Exists(map) && File.ReadAllText(map).Contains("whoAmI: 1216") && json.Contains("\"register_map_from\": \"Harp.Behavior 0.2.0\""), json);
 
@@ -177,6 +179,8 @@ namespace OpenRigs.HarpDevices.Tests
                         var json = written.Count == 1 ? File.ReadAllText(written[0]) : "";
                         Check("a dump with the core's registers after 7 is recorded whole", json.Contains("\"device_name\": \"Behavior\"") && json.Contains("\"harp_serial\": 65535")
                             && json.Contains("\"uid\": \"0102030405060708090a0b0c0d0e0f10\"") && json.Contains("\"dumped\": true"), written.Count + " " + json);
+                        // L2-I1: a wrong kind could stop the workflow before Go only from a WhoAmI at connection.
+                        Check("... and says the kind was checked only after the session started, as nothing came at connection", json.Contains("checked only after the session started"), json);
                     }
                 }
                 {
@@ -213,6 +217,16 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
+                    // L2-L3: an error on the board's messages before any session was dropped.
+                    var messages = new Subject<HarpMessage>();
+                    Exception error = null;
+                    using (Recorder().Process(messages, new Subject<string>()).Subscribe(_ => { }, ex => error = ex))
+                    {
+                        messages.OnError(new InvalidOperationException("port closed"));
+                        Check("an error on the board's messages before any session stops the workflow", error != null && error.Message == "port closed", error == null ? "no error" : error.Message);
+                    }
+                }
+                {
                     // L2: a board of the wrong kind is found from the dump at connection, before Go.
                     var messages = new Subject<HarpMessage>();
                     Exception error = null;
@@ -243,7 +257,8 @@ namespace OpenRigs.HarpDevices.Tests
                     using (new RequestRegisterDump { Delay = TimeSpan.Zero }.Process(messages, path).Subscribe(sent.Add))
                     {
                         path.OnNext("x");
-                        Thread.Sleep(100);
+                        // L2-I3: polled, not a fixed 100 ms, so a slow machine does not fail it.
+                        for (var waited = Stopwatch.StartNew(); sent.Count != 1 && waited.ElapsedMilliseconds < 2000; ) Thread.Sleep(10);
                         Check("reads OperationControl when the session folder appears", sent.Count == 1 && sent[0].Address == OperationControl.Address && sent[0].MessageType == MessageType.Read, sent.Count.ToString());
                         // Active, heartbeat on, operation LED on: what the device answers with.
                         messages.OnNext(OperationControl.FromPayload(MessageType.Read, new OperationControlPayload(OperationMode.Active, false, false, LedState.On, LedState.On, EnableFlag.Enabled)));

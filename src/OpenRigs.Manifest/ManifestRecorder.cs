@@ -15,6 +15,9 @@ namespace OpenRigs.Manifest
         readonly string configFiles;
         readonly ExpectedPlan expected;
 
+        // How often the controller's stop is looked for while the run goes on: ControlSession is read by name, with nothing to subscribe to.
+        internal static TimeSpan StopPoll = TimeSpan.FromMilliseconds(250);
+
         internal ManifestRecorder(string ingestScript, string configFiles, ExpectedPlan expected)
         {
             this.ingestScript = ingestScript;
@@ -50,6 +53,7 @@ namespace OpenRigs.Manifest
                 var items = 0L;
                 var begun = false;
                 var finished = false;
+                var stopWritten = false;
                 // How the run ended, kept until the folder's path arrives: the run may end before
                 // LogController has made the folder, and the manifest must still say so.
                 RunEnd pending = null;
@@ -102,7 +106,24 @@ namespace OpenRigs.Manifest
                     {
                         if (ended.Outcome == RunEnd.Failed) observer.OnError(new SessionManifestException(ended.Error));
                         else observer.OnCompleted();
+                        return;
                     }
+                    // The controller's stop is written as soon as it comes, the run still going:
+                    // rig-control kills a workflow that has not stopped by its deadline, and the
+                    // end-of-run write never comes.
+                    if (control != null) subscriptions.Add(Observable.Interval(StopPoll).Subscribe(_ =>
+                    {
+                        try
+                        {
+                            lock (gate)
+                            {
+                                if (finished || stopWritten || control.StopReason == null) return;
+                                stopWritten = true;
+                                writer.Stopping(control);
+                            }
+                        }
+                        catch (Exception ex) { NotWritten("the controller's stop", ex); }
+                    }));
                 }, observer.OnError));
 
                 if (run != null)
@@ -112,7 +133,7 @@ namespace OpenRigs.Manifest
                         error =>
                         {
                             try { finish(new RunEnd(RunEnd.Failed, error.Message)); }
-                            catch (Exception ex) { NotWritten(ex); }
+                            catch (Exception ex) { NotWritten("the final manifest", ex); }
                             lock (gate) { if (!begun) return; }
                             observer.OnError(error);
                         },
@@ -130,16 +151,16 @@ namespace OpenRigs.Manifest
                 subscriptions.Add(Disposable.Create(() =>
                 {
                     try { finish(RunEnd.AtDisposal(control ?? ControlSession.Current())); }
-                    catch (Exception ex) { NotWritten(ex); }
+                    catch (Exception ex) { NotWritten("the final manifest", ex); }
                 }));
                 return subscriptions;
             });
         }
 
         // Where nothing downstream can take the error: Bonsai's console shows stderr, which a trace alone does not reach.
-        static void NotWritten(Exception ex)
+        static void NotWritten(string what, Exception ex)
         {
-            var message = "SessionManifest: the final manifest was not written: " + ex.Message;
+            var message = "SessionManifest: " + what + " was not written: " + ex.Message;
             Trace.TraceError(message);
             Console.Error.WriteLine(message);
         }

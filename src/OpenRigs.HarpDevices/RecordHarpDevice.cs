@@ -91,14 +91,16 @@ namespace OpenRigs.HarpDevices
                 var gate = new object();
                 var atConnection = new Dictionary<int, HarpMessage>();
                 var started = false;
+                var checkedBeforeStart = false;
                 var keep = messages.Subscribe(message =>
                 {
                     if (!IsReport(message)) return;
                     lock (gate) atConnection[message.Address] = message;
                     if (message.Address != WhoAmI.Address || Volatile.Read(ref started) || message.GetPayload().Count < 2) return;
+                    Volatile.Write(ref checkedBeforeStart, true);
                     var wrong = WrongKind(message.GetPayloadUInt16());
                     if (wrong != null) observer.OnError(new InvalidOperationException(wrong));
-                }, ex => { });
+                }, observer.OnError);
 
                 var records = pathPrefix.SelectMany(path =>
                 {
@@ -120,7 +122,7 @@ namespace OpenRigs.HarpDevices
                             registers = new Dictionary<int, HarpMessage>(atConnection);
                             foreach (var pair in fresh) registers[pair.Key] = pair.Value;
                         }
-                        return Write(path, usbSerial, registers, dumped);
+                        return Write(path, usbSerial, registers, dumped, Volatile.Read(ref checkedBeforeStart));
                     });
                 }).Subscribe(observer);
                 return new CompositeDisposable(keep, records);
@@ -174,7 +176,7 @@ namespace OpenRigs.HarpDevices
         }
 
         // Writes the record and the register map, then stops the workflow if the board is of the wrong kind.
-        string Write(string pathPrefix, string usbSerial, Dictionary<int, HarpMessage> registers, bool dumped)
+        string Write(string pathPrefix, string usbSerial, Dictionary<int, HarpMessage> registers, bool dumped, bool checkedAtConnection)
         {
             var notes = new List<object>();
             if (!dumped) notes.Add(registers.Count == 0 ? "The device reported no registers, at connection or after the session folder appeared."
@@ -188,6 +190,8 @@ namespace OpenRigs.HarpDevices
             if (whoAmI.HasValue && map == null) notes.Add("No Harp package loaded in this workflow decodes WhoAmI " + whoAmI.Value + ", so its register map is not written.");
             else if (!whoAmI.HasValue && map != null) notes.Add("The device reported no WhoAmI, so the register map written is the one for the kind rig.yml names (WhoAmI " + ExpectedWhoAmI + ").");
             else if (!whoAmI.HasValue) notes.Add("The device reported no WhoAmI, and no Harp package loaded in this workflow decodes its kind's (" + ExpectedWhoAmI + "), so no register map is written.");
+            // A wrong kind stops the workflow before Go only when the WhoAmI came at connection.
+            if (whoAmI.HasValue && !checkedAtConnection) notes.Add("The board reported no WhoAmI at connection, so its kind was checked only after the session started.");
 
             var folder = Path.Combine(pathPrefix, Name);
             Directory.CreateDirectory(folder);

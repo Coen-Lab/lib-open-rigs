@@ -160,6 +160,30 @@ namespace OpenRigs.Manifest.Tests
                 });
                 Check("control names who launched the session and who sent Go", Field(named, "control.launched_by.id") == "PipC" && Field(named, "control.launched_by.name") == "Pip Coen" && Field(named, "control.go_by.id") == "JoB", named);
                 Check("... and who stopped it", Field(named, "control.stopped_by.name") == "Jo Bloggs" && Field(named, "control.stopped_by.id") == "", Field(named, "control.stopped_by.name"));
+                {
+                    // S3-L3: rig-control kills a workflow slow to stop, so the running write is the last.
+                    var control = Controller();
+                    var folder = Path.Combine(root, "sub-TC002", "ses-slow_2026-10-30T19-57-12");
+                    var path = new Subject<string>();
+                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    using (recorder.Process(path).Subscribe(_ => { }, _ => { }))
+                    {
+                        control.SetPhase(SessionPhase.Recording);
+                        path.OnNext(folder);
+                        Set(control, "StoppedBy", new Person { Id = "JoB", Name = "Jo Bloggs" });
+                        Stop(control, "mouse unwell");
+                        var manifest = Path.Combine(folder, ManifestWriter.FileName);
+                        var running = "";
+                        for (var waited = System.Diagnostics.Stopwatch.StartNew(); waited.ElapsedMilliseconds < 2000; System.Threading.Thread.Sleep(50))
+                        {
+                            try { running = File.ReadAllText(manifest); } catch (IOException) { continue; }
+                            if (Field(running, "run.stop_reason") != "null") break;
+                        }
+                        Check("a controller's stop is written while the run is still going, with who sent it", Field(running, "run.outcome") == "running" && Field(running, "run.stop_reason") == "mouse unwell"
+                            && Field(running, "control.stopped_by.id") == "JoB", Field(running, "run.outcome") + " " + Field(running, "run.stop_reason") + " " + Field(running, "control.stopped_by.id"));
+                    }
+                    Set(null, "Current", null);
+                }
                 Check("a controller that names nobody leaves them null", Field(finished, "control.launched_by") == "null" && Field(finished, "control.go_by") == "null" && Field(finished, "control.stopped_by") == "null", Field(finished, "control.launched_by"));
                 Check("rig.os is the real Windows version, not the 6.2 Windows tells an undeclared program", !Field(finished, "rig.os").Contains("6.2.9200"), Field(finished, "rig.os"));
                 // 0.1.0-local.6: rig.yml is in config_files only, not copied again into rig.

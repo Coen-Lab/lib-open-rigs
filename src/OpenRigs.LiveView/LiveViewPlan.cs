@@ -20,6 +20,7 @@ namespace OpenRigs.LiveView
         public int Width;        // video only
         public int Height;
         public Func<Type, string> Accepts;  // null if the data can be streamed, else why not
+        public bool Harp;        // a Harp board, streamed only when HarpRig.NotHarp says it is one, as it is recorded
 
         public bool IsVideo { get { return Width > 0; } }
 
@@ -32,8 +33,7 @@ namespace OpenRigs.LiveView
             },
             new DeviceRecipe
             {
-                Kind = "behaviorBoard", Template = "BehaviorBoard", Stream = "encoder", Rate = 10,
-                Accepts = t => t.FullName == "Bonsai.Harp.HarpMessage" ? null : "its data (" + t.Name + ") is not HarpMessage",
+                Kind = "behaviorBoard", Template = "BehaviorBoard", Stream = "encoder", Rate = 10, Harp = true,
             },
         };
 
@@ -149,7 +149,7 @@ namespace OpenRigs.LiveView
                 return plan;
             }
             string problem;
-            var devices = RigDevices.Read(Path.Combine(Environment.ExpandEnvironmentVariables(configRoot), Environment.MachineName, "rig.yml"), out problem);
+            var devices = RigDevices.Read(RigDevices.PathFor(configRoot), out problem);
             if (devices == null)
             {
                 plan.Notes.Add(problem);
@@ -157,13 +157,15 @@ namespace OpenRigs.LiveView
             }
             foreach (var device in devices)
             {
-                plan.Consider(device.Name, device.Kind, device.Settings, publishedType);
+                plan.Consider(device, publishedType);
             }
             return plan;
         }
 
-        void Consider(string name, string kind, YamlMappingNode settings, Func<string, Type> publishedType)
+        void Consider(RigDevice rigDevice, Func<string, Type> publishedType)
         {
+            var name = rigDevice.Name;
+            var kind = rigDevice.Kind;
             var recipe = DeviceRecipe.All.FirstOrDefault(r => r.Kind == kind);
             if (recipe == null)
             {
@@ -171,18 +173,20 @@ namespace OpenRigs.LiveView
                 return;
             }
             var device = new PlannedDevice { Name = name, Recipe = recipe, Rate = recipe.Rate, Width = recipe.Width, Height = recipe.Height };
-            if (!ApplyOverrides(device, settings))
+            if (!ApplyOverrides(device, rigDevice.Settings))
             {
                 Skipped.Add(name + ": liveView enabled is false in rig.yml");
                 return;
             }
             var data = publishedType(name + ".Data");
-            if (data == null)
+            string refusal;
+            if (recipe.Harp)
             {
-                Skipped.Add(name + ": the workflow publishes no " + name + ".Data before this node");
-                return;
+                // The rule RecordHarpDevices and the manifest use, so live view streams the boards recorded.
+                refusal = HarpRig.NotHarp(rigDevice, publishedType);
+                if (refusal == string.Empty) refusal = "it has no portName, so it is not a Harp device";
             }
-            var refusal = recipe.Accepts(data);
+            else refusal = data == null ? "the workflow publishes no " + name + ".Data before this node" : recipe.Accepts(data);
             if (refusal != null)
             {
                 Skipped.Add(name + ": " + refusal);
@@ -202,17 +206,16 @@ namespace OpenRigs.LiveView
             if (liveView == null)
             {
                 // liveView: null, as a generated rig template writes it, is the same as leaving it out.
-                var value = RigDevices.Scalar(node);
-                if (!string.IsNullOrEmpty(value) && value != "null" && value != "~")
+                if (RigDevices.Value(node) != null)
                     Notes.Add(device.Name + ": liveView is not a set of settings; ignored");
                 return true;
             }
             foreach (var entry in liveView.Children)
             {
                 var key = RigDevices.Scalar(entry.Key);
-                var value = RigDevices.Scalar(entry.Value);
+                var value = RigDevices.Value(entry.Value);
                 // A setting left null (rate: null, as model_dump writes it) keeps its default.
-                if (value == null || value == "null" || value == "~" || value.Length == 0) continue;
+                if (value == null) continue;
                 double number;
                 bool flag;
                 switch (key)

@@ -10,9 +10,27 @@ Found while merging it into av-dome `pip/main-switchover`; fixed there, not on h
 
 Pip asked for this as a backlog item (4 Nov 2026), not a message: raise it with Tom when next in touch, nothing posted.
 
+## Audit 2026-11-04, day (/audit-rigs, set B)
+
+Changed (HarpDevices 0.1.0-local.7, LiveView 0.1.0-local.11, Manifest 0.1.0-local.13, all three also for `src\Shared`; not pushed):
+
+- One rule for where rig.yml lives: `RigDevices.DefaultConfigRoot` and `RigDevices.PathFor` (`src\Shared\RigDevices.cs`), used by `HarpDevicePlan`, `LiveViewPlan`, `RecordHarpDevices` and `StreamDevices` (set C had to fix StreamDevices' default drifting from RecordHarpDevices').
+- One rule for an empty YAML value: `RigDevices.Value` (null for null, `null`, `~`, empty or blank, else trimmed), called by `HarpRig.Setting` and LiveView's `liveView:` settings.
+- LiveView streams a `behaviorBoard` only when `HarpRig.NotHarp` says it is a Harp device, the rule RecordHarpDevices records by and the manifest expects by; the recipe had its own HarpMessage check and ignored `portName`. Tested with a `portName: null` board whose data is HarpMessage, as HarpDevices' test does for records.
+- `RecordHarpDevice` passes an error on the board's messages to the workflow (`observer.OnError`); before the session folder appeared it was dropped. Tested.
+- A board whose WhoAmI came only after the session started has the note "The board reported no WhoAmI at connection, so its kind was checked only after the session started." in its record: a wrong kind then stops the workflow after Go, not before. Tested both ways.
+- HarpDevices' dump-request test polls for the read for up to 2 s instead of a fixed 100 ms sleep.
+- `scripts\hourly.ps1` runs `update-workflows.ps1` as a child process, as `push.ps1` does: called in-process, a script that did not parse left `$LASTEXITCODE` at git's 0 and the run was recorded as a pass (probed: a missing `}` gave `Exit 0`). The child gives `Exit 1` and the parser's error in the same log. No parse check of `scripts\*.ps1` was added to CI: `.github\workflows\OpenRigs.yml` is upstream's, not in COEN-LAB.md's table, and the lab's scripts are tested nowhere else.
+- A controller's stop is written as soon as it comes, outcome still `running`, with `run.stop_reason` and `control.stopped_by` (`ManifestRecorder` looks for it every 0.25 s; `ManifestWriter.Stopping`, the same atomic write): rig-control kills a workflow slow to stop, and the end-of-run write that carried them never came. Tested; FORMAT.md says a `running` manifest may carry the stop, and its example writer is local.13.
+- Docs: COEN-LAB.md and `hourly.ps1` name every reader of `<MACHINE>_WorkflowsUpdate.json` (rig-setup's rig-status report and Machines window at 3 h, ClaudioVisual's rig health DM at a day); the HarpDevices, LiveView and Manifest READMEs say what changed.
+
+Not changed, do not raise again without new information:
+
+- `src\Shared\WorkflowFile.cs`'s empty catches in the git readers (`:90`, `:141`, `:173`): reading .git must never stop a session, and the summaries say null when it cannot be read.
+
 ## Audit 2026-11-04, morning (/audit-rigs, set A)
 
-Changed (Control 0.1.0-local.13, Manifest 0.1.0-local.12, HarpDevices 0.1.0-local.6, LiveView 0.1.0-local.10, the last two for `src\Shared`; not pushed):
+Changed (Control 0.1.0-local.13, Manifest 0.1.0-local.12, HarpDevices 0.1.0-local.6, LiveView 0.1.0-local.10, the last two for `src\Shared`; pushed with e80399b):
 
 - `AtomicFile.Write` (`src\Shared\Json.cs`) tries the rename up to 10 times, 50 ms apart: Windows refuses `File.Replace` while a reader holds the file without delete sharing (Python's `open()`; rig-control's agent polls `manifest.json` every second around the final write), and the final manifest was then lost. A Manifest test holds the file open for 200 ms during a write (fails without the retry). A final write that fails goes to stderr as well as the trace (`ManifestRecorder`).
 - `RunEnd.AtDisposal` says `stopped` only when the controller's stop set `StopReason`, as FORMAT.md says, not for any Stopping phase; `ControlSession.Stopping` is gone. Tested.

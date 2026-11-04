@@ -73,6 +73,9 @@ namespace OpenRigs.LiveView.Tests
                 Check("data that is the image itself is streamed as it is", camera.ImagePath == "it", camera.ImagePath);
                 var wrong = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n", name => name == "BehaviorBoard-Main.Data" ? typeof(string) : null);
                 Check("a board whose data is not HarpMessage is skipped, saying why", wrong.Skipped.Any(s => s.Contains("is not HarpMessage")), string.Join(" | ", wrong.Skipped));
+                // L2-L2: HarpRig.NotHarp's rule, as RecordHarpDevices records and the manifest expects.
+                var idle = Plan(root, "behaviorBoard:\n  idle:\n    portName: null\n", name => name == "BehaviorBoard-Idle.Data" ? typeof(Bonsai.Harp.HarpMessage) : null);
+                Check("a board with portName: null is not streamed, though its data is HarpMessage", !idle.Streamed.Any() && idle.Skipped.Any(s => s.StartsWith("BehaviorBoard-Idle: it has no portName")), string.Join(" | ", idle.Skipped));
                 var none = LiveViewPlan.Create(Path.Combine(root, "nowhere"), name => null);
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
 

@@ -25,6 +25,15 @@ namespace OpenRigs.Shared
     /// <summary>The devices a rig.yml lists, read the same way by every package here.</summary>
     internal static class RigDevices
     {
+        /// <summary>The folder rig-setup keeps each machine's rig.yml under, the ConfigRoot every package here defaults to.</summary>
+        public const string DefaultConfigRoot = @"C:\Coen-Lab-Local\RigConfigs";
+
+        /// <summary>This machine's rig.yml under a ConfigRoot: &lt;ConfigRoot&gt;\&lt;MACHINE-NAME&gt;\rig.yml, with environment variables expanded.</summary>
+        public static string PathFor(string configRoot)
+        {
+            return Path.Combine(Environment.ExpandEnvironmentVariables(configRoot), Environment.MachineName, "rig.yml");
+        }
+
         /// <summary>
         /// Every device entry in the rig.yml at this path, in file order; null with the reason
         /// when there is no such file, or it cannot be read, or holds no settings. Never throws:
@@ -84,6 +93,13 @@ namespace OpenRigs.Shared
         {
             var scalar = node as YamlScalarNode;
             return scalar != null ? scalar.Value : null;
+        }
+
+        /// <summary>A scalar's text, trimmed; null when there is none or it is left empty (null, ~, empty or blank), as a generated rig.yml writes an unset value.</summary>
+        public static string Value(YamlNode node)
+        {
+            var value = Scalar(node);
+            return string.IsNullOrWhiteSpace(value) || value == "null" || value == "~" ? null : value.Trim();
         }
 
         static string Pascal(string name)

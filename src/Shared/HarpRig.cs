@@ -86,11 +86,10 @@ namespace OpenRigs.Shared
         /// <summary>A setting's text, null when rig.yml has none or leaves it empty (usbSerial: null).</summary>
         public static string Setting(RigDevice device, string key)
         {
-            var value = device.Settings.Children
+            return device.Settings.Children
                 .Where(pair => RigDevices.Scalar(pair.Key) == key)
-                .Select(pair => RigDevices.Scalar(pair.Value))
+                .Select(pair => RigDevices.Value(pair.Value))
                 .FirstOrDefault();
-            return string.IsNullOrWhiteSpace(value) || value == "null" || value == "~" ? null : value.Trim();
         }
     }
 

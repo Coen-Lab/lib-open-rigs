@@ -160,7 +160,7 @@ namespace OpenRigs.HarpDevices
     public class RecordHarpDevicesSettings : ZeroArgumentExpressionBuilder
     {
         /// <summary>Gets or sets RecordHarpDevices' ConfigRoot.</summary>
-        public string ConfigRoot { get; set; } = @"C:\Coen-Lab-Local\RigConfigs";
+        public string ConfigRoot { get; set; } = RigDevices.DefaultConfigRoot;
 
         /// <summary>Builds to an empty sequence: the node only holds the settings.</summary>
         /// <param name="arguments">None.</param>
