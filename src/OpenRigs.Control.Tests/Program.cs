@@ -43,11 +43,11 @@ namespace OpenRigs.Control.Tests
             catch (Exception error) { return error; }
         }
 
-        static ControlServer Server()
+        static ControlServer Server(string endpoint = Endpoint)
         {
             return new ControlServer
             {
-                ConnectionString = "@" + Endpoint,
+                ConnectionString = "@" + endpoint,
                 SubjectId = "TC002",
                 SessionId = "003B1",
                 Parameters = new Collection<Parameter>
@@ -137,6 +137,12 @@ namespace OpenRigs.Control.Tests
                 var status = Ask(socket, new { cmd = "status" });
                 Check("status reports the phase, which only moves forward", (string)status["phase"] == "Recording", (string)status["phase"]);
                 Check("a metric is reported in the invariant culture, whatever the rig's", (string)status["metrics"]["water_ml"] == "0.25", status["metrics"]?.ToString());
+                // Before 0.1.0-local.13 the second frame was left unread, the reply threw and the session ended.
+                socket.SendMoreFrame("{\"cmd\": \"status\"}").SendFrame("{\"cmd\": \"status\"}");
+                string twoFrames;
+                var gotTwoFrames = socket.TryReceiveFrameString(TimeSpan.FromSeconds(5), out twoFrames);
+                Check("a request of two frames is refused, saying so", gotTwoFrames && !Ok(JObject.Parse(twoFrames)) && ((string)JObject.Parse(twoFrames)["why"]) == "one frame per request, got 2", twoFrames ?? "no reply in 5 s");
+                Check("... and the session goes on", Ok(Ask(socket, new { cmd = "status" })) && ended == null, ended == null ? "no status" : ended.Message);
 
                 Console.WriteLine("Stop:");
                 var watch = Stopwatch.StartNew();
@@ -155,9 +161,38 @@ namespace OpenRigs.Control.Tests
             Check("an ID alone is kept", Person.From(new JObject { ["id"] = "PipC" })?.Id == "PipC", "lost");
             subscription.Dispose();
 
+            Console.WriteLine("Work downstream of Go or a command:");
+            {
+                // A subscriber that takes 3 s over each, as a session folder or file writer may. A port of
+                // its own: the last server's may not be released yet.
+                const string slowEndpoint = "tcp://127.0.0.1:5642";
+                var done = new AutoResetEvent(false);
+                var slow = Server(slowEndpoint).Generate().Subscribe(e =>
+                {
+                    if (e.Kind == ControlEventKind.Set) return;
+                    Thread.Sleep(3000);
+                    done.Set();
+                }, _ => { });
+                using (var socket = new RequestSocket(">" + slowEndpoint))
+                {
+                    ControlState.Current.SetPhase(SessionPhase.Ready);
+                    var watch = Stopwatch.StartNew();
+                    var go = Ask(socket, new { cmd = "go" });
+                    Check("Go is answered before the work downstream of it", Ok(go) && watch.ElapsedMilliseconds < 1000, go + " after " + watch.ElapsedMilliseconds + " ms");
+                    done.WaitOne(5000);
+                    watch.Restart();
+                    var command = Ask(socket, new { cmd = "command", name = "reward" });
+                    Check("... and so is a command", Ok(command) && watch.ElapsedMilliseconds < 1000, command + " after " + watch.ElapsedMilliseconds + " ms");
+                    done.WaitOne(5000);
+                }
+                slow.Dispose();
+            }
+
             Console.WriteLine("Two servers on one port:");
             {
                 var first = Server().Generate().Subscribe(_ => { }, _ => { });
+                // The first answering before the second starts, so the two threads cannot race to bind.
+                using (var socket = new RequestSocket(">" + Endpoint)) Check("the first server answers", Ok(Ask(socket, new { cmd = "status" })), "no reply");
                 Exception second = null;
                 var failedAt = new ManualResetEvent(false);
                 var other = Server().Generate().Subscribe(_ => { }, e => { second = e; failedAt.Set(); });

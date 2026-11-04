@@ -19,6 +19,8 @@ New-Item -ItemType Directory -Force $logDir | Out-Null
 $log = Join-Path $logDir 'update-workflows.log'
 $failed = Join-Path $logDir 'update-workflows-failed.log'
 $self = Join-Path $logDir 'self'
+function UtcNow { [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture) }
+$started = UtcNow
 & {
     'Started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')
     $ErrorActionPreference = 'Continue'
@@ -34,13 +36,37 @@ $self = Join-Path $logDir 'self'
     'Exit ' + $LASTEXITCODE
 } *> $log
 $code = $LASTEXITCODE
-# A failed run is also copied to the share, where rig-setup's Machines window shows it beside
-# the machine's update log; a run that passes removes it. A share not mapped leaves only the
-# local logs.
+# A failed run is also copied to the share, where a person can read it without this machine; a
+# run that passes removes it. A share not mapped leaves only the local logs.
 $shared = "K:\config\$env:COMPUTERNAME\$($env:COMPUTERNAME)_WorkflowsFailed.txt"
 if ($code) { Add-Content -LiteralPath $failed -Value (Get-Content -LiteralPath $log -Raw) }
 try {
     if ($code) { Copy-Item -LiteralPath $log $shared -Force -ErrorAction Stop }
     elseif (Test-Path -LiteralPath $shared) { Remove-Item -LiteralPath $shared -ErrorAction Stop }
 } catch { Add-Content -LiteralPath $log -Value "Could not update ${shared}: $($_.Exception.Message)" }
+# Every run, passed or not, so a task that stopped running is seen too: it runs only while Pip is
+# signed in here, and the task's history reads 0 whatever happened. rig-setup's rig-status report
+# reads this file and flags it when finished is over 3 h old or exitCode is not 0 (audit-rigs set A,
+# 4 Nov 2026). lastPass is this run's finish when it passed, else kept from the last file.
+$machine = $env:COMPUTERNAME
+$statusDir = "K:\config\$machine"
+$status = Join-Path $statusDir "$($machine)_WorkflowsUpdate.json"
+$finished = UtcNow
+try {
+    $lastPass = 'null'
+    if ([int]$code -eq 0) { $lastPass = "`"$finished`"" }
+    elseif (Test-Path -LiteralPath $status) {
+        $previous = [IO.File]::ReadAllText($status)
+        if ($previous -match '"lastPass":\s*"([^"]+)"') { $lastPass = "`"$($Matches[1])`"" }
+    }
+    $json = "{`"machine`": `"$machine`", `"started`": `"$started`", `"finished`": `"$finished`", `"exitCode`": $([int]$code), `"lastPass`": $lastPass}"
+    New-Item -ItemType Directory -Force $statusDir -ErrorAction Stop | Out-Null
+    # Written beside it, then renamed over it, so rig-setup never reads half a file.
+    $tmp = "$status.tmp"
+    [IO.File]::WriteAllText($tmp, $json + "`n", (New-Object Text.UTF8Encoding $false))
+    if (Test-Path -LiteralPath $status) { [IO.File]::Replace($tmp, $status, [NullString]::Value) } else { [IO.File]::Move($tmp, $status) }
+} catch {
+    Add-Content -LiteralPath $log -Value "Could not write ${status}: $($_.Exception.Message)"
+    Remove-Item -LiteralPath "$status.tmp" -ErrorAction SilentlyContinue
+}
 exit $code

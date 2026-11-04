@@ -111,8 +111,21 @@ namespace OpenRigs.Shared
             try
             {
                 File.WriteAllText(tmp, text, new UTF8Encoding(false));
-                if (File.Exists(path)) File.Replace(tmp, path, null);
-                else File.Move(tmp, path);
+                // Windows refuses the rename while a reader holds the file without delete sharing
+                // (Python's open(); rig-control polls manifest.json every second): wait it out, about 0.5 s.
+                for (var attempt = 1; ; attempt++)
+                {
+                    try
+                    {
+                        if (File.Exists(path)) File.Replace(tmp, path, null);
+                        else File.Move(tmp, path);
+                        break;
+                    }
+                    catch (IOException) when (attempt < 10)
+                    {
+                        System.Threading.Thread.Sleep(50);
+                    }
+                }
             }
             catch
             {

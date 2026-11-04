@@ -15,7 +15,7 @@ namespace OpenRigs.Manifest
     class ControlSession
     {
         /// <summary>The ControlState members read here, for the test to check against OpenRigs.Control.</summary>
-        internal static readonly string[] StateMembers = { "Current", "SubjectId", "SessionId", "Phase", "Go", "StopReason", "FinishedAt", "LaunchedBy", "GoBy", "StoppedBy" };
+        internal static readonly string[] StateMembers = { "Current", "SubjectId", "SessionId", "Go", "StopReason", "FinishedAt", "LaunchedBy", "GoBy", "StoppedBy" };
 
         /// <summary>The Person members read here (OpenRigs.Control 0.1.0-local.9).</summary>
         internal static readonly string[] PersonMembers = { "Id", "Name" };
@@ -47,9 +47,6 @@ namespace OpenRigs.Manifest
 
         /// <summary>The session ID ControlServer was given.</summary>
         public string SessionId { get { return Read(state, "SessionId") as string; } }
-
-        /// <summary>Whether a controller's stop has moved the session to Stopping.</summary>
-        public bool Stopping { get { return string.Equals(Convert.ToString(Read(state, "Phase")), "Stopping", StringComparison.Ordinal); } }
 
         /// <summary>The why of a controller's stop; null unless the controller stopped the session.</summary>
         public string StopReason { get { return Read(state, "StopReason") as string; } }

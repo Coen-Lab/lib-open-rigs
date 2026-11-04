@@ -472,7 +472,7 @@ namespace OpenRigs.Control
             {
                 while (!cancel.IsCancellationRequested)
                 {
-                    string text;
+                    List<string> frames = null;
                     Exception stop = null;
                     ControlEvent emit = null;
                     JObject reply;
@@ -482,9 +482,14 @@ namespace OpenRigs.Control
                     // node is fixed in that node.
                     try
                     {
-                        if (!socket.TryReceiveFrameString(TimeSpan.FromMilliseconds(100), out text)) continue;
-                        try { reply = Handle(text, state, out emit, out stop); }
-                        catch (Exception error) { reply = Refuse(error.Message); }
+                        // Every frame of the request is taken: a reply sent with one left unread throws.
+                        if (!socket.TryReceiveMultipartStrings(TimeSpan.FromMilliseconds(100), ref frames)) continue;
+                        if (frames.Count != 1) reply = Refuse("one frame per request, got " + frames.Count);
+                        else
+                        {
+                            try { reply = Handle(frames[0], state, out emit, out stop); }
+                            catch (Exception error) { reply = Refuse(error.Message); }
+                        }
                         socket.SendFrame(reply.ToString(Newtonsoft.Json.Formatting.None));
                     }
                     catch (Exception error)

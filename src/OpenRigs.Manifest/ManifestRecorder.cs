@@ -112,7 +112,7 @@ namespace OpenRigs.Manifest
                         error =>
                         {
                             try { finish(new RunEnd(RunEnd.Failed, error.Message)); }
-                            catch (Exception ex) { Trace.TraceError("SessionManifest: the final manifest was not written: " + ex.Message); }
+                            catch (Exception ex) { NotWritten(ex); }
                             lock (gate) { if (!begun) return; }
                             observer.OnError(error);
                         },
@@ -130,10 +130,18 @@ namespace OpenRigs.Manifest
                 subscriptions.Add(Disposable.Create(() =>
                 {
                     try { finish(RunEnd.AtDisposal(control ?? ControlSession.Current())); }
-                    catch (Exception ex) { Trace.TraceError("SessionManifest: the final manifest was not written: " + ex.Message); }
+                    catch (Exception ex) { NotWritten(ex); }
                 }));
                 return subscriptions;
             });
+        }
+
+        // Where nothing downstream can take the error: Bonsai's console shows stderr, which a trace alone does not reach.
+        static void NotWritten(Exception ex)
+        {
+            var message = "SessionManifest: the final manifest was not written: " + ex.Message;
+            Trace.TraceError(message);
+            Console.Error.WriteLine(message);
         }
     }
 
@@ -176,7 +184,8 @@ namespace OpenRigs.Manifest
         {
             if (control == null) return new RunEnd(Stopped, null);
             if (control.FinishedAt.HasValue) return new RunEnd(Completed, null);
-            if (control.Stopping) return new RunEnd(Stopped, null);
+            // The controller's stop, which sets the reason (ControlServer's stop), not the phase alone.
+            if (control.StopReason != null) return new RunEnd(Stopped, null);
             return new RunEnd(EndedEarly, "The workflow ended before the run finished and without a stop from the controller: an error elsewhere in the workflow, or the editor's Stop button. Bonsai's output says which.");
         }
     }

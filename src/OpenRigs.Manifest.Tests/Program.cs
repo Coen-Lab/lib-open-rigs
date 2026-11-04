@@ -145,6 +145,8 @@ namespace OpenRigs.Manifest.Tests
                 Check("a controller stop before Finished is stopped, with its reason", Field(stopped, "run.outcome") == "stopped" && Field(stopped, "run.stop_reason") == "mouse unwell", Field(stopped, "run.outcome") + " " + Field(stopped, "run.stop_reason"));
                 var early = Session(root, "d", Controller(), null);
                 Check("a workflow that ends before Finished, unstopped, is ended-early", Field(early, "run.outcome") == "ended-early", Field(early, "run.outcome"));
+                var stoppingUnasked = Session(root, "h", Controller(), c => c.SetPhase(SessionPhase.Stopping));
+                Check("a Stopping phase with no stop from the controller is ended-early, not stopped", Field(stoppingUnasked, "run.outcome") == "ended-early", Field(stoppingUnasked, "run.outcome"));
                 var alone = Session(root, "e", null, null);
                 Check("without SessionControl it is stopped", Field(alone, "run.outcome") == "stopped" && Field(alone, "control") == "null", Field(alone, "run.outcome"));
                 Check("the settings at Go are recorded", Field(finished, "control.parameters.RunLengthMins") == "30", Field(finished, "control.parameters.RunLengthMins"));
@@ -189,7 +191,6 @@ namespace OpenRigs.Manifest.Tests
                     string.Join(", ", ControlSession.GoMembers.Where(m => typeof(ControlEvent).GetProperty(m) == null)));
                 Check("... and every Person member", ControlSession.PersonMembers.All(m => typeof(Person).GetProperty(m) != null),
                     string.Join(", ", ControlSession.PersonMembers.Where(m => typeof(Person).GetProperty(m) == null)));
-                Check("... and the Stopping phase", Enum.IsDefined(typeof(SessionPhase), "Stopping"), "no Stopping");
                 Check("the package does not reference OpenRigs.Control", !typeof(ManifestWriter).Assembly.GetReferencedAssemblies().Any(a => a.Name == "OpenRigs.Control"), "it does");
 
                 Console.WriteLine("The run input:");
@@ -238,6 +239,24 @@ namespace OpenRigs.Manifest.Tests
                 ManifestWriter.WriteAtomically(file, "one");
                 ManifestWriter.WriteAtomically(file, "two");
                 Check("a second write replaces the first and leaves no .tmp", File.ReadAllText(file) == "two" && !File.Exists(file + ".tmp"), File.ReadAllText(file));
+                {
+                    // A reader without delete sharing, as Python's open() is (rig-control polls manifest.json every second).
+                    var opened = new System.Threading.ManualResetEventSlim();
+                    var reader = new System.Threading.Thread(() =>
+                    {
+                        using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            opened.Set();
+                            System.Threading.Thread.Sleep(200);
+                        }
+                    });
+                    reader.Start();
+                    opened.Wait();
+                    Exception held = null;
+                    try { ManifestWriter.WriteAtomically(file, "three"); } catch (Exception e) { held = e; }
+                    reader.Join();
+                    Check("a write while a reader holds the file waits for it and succeeds", held == null && File.ReadAllText(file) == "three" && !File.Exists(file + ".tmp"), held != null ? held.Message : File.ReadAllText(file));
+                }
 
                 Console.WriteLine("Expected files:");
                 var rigYml = Path.Combine(root, "rig.yml");
@@ -247,6 +266,10 @@ namespace OpenRigs.Manifest.Tests
                 Check("auto expects each published device's folder, and a listed file", paths == "BehaviorBoard-Main/, Camera-Box/, events.csv", paths);
                 Check("a device in rig.yml the workflow does not publish is noted, not expected", plan.Notes.Any(n => n.StartsWith("Camera-Face")), string.Join(" | ", plan.Notes));
                 Check("a wildcard entry is noted, not expected", plan.Notes.Any(n => n.Contains("Camera-*/")) && !paths.Contains("*"), string.Join(" | ", plan.Notes));
+                var outside = ExpectedPlan.Create(@".\RigSchema\x.json;/abs.json;C:\data\x.json;../up.json;a/../b.json", null, n => null);
+                var outsidePaths = string.Join(", ", outside.Entries.Select(e => e.Path));
+                Check("a leading ./ is dropped, as rig-sync names the file", outsidePaths == "RigSchema/x.json", outsidePaths);
+                Check("... and a rooted entry or one with .. is noted, not expected", outside.Notes.Count == 4 && outside.Notes.All(n => n.EndsWith("not a path inside the session folder.")), string.Join(" | ", outside.Notes));
                 // A Harp device's data is HarpMessage, told by name: the manifest does not reference Bonsai.Harp.
                 // 0.1.0-local.9: which entries are Harp devices is src\Shared\HarpRig.cs, the rule RecordHarpDevices
                 // uses (a portName: null is none), and the register map is expected only when a loaded package decodes the kind.

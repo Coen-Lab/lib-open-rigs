@@ -47,11 +47,15 @@ namespace OpenRigs.Manifest
             foreach (var raw in (expectedFiles ?? "").Split(';'))
             {
                 var entry = raw.Trim().Replace('\\', '/');
+                // rig-sync matches paths relative to the session folder (RigSchema/x.json), so ./ is dropped.
+                while (entry.StartsWith("./")) entry = entry.Substring(2);
                 if (entry.Length == 0) continue;
                 if (string.Equals(entry, Auto, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, false);
                 else if (string.Equals(entry, Harp, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, true);
                 // rig-sync matches a path or a folder, never a pattern: a wildcard would match nothing and hold the session back.
                 else if (entry.IndexOfAny(new[] { '*', '?' }) >= 0) plan.Notes.Add("ExpectedFiles entry " + entry + " is not expected: a wildcard is not a path. Name the folder (Camera-Box/) instead.");
+                else if (entry.StartsWith("/") || entry.Contains(":") || entry.Split('/').Contains(".."))
+                    plan.Notes.Add("ExpectedFiles entry " + entry + " is not expected: it is not a path inside the session folder.");
                 else plan.Add(entry, "listed in ExpectedFiles");
             }
             return plan;
