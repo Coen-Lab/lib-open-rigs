@@ -10,6 +10,25 @@ Found while merging it into av-dome `pip/main-switchover`; fixed there, not on h
 
 Pip asked for this as a backlog item (4 Nov 2026), not a message: raise it with Tom when next in touch, nothing posted.
 
+## Audit 2026-11-04, late evening (/audit-rigs, set B; rig-control left to its own session)
+
+Changed (tests and docs only, no package version raised):
+
+- HarpDevices' record tests waited on fixed sleeps and read `written` and `error` across threads (L2-L2): each wait polls for the write, the error or the file, up to 3 s.
+- `patches\README.md` still said Logging 0.1.0-bbox.3 and listed its hash (S5-L1): bbox.4, its line and its hash.
+- COEN-LAB.md said the green domes keep no rig.yml rig-control reads (S5-L2): GREEN-DOME-1's has `rigId: D1` since rig-setup 7e78905.
+- The LiveView README credited coen-behaviour-box's session manifest with finding the workflow, and told a workflow to set `ConfigRoot` (S5-L3, S5-I2): `SessionManifest` through `src\Shared\WorkflowFile.cs`, and `ConfigRoot` left at its default. FORMAT.md's example writer is local.15 (S5-I1).
+
+Not changed, do not raise again without new information:
+
+- `RequestRegisterDump` reading WhoAmI itself about 1 s after Start, so a wrong-kind board stops in ready mode when the connection dump was missed (L2-L1): `CheckBoard` already confirms the USB serial at Start, so a wrong kind is a rig.yml filing a right serial under the wrong kind, caught on the first session with the record written first.
+- `StoppedBy` before `StopReason` by store order, no lock or volatile (S2-I1): x64 never reorders stores, and every rig is x64.
+- The packed READMEs of HarpDevices local.8 and LiveView local.12 predate a1b9984's `licketySplit` and ConfigRoot notes (L2-I1): the next version bump packs the current README.
+- OpenRigs.Core's and the template's `C:\RigConfigs` default (S4-I2): upstream's, and both lab workflows set `ConfigRoot`.
+- coen-av-arena takes `ucl-open-rigs` from upstream main unpinned while its row reads up to date (S1-I1): an old-template workflow with no OpenRigs node, nothing to keep in step.
+
+Environment: the UCL-Open coen-behaviour-box clone on PIPOFFICERIG holds Control local.13 and no Logging bbox.4 while its Bonsai.config (f6983b3) names local.14, so rig-control's `test_bonsai.py` skips there (S2-I2); `.bonsai\Setup.ps1` in that clone brings it up, for the rig-control session.
+
 ## Audit 2026-11-04, evening (/audit-rigs, set A; rig-control left to its own session)
 
 Changed (Manifest 0.1.0-local.15, Control 0.1.0-local.14):
