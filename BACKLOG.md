@@ -10,7 +10,7 @@ Changed (LiveView 0.1.0-local.9, Manifest 0.1.0-local.11; Pip: "Implement everyt
 - A ticked branch gone from GitHub is `gone`, not `FAILED`, as rig-setup reads it, until Repos takes the tick off.
 - A dependency folder with NuGet's fourth version part (`openal.redist.2.0.7.0`) is found by the dependency walk and copy, as `Get-SetupGap` already found it.
 - `StreamDevices`' `ConfigRoot` defaults to `C:\Coen-Lab-Local\RigConfigs`, as `RecordHarpDevices`' (unset, it streamed nothing).
-- FORMAT.md defines `completed.unmet` and rig-sync's recount of `expected[].found` (rig-setup, same round); the Manifest and HarpDevices READMEs say rig-sync copies a run that did not complete with a note and an alarm (rig-setup ddff734); the LiveView README says `ConfigRoot` can be mapped (7b02057); COEN-LAB.md says a Use As Main branch is not kept.
+- FORMAT.md defines `completed.unmet` and rig-sync's recount of `expected[].found` (rig-setup, same round); the Manifest and HarpDevices READMEs say rig-sync copies a run that did not complete with a note and an alarm (rig-setup ddff734); the LiveView README says `ConfigRoot` can be mapped (7b02057); COEN-LAB.md says a ticked branch gone from GitHub is `gone`.
 
 Not changed, do not raise again without new information:
 
