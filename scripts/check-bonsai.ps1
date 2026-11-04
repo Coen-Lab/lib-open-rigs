@@ -10,8 +10,10 @@ param(
 #   1. Compiles src\Extensions, if the workflow has one, under C# 5, the language Bonsai
 #      compiles it with.
 #   2. Builds src\main.bonsai with Bonsai's own expression builders, as Bonsai does at Start
-#      before it subscribes anything: every type, selector, include, subject and mapping.
-# It cannot check hardware, visualizers or the data a run writes. Exit 0 when both pass.
+#      before it subscribes anything: every type, selector, include, subject and mapping; and,
+#      when the workflow tracks config\main.layout, that each window sits on a node it fits.
+# It cannot check hardware, the visualizers themselves or the data a run writes. Exit 0 when
+# both pass.
 $ErrorActionPreference = 'Stop'
 $self = $MyInvocation.MyCommand.Path
 $Repo = (Resolve-Path $Repo).Path
@@ -64,7 +66,39 @@ if ($Step -eq 'Build') {
         while ($x) { "  $($x.GetType().Name): $($x.Message)"; $x = $x.InnerException }
         exit 1
     }
-    exit 0
+    # config\main.layout's windows, on the nodes as the editor has them (the lab's rule: every
+    # open-rigs workflow tracks its layout there and .bonsai\Setup.ps1 copies it in). Bonsai loads
+    # each group in topological order, not file order, so a restructure shifts window indices; a
+    # window on a missing node or a wrong type makes the editor offer to delete the layout, and
+    # --start waits. Visualizer types this check does not know are listed, not failed.
+    $layoutPath = Join-Path $Repo 'config\main.layout'
+    if (-not (Test-Path $layoutPath)) { exit 0 }
+    $inspectable = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::ToInspectableGraph($wb.Workflow)
+    $null = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::Build($inspectable)
+    $wanted = @{ 'Bonsai.Vision.Design.IplImageVisualizer' = 'OpenCV.Net.IplImage'; 'Bonsai.Design.ObjectTextVisualizer' = '' }
+    function Test-Layout($settings, $graph, $where) {
+        $nodes = @($graph)
+        foreach ($window in $settings.WindowSettings) {
+            $i = [int]$window.Index
+            if ($i -ge $nodes.Count) { "  FAIL  layout $where$i`: the workflow has $($nodes.Count) nodes there"; continue }
+            $node = $nodes[$i].Value
+            $at = "$where$i ($($node.Builder.GetType().Name))"
+            if ($window.NestedLayout) {
+                if ($node.Builder -is [Bonsai.Expressions.IWorkflowExpressionBuilder]) { Test-Layout $window.NestedLayout $node.Builder.Workflow "$at > " }
+                else { "  FAIL  layout $at holds windows but is not a group" }
+            }
+            if ($window.VisualizerTypeName) {
+                $type = $wanted[$window.VisualizerTypeName]
+                if ($null -eq $type) { "  note  layout $at`: $($window.VisualizerTypeName), a type this check does not know, on a node of $($node.ObservableType)" }
+                elseif ($type -and "$($node.ObservableType)" -ne $type) { "  FAIL  layout $at`: $($window.VisualizerTypeName) on a node of $($node.ObservableType), not $type" }
+                else { "  ok    layout window $($window.VisualizerTypeName) on $at" }
+            }
+        }
+    }
+    [xml]$layout = Get-Content $layoutPath -Raw
+    $lines = @(Test-Layout $layout.VisualizerLayout $inspectable '')
+    $lines
+    exit $(if (@($lines | Where-Object { $_ -like '  FAIL*' }).Count) { 2 } else { 0 })
 }
 
 if (-not (Test-Path (Join-Path $bonsaiDir 'Packages'))) { throw "No .bonsai\Packages in $Repo. Run its .bonsai\Setup.ps1 first." }
@@ -90,6 +124,7 @@ if (Test-Path $extensions) {
 } else { "1. No src\Extensions to compile." }
 "2. Building src\main.bonsai with Bonsai's builders..."
 & { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Build 2>&1 | ForEach-Object { "$_" } }
+if ($LASTEXITCODE -eq 2) { "  FAILED"; "check-bonsai: config\main.layout does not fit the workflow."; exit 1 }
 if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-bonsai: the workflow does not build."; exit 1 }
 "  ok"
 "check-bonsai: both steps passed."
