@@ -1,6 +1,6 @@
-# The hourly task's body (scripts\schedule.ps1 registers a task that runs this file), so a
-# change to what the task does arrives with the clone's next pull and needs no new
-# registration (audit, 3 Nov 2026: schedule.ps1's failed-run log shipped on 3 Nov, and
+# The hourly task's body (scripts\schedule.ps1 registers a task that runs this file from the
+# clone below), so a change to what the task does arrives with the next push to main and needs
+# no new registration (audit, 3 Nov 2026: schedule.ps1's failed-run log shipped on 3 Nov, and
 # PIPOFFICERIG's task still ran the registration from 2 Nov).
 #
 # Output of the run: %LOCALAPPDATA%\lib-open-rigs\update-workflows.log, overwritten each hour;
@@ -11,9 +11,12 @@
 # copy below is where a person sees it.
 #
 # The run is from a clone of its own, %LOCALAPPDATA%\lib-open-rigs\self, set to origin/main each
-# hour, never the working copy this file is in: commits not yet pushed there failed three runs in
-# a row on 3 Nov 2026, and a branch checked out there would have pinned every workflow to it
-# (audit-rigs set C). push.ps1 still runs from the working copy, where those refusals belong.
+# hour, never a working copy: commits not yet pushed there failed three runs in a row on 3 Nov
+# 2026, and a branch checked out there would have pinned every workflow to it (audit-rigs set C).
+# The task runs this file from that clone too, so the reset below rewrites the file running:
+# PowerShell parses a -File script whole before running it, so this run finishes as it began
+# and the next takes the new one. push.ps1 still runs from the working copy, where its refusals
+# belong.
 $logDir = Join-Path $env:LOCALAPPDATA 'lib-open-rigs'
 New-Item -ItemType Directory -Force $logDir | Out-Null
 $log = Join-Path $logDir 'update-workflows.log'
@@ -29,6 +32,8 @@ $started = UtcNow
         git clone -q $url $self 2>&1 | ForEach-Object { "$_" }
     }
     git -C $self fetch -q origin 2>&1 | ForEach-Object { "$_" }
+    # Unchecked, a failed fetch ran last hour's origin/main again and could pass (audit-rigs set C).
+    if ($LASTEXITCODE -ne 0) { 'Stopped: fetch failed.'; 'Exit 1'; return }
     # On main, following origin/main, which update-workflows' checks read as @{u}.
     git -C $self checkout -q -f -B main origin/main 2>&1 | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0) { "Stopped: could not set $self to origin/main."; 'Exit 1'; return }
@@ -43,14 +48,16 @@ $code = $LASTEXITCODE
 $shared = "K:\config\$env:COMPUTERNAME\$($env:COMPUTERNAME)_WorkflowsFailed.txt"
 if ($code) { Add-Content -LiteralPath $failed -Value (Get-Content -LiteralPath $log -Raw) }
 try {
-    if ($code) { Copy-Item -LiteralPath $log $shared -Force -ErrorAction Stop }
+    # Rewritten as UTF-8, not copied: *> writes the log as UTF-16 under PowerShell 5.1, and
+    # ClaudioVisual reads the share copy as UTF-8 and got a NUL after every character.
+    if ($code) { [IO.File]::WriteAllText($shared, [IO.File]::ReadAllText($log), (New-Object Text.UTF8Encoding $false)) }
     elseif (Test-Path -LiteralPath $shared) { Remove-Item -LiteralPath $shared -ErrorAction Stop }
 } catch { Add-Content -LiteralPath $log -Value "Could not update ${shared}: $($_.Exception.Message)" }
 # Every run, passed or not, so a task that stopped running is seen too: it runs only while Pip is
 # signed in here, and the task's history reads 0 whatever happened. rig-setup's rig-status report
 # and Machines window read this file and flag it when exitCode is not 0 or finished is over 3 h
-# old, and ClaudioVisual's rig health DM when finished is over a day old (audit-rigs sets A and B,
-# 4 Nov 2026). lastPass is this run's finish when it passed, else kept from the last file.
+# old, and ClaudioVisual's rig health DMs the same failures and a finished over 26 hours old
+# (audit-rigs sets A to C, 4 Nov 2026). lastPass is this run's finish when it passed, else kept from the last file.
 $machine = $env:COMPUTERNAME
 $statusDir = "K:\config\$machine"
 $status = Join-Path $statusDir "$($machine)_WorkflowsUpdate.json"

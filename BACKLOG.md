@@ -10,6 +10,26 @@ Found while merging it into av-dome `pip/main-switchover`; fixed there, not on h
 
 Pip asked for this as a backlog item (4 Nov 2026), not a message: raise it with Tom when next in touch, nothing posted.
 
+## Audit 2026-11-04, afternoon (/audit-rigs, set C)
+
+Changed (scripts and READMEs only, no package version raised):
+
+- `scripts\hourly.ps1` writes the share's `<MACHINE>_WorkflowsFailed.txt` as UTF-8 without BOM from the log's text: the log is UTF-16 (`*>` under PowerShell 5.1), and the copied bytes reached ClaudioVisual as a NUL after every character. Probed: the log starts `FF FE`, the share copy `53 74`, no NUL bytes.
+- `hourly.ps1` stops with `Stopped: fetch failed.` and `Exit 1` when the fetch of its own clone fails, as its other stops do; unchecked, the run went on with last hour's origin/main.
+- `scripts\schedule.ps1` registers `%LOCALAPPDATA%\lib-open-rigs\self\scripts\hourly.ps1`, cloning `self` if missing, so the task runs what origin/main has, not the working copy's checkout or unpushed commits. hourly.ps1 resets that clone, its own file included, which is safe as PowerShell parses a `-File` script whole first. PIPOFFICERIG's task keeps the old path until `schedule.ps1` is run there again.
+- `scripts\push.ps1` refuses, before pushing: uncommitted changes under `scripts\` (the parse check reads the files, the push sends HEAD); after `git fetch`, a `.nupkg` that a commit in `@{u}..HEAD` adds or changes while origin's history already holds that path; a lab `.nupkg` whose nuspec commit this clone lacks, or whose source there differs from the commit it was added onto (its parent), the 6d0b870 rebase case; and two versions of one package in `local_packages\`. `Directory.Build.props` and `.targets` now count as every lab package's source. Probed in a clone without a remote: today's tree passes, and each refusal fires on a recreated case.
+- `scripts\update-workflows.ps1` stops a workflow's update when `dotnet tool restore` fails, naming it, instead of failing later in `regenerate-schemas` with no reason.
+- Docs: the HarpDevices README lists `licketySplit` 1400; the HarpDevices and LiveView READMEs say only `check-workflow.ps1` maps `ConfigRoot` (to a temporary root) and rig-control refuses any other (rig-control 482dd5d); the LiveView README says the stream's `rigId` is the machine name; COEN-LAB.md and `hourly.ps1` say ClaudioVisual DMs the same failures and a `finished` over 26 hours old, and COEN-LAB.md lists push.ps1's refusals and the task's clone.
+
+Not changed, do not raise again without new information:
+
+- The Manifest recording a kill after Finished as `killed` (S3-M1): it is true, a kill can truncate the last file, and rig-sync alarms either way.
+- No committed real-ManifestWriter sample for rig-setup's tests: it would make a fixture depend on another repository, and a probe of six cases agreed.
+
+Deferred (other repos):
+
+- coen-behaviour-box's `regenerate.py` should exit with bonsai.sgen's return code.
+
 ## Audit 2026-11-04, day (/audit-rigs, set B)
 
 Changed (HarpDevices 0.1.0-local.8, LiveView 0.1.0-local.12, Manifest 0.1.0-local.14, all three also for `src\Shared`, above 6d0b870's local.7, local.11 and local.13 for the Lickety Split's WhoAmI):

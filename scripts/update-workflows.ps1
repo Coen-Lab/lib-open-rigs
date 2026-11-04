@@ -356,7 +356,11 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
                 # Its paths are relative to the repository, and it runs the bonsai.sgen tool.
                 Push-Location $Dir
                 try {
-                    if (Test-Path '.config\dotnet-tools.json') { $null = Invoke-Native dotnet tool restore }
+                    # Unchecked, a failed restore surfaced only as regenerate-schemas failing, with no word of why.
+                    if (Test-Path '.config\dotnet-tools.json') {
+                        $out = Invoke-Native dotnet tool restore
+                        if ($LASTEXITCODE -ne 0) { throw "dotnet tool restore failed: $(($out | Select-Object -Last 3) -join ' / ')" }
+                    }
                     $out = Invoke-Native uv run regenerate-schemas
                     if ($LASTEXITCODE -ne 0) { throw "regenerate-schemas failed: $(($out | Select-Object -Last 3) -join ' / ')" }
                 } finally { Pop-Location }
