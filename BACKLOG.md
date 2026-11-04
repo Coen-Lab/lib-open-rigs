@@ -10,6 +10,26 @@ Found while merging it into av-dome `pip/main-switchover`; fixed there, not on h
 
 Pip asked for this as a backlog item (4 Nov 2026), not a message: raise it with Tom when next in touch, nothing posted.
 
+## Audit 2026-11-04, evening (/audit-rigs, set A; rig-control left to its own session)
+
+Changed (Manifest 0.1.0-local.15, Control 0.1.0-local.14):
+
+- **A run that failed before the session folder existed had its error held back** (L1-M1, reproduced): `ManifestRecorder` kept it until the folder appeared, so a workflow whose only subscriber to the run was `SessionManifest` stood at Ready with a dead run, and a Go then made a folder for it. The error now ends the node at once (no folder, no session to record); a completion before the folder still waits for it. Tested.
+- `ControlServer` sets `StoppedBy` before `StopReason` (L1-L1): the Manifest's stop poll fires on `StopReason` and then reads `StoppedBy`, so the other order could write the running stop without the person. Not reproduced; the window is two assignments.
+- `scripts\update-workflows.ps1` says in the row when a repo with `src\DataSchemas` has no `regenerate-schemas` script, so its schemas stay stale at every pin move (S4-M1: av-dome's `pip/main-switchover`, whose `examples\rig.py` would also fail the step 7e9ed6f added; both for that branch, see Deferred).
+- Docs: the Manifest README says `BonsaiData/` is the `ExpectedFiles` entry for `LogTrial` and `LogAsync` (L1-L2, S3-L2: the files carry the hour and wildcards are refused; a session with no trials still meets it through `BonsaiData_Async`); FORMAT.md says `closed: false` also comes from Bonsai's own writers, `BonsaiData_Async` open until disposal among them (L1-I); COEN-LAB.md names the four packages and the Logging and Core test projects (S5-L3).
+
+Not changed, do not raise again without new information:
+
+- `LogAsync` does not write the `Go` row rig-control's water count starts from (S2-H1): av-dome mirrors `ControlEvents` into `AsyncEvents`, so the row is there, and Logging stays independent of Control. The rule (a workflow with `LogAsync` sends its `ControlEvents` through `CreateAsyncEvent`, else rig-control records no water) belongs in claude-tools' bonsai-workflows skill and rig-control's README, not the package.
+- Parameter limits not in `status` (S2-I1): a refused `set` names them; a second copy would drift.
+
+Deferred, for Pip:
+
+- **`BonsaiData_Trial` and `BonsaiData_Async` reach disk about 4 KB at a time** (S3-M2): `OpenRigs.Logging.CsvWriter` rewraps Bonsai's own `CsvWriter`, which never flushes. The session page runs 15-25 trials behind, and a run killed past its stop deadline loses its unflushed tail, so `async_water_ml` undercounts with nothing saying so. A flush per row on `LogTrial`/`LogAsync` only (a few rows a second) is a patch to the bbox Logging package; a Harp log at full rate must not have it.
+- A `Detail` starting with `"` swallows every later row of `BonsaiData_Async` in rig-control's `csv.reader` (S3-L3): `AsyncEvent.Clean` replaces commas and line breaks, not quotes; no sender today starts one. `Clean` could replace `"` with `'`, and rig-control read with `QUOTE_NONE`.
+- av-dome `pip/main-switchover` (S4-M1): add `regenerate-schemas = "ucl_open_av_dome.regenerate:main"` to `[project.scripts]`, and make `examples\rig.py` write `config\rig-template.yml` (today it writes `.\local\UclOpenAvDomeRig.json` and calls `UclOpenAvDomeRig()` with no arguments, which throws) or delete it; with the script line alone, every hourly run would read FAILED.
+
 ## Audit 2026-11-04, afternoon (/audit-rigs, set C)
 
 Changed (scripts and READMEs only, no package version raised):

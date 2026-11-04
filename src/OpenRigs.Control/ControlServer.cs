@@ -627,8 +627,10 @@ namespace OpenRigs.Control
                 case "stop":
                 {
                     var why = (string)request["why"] ?? "stopped by the controller";
-                    state.StopReason = why;
+                    // The person first: the Manifest's stop poll (local.14) fires on StopReason and
+                    // then reads StoppedBy, so the other order could write the stop without them.
                     state.StoppedBy = Person.From(request["by"]);
+                    state.StopReason = why;
                     state.SetPhase(SessionPhase.Stopping);
                     stop = new SessionStoppedException("Session stopped: " + why);
                     return Ok();

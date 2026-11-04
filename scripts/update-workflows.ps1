@@ -374,7 +374,11 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
                     }
                 } finally { Pop-Location }
             }
-            $changes += "open-rigs (Python) from lib-open-rigs $($pin.Substring(0, 7)): pyproject.toml, uv.lock$(if ($py -match '(?m)^regenerate-schemas\s*=') { ', regenerated schemas' + $(if (Test-Path (Join-Path $Dir 'examples\rig.py')) { ' and rig template' }) })"
+            # A repo with generated schemas but no regenerate-schemas script keeps them stale
+            # at every pin move (av-dome pip/main-switchover, audit 4 Nov 2026): said in the row.
+            $regen = if ($py -match '(?m)^regenerate-schemas\s*=') { ', regenerated schemas' + $(if (Test-Path (Join-Path $Dir 'examples\rig.py')) { ' and rig template' }) }
+                     elseif (Test-Path (Join-Path $Dir 'src\DataSchemas')) { '; schemas NOT regenerated: pyproject.toml has no regenerate-schemas script' }
+            $changes += "open-rigs (Python) from lib-open-rigs $($pin.Substring(0, 7)): pyproject.toml, uv.lock$regen"
         }
         if (-not $changes) { $row.Result = 'up to date'; return $row }
         $written = (Get-FileHash (Join-Path $bonsai 'Bonsai.config')).Hash

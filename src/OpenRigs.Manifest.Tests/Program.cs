@@ -232,6 +232,18 @@ namespace OpenRigs.Manifest.Tests
                     Check("... and is written completed, with its items, when the folder appears", Field(text, "run.outcome") == "completed" && Field(text, "run.items") == "2", Field(text, "run.outcome") + " " + Field(text, "run.items"));
                     Check("... and the older ses-<Session>_date-<DateTime> name is still read", Field(text, "session.id") == "f" && Field(text, "session.started") == "2026-10-30T19:57:12Z", Field(text, "session.id") + " " + Field(text, "session.started"));
                     Check("... and the node completes", completed, "no OnCompleted");
+                    // A run that fails before the folder exists: nothing to record, and the error goes
+                    // on at once, so the workflow does not stand at Ready with a dead run (4 Nov 2026).
+                    var failedFolder = Path.Combine(root, "sub-TC002", "ses-f2_date-2026-10-30T19-57-12");
+                    var failedPath = new Subject<string>();
+                    var failedRun = new Subject<int>();
+                    Exception failedWith = null;
+                    var failedRecorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    var failedSubscription = failedRecorder.Process(failedPath, failedRun).Subscribe(_ => { }, e => failedWith = e, () => { });
+                    failedRun.OnError(new InvalidOperationException("camera lost before Go"));
+                    Check("a run that fails before the folder exists ends the node with its error at once", failedWith != null && failedWith.Message == "camera lost before Go", failedWith?.ToString() ?? "no OnError");
+                    Check("... and writes nothing", !Directory.Exists(failedFolder), failedFolder);
+                    failedSubscription.Dispose();
                     subscription.Dispose();
                 }
 

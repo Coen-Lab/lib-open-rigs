@@ -134,7 +134,10 @@ namespace OpenRigs.Manifest
                         {
                             try { finish(new RunEnd(RunEnd.Failed, error.Message)); }
                             catch (Exception ex) { NotWritten("the final manifest", ex); }
-                            lock (gate) { if (!begun) return; }
+                            // Before the folder exists there is no session to record, so the error
+                            // goes on at once: held until the folder appeared, a run that failed at
+                            // Ready left the workflow standing with a dead run, and a Go then made a
+                            // folder for it (audit, 4 Nov 2026). A completion still waits for the folder.
                             observer.OnError(error);
                         },
                         () =>
