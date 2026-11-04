@@ -1,5 +1,15 @@
 # Backlog
 
+## Tell Tom Ryan: `tr-open-rigs` (8406573) does not build (4 Nov 2026)
+
+Found while merging it into av-dome `pip/main-switchover`; fixed there, not on his branch. Both fail on his own pinned packages (`openrigs.* 0.0.0-ci17`, built from upstream `f313716`), so they are his branch's, not the fork's:
+
+- `Logging` lost 9 edges in his merge `8406573` (git merged the node list and the edge list separately): RewardLineLeft/Right > Calibrated? > ArtefactJson > ValveCalibrationDO1/DO2, and RewardDelivered > LoggingPrefixCondition > Timestamp > LogData sit unconnected. `LogDataSchema`'s Zip then has one input ("No method overload found"), and the valve calibration and RewardDelivered logs would never be written. av-dome fix `d1cfa28` restores them as `tr-calibration-loop` wired them.
+- `Logging > SessionLogs > TrialParameters` still stamps before building the row (`WithLatestTimestamp` then `new(Seconds as Seconds, Value.Item1...)`), so `GroupByTime` has no overload for it. His `c14dba2` fixed TrialSettings and Zapit this way, not this one. av-dome fix `169478b`.
+- Also from his branch: NetMQ, AsyncIO, NaCl.Net and Bonsai.ZeroMQ dropped from `Bonsai.config` in the same merge (unused by av-dome, needed by the lab's LiveView, so kept on the switch-over branch).
+
+Pip asked for this as a backlog item (4 Nov 2026), not a message: raise it with Tom when next in touch, nothing posted.
+
 ## Audit 2026-11-04 (/audit-rigs, set C)
 
 Changed (LiveView 0.1.0-local.9, Manifest 0.1.0-local.11; Pip: "Implement everything recommended as you go"):
