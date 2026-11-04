@@ -11,6 +11,7 @@ Changed (LiveView 0.1.0-local.9, Manifest 0.1.0-local.11; Pip: "Implement everyt
 - A dependency folder with NuGet's fourth version part (`openal.redist.2.0.7.0`) is found by the dependency walk and copy, as `Get-SetupGap` already found it.
 - `StreamDevices`' `ConfigRoot` defaults to `C:\Coen-Lab-Local\RigConfigs`, as `RecordHarpDevices`' (unset, it streamed nothing).
 - FORMAT.md defines `completed.unmet` and rig-sync's recount of `expected[].found` (rig-setup, same round); the Manifest and HarpDevices READMEs say rig-sync copies a run that did not complete with a note and an alarm (rig-setup ddff734); the LiveView README says `ConfigRoot` can be mapped (7b02057); COEN-LAB.md says a ticked branch gone from GitHub is `gone`.
+- After Phase 5 (`8162fcb`): `check-bonsai.ps1` compiles `src\Extensions` as Bonsai does, leaving out a folder under `src` with a project of its own; av-dome `pip/main-switchover`'s gamma calibration (MathNet, in its own `Extensions.csproj`) failed every hourly run. A nested folder with a space in its name is passed as `%20` (Phase 5 WARN).
 
 Not changed, do not raise again without new information:
 

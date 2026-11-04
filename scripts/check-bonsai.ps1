@@ -79,7 +79,9 @@ if (Test-Path $extensions) {
     # that is kept. Quoted as \"...\" for Windows PowerShell 5.1, which runs this script.
     $src = Join-Path $Repo 'src'
     $nested = @(Get-ChildItem $src -Recurse -Filter *.csproj | Where-Object { $_.DirectoryName -ne $src } |
-        ForEach-Object { ($_.DirectoryName.Substring($src.Length + 1) -replace '\\', '/') + '/**' } | Select-Object -Unique)
+        ForEach-Object { ($_.DirectoryName.Substring($src.Length + 1) -replace '\\', '/' -replace ' ', '%20') + '/**' } | Select-Object -Unique)
+    # A space as %20, which MSBuild reads back as one: PowerShell 5.1 does not quote an
+    # argument that already holds a quote, so a bare space split it in two (MSB1008).
     $exclude = '-p:DefaultItemExcludesInProjectFolder=\"' + ((@('**/.*/**') + $nested) -join ';') + '\"'
     $log = & { $ErrorActionPreference = 'Continue'; & dotnet build $extensions -o $bin -nologo -v q -p:LangVersion=5 $exclude `
         --source https://api.nuget.org/v3/index.json --source (Join-Path $Repo 'local_packages') 2>&1 | ForEach-Object { "$_" } }
