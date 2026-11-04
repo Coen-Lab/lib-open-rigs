@@ -10,6 +10,20 @@ Found while merging it into av-dome `pip/main-switchover`; fixed there, not on h
 
 Pip asked for this as a backlog item (4 Nov 2026), not a message: raise it with Tom when next in touch, nothing posted.
 
+## Audit 2026-11-04, morning (/audit-rigs, set A)
+
+Changed (Control 0.1.0-local.13, Manifest 0.1.0-local.12, HarpDevices 0.1.0-local.6, LiveView 0.1.0-local.10, the last two for `src\Shared`; not pushed):
+
+- `AtomicFile.Write` (`src\Shared\Json.cs`) tries the rename up to 10 times, 50 ms apart: Windows refuses `File.Replace` while a reader holds the file without delete sharing (Python's `open()`; rig-control's agent polls `manifest.json` every second around the final write), and the final manifest was then lost. A Manifest test holds the file open for 200 ms during a write (fails without the retry). A final write that fails goes to stderr as well as the trace (`ManifestRecorder`).
+- `RunEnd.AtDisposal` says `stopped` only when the controller's stop set `StopReason`, as FORMAT.md says, not for any Stopping phase; `ControlSession.Stopping` is gone. Tested.
+- `ExpectedFiles` drops a leading `./` (rig-sync matches `RigSchema/x.json`) and leaves out, with a note, an entry that is rooted or holds `..`, as it does a wildcard. Tested.
+- `ControlServer` reads every frame of a request and refuses more than one ("one frame per request, got N"): a second frame left unread made the reply throw, which ended the session. Tested with a two-frame status (fails without the change).
+- A Control test that Go and a command are answered within 1 s while a subscriber spends 3 s on each. The two-servers test waits for the first to answer before starting the second (they raced to bind).
+- `scripts\hourly.ps1` writes `K:\config\<MACHINE>\<MACHINE>_WorkflowsUpdate.json` every run (`machine`, `started`, `finished`, `exitCode`, `lastPass`; atomic, UTF-8 without BOM; a failed share write is logged, not fatal), which rig-setup's rig-status report flags when `finished` is over 3 h old or `exitCode` is not 0: nothing noticed a task that stopped running. COEN-LAB.md says so, and no longer says rig-setup's Machines window shows `WorkflowsFailed.txt` (PIPOFFICERIG has no heartbeat, so it never did; set B above says it did).
+- Docs: FORMAT.md's example writer is Manifest local.12 and `expected[].path` has no `./`; the Control and Manifest READMEs say what changed.
+
+Not changed, do not raise again without new information: none.
+
 ## Audit 2026-11-04 (/audit-rigs, set C)
 
 Changed (LiveView 0.1.0-local.9, Manifest 0.1.0-local.11; Pip: "Implement everything recommended as you go"):
@@ -73,7 +87,7 @@ Not changed, do not raise again without new information:
 - `ParameterDefault` and `ParameterMaximum` throw before ControlServer has subscribed: fails loudly; coen-behaviour-box's `DelaySubscription PT1S` covers it.
 - A `SessionStoppedException` reaching the run input through the camera's PropertyMapping (since a92cde7) could write `error` instead of `stopped`: the include's terminal subscribes first, so teardown disposes the manifest before the camera chain sees the error; not seen.
 - `Matches` counts a device's `<Name>_device.json` and `<Name>.yml` towards its folder under `auto` alone: coen-behaviour-box runs `auto;harp;RigSchema/`, whose Harp kinds are all in the WhoAmI table, so no live workflow is held back or passed wrongly. The `FORMAT.md` rule (a register map never stands in for data) is the intent; a code change waits for a workflow that hits it.
-- `OpenRigs.Core` declares YamlDotNet 16.0.0 where every other package declares 16.3.0: NuGet resolves coen-behaviour-box to 16.3.0; bump Core's reference at its next pack.
+- `OpenRigs.Core` declares YamlDotNet 16.0.0 where every other package declares 16.3.0: NuGet resolves coen-behaviour-box to 16.3.0; bump Core's reference at its next pack; superseded by set C's item above (upstream's code).
 
 ## Audit 2 Nov 2026 (rig.yml-driven Harp identity, dump and register map): not changed
 
