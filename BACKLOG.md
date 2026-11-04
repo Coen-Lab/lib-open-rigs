@@ -1,5 +1,22 @@
 # Backlog
 
+## Audit 2026-11-04 (/audit-rigs, set C)
+
+Changed (LiveView 0.1.0-local.9, Manifest 0.1.0-local.11; Pip: "Implement everything recommended as you go"):
+
+- `push.ps1` refuses a package whose source (its folder, its READMEs aside, and `..\Shared\` it compiles) changed after its `.nupkg` was committed with `<Version>` unraised: it pushed and shipped nothing. It found Manifest local.10 built before 7b02057's Shared change, so Manifest is local.11 (no behaviour change).
+- `build-package.ps1` refuses a version committed at any time (`git log --all`), not only one in the index: a version set back by hand rebuilt a file a rig may hold cached.
+- The hourly task runs `update-workflows.ps1` from its own clone, `%LOCALAPPDATA%\lib-open-rigs\self`, set to `origin/main` each hour: unpushed commits in the working copy failed three runs in a row on 3 Nov, and a branch checked out there would have pinned every workflow to it. `push.ps1` still runs from the working copy. The task's limit is three hours (rerun `scripts\schedule.ps1` once to take it).
+- A ticked branch gone from GitHub is `gone`, not `FAILED`, as rig-setup reads it, until Repos takes the tick off.
+- A dependency folder with NuGet's fourth version part (`openal.redist.2.0.7.0`) is found by the dependency walk and copy, as `Get-SetupGap` already found it.
+- `StreamDevices`' `ConfigRoot` defaults to `C:\Coen-Lab-Local\RigConfigs`, as `RecordHarpDevices`' (unset, it streamed nothing).
+- FORMAT.md defines `completed.unmet` and rig-sync's recount of `expected[].found` (rig-setup, same round); the Manifest and HarpDevices READMEs say rig-sync copies a run that did not complete with a note and an alarm (rig-setup ddff734); the LiveView README says `ConfigRoot` can be mapped (7b02057); COEN-LAB.md says a Use As Main branch is not kept.
+
+Not changed, do not raise again without new information:
+
+- `update-workflows.ps1` writing a version downgrade (`:298` tests only `-ne`): `build-package.ps1` now refuses any version committed before, so a downgrade cannot be built.
+- OpenRigs.Core asking for YamlDotNet 16.0.0 where the lab's packages ask 16.3.0: Core is open-rigs' code, and every lab workflow also installs a package that requires 16.3.0; an upstream issue if it ever matters.
+
 ## Audit 2026-11-03, night (/audit-rigs, set B)
 
 Changed (Control 0.1.0-local.12, HarpDevices 0.1.0-local.4, LiveView 0.1.0-local.7; Manifest stays local.10; Pip: "Implement everything recommended as you go"):
