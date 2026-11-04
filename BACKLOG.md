@@ -12,7 +12,7 @@ Pip asked for this as a backlog item (4 Nov 2026), not a message: raise it with 
 
 ## Audit 2026-11-04, day (/audit-rigs, set B)
 
-Changed (HarpDevices 0.1.0-local.7, LiveView 0.1.0-local.11, Manifest 0.1.0-local.13, all three also for `src\Shared`; not pushed):
+Changed (HarpDevices 0.1.0-local.8, LiveView 0.1.0-local.12, Manifest 0.1.0-local.14, all three also for `src\Shared`, above 6d0b870's local.7, local.11 and local.13 for the Lickety Split's WhoAmI):
 
 - One rule for where rig.yml lives: `RigDevices.DefaultConfigRoot` and `RigDevices.PathFor` (`src\Shared\RigDevices.cs`), used by `HarpDevicePlan`, `LiveViewPlan`, `RecordHarpDevices` and `StreamDevices` (set C had to fix StreamDevices' default drifting from RecordHarpDevices').
 - One rule for an empty YAML value: `RigDevices.Value` (null for null, `null`, `~`, empty or blank, else trimmed), called by `HarpRig.Setting` and LiveView's `liveView:` settings.
@@ -21,7 +21,7 @@ Changed (HarpDevices 0.1.0-local.7, LiveView 0.1.0-local.11, Manifest 0.1.0-loca
 - A board whose WhoAmI came only after the session started has the note "The board reported no WhoAmI at connection, so its kind was checked only after the session started." in its record: a wrong kind then stops the workflow after Go, not before. Tested both ways.
 - HarpDevices' dump-request test polls for the read for up to 2 s instead of a fixed 100 ms sleep.
 - `scripts\hourly.ps1` runs `update-workflows.ps1` as a child process, as `push.ps1` does: called in-process, a script that did not parse left `$LASTEXITCODE` at git's 0 and the run was recorded as a pass (probed: a missing `}` gave `Exit 0`). The child gives `Exit 1` and the parser's error in the same log. No parse check of `scripts\*.ps1` was added to CI: `.github\workflows\OpenRigs.yml` is upstream's, not in COEN-LAB.md's table, and the lab's scripts are tested nowhere else.
-- A controller's stop is written as soon as it comes, outcome still `running`, with `run.stop_reason` and `control.stopped_by` (`ManifestRecorder` looks for it every 0.25 s; `ManifestWriter.Stopping`, the same atomic write): rig-control kills a workflow slow to stop, and the end-of-run write that carried them never came. Tested; FORMAT.md says a `running` manifest may carry the stop, and its example writer is local.13.
+- A controller's stop is written as soon as it comes, outcome still `running`, with `run.stop_reason` and `control.stopped_by` (`ManifestRecorder` looks for it every 0.25 s; `ManifestWriter.Stopping`, the same atomic write): rig-control kills a workflow slow to stop, and the end-of-run write that carried them never came. Tested; FORMAT.md says a `running` manifest may carry the stop, and its example writer is local.14.
 - Docs: COEN-LAB.md and `hourly.ps1` name every reader of `<MACHINE>_WorkflowsUpdate.json` (rig-setup's rig-status report and Machines window at 3 h, ClaudioVisual's rig health DM at a day); the HarpDevices, LiveView and Manifest READMEs say what changed.
 
 Not changed, do not raise again without new information:
