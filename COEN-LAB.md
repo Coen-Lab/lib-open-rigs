@@ -1,6 +1,6 @@
 # The Coen Lab's open-rigs
 
-This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (branch `rig-config-resolver` at `3788bfb`, NeuroThom's per-machine config operators), plus the lab's fixes and packages. Each lab change is a commit on `main`; a change meant for upstream also gets a branch of its own for its pull request.
+This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (branch `rig-config-resolver` at `3788bfb`, NeuroThom's per-machine config operators, and upstream `main` merged at `f313716` on 4 Nov 2026 for the calibration loop av-dome's `tr-open-rigs` uses), plus the lab's fixes and packages. Each lab change is a commit on `main`; a change meant for upstream also gets a branch of its own for its pull request.
 
 | On `main` | What it is |
 |---|---|
@@ -12,7 +12,7 @@ This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (bra
 | [`OpenRigs.HarpDevices`](src/OpenRigs.HarpDevices/README.md) | `RecordHarpDevices` checks every Harp device in rig.yml at Start by its `usbSerial`, and writes each device's registers and register map into each session |
 | [`OpenRigs.LiveView`](src/OpenRigs.LiveView/README.md) | `StreamDevices` streams every device in rig.yml that the workflow publishes, with the workflow's repository and commit |
 | `src/Shared/` | Code compiled into LiveView, Manifest and HarpDevices as internal code, so none depends on another |
-| `local_packages/` | One `.nupkg` per package: the four above, the patched `OpenRigs.Core`, `Devices` `0.1.0-bbox.1`, `Logging`, `Streaming` `0.1.0-bbox.2` (session folders `ses-<Session>_<DateTime>`, ucl-open/roadmap#37) and `Video` `0.1.0-bbox.3` (`ExposureTime` and `Gain` taken live by the open camera), and `Bonsai.FFmpeg` `0.2.0-uniquepipe` ([`patches/README.md`](patches/README.md), licences in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)) |
+| `local_packages/` | One `.nupkg` per package: the four above, the patched `OpenRigs.Core`, `Devices` `0.1.0-bbox.2`, `Logging` `0.1.0-bbox.3`, `Streaming` `0.1.0-bbox.2` (session folders `ses-<Session>_<DateTime>`, ucl-open/roadmap#37) and `Video` `0.1.0-bbox.3` (`ExposureTime` and `Gain` taken live by the open camera), and `Bonsai.FFmpeg` `0.2.0-uniquepipe` ([`patches/README.md`](patches/README.md), licences in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)) |
 
 They moved here from coen-openrigs-custom on 2 Nov 2026.
 
