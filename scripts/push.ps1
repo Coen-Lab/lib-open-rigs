@@ -36,6 +36,14 @@ $stale = @(Get-ChildItem (Join-Path $repo 'src') -Directory | ForEach-Object {
     } })
 if ($stale) { throw "Changed since built: $($stale -join ', '). Raise <Version>, run scripts\build-package.ps1 -Package <name> and commit local_packages\ first." }
 
+# The hourly task runs these from origin/main, and a script that does not parse fails every
+# hour there (audit-rigs set B): no CI here checks the lab's scripts, so this push does.
+$broken = @(Get-ChildItem (Join-Path $repo 'scripts') -Filter '*.ps1' | ForEach-Object {
+    $errors = $null
+    $null = [Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors)
+    if ($errors) { "$($_.Name): $($errors[0].Message) (line $($errors[0].Extent.StartLineNumber))" } })
+if ($broken) { throw "Does not parse: $($broken -join '; '). Fix it before pushing." }
+
 # Windows PowerShell turns a native command's stderr into errors, so git runs under 'Continue'.
 & { $ErrorActionPreference = 'Continue'; & git -C $repo push 2>&1 | ForEach-Object { "$_" } }
 if ($LASTEXITCODE -ne 0) { throw "git push failed." }
