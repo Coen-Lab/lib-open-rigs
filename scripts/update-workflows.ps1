@@ -29,7 +29,8 @@ param(
 #   - .bonsai\NuGet.config gets the ../local_packages/ source if it lacks it;
 #   - an open-rigs git source in pyproject.toml is set to this repository at the last commit
 #     that changed src\, pyproject.toml or local_packages\, then uv.lock is relocked and, if
-#     the workflow has regenerate-schemas, its schema and generated classes are regenerated.
+#     the workflow has regenerate-schemas, its schema and generated classes are regenerated,
+#     and its rig template (examples\rig.py) where it has one.
 # A branch that changed is checked with its own scripts\check-workflow.ps1, or else with
 # scripts\check-bonsai.ps1 here; if that passes, those files and nothing else are committed and
 # pushed to that branch, and rig-setup's 30-minute update takes main to the rigs. A failure is
@@ -363,9 +364,17 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
                     }
                     $out = Invoke-Native uv run regenerate-schemas
                     if ($LASTEXITCODE -ne 0) { throw "regenerate-schemas failed: $(($out | Select-Object -Last 3) -join ' / ')" }
+                    # The rig template (config\rig-template.yml) is written from the same models by
+                    # examples\rig.py. Left alone, a field new in the lab's rig schema reached the
+                    # schema but not the template, and coen-behaviour-box's Schemas check failed
+                    # from 228d10c here until its e118138 (4 Nov 2026).
+                    if (Test-Path 'examples\rig.py') {
+                        $out = Invoke-Native uv run python examples/rig.py
+                        if ($LASTEXITCODE -ne 0) { throw "examples\rig.py failed: $(($out | Select-Object -Last 3) -join ' / ')" }
+                    }
                 } finally { Pop-Location }
             }
-            $changes += "open-rigs (Python) from lib-open-rigs $($pin.Substring(0, 7)): pyproject.toml, uv.lock$(if ($py -match '(?m)^regenerate-schemas\s*=') { ', regenerated schemas' })"
+            $changes += "open-rigs (Python) from lib-open-rigs $($pin.Substring(0, 7)): pyproject.toml, uv.lock$(if ($py -match '(?m)^regenerate-schemas\s*=') { ', regenerated schemas' + $(if (Test-Path (Join-Path $Dir 'examples\rig.py')) { ' and rig template' }) })"
         }
         if (-not $changes) { $row.Result = 'up to date'; return $row }
         $written = (Get-FileHash (Join-Path $bonsai 'Bonsai.config')).Hash
