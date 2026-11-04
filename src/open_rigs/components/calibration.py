@@ -6,7 +6,7 @@ class ProjectionCalibration(BaseSchema):
     """File-based calibration assets for mesh-mapped projection displays.
 
     Superseded by vision.ProjectionCorrection, whose paths are relative to the rig configuration
-    directory; kept until av-dome migrates (open-rigs/av-dome#20, #22).
+    directory; kept until av-dome migrates (ucl-open/av-dome#20, #22).
     """
 
     mesh_map_path: str = Field(

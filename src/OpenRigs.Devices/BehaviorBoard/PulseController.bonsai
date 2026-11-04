@@ -11,7 +11,7 @@
       <Expression xsi:type="beh:CreateMessage">
         <harp:MessageType>Write</harp:MessageType>
         <harp:Payload xsi:type="beh:CreateOutputClearPayload">
-          <beh:OutputClear>DO0 DO1 DO2</beh:OutputClear>
+          <beh:OutputClear>DO1 DO2 DO3</beh:OutputClear>
         </harp:Payload>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
@@ -146,45 +146,10 @@
         <Combinator xsi:type="rx:SubscribeWhen" />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="TriggerPulseSubjectName" Description="The name of the subject to which pulse triggers should be sent. The value of the integer sent to this trigger will trigger a pulse on th corresponding DO line" Category="Subjects" />
+        <Property Name="Name" DisplayName="TriggerPulseSubjectName" Description="The name of the subject to which pulse triggers should be sent. The integer sent to this subject is the DO line to pulse, 1 to 3" Category="Subjects" />
       </Expression>
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Int32">
         <rx:Name>TriggerPulse</rx:Name>
-      </Expression>
-      <Expression xsi:type="rx:Condition">
-        <Workflow>
-          <Nodes>
-            <Expression xsi:type="WorkflowInput">
-              <Name>Source1</Name>
-            </Expression>
-            <Expression xsi:type="ExternalizedMapping">
-              <Property Name="Value" />
-            </Expression>
-            <Expression xsi:type="Equal">
-              <Operand xsi:type="IntProperty">
-                <Value>0</Value>
-              </Operand>
-            </Expression>
-            <Expression xsi:type="WorkflowOutput" />
-          </Nodes>
-          <Edges>
-            <Edge From="0" To="2" Label="Source1" />
-            <Edge From="1" To="2" Label="Source2" />
-            <Edge From="2" To="3" Label="Source1" />
-          </Edges>
-        </Workflow>
-      </Expression>
-      <Expression xsi:type="beh:CreateMessage">
-        <harp:MessageType>Write</harp:MessageType>
-        <harp:Payload xsi:type="beh:CreateOutputSetPayload">
-          <beh:OutputSet>DO0</beh:OutputSet>
-        </harp:Payload>
-      </Expression>
-      <Expression xsi:type="MulticastSubject">
-        <Name>BehaviorCommands</Name>
-      </Expression>
-      <Expression xsi:type="SubscribeSubject">
-        <Name>TriggerPulse</Name>
       </Expression>
       <Expression xsi:type="rx:Condition">
         <Workflow>
@@ -248,6 +213,41 @@
         <harp:MessageType>Write</harp:MessageType>
         <harp:Payload xsi:type="beh:CreateOutputSetPayload">
           <beh:OutputSet>DO2</beh:OutputSet>
+        </harp:Payload>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>BehaviorCommands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TriggerPulse</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="Value" />
+            </Expression>
+            <Expression xsi:type="Equal">
+              <Operand xsi:type="IntProperty">
+                <Value>3</Value>
+              </Operand>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="2" Label="Source1" />
+            <Edge From="1" To="2" Label="Source2" />
+            <Edge From="2" To="3" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="beh:CreateMessage">
+        <harp:MessageType>Write</harp:MessageType>
+        <harp:Payload xsi:type="beh:CreateOutputSetPayload">
+          <beh:OutputSet>DO3</beh:OutputSet>
         </harp:Payload>
       </Expression>
       <Expression xsi:type="MulticastSubject">

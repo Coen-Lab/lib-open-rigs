@@ -52,5 +52,24 @@ namespace OpenRigs.Core
         {
             return source.Select(pair => new CalibrationCurveFit(pair.Item1, pair.Item2, Model, Order));
         }
+
+        /// <summary>
+        /// Derives a curve from the points of each calibration artefact.
+        /// </summary>
+        public IObservable<CalibrationCurveFit> Process(IObservable<Calibration.CalibrationCurve> source)
+        {
+            return source.Select(curve =>
+            {
+                if (curve == null || curve.Points == null || curve.Points.Count < 2)
+                {
+                    throw new InvalidOperationException("The calibration curve needs at least two points to fit.");
+                }
+                return new CalibrationCurveFit(
+                    curve.Points.Select(point => point.X),
+                    curve.Points.Select(point => point.Y),
+                    Model,
+                    Order);
+            });
+        }
     }
 }

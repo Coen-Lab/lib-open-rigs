@@ -10,9 +10,8 @@ namespace OpenRigs.Core
     /// <summary>
     /// A calibration curve derived from measured (x, y) points, keeping the calibrated range so
     /// lookups can be clamped to it. x is the quantity the rig controls, y the quantity measured.
-    /// Implements <see cref="IInterpolation"/> so Bonsai.Numerics operators can evaluate it too.
     /// </summary>
-    public sealed class CalibrationCurveFit : IInterpolation
+    public sealed class CalibrationCurveFit
     {
         const double RootAccuracy = 1e-10;
         const int RootIterations = 200;
@@ -242,43 +241,23 @@ namespace OpenRigs.Core
             return points.ToArray();
         }
 
-        bool IInterpolation.SupportsDifferentiation
+        /// <summary>
+        /// Describes the fit without assuming its model: the model, the point count, the x range
+        /// and the y range it maps to, whether it is monotone, and the line's slope and intercept
+        /// when the model is <see cref="CalibrationModel.LinearFit"/>.
+        /// </summary>
+        public override string ToString()
         {
-            get { return interpolation != null && interpolation.SupportsDifferentiation; }
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            var text = string.Format(culture,
+                "{0} through {1} points: x {2:0.###} to {3:0.###} maps to y {4:0.###} to {5:0.###}, {6}",
+                Model, PointCount, MinX, MaxX, MinY, MaxY, IsMonotone ? "monotone" : "NOT monotone");
+            if (Model == CalibrationModel.LinearFit)
+            {
+                text += string.Format(culture, "; slope {0:0.####}, intercept {1:0.####}", Slope, Intercept);
+            }
+            return text;
         }
 
-        bool IInterpolation.SupportsIntegration
-        {
-            get { return interpolation != null && interpolation.SupportsIntegration; }
-        }
-
-        double IInterpolation.Interpolate(double t)
-        {
-            return evaluate(t);
-        }
-
-        double IInterpolation.Differentiate(double t)
-        {
-            if (interpolation == null) throw new NotSupportedException("Fitted curves do not support differentiation.");
-            return interpolation.Differentiate(t);
-        }
-
-        double IInterpolation.Differentiate2(double t)
-        {
-            if (interpolation == null) throw new NotSupportedException("Fitted curves do not support differentiation.");
-            return interpolation.Differentiate2(t);
-        }
-
-        double IInterpolation.Integrate(double t)
-        {
-            if (interpolation == null) throw new NotSupportedException("Fitted curves do not support integration.");
-            return interpolation.Integrate(t);
-        }
-
-        double IInterpolation.Integrate(double a, double b)
-        {
-            if (interpolation == null) throw new NotSupportedException("Fitted curves do not support integration.");
-            return interpolation.Integrate(a, b);
-        }
     }
 }

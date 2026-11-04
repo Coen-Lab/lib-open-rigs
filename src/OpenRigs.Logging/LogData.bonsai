@@ -4,6 +4,7 @@
                  xmlns:p1="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Workflow>
     <Nodes>
@@ -60,7 +61,7 @@
             <Expression xsi:type="ExternalizedMapping">
               <Property Name="Selector" />
             </Expression>
-            <Expression xsi:type="io:CsvWriter">
+            <Expression xsi:type="orl:CsvWriter">
               <io:FileName />
               <io:Append>true</io:Append>
               <io:Overwrite>false</io:Overwrite>

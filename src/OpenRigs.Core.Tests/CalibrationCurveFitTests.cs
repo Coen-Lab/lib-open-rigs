@@ -147,16 +147,5 @@ namespace OpenRigs.Core.Tests
             Assert.AreEqual(60, curve.MaxX);
             Assert.AreEqual(1.6, curve.Evaluate(30), 1e-12);
         }
-
-        [TestMethod]
-        public void ImplementsIInterpolation()
-        {
-            MathNet.Numerics.Interpolation.IInterpolation interpolation = Line();
-            Assert.AreEqual(2.1, interpolation.Interpolate(40), 1e-12);
-            Assert.IsFalse(interpolation.SupportsDifferentiation);
-            MathNet.Numerics.Interpolation.IInterpolation spline = Line(CalibrationModel.Linear);
-            Assert.IsTrue(spline.SupportsDifferentiation);
-            Assert.AreEqual(0.05, spline.Differentiate(30), 1e-9);
-        }
     }
 }

@@ -19,15 +19,27 @@ class DigitalOutputs(RootModel[str]):
 
 
 class CameraTriggerController(BaseSchema):
-    """Represents a CameraTriggerController module on a BehaviorBoard device."""
+    """Represents a CameraTriggerController module on a BehaviorBoard device.
 
+    The two camera trigger outputs share pins with digital outputs: Trigger0 is DO0 and Trigger1
+    is DO1. A trigger that is not enabled is never started, which leaves its pin free for a pulse
+    output such as a reward valve.
+    """
+
+    trigger0_enabled: bool = Field(
+        default=True, description="Start camera trigger 0 (CameraOutput0, the DO0 pin) when the rig starts."
+    )
     trigger0_frequency: int = Field(
         examples=["50"],
         description="The frequency, in Hz, at which to emit camera triggers on Trigger0 (DO0, CameraOutput0)",
     )
+    trigger1_enabled: bool = Field(
+        default=False,
+        description="Start camera trigger 1 (CameraOutput1, the DO1 pin) when the rig starts. Leave off when DO1 drives a pulse output.",
+    )
     trigger1_frequency: int = Field(
         examples=["50"],
-        description="The frequency, in Hz, at which to emit camera triggers on Trigger1 (DO1, CameraOutput1)",
+        description="The frequency, in Hz, at which to emit camera triggers on Trigger1 (DO1, CameraOutput1). Only matters when trigger 1 is enabled.",
     )
 
 
