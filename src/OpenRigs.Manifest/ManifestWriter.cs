@@ -113,13 +113,13 @@ namespace OpenRigs.Manifest
         /// <summary>The first write, status partial and outcome running. Makes the folder if the loggers have not yet: PathPrefix names it before any of them writes and they make the same folder. Throws if the file cannot be written: nothing recorded is the thing to stop for.</summary>
         public string Begin(string sessionFolder, ControlSession control)
         {
-            if (string.IsNullOrEmpty(sessionFolder)) throw new ArgumentException("SessionManifest was given no session folder.");
+            if (string.IsNullOrEmpty(sessionFolder)) throw new ArgumentException("ExperimentManifest was given no session folder.");
             var full = Path.GetFullPath(sessionFolder.TrimEnd('\\', '/'));
             Directory.CreateDirectory(full);
             var path = Path.Combine(full, FileName);
             folder = full;
             started = DateTime.UtcNow;
-            if (control == null) start.Notes.Add("No SessionControl running when the session folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it.");
+            if (control == null) start.Notes.Add("No ExperimentControl running when the session folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it.");
             try
             {
                 manifestPath = path;
@@ -312,7 +312,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>The session controller's settings at Go: subject, session, who launched it, sent
-        /// Go and stopped it, and every parameter. Null without SessionControl.</summary>
+        /// Go and stopped it, and every parameter. Null without ExperimentControl.</summary>
         public static JsonObject ControlSection(ControlSession control)
         {
             if (control == null) return null;

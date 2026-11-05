@@ -6,7 +6,7 @@ using System.Linq;
 namespace OpenRigs.Manifest
 {
     /// <summary>
-    /// The running OpenRigs.Control session (SessionControl's ControlState.Current), read by name,
+    /// The running OpenRigs.Control session (ExperimentControl's ControlState.Current), read by name,
     /// so that OpenRigs.Manifest does not depend on OpenRigs.Control: a workflow can have the
     /// manifest without the session controller's package, and then there is no session to read.
     /// src\OpenRigs.Manifest.Tests runs against the real ControlState, and fails if a member

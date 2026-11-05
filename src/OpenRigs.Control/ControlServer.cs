@@ -17,7 +17,7 @@ namespace OpenRigs.Control
     /// <summary>
     /// Where a session is, as the controller sees it.
     /// </summary>
-    public enum SessionPhase
+    public enum ExperimentPhase
     {
         /// <summary>The workflow is up; its hardware is not yet confirmed.</summary>
         Starting,
@@ -211,11 +211,11 @@ namespace OpenRigs.Control
     /// The controller asked the workflow to stop. Ends the workflow through Rx's error path,
     /// as Watchdog does, so every subscription is disposed and every file closed.
     /// </summary>
-    public class SessionStoppedException : Exception
+    public class ExperimentStoppedException : Exception
     {
         /// <summary>Initializes a new instance with the controller's reason.</summary>
         /// <param name="message">Why the session was stopped.</param>
-        public SessionStoppedException(string message) : base(message) { }
+        public ExperimentStoppedException(string message) : base(message) { }
     }
 
     /// <summary>
@@ -229,7 +229,7 @@ namespace OpenRigs.Control
         readonly object gate = new object();
 
         /// <summary>Gets the session's phase.</summary>
-        public SessionPhase Phase { get; private set; } = SessionPhase.Starting;
+        public ExperimentPhase Phase { get; private set; } = ExperimentPhase.Starting;
 
         /// <summary>Gets when the phase last moved, in UTC.</summary>
         public DateTime PhaseSince { get; private set; } = DateTime.UtcNow;
@@ -289,7 +289,7 @@ namespace OpenRigs.Control
             var state = Current;
             if (state == null)
             {
-                throw new InvalidOperationException(operatorName + " needs a running ControlServer (the SessionControl include) in this workflow.");
+                throw new InvalidOperationException(operatorName + " needs a running ControlServer (the ExperimentControl include) in this workflow.");
             }
             return state;
         }
@@ -299,14 +299,14 @@ namespace OpenRigs.Control
         /// left on a stream that keeps running (Ready on every frame) cannot undo Recording.
         /// </summary>
         /// <param name="phase">The phase reported.</param>
-        public void SetPhase(SessionPhase phase)
+        public void SetPhase(ExperimentPhase phase)
         {
             lock (gate)
             {
                 if (phase <= Phase) return;
                 Phase = phase;
                 PhaseSince = DateTime.UtcNow;
-                if (phase == SessionPhase.Finished) FinishedAt = PhaseSince;
+                if (phase == ExperimentPhase.Finished) FinishedAt = PhaseSince;
             }
         }
 
@@ -390,7 +390,7 @@ namespace OpenRigs.Control
     /// <summary>
     /// Answers a controller over a ZeroMQ reply socket: status, parameter changes while ready,
     /// declared commands, Go and Stop. Emits Go (with the parameters as they stood) and each
-    /// command as a ControlEvent; Stop ends the workflow with SessionStoppedException.
+    /// command as a ControlEvent; Stop ends the workflow with ExperimentStoppedException.
     /// One request is one JSON object with "cmd"; one reply is {"ok": true, ...} or
     /// {"ok": false, "why": "..."}.
     /// </summary>
@@ -528,7 +528,7 @@ namespace OpenRigs.Control
                     var name = (string)request["name"] ?? "";
                     var value = (string)request["value"] ?? "";
                     var phase = state.Locked(() => state.Phase);
-                    if (phase != SessionPhase.Starting && phase != SessionPhase.Ready)
+                    if (phase != ExperimentPhase.Starting && phase != ExperimentPhase.Ready)
                         return Refuse("parameters can only change before Go (phase " + phase + ")");
                     if (state.Locked(() => state.GoRequested))
                         return Refuse("Go has already been requested");
@@ -560,7 +560,7 @@ namespace OpenRigs.Control
                 case "go":
                 {
                     var phase = state.Locked(() => state.Phase);
-                    if (phase != SessionPhase.Ready)
+                    if (phase != ExperimentPhase.Ready)
                         return Refuse("not ready (phase " + phase + ")");
                     // One lock: the snapshot, the check and GoRequested, so a ParameterDefault
                     // or ParameterMaximum landing between them cannot show Go a value it did not
@@ -607,7 +607,7 @@ namespace OpenRigs.Control
                     var name = (string)request["name"] ?? "";
                     var args = (string)request["args"] ?? "";
                     var phase = state.Locked(() => state.Phase);
-                    if (phase != SessionPhase.Ready && phase != SessionPhase.Recording)
+                    if (phase != ExperimentPhase.Ready && phase != ExperimentPhase.Recording)
                         return Refuse("commands are taken while ready or recording (phase " + phase + ")");
                     if (!state.Commands.Any(c => c.Name == name))
                         return Refuse("no command named '" + name + "'; this workflow declares: " + Names(state.Commands.Select(c => c.Name)));
@@ -631,8 +631,8 @@ namespace OpenRigs.Control
                     // then reads StoppedBy, so the other order could write the stop without them.
                     state.StoppedBy = Person.From(request["by"]);
                     state.StopReason = why;
-                    state.SetPhase(SessionPhase.Stopping);
-                    stop = new SessionStoppedException("Session stopped: " + why);
+                    state.SetPhase(ExperimentPhase.Stopping);
+                    stop = new ExperimentStoppedException("Experiment stopped: " + why);
                     return Ok();
                 }
 

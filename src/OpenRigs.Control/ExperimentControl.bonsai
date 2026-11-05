@@ -37,7 +37,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
-        <Name>SessionGo</Name>
+        <Name>ExperimentGo</Name>
       </Expression>
     </Nodes>
     <Edges>

@@ -101,7 +101,7 @@ namespace OpenRigs.Manifest
                 var published = publishedType(name) != null ? name : publishedType(name + ".Data") != null ? name + ".Data" : null;
                 if (published == null)
                 {
-                    Notes.Add(name + " (" + entry + ") is not expected: the workflow publishes no " + name + " or " + name + ".Data before SessionManifest.");
+                    Notes.Add(name + " (" + entry + ") is not expected: the workflow publishes no " + name + " or " + name + ".Data before ExperimentManifest.");
                     continue;
                 }
                 Add(name + "/", entry + ", published as " + published);

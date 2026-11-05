@@ -12,7 +12,7 @@ param(
 #   2. Builds src\main.bonsai with Bonsai's own expression builders, as Bonsai does at Start
 #      before it subscribes anything: every type, selector, include, subject and mapping; and,
 #      when the workflow tracks config\main.layout, that each window sits on a node it fits;
-#      and that every device, log, session setting and BonsaiData_Trial column is named as
+#      and that every device, log, experiment setting and BonsaiData_Trial column is named as
 #      src\open_rigs\lab_names.yml allows for the workflow's rig.
 # It cannot check hardware, the visualizers themselves or the data a run writes. Exit 0 when
 # both pass.
@@ -72,7 +72,7 @@ if ($Step -eq 'Build') {
     $null = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::Build($inspectable)
 
     # The lab's approved names (src\open_rigs\lab_names.yml, this repository's copy): device
-    # subjects and log names, other log names, SessionControl parameters and the columns of each
+    # subjects and log names, other log names, ExperimentControl parameters and the columns of each
     # BonsaiData_Trial, for the rig whose repos list holds this workflow's repository.
     $namesLines = @(& {
         $namesPath = Join-Path (Split-Path (Split-Path $self -Parent) -Parent) 'src\open_rigs\lab_names.yml'
@@ -94,10 +94,10 @@ if ($Step -eq 'Build') {
             $n = $m.Groups[1].Value
             if ($n -notmatch '-' -and $streams -notcontains $n) { "  FAIL  names: log $n is not one of $rigName's streams ($($streams -join ', '))" }
         }
-        $settings = @($rig['sessionSettings'].Keys)
-        foreach ($m in [regex]::Matches($text, 'OpenRigs\.Control:SessionControl\.bonsai">.*?</Parameters>', 'Singleline')) {
+        $settings = @($rig['experimentSettings'].Keys)
+        foreach ($m in [regex]::Matches($text, 'OpenRigs\.Control:ExperimentControl\.bonsai">.*?</Parameters>', 'Singleline')) {
             foreach ($p in [regex]::Matches($m.Value, '<Parameter>\s*<Name>([^<]+)</Name>')) {
-                if ($settings -notcontains $p.Groups[1].Value) { "  FAIL  names: session setting $($p.Groups[1].Value) is not one of $rigName's sessionSettings" }
+                if ($settings -notcontains $p.Groups[1].Value) { "  FAIL  names: experiment setting $($p.Groups[1].Value) is not one of $rigName's experimentSettings" }
             }
         }
         # BonsaiData_Trial's columns are the CsvWriter's inside each LogTrial, from the type that

@@ -6,10 +6,10 @@ Bonsai operators that put a workflow under a session controller: the workflow st
 
 | Operator | Role |
 |----------|------|
-| `SessionControl` | The include to drop into a workflow. Runs `ControlServer`, publishes every event as `ControlEvents` and the Go event once as `SessionGo`. |
+| `ExperimentControl` | The include to drop into a workflow. Runs `ControlServer`, publishes every event as `ControlEvents` and the Go event once as `ExperimentGo`. |
 | `ControlServer` | Reply socket (default `@tcp://127.0.0.1:5561`, local only: the rig agent relays and checks the Lab PIN). Answers `status`, `set`, `go`, `command`, `stop`. Declares the parameters a controller may change until Go and the commands it may send. |
-| `OnGo` | Passes only the Go event through; inside the include, before `SessionGo`. |
-| `ParameterValue` | The value of a declared parameter as it stood at Go, from the `SessionGo` event. |
+| `OnGo` | Passes only the Go event through; inside the include, before `ExperimentGo`. |
+| `ParameterValue` | The value of a declared parameter as it stood at Go, from the `ExperimentGo` event. |
 | `OnCommand` | The arguments of one declared command, each time the controller sends it. |
 | `OnParameterSet` | Each new value of one declared parameter as a controller sets it before Go, for a setting the hardware takes live (camera exposure and gain while ready). Nothing until the first set. |
 | `ParameterDefault` | Sets a declared parameter's value from the workflow (a rig setting) before Go, unless a controller has set it, so the controller shows the value the hardware starts with. |
@@ -27,7 +27,7 @@ One JSON object per request on a ZeroMQ REQ/REP pair, one per reply: `{"ok": tru
 | `{"cmd": "set", "name": ..., "value": ...}` | Refused after Go, for an undeclared name, or for a value outside the parameter's limits. Since 0.1.0-local.10 each accepted set is emitted as a `Set` event after the reply (`OnParameterSet`). |
 | `{"cmd": "go", "by": ..., "launched_by": ...}` | Refused unless the phase is `Ready`; once; and since 0.1.0-local.11 while any parameter's value is outside its limits as they stand (a value set before `ParameterMaximum` lowered the limit), naming it, so a set is wanted again. Answered before the Go event is emitted, so work downstream of Go never delays the reply; the same for `command`. Work downstream of Go, a set or a command runs on the server's request thread, so a request sent while it runs waits for it. |
 | `{"cmd": "command", "name": ..., "args": ...}` | Refused unless declared and the phase is `Ready` or `Recording`. |
-| `{"cmd": "stop", "why": ..., "by": ...}` | Replies, then ends the workflow with `SessionStoppedException`, so every file closes. Since 0.1.0-local.14 `StoppedBy` is set before `StopReason`, which OpenRigs.Manifest's stop poll fires on, so the stop it writes always carries the person. |
+| `{"cmd": "stop", "why": ..., "by": ...}` | Replies, then ends the workflow with `ExperimentStoppedException`, so every file closes. Since 0.1.0-local.14 `StoppedBy` is set before `StopReason`, which OpenRigs.Manifest's stop poll fires on, so the stop it writes always carries the person. |
 | A request of more than one frame | Refused, "one frame per request, got N" (since 0.1.0-local.13; before, the reply threw and the session ended). |
 
 `by` and `launched_by` (0.1.0-local.9) name a person: `{"id": ..., "name": ...}` as the controller knows them, or a name alone as a string. They are optional, so a controller that names nobody still works; the workflow keeps them (`ControlState.LaunchedBy`, `GoBy`, `StoppedBy`) and reports them in `status`, and OpenRigs.Manifest writes them into the session's manifest. The controller vouches for them: rig-control's agent fills them in from the Lab PIN or control token behind each request, and drops any a window sent itself.

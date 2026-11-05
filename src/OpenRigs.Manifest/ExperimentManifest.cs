@@ -18,19 +18,19 @@ namespace OpenRigs.Manifest
     /// it writes the manifest (status partial, outcome running), and again when the run ends.
     /// One input may be connected, the run: its completion means completed, its error is the
     /// run's error, and its elements are counted. Without it the end is read from
-    /// OpenRigs.Control's phase when SessionControl is in the workflow.
+    /// OpenRigs.Control's phase when ExperimentControl is in the workflow.
     /// </summary>
     [DefaultProperty(nameof(ConfigFiles))]
-    [TypeDescriptionProvider(typeof(SessionManifestTypeDescriptionProvider))]
+    [TypeDescriptionProvider(typeof(ExperimentManifestTypeDescriptionProvider))]
     [WorkflowElementCategory(ElementCategory.Sink)]
     [Description("Writes manifest.json into the session folder (PathPrefix) when it appears and when the run ends: rig, workflow commit, launch, settings at Go, config files as loaded at Start, outcome and every file. Put it after LogController. An input, if connected, is the run: its completion, error and element count.")]
-    public class SessionManifest : GroupWorkflowBuilder
+    public class ExperimentManifest : GroupWorkflowBuilder
     {
         /// <summary>The subject LogController publishes the session folder's path under.</summary>
         public const string PathSubject = "PathPrefix";
 
-        /// <summary>Initializes a new instance of the <see cref="SessionManifest"/> class.</summary>
-        public SessionManifest()
+        /// <summary>Initializes a new instance of the <see cref="ExperimentManifest"/> class.</summary>
+        public ExperimentManifest()
         {
         }
 
@@ -38,10 +38,10 @@ namespace OpenRigs.Manifest
         /// Initializes a copy with the given inner workflow. Bonsai copies a group by this
         /// constructor (the editor's working copy, the player's when it shows a layout, every
         /// save), passing only the Name, Description and inner workflow, so the settings live in
-        /// that workflow (SessionManifestSettings), as StreamDevices' do.
+        /// that workflow (ExperimentManifestSettings), as StreamDevices' do.
         /// </summary>
         /// <param name="workflow">The inner workflow to copy.</param>
-        public SessionManifest(ExpressionBuilderGraph workflow)
+        public ExperimentManifest(ExpressionBuilderGraph workflow)
             : base(workflow)
         {
         }
@@ -70,9 +70,9 @@ namespace OpenRigs.Manifest
             set { Settings.ExpectedFiles = value; }
         }
 
-        SessionManifestSettings Settings
+        ExperimentManifestSettings Settings
         {
-            get { return GroupNode.Settings<SessionManifestSettings>(Workflow); }
+            get { return GroupNode.Settings<ExperimentManifestSettings>(Workflow); }
         }
 
         /// <summary>Gets the range of inputs: none, or one, the run.</summary>
@@ -93,12 +93,12 @@ namespace OpenRigs.Manifest
             var path = GroupNode.Subject(this, PathSubject);
             if (path == null)
             {
-                throw new InvalidOperationException("SessionManifest found no " + PathSubject + " subject. It names the session folder and comes from OpenRigs.Logging's LogController: put SessionManifest after LogController, at the same level or below it.");
+                throw new InvalidOperationException("ExperimentManifest found no " + PathSubject + " subject. It names the session folder and comes from OpenRigs.Logging's LogController: put ExperimentManifest after LogController, at the same level or below it.");
             }
             var pathType = GroupNode.ObservedType(path.Type);
             if (pathType != typeof(string))
             {
-                throw new InvalidOperationException("SessionManifest needs " + PathSubject + " to be a string, the session folder's path; this workflow's is " + pathType + ".");
+                throw new InvalidOperationException("ExperimentManifest needs " + PathSubject + " to be a string, the session folder's path; this workflow's is " + pathType + ".");
             }
             var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles), name => GroupNode.PublishedType(this, name));
             var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, expected));
@@ -115,19 +115,19 @@ namespace OpenRigs.Manifest
     }
 
     /// <summary>
-    /// SessionManifest's settings, kept as a node in its inner workflow so that they survive
-    /// Bonsai's copies of the group. Set them on SessionManifest; this node builds to nothing.
+    /// ExperimentManifest's settings, kept as a node in its inner workflow so that they survive
+    /// Bonsai's copies of the group. Set them on ExperimentManifest; this node builds to nothing.
     /// </summary>
-    [Description("SessionManifest's settings (IngestScript, ConfigFiles, ExpectedFiles), kept here so Bonsai's copies of the group keep them. Set them on SessionManifest.")]
-    public class SessionManifestSettings : ZeroArgumentExpressionBuilder
+    [Description("ExperimentManifest's settings (IngestScript, ConfigFiles, ExpectedFiles), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
+    public class ExperimentManifestSettings : ZeroArgumentExpressionBuilder
     {
-        /// <summary>Gets or sets SessionManifest's IngestScript.</summary>
+        /// <summary>Gets or sets ExperimentManifest's IngestScript.</summary>
         public string IngestScript { get; set; }
 
-        /// <summary>Gets or sets SessionManifest's ConfigFiles.</summary>
+        /// <summary>Gets or sets ExperimentManifest's ConfigFiles.</summary>
         public string ConfigFiles { get; set; } = @"C:\Coen-Lab-Local\RigConfigs\%COMPUTERNAME%\rig.yml";
 
-        /// <summary>Gets or sets SessionManifest's ExpectedFiles.</summary>
+        /// <summary>Gets or sets ExperimentManifest's ExpectedFiles.</summary>
         public string ExpectedFiles { get; set; } = ExpectedPlan.Auto;
 
         /// <summary>Builds to an empty sequence: the node only holds the settings.</summary>
@@ -139,10 +139,10 @@ namespace OpenRigs.Manifest
         }
     }
 
-    // SessionManifest's own settings in the Properties panel: its inner workflow externalizes nothing.
-    class SessionManifestTypeDescriptionProvider : ShownPropertiesProvider
+    // ExperimentManifest's own settings in the Properties panel: its inner workflow externalizes nothing.
+    class ExperimentManifestTypeDescriptionProvider : ShownPropertiesProvider
     {
-        public SessionManifestTypeDescriptionProvider()
+        public ExperimentManifestTypeDescriptionProvider()
             : base("IngestScript", "ConfigFiles", "ExpectedFiles")
         {
         }

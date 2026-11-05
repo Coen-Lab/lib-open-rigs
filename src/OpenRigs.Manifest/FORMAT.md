@@ -4,7 +4,7 @@ One `manifest.json` in every session folder a rig records: what ran, from which 
 
 This file is the format. What each tool does with it lives with the tool:
 
-- **The workflow** (`SessionManifest`, this package) writes it when the session folder exists and again when the run ends, with everything the rig knows. `status` is `partial`.
+- **The workflow** (`ExperimentManifest`, this package) writes it when the session folder exists and again when the run ends, with everything the rig knows. `status` is `partial`.
 - **A finishing step** checks every listed file is present and no longer being written, fills in sizes and `sha256`, and writes `status: complete`. In the Coen Lab that is rig-setup's overnight copy, which decides per session whether to copy, wait or raise an alarm: [rig-setup `docs/manifests.md`](https://github.com/Coen-Lab/rig-setup/blob/main/docs/manifests.md).
 - **A server** treats the session as finished only when `status` is `complete` and every listed file matches, then runs the registered script. In the Coen Lab that is the ingest proposal in [Coen-Lab/jacuzzi-ingest](https://github.com/Coen-Lab/jacuzzi-ingest).
 

@@ -133,7 +133,7 @@ namespace OpenRigs.Control
         public string Name { get; set; }
 
         /// <summary>Takes the named parameter's value from each event.</summary>
-        /// <param name="source">The Go event (SessionGo).</param>
+        /// <param name="source">The Go event (ExperimentGo).</param>
         /// <returns>The parameter's value at Go, as text.</returns>
         public IObservable<string> Process(IObservable<ControlEvent> source)
         {
@@ -164,7 +164,7 @@ namespace OpenRigs.Control
     {
         /// <summary>Gets or sets the phase to report.</summary>
         [Description("The phase to report.")]
-        public SessionPhase Phase { get; set; } = SessionPhase.Ready;
+        public ExperimentPhase Phase { get; set; } = ExperimentPhase.Ready;
 
         /// <summary>Reports the phase on each element, passing the element through.</summary>
         /// <typeparam name="T">The type of the elements.</typeparam>

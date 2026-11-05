@@ -1,10 +1,10 @@
-# The Coen Lab's approved names: what a rig's devices, logs, session settings and trial columns
+# The Coen Lab's approved names: what a rig's devices, logs, experiment settings and trial columns
 # may be called. One file for every rig, so the same thing has the same name wherever it is
 # recorded. Change it by commit: scripts\push.ps1 then rechecks every lab workflow against it.
 #
 # Who reads it:
 #   - scripts\check-bonsai.ps1 fails a workflow that uses a name not here (device subjects and
-#     log names, SessionControl parameters, BonsaiData_Trial columns), so update-workflows does
+#     log names, ExperimentControl parameters, BonsaiData_Trial columns), so update-workflows does
 #     not update it and reports why.
 #   - rig-setup's machines window marks each key of a rig's rig.yml against its rig's devices
 #     and settings (update-workflows copies this file to K:\config\lab-names.yml).
@@ -14,7 +14,7 @@
 #     (BehaviorBoard-Main), so a second never renames the first. A hyphen, never an underscore:
 #     FormatFileName takes a device's folder from its name up to the first underscore.
 #     In rig.yml the kind is a camelCase group with the instances inside (camera: face:).
-#   - Session settings (SessionControl parameters) are PascalCase, as the controller shows them.
+#   - Experiment settings (ExperimentControl parameters) are PascalCase, as the controller shows them.
 #   - Trial columns are camelCase. A unit goes in the name when the value has one
 #     (stimulusOnsetSeconds, itiDuration in seconds, rewardSize in microlitres).
 #   - A setting that is the same for the whole session is not a trial column: the manifest has
@@ -46,7 +46,7 @@ rigs:
     settings: [rootPath, rigId]
     # Logs that are not devices or BonsaiData_Trial/BonsaiData_Async.
     streams: []
-    sessionSettings:
+    experimentSettings:
       RunLengthMins: How long the session runs, in minutes.
       ExposureTime: Camera exposure, in microseconds.
       Gain: Camera gain, in dB.
@@ -63,7 +63,7 @@ rigs:
       Camera: [Face, Pupil, Body]
     settings: [rootPath, rigId, interPulseInterval, lickSpoutDefaultPosition, projectionCalibration, speakerArray, zapit]
     streams: [Zapit, RigSchema, TaskSchema, TaskConfig, ValveCalibrationDO1, ValveCalibrationDO2, RenderHeartbeat, ResponseEvents, TrialStartEvents]
-    sessionSettings:
+    experimentSettings:
       TrainingStage: Row of the task file's trainingStages to run.
       TaskFile: The task file, in the repository's config folder.
       RewardSizeUl: Reward size in microlitres for every stage; blank keeps the task file's.

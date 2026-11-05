@@ -10,7 +10,7 @@ namespace OpenRigs.Shared
 {
     /// <summary>
     /// What a node built as a group with settings of its own needs (StreamDevices,
-    /// SessionManifest): the subjects the workflow publishes before it, and its settings kept as
+    /// ExperimentManifest): the subjects the workflow publishes before it, and its settings kept as
     /// a node in its inner workflow.
     /// </summary>
     internal static class GroupNode

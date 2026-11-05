@@ -12,7 +12,7 @@ using OpenRigs.Control;
 using OpenRigs.Manifest;
 using OpenRigs.Shared;
 
-// Runs SessionManifest's writer and recorder against a temporary session folder, without Bonsai's
+// Runs ExperimentManifest's writer and recorder against a temporary session folder, without Bonsai's
 // editor or hardware: exit 0 when every check passes. dotnet run --project src\OpenRigs.Manifest.Tests
 namespace OpenRigs.Manifest.Tests
 {
@@ -42,14 +42,14 @@ namespace OpenRigs.Manifest.Tests
             return v.StartsWith("\"") ? v.Substring(1, v.Length - 2).Replace("\\\\", "\\") : v;
         }
 
-        // A running ControlServer's state, as SessionControl leaves it: ControlState's constructor
+        // A running ControlServer's state, as ExperimentControl leaves it: ControlState's constructor
         // and setters are the server's own, so a test reaches them by reflection.
         static ControlState Controller()
         {
             var ctor = typeof(ControlState).GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(ControlServer) }, null);
             var state = (ControlState)ctor.Invoke(new object[] { new ControlServer { SubjectId = "TC002", SessionId = "003B1" } });
             Set(null, "Current", state);
-            state.SetPhase(SessionPhase.Ready);
+            state.SetPhase(ExperimentPhase.Ready);
             Set(state, "Go", new ControlEvent
             {
                 Kind = ControlEventKind.Go, SubjectId = "TC002", SessionId = "003B1", Time = DateTime.UtcNow,
@@ -67,7 +67,7 @@ namespace OpenRigs.Manifest.Tests
         static void Stop(ControlState state, string why)
         {
             Set(state, "StopReason", why);
-            state.SetPhase(SessionPhase.Stopping);
+            state.SetPhase(ExperimentPhase.Stopping);
         }
 
         // One session with no run input: the folder appears, then whatever the controller does, then the workflow ends.
@@ -78,7 +78,7 @@ namespace OpenRigs.Manifest.Tests
             var path = new Subject<string>();
             var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
             var subscription = recorder.Process(path).Subscribe(_ => { }, _ => { });
-            if (control != null) control.SetPhase(SessionPhase.Recording);
+            if (control != null) control.SetPhase(ExperimentPhase.Recording);
             path.OnNext(folder);
             if (during != null) during(control);
             subscription.Dispose();
@@ -135,20 +135,20 @@ namespace OpenRigs.Manifest.Tests
             try
             {
                 Console.WriteLine("How the run ended, with no run input:");
-                var finishedThenStopped = Session(root, "a", Controller(), c => { c.SetPhase(SessionPhase.Finished); Stop(c, "run finished"); });
+                var finishedThenStopped = Session(root, "a", Controller(), c => { c.SetPhase(ExperimentPhase.Finished); Stop(c, "run finished"); });
                 Check("a run that finished, then was stopped by rig-control, is completed", Field(finishedThenStopped, "run.outcome") == "completed", Field(finishedThenStopped, "run.outcome"));
                 Check("... in a folder named ses-<Session>_<DateTime>, its session read from the name", Field(finishedThenStopped, "session.id") == "a" && Field(finishedThenStopped, "session.subject") == "TC002" && Field(finishedThenStopped, "session.started") == "2026-10-30T19:57:12Z", Field(finishedThenStopped, "session.id") + " " + Field(finishedThenStopped, "session.started"));
                 Check("... with no stop reason", Field(finishedThenStopped, "run.stop_reason") == "null", Field(finishedThenStopped, "run.stop_reason"));
-                var finished = Session(root, "b", Controller(), c => c.SetPhase(SessionPhase.Finished));
+                var finished = Session(root, "b", Controller(), c => c.SetPhase(ExperimentPhase.Finished));
                 Check("a run that finished is completed", Field(finished, "run.outcome") == "completed", Field(finished, "run.outcome"));
                 var stopped = Session(root, "c", Controller(), c => Stop(c, "mouse unwell"));
                 Check("a controller stop before Finished is stopped, with its reason", Field(stopped, "run.outcome") == "stopped" && Field(stopped, "run.stop_reason") == "mouse unwell", Field(stopped, "run.outcome") + " " + Field(stopped, "run.stop_reason"));
                 var early = Session(root, "d", Controller(), null);
                 Check("a workflow that ends before Finished, unstopped, is ended-early", Field(early, "run.outcome") == "ended-early", Field(early, "run.outcome"));
-                var stoppingUnasked = Session(root, "h", Controller(), c => c.SetPhase(SessionPhase.Stopping));
+                var stoppingUnasked = Session(root, "h", Controller(), c => c.SetPhase(ExperimentPhase.Stopping));
                 Check("a Stopping phase with no stop from the controller is ended-early, not stopped", Field(stoppingUnasked, "run.outcome") == "ended-early", Field(stoppingUnasked, "run.outcome"));
                 var alone = Session(root, "e", null, null);
-                Check("without SessionControl it is stopped", Field(alone, "run.outcome") == "stopped" && Field(alone, "control") == "null", Field(alone, "run.outcome"));
+                Check("without ExperimentControl it is stopped", Field(alone, "run.outcome") == "stopped" && Field(alone, "control") == "null", Field(alone, "run.outcome"));
                 Check("the settings at Go are recorded", Field(finished, "control.parameters.RunLengthMins") == "30", Field(finished, "control.parameters.RunLengthMins"));
                 // 0.1.0-local.5: who launched, released and stopped the session, as the controller named them.
                 var named = Session(root, "h", Controller(), c =>
@@ -168,7 +168,7 @@ namespace OpenRigs.Manifest.Tests
                     var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
                     using (recorder.Process(path).Subscribe(_ => { }, _ => { }))
                     {
-                        control.SetPhase(SessionPhase.Recording);
+                        control.SetPhase(ExperimentPhase.Recording);
                         path.OnNext(folder);
                         Set(control, "StoppedBy", new Person { Id = "JoB", Name = "Jo Bloggs" });
                         Stop(control, "mouse unwell");
@@ -340,7 +340,7 @@ namespace OpenRigs.Manifest.Tests
                 Console.WriteLine("The editor's copy:");
                 {
                     var xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<WorkflowBuilder Version=\"2.9.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:mf=\"clr-namespace:OpenRigs.Manifest;assembly=OpenRigs.Manifest\" xmlns=\"https://bonsai-rx.org/2018/workflow\">\n" +
-                        "  <Workflow><Nodes><Expression xsi:type=\"mf:SessionManifest\"><mf:IngestScript>x</mf:IngestScript><mf:ConfigFiles>a.yml</mf:ConfigFiles><mf:ExpectedFiles>b/</mf:ExpectedFiles></Expression></Nodes><Edges /></Workflow>\n</WorkflowBuilder>\n";
+                        "  <Workflow><Nodes><Expression xsi:type=\"mf:ExperimentManifest\"><mf:IngestScript>x</mf:IngestScript><mf:ConfigFiles>a.yml</mf:ConfigFiles><mf:ExpectedFiles>b/</mf:ExpectedFiles></Expression></Nodes><Edges /></Workflow>\n</WorkflowBuilder>\n";
                     WorkflowBuilder builder;
                     using (var reader = XmlReader.Create(new StringReader(xml))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
                     var copy = new WorkflowBuilder(builder.Workflow.ToInspectableGraph().FromInspectableGraph());
@@ -348,9 +348,9 @@ namespace OpenRigs.Manifest.Tests
                     // Indented, as the editor saves: Bonsai's reader of a group's inner workflow expects it.
                     using (var writer = XmlWriter.Create(saved, new XmlWriterSettings { Indent = true })) WorkflowBuilder.Serializer.Serialize(writer, copy);
                     using (var reader = XmlReader.Create(new StringReader(saved.ToString()))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
-                    var node = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<SessionManifest>().Single();
+                    var node = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<ExperimentManifest>().Single();
                     Check("its settings survive the editor's copy, a save and a reload", node.IngestScript == "x" && node.ConfigFiles == "a.yml" && node.ExpectedFiles == "b/", node.IngestScript + " " + node.ConfigFiles + " " + node.ExpectedFiles);
-                    Check("... in one settings node", node.Workflow.Count(n => ExpressionBuilder.Unwrap(n.Value) is SessionManifestSettings) == 1, "more than one");
+                    Check("... in one settings node", node.Workflow.Count(n => ExpressionBuilder.Unwrap(n.Value) is ExperimentManifestSettings) == 1, "more than one");
                 }
             }
             finally

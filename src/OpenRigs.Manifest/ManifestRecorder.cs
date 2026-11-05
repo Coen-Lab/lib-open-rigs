@@ -6,7 +6,7 @@ using System.Reactive.Linq;
 namespace OpenRigs.Manifest
 {
     /// <summary>
-    /// The subscription SessionManifest builds: reads what is fixed at Start, writes the manifest
+    /// The subscription ExperimentManifest builds: reads what is fixed at Start, writes the manifest
     /// when the session folder's path arrives, and again with the outcome when the run ends.
     /// </summary>
     public class ManifestRecorder
@@ -85,7 +85,7 @@ namespace OpenRigs.Manifest
                         {
                             if (begun) return;
                             begun = true;
-                            // PathPrefix comes after Go, so a running SessionControl has its Go by now.
+                            // PathPrefix comes after Go, so a running ExperimentControl has its Go by now.
                             control = ControlSession.Current();
                             manifestPath = writer.Begin(path, control);
                             ended = pending;
@@ -104,7 +104,7 @@ namespace OpenRigs.Manifest
                     observer.OnNext(manifestPath);
                     if (ended != null)
                     {
-                        if (ended.Outcome == RunEnd.Failed) observer.OnError(new SessionManifestException(ended.Error));
+                        if (ended.Outcome == RunEnd.Failed) observer.OnError(new ExperimentManifestException(ended.Error));
                         else observer.OnCompleted();
                         return;
                     }
@@ -163,7 +163,7 @@ namespace OpenRigs.Manifest
         // Where nothing downstream can take the error: Bonsai's console shows stderr, which a trace alone does not reach.
         static void NotWritten(string what, Exception ex)
         {
-            var message = "SessionManifest: " + what + " was not written: " + ex.Message;
+            var message = "ExperimentManifest: " + what + " was not written: " + ex.Message;
             Trace.TraceError(message);
             Console.Error.WriteLine(message);
         }
@@ -215,10 +215,10 @@ namespace OpenRigs.Manifest
     }
 
     /// <summary>The error carried into the manifest when the run failed before the folder existed.</summary>
-    public class SessionManifestException : Exception
+    public class ExperimentManifestException : Exception
     {
         /// <summary>Initializes a new instance with the run's error.</summary>
         /// <param name="message">The run's error.</param>
-        public SessionManifestException(string message) : base(message) { }
+        public ExperimentManifestException(string message) : base(message) { }
     }
 }

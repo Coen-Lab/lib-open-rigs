@@ -101,7 +101,7 @@ namespace OpenRigs.Control.Tests
 
                 Console.WriteLine("Go:");
                 Check("Go is refused before Ready", !Ok(Ask(socket, new { cmd = "go" })), "taken");
-                state.SetPhase(SessionPhase.Ready);
+                state.SetPhase(ExperimentPhase.Ready);
                 // 0.1.0-local.11: a value taken before the workflow learned the limit is refused at Go, not recorded.
                 Check("a set within the limit as it stands is taken", Ok(Ask(socket, new { cmd = "set", name = "RewardUl", value = "4" })), "refused");
                 new ParameterMaximum { Name = "RewardUl" }.Process(Observable.Return(3.0)).Wait();
@@ -126,10 +126,10 @@ namespace OpenRigs.Control.Tests
                 Check("ControlState.Go is that event", state.Go == go, "differs");
 
                 Console.WriteLine("Commands and status:");
-                state.SetPhase(SessionPhase.Recording);
+                state.SetPhase(ExperimentPhase.Recording);
                 Check("a declared command is taken while recording", Ok(Ask(socket, new { cmd = "command", name = "reward", args = "5" })), "refused");
                 Check("an undeclared one is refused", !Ok(Ask(socket, new { cmd = "command", name = "flash" })), "taken");
-                state.SetPhase(SessionPhase.Ready);
+                state.SetPhase(ExperimentPhase.Ready);
                 var culture = Thread.CurrentThread.CurrentCulture;
                 Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
                 try { new ReportMetric { Name = "water_ml" }.Process(Observable.Return(0.25)).Wait(); }
@@ -148,7 +148,7 @@ namespace OpenRigs.Control.Tests
                 var watch = Stopwatch.StartNew();
                 Check("stop is answered", Ok(Ask(socket, new { cmd = "stop", why = "mouse unwell", by = "Jo Bloggs" })), "refused");
                 stoppedAt.WaitOne(5000);
-                Check("... then ends the sequence with SessionStoppedException", ended is SessionStoppedException, ended == null ? "no error" : ended.GetType().Name);
+                Check("... then ends the sequence with ExperimentStoppedException", ended is ExperimentStoppedException, ended == null ? "no error" : ended.GetType().Name);
                 while (ControlState.Current != null && watch.ElapsedMilliseconds < 5000) Thread.Sleep(5);
                 // Before 0.1.0-local.7 the server joined its own thread here and waited out the 2 s timeout.
                 Check("... and the server is gone within a second, not after a 2 s wait on itself", watch.ElapsedMilliseconds < 1000, watch.ElapsedMilliseconds + " ms");
@@ -175,7 +175,7 @@ namespace OpenRigs.Control.Tests
                 }, _ => { });
                 using (var socket = new RequestSocket(">" + slowEndpoint))
                 {
-                    ControlState.Current.SetPhase(SessionPhase.Ready);
+                    ControlState.Current.SetPhase(ExperimentPhase.Ready);
                     var watch = Stopwatch.StartNew();
                     var go = Ask(socket, new { cmd = "go" });
                     Check("Go is answered before the work downstream of it", Ok(go) && watch.ElapsedMilliseconds < 1000, go + " after " + watch.ElapsedMilliseconds + " ms");

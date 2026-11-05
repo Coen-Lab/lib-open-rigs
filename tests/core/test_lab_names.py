@@ -23,7 +23,7 @@ def test_names_follow_the_rules_in_the_header():
     names = lab_names.load()
     columns = dict(names["trialColumns"])
     for rig, entry in names["rigs"].items():
-        for setting in entry.get("sessionSettings") or {}:
+        for setting in entry.get("experimentSettings") or {}:
             assert PASCAL.match(setting), (rig, setting)
         for column in entry.get("trialColumns") or {}:
             assert CAMEL.match(column), (rig, column)
