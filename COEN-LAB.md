@@ -1,6 +1,6 @@
 # The Coen Lab's open-rigs
 
-This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (branch `rig-config-resolver` at `3788bfb`, NeuroThom's per-machine config operators, and upstream `main` merged at `f313716` on 4 Nov 2026 for the calibration loop av-dome's `tr-open-rigs` uses), plus the lab's fixes and packages. Each lab change is a commit on `main`; a change meant for upstream also gets a branch of its own for its pull request.
+This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (branch `rig-config-resolver` at `3788bfb`, NeuroThom's per-machine config operators, and upstream `main` merged at `f313716` on 4 Nov 2026 for the calibration loop av-dome's `tr-open-rigs` uses), plus the lab's fixes and packages. Each lab change is a commit on `main`; a change meant for upstream also gets a branch of its own for its pull request. Why the lab's tooling is shaped as it is, and what was rejected, is in [`DECISIONS.md`](DECISIONS.md).
 
 | On `main` | What it is |
 |---|---|
