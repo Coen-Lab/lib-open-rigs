@@ -121,6 +121,36 @@ namespace OpenRigs.Logging.Tests
                 $"it.{result.Describe()}");
         }
 
+        // A session crossing the hour opens a new pair, named by the chunk's start, and never writes
+        // over the one before (audit, 5 Nov 2026). The test's time base steps an hour per tick, so
+        // every frame falls in an hour of its own.
+        [TestMethod]
+        public void LogRawVideo_AcrossTheHour_WritesOnePairPerHourAndLosesNoFrame()
+        {
+            const string LogName = "TestVideo";
+            const int FrameCount = 5;
+            GenerateSourceVideo(FrameCount, width: 160, height: 120);
+            var result = RunWorkflow(new Dictionary<string, string>
+            {
+                { "FileName", SourceVideo },
+                { "PlaybackRate", SourceFrameRate.ToString(CultureInfo.InvariantCulture) },
+                { "LogName", LogName },
+                { "TimeStep", "3600" }
+            });
+
+            var videos = Directory.GetFiles(LogRoot, "*.avi", SearchOption.AllDirectories);
+            var metadata = Directory.GetFiles(LogRoot, "*.csv", SearchOption.AllDirectories);
+            Assert.IsTrue(videos.Length >= 2, $"Expected a new video once the hour turned, found {videos.Length}.{result.Describe()}");
+            CollectionAssert.AreEquivalent(
+                Array.ConvertAll(videos, v => Path.ChangeExtension(v, null)),
+                Array.ConvertAll(metadata, m => Path.ChangeExtension(m, null)),
+                $"Expected each hour's video and metadata in a pair.{result.Describe()}");
+
+            var rows = 0;
+            foreach (var file in metadata) rows += File.ReadAllLines(file).Length - 1;
+            Assert.AreEqual(FrameCount, rows, $"Expected every frame in one hour's metadata or another.{result.Describe()}");
+        }
+
         [TestMethod]
         public void LogVideo_IsLogRawVideo_ApartFromItsFrameAndColumns()
         {
