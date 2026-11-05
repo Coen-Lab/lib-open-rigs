@@ -31,4 +31,11 @@ Decided by Pip with Claude, 5 Nov 2026. Built in four stages, in this order; eac
 - Rejected: a GitHub Actions or GitHub App updater (needs a bot login and the ucl-open owners' approval; too complicated), and a scheduled task on a rig.
 - Then `scripts\hourly.ps1` and `scripts\schedule.ps1` go, the task is unregistered on PIPOFFICERIG, and the `*_Workflows*` files on K: are deleted.
 
+### Stage 2, first: the share's config folder holds machines in one place (6 Nov 2026)
+
+- `K:\config\` holds only lab-wide files (`profile-repos.json`, `data-dictionary.json`, `device-dictionary.json`, `rollouts.json`), `_backups\` and `machines\`. Every machine's files are under `config\machines\<MACHINE>\`, including rig-control's card (`rig-control.json`) and its session summary (`<MACHINE>_Sessions.json`, before this in `config\rig-control\sessions\<MACHINE>.json`). Pip, looking at `K:\config`: "This should be tidied up--not a mix of rig names and a bunch of other random folders & files".
+- Lab-wide files stay at the top of `config\`, not in a `config\lab\` folder: four or five files never need a folder, and `profile-repos.json`, read by every rig every 30 minutes, keeps its path.
+- `config\login-used\` (one stale Lab PIN stamp from 23 Oct; the stamps live in `K:\logins\login-used\`) was deleted, with a backup in `config\_backups\`. `config\RigTransfer\` (ASUS chipset and Serial IO drivers copied by hand on 20 Aug, used by no code) moved to `K:\setup\drivers\`.
+- Order: the code in rig-setup, rig-control, ClaudioVisual and `scripts\hourly.ps1` first, then the folders moved; a rig that had not yet taken rig-setup's update wrote to its old folder for up to 30 minutes, merged in afterwards.
+
 **Out of scope, noted.** Rigs restore ucl-open packages with a token on Pip's personal GitHub account (rig-setup-rules.json, until ucl-open publishes to nuget.org, ucl-open/ucl-open#12). pip-hub's Monday rota emails also run on PIPOFFICERIG.

@@ -45,7 +45,7 @@ $started = UtcNow
 $code = $LASTEXITCODE
 # A failed run is also copied to the share, where a person can read it without this machine; a
 # run that passes removes it. A share not mapped leaves only the local logs.
-$shared = "K:\config\$env:COMPUTERNAME\$($env:COMPUTERNAME)_WorkflowsFailed.txt"
+$shared = "K:\config\machines\$env:COMPUTERNAME\$($env:COMPUTERNAME)_WorkflowsFailed.txt"
 if ($code) { Add-Content -LiteralPath $failed -Value (Get-Content -LiteralPath $log -Raw) }
 try {
     # Rewritten as UTF-8, not copied: *> writes the log as UTF-16 under PowerShell 5.1, and
@@ -59,7 +59,7 @@ try {
 # old, and ClaudioVisual's rig health DMs the same failures and a finished over 26 hours old
 # (audit-rigs sets A to C, 4 Nov 2026). lastPass is this run's finish when it passed, else kept from the last file.
 $machine = $env:COMPUTERNAME
-$statusDir = "K:\config\$machine"
+$statusDir = "K:\config\machines\$machine"
 $status = Join-Path $statusDir "$($machine)_WorkflowsUpdate.json"
 $finished = UtcNow
 try {
