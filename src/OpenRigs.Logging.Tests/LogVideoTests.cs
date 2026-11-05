@@ -121,6 +121,26 @@ namespace OpenRigs.Logging.Tests
                 $"it.{result.Describe()}");
         }
 
+        [TestMethod]
+        public void LogVideo_IsLogRawVideo_ApartFromItsFrameAndColumns()
+        {
+            static string Read(string name)
+            {
+                var assembly = typeof(LoggedRows).Assembly;
+                using var stream = assembly.GetManifestResourceStream($"OpenRigs.Logging.{name}");
+                Assert.IsNotNull(stream, $"Missing embedded resource '{name}'.");
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd().Replace("\r\n", "\n");
+            }
+
+            var raw = Read("LogRawVideo.bonsai")
+                .Replace("<Selector>Value</Selector>", "<Selector>Value.Image</Selector>")
+                .Replace(
+                    "<io:Selector>Seconds,Value.Width,Value.Height</io:Selector>",
+                    "<io:Selector>Seconds,Value.ChunkData.FrameID,Value.ChunkData.Timestamp,Value.ChunkData.ExposureTime,Value.ChunkData.Gain</io:Selector>");
+            Assert.AreEqual(raw, Read("LogVideo.bonsai"));
+        }
+
         /// <summary>
         /// Writes a video of solid, randomly colored frames to the source path, and returns the
         /// color of each frame in BGR order.

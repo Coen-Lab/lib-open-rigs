@@ -1,10 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Description>A package providing common hardware and control functionality for all Open Rigs experiments.</Description>
     <PackageTags>$(PackageTags) Devices</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.0-bbox.2</Version>
+    <Version>0.1.0-bbox.3</Version>
   </PropertyGroup>
 
   <ItemGroup>

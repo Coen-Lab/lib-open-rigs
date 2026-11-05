@@ -31,6 +31,7 @@ Image as Image,
 new(ChunkData.FrameID as FrameID,
 ChunkData.Timestamp as Timestamp,
 ChunkData.ExposureTime as ExposureTime,
+ChunkData.Gain as Gain,
 ChunkData.Width as Width,
 ChunkData.Height as Height) as ChunkData)</scr:Expression>
       </Expression>

@@ -15,7 +15,7 @@ The workflow groups incoming frames by time (`GroupByTime` with `ChunkSize = 1`)
 - **VideoWriter** - encodes frames to `.avi` using the FMP4 codec at the configured `FrameRate`.
 - **CsvWriter** - records per-frame metadata (timestamp, frame ID, exposure, gain) to a `.csv` file.
 
-File paths are built from the `PathPrefix` subject (published by [LogController](log-controller.md)) plus the `LogName` property.
+File paths are built by `FormatFileName` from the `PathPrefix` subject (published by [LogController](log-controller.md)), the `LogName` property and the start of each chunk: `<LogName>\<LogName>_<DateTime>.avi` and `.csv`, a new pair each hour, as `LogRawVideo` writes.
 
 ### Externalized properties
 

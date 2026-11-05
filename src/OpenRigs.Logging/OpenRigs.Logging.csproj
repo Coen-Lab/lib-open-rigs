@@ -1,10 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Description>OpenRigs Logging Bonsai library.</Description>
     <PackageTags>$(PackageTags) Logging</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.0-bbox.5</Version>
+    <Version>0.1.0-bbox.6</Version>
   </PropertyGroup>
 
 
