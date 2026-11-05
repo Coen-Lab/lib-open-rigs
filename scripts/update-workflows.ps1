@@ -32,7 +32,7 @@ param(
 #     the workflow has regenerate-schemas, its schema and generated classes are regenerated,
 #     and its rig template (examples\rig.py) where it has one.
 # A branch that changed is checked with its own scripts\check-workflow.ps1, if it has one, then
-# with scripts\check-bonsai.ps1 here (which holds its names to src\open_rigs\lab_names.yml); if that passes, those files and nothing else are committed and
+# with scripts\check-bonsai.ps1 here (which holds its names to src\open_rigs\data_dictionary.yml); if that passes, those files and nothing else are committed and
 # pushed to that branch, and rig-setup's 30-minute update takes main to the rigs. A failure is
 # not committed and is named in the table; the next run tries again from what GitHub has.
 # Exits 1 unless every branch of every lab workflow is up to date.
@@ -222,12 +222,12 @@ if (-not (Test-Path $RepoList)) { throw "Cannot read rig-setup's repo list at $R
 if (-not (Test-Path $Rules)) { throw "Cannot read rig-setup's rules at $Rules." }
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 
-# The lab's approved names, where rig-setup reads them (beside the repo list), as JSON so it
-# needs no YAML reader; open_rigs.lab_names writes it beside and renames it over the old one.
-$namesTarget = Join-Path (Split-Path $RepoList -Parent) 'lab-names.json'
-& uv run --project $repo --frozen python -m open_rigs.lab_names --json $namesTarget
-if ($LASTEXITCODE -ne 0) { throw "Could not write the approved names to $namesTarget." }
-"lab_names.yml written to $namesTarget"
+# The lab's data dictionary, where rig-setup reads them (beside the repo list), as JSON so it
+# needs no YAML reader; open_rigs.data_dictionary writes it beside and renames it over the old one.
+$namesTarget = Join-Path (Split-Path $RepoList -Parent) 'data-dictionary.json'
+& uv run --project $repo --frozen python -m open_rigs.data_dictionary --json $namesTarget
+if ($LASTEXITCODE -ne 0) { throw "Could not write the data dictionary to $namesTarget." }
+"data_dictionary.yml written to $namesTarget"
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
 # Main is left alone for a workflow whose main runs live experiments while a branch moves to
@@ -392,7 +392,7 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
         # What this script wrote, staged before the check, so whatever the check changes is stray.
         $null = Invoke-Git $Dir add -A
 
-        # check-bonsai always (it holds the lab's names, lab_names.yml), after the workflow's own
+        # check-bonsai always (it holds the lab's names, data_dictionary.yml), after the workflow's own
         # check when it has one.
         $own = Join-Path $Dir 'scripts\check-workflow.ps1'
         $check = if (Test-Path $own) { 'scripts\check-workflow.ps1 and lib-open-rigs scripts\check-bonsai.ps1' } else { 'lib-open-rigs scripts\check-bonsai.ps1' }

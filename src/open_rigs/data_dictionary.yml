@@ -1,5 +1,5 @@
-# The Coen Lab's approved names: what a rig's devices, logs, experiment settings and trial columns
-# may be called. One file for every rig, so the same thing has the same name wherever it is
+# The Coen Lab's data dictionary: what a rig's devices, logs, experiment settings and trial columns
+# may be called, and each trial column's type, unit, values and former names. One file for every rig, so the same thing has the same name wherever it is
 # recorded. Change it by commit: scripts\push.ps1 then rechecks every lab workflow against it.
 #
 # Who reads it:
@@ -7,7 +7,7 @@
 #     log names, ExperimentControl parameters, BonsaiData_Trial columns), so update-workflows does
 #     not update it and reports why.
 #   - rig-setup's machines window marks each key of a rig's rig.yml against its rig's devices
-#     and settings (update-workflows writes this file as JSON to K:\config\lab-names.json).
+#     and settings (update-workflows writes this file as JSON to K:\config\data-dictionary.json).
 #   - open_rigs.trials reads BonsaiData_Trial by the columns here: old names through formerly,
 #     each column as its type, codes decoded through values.
 #

@@ -1,4 +1,4 @@
-"""An experiment's BonsaiData_Trial as one typed table, by lab_names.yml.
+"""An experiment's BonsaiData_Trial as one typed table, by data_dictionary.yml.
 
     from open_rigs import trials
     rows = trials.read(r"...\\sub-<mouse>\\ses-<id>_<DateTime>")
@@ -7,7 +7,7 @@ LogData writes the log hourly (`BonsaiData\\BonsaiData_Trial_<hour>.csv`, split 
 hour); this joins the files in name order, renames each column recorded under an old name
 (`formerly`) to its current one, converts each column to its type (int, float, bool or str; an
 empty cell is None, "NaN" a float NaN) and, with `decode`, replaces a coded column's number with its
-name (`values`, such as av-dome's trialType). Columns lab_names.yml does not list are kept as
+name (`values`, such as av-dome's trialType). Columns data_dictionary.yml does not list are kept as
 written, as text. Nothing on disk is changed: recorded data is never rewritten.
 """
 
@@ -15,14 +15,14 @@ import csv
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from open_rigs import lab_names
+from open_rigs import data_dictionary
 
 LOG = "BonsaiData_Trial"
 
 
 def columns(rig: Optional[str] = None, names: Optional[Dict[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
-    """Every trial column lab_names.yml lists, name: its entry; the lab's and `rig`'s, or every rig's."""
-    names = names if names is not None else lab_names.load()
+    """Every trial column data_dictionary.yml lists, name: its entry; the lab's and `rig`'s, or every rig's."""
+    names = names if names is not None else data_dictionary.load()
     out = dict(names["trialColumns"])
     for name, entry in names["rigs"].items():
         if rig is None or name == rig:

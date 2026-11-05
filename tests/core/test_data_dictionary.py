@@ -1,16 +1,16 @@
-"""lab_names.yml holds to its own rules, and its JSON copy for rig-setup is the same list."""
+"""data_dictionary.yml holds to its own rules, and its JSON copy for rig-setup is the same list."""
 
 import json
 import re
 
-from open_rigs import lab_names
+from open_rigs import data_dictionary
 
 PASCAL = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 CAMEL = re.compile(r"^[a-z][A-Za-z0-9]*$")
 
 
 def test_every_rig_names_its_repos_profiles_and_devices():
-    names = lab_names.load()
+    names = data_dictionary.load()
     assert names["rigs"]
     for rig, entry in names["rigs"].items():
         assert entry["repos"] and entry["profiles"], rig
@@ -43,7 +43,7 @@ def check_column(where, name, column):
 
 
 def test_names_follow_the_rules_in_the_header():
-    names = lab_names.load()
+    names = data_dictionary.load()
     columns = dict(names["trialColumns"])
     for name, column in columns.items():
         check_column("lab", name, column)
@@ -62,7 +62,7 @@ def test_names_follow_the_rules_in_the_header():
 
 
 def test_no_old_name_is_a_current_one():
-    names = lab_names.load()
+    names = data_dictionary.load()
     tables = [names["trialColumns"]] + [e.get("trialColumns") or {} for e in names["rigs"].values()]
     current = {n for t in tables for n in t}
     old = [o for t in tables for c in t.values() for o in c.get("formerly") or []]
@@ -71,6 +71,6 @@ def test_no_old_name_is_a_current_one():
 
 
 def test_json_copy_is_the_same_list(tmp_path):
-    target = tmp_path / "lab-names.json"
-    lab_names.write_json(target)
-    assert json.loads(target.read_text(encoding="utf-8")) == lab_names.load()
+    target = tmp_path / "data-dictionary.json"
+    data_dictionary.write_json(target)
+    assert json.loads(target.read_text(encoding="utf-8")) == data_dictionary.load()

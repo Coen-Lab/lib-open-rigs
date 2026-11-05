@@ -1,6 +1,6 @@
-"""The lab's approved names (lab_names.yml beside this file), and their JSON copy for rig-setup.
+"""The lab's data dictionary (data_dictionary.yml beside this file), and its JSON copy for rig-setup.
 
-    python -m open_rigs.lab_names --json K:\\config\\lab-names.json
+    python -m open_rigs.data_dictionary --json K:\\config\\data-dictionary.json
 
 writes the list as JSON, which rig-setup's machines window reads without a YAML reader;
 scripts\\update-workflows.ps1 does this on every run.
@@ -14,7 +14,7 @@ from typing import Any, Dict
 
 from ruamel.yaml import YAML
 
-PATH = Path(__file__).with_name("lab_names.yml")
+PATH = Path(__file__).with_name("data_dictionary.yml")
 
 
 def load(path: Path = PATH) -> Dict[str, Any]:
