@@ -1,9 +1,9 @@
 # The Coen Lab's data dictionary: what a rig's devices, logs, experiment settings and trial columns
 # may be called, and each trial column's type, unit, values and former names. One file for every rig, so the same thing has the same name wherever it is
-# recorded. Change it by commit: scripts\push.ps1 then rechecks every lab workflow against it.
+# recorded. Change it by commit: scripts\push-and-update-workflows.ps1 then rechecks every lab workflow against it.
 #
 # Who reads it:
-#   - scripts\check-bonsai.ps1 fails a workflow that uses a name not here (device subjects and
+#   - scripts\check-workflow-builds.ps1 fails a workflow that uses a name not here (device subjects and
 #     log names, ExperimentControl parameters, BonsaiData_Trial columns), so update-workflows does
 #     not update it and reports why.
 #   - rig-setup's machines window marks each key of a rig's rig.yml against its rig's devices
@@ -30,7 +30,7 @@
 #     overrides applied).
 #   - A column two rigs write is a lab-wide one, never two rigs' own.
 #
-# Each trial column: type (int, double, bool or string; check-bonsai compares the record's
+# Each trial column: type (int, double, bool or string; check-workflow-builds compares the record's
 # member type), unit (when it has one), values (the strings it may hold, or a code: meaning
 # map), formerly (names it was recorded under before, newest first), required (every rig's row
 # has it), description.
@@ -77,7 +77,7 @@ trialColumns:
     required: true
     description: Harp time the row was stamped (the Seconds of the Timestamped record LogTrial receives), when the outcome is known.
 
-# Each kind of rig. repos: the workflow repositories that run on it (check-bonsai finds a
+# Each kind of rig. repos: the workflow repositories that run on it (check-workflow-builds finds a
 # workflow's rig by its repository's name). profiles: rig-setup's profiles for it.
 rigs:
   behaviour-box:

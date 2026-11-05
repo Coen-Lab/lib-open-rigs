@@ -21,7 +21,7 @@ $ErrorActionPreference = 'Stop'
 $self = $MyInvocation.MyCommand.Path
 $Repo = (Resolve-Path $Repo).Path
 $bonsaiDir = Join-Path $Repo '.bonsai'
-$bin = Join-Path ([IO.Path]::GetTempPath()) ("check-bonsai-" + (Split-Path $Repo -Leaf))
+$bin = Join-Path ([IO.Path]::GetTempPath()) ("check-workflow-builds-" + (Split-Path $Repo -Leaf))
 $workflow = Join-Path $Repo 'src\main.bonsai'
 
 if ($Step -eq 'Build') {
@@ -227,8 +227,8 @@ if (Test-Path $extensions) {
 } else { "1. No src\Extensions to compile." }
 "2. Building src\main.bonsai with Bonsai's builders..."
 & { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Build 2>&1 | ForEach-Object { "$_" } }
-if ($LASTEXITCODE -eq 2) { "  FAILED"; "check-bonsai: config\main.layout does not fit the workflow."; exit 1 }
-if ($LASTEXITCODE -eq 3) { "  FAILED"; "check-bonsai: a name is not in src\open_rigs\data_dictionary.yml (above)."; exit 1 }
-if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-bonsai: the workflow does not build."; exit 1 }
+if ($LASTEXITCODE -eq 2) { "  FAILED"; "check-workflow-builds: config\main.layout does not fit the workflow."; exit 1 }
+if ($LASTEXITCODE -eq 3) { "  FAILED"; "check-workflow-builds: a name is not in src\open_rigs\data_dictionary.yml (above)."; exit 1 }
+if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-workflow-builds: the workflow does not build."; exit 1 }
 "  ok"
-"check-bonsai: both steps passed."
+"check-workflow-builds: both steps passed."

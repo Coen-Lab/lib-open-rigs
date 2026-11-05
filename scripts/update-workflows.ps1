@@ -16,7 +16,7 @@ param(
 )
 # Keeps every lab Bonsai workflow on the lab's packages, on main and on each branch ticked for
 # it in rig-setup: every package in local_packages\ here, at the version here, with what they
-# depend on. Run by scripts\push.ps1 after each push here, and hourly (scripts\hourly.ps1, the task scripts\schedule.ps1 registers),
+# depend on. Run by scripts\push-and-update-workflows.ps1 after each push here, and hourly (scripts\hourly.ps1, the task scripts\schedule.ps1 registers),
 # so a repository added with rig-setup's Repos button, or a branch ticked there, gets them
 # unasked.
 #
@@ -32,7 +32,7 @@ param(
 #     the workflow has regenerate-schemas, its schema and generated classes are regenerated,
 #     and its rig template (examples\rig.py) where it has one.
 # A branch that changed is checked with its own scripts\check-workflow.ps1, if it has one, then
-# with scripts\check-bonsai.ps1 here (which holds its names to src\open_rigs\data_dictionary.yml); if that passes, those files and nothing else are committed and
+# with scripts\check-workflow-builds.ps1 here (which holds its names to src\open_rigs\data_dictionary.yml); if that passes, those files and nothing else are committed and
 # pushed to that branch, and rig-setup's 30-minute update takes main to the rigs. A failure is
 # not committed and is named in the table; the next run tries again from what GitHub has.
 # Exits 1 unless every branch of every lab workflow is up to date.
@@ -186,7 +186,7 @@ foreach ($f in Get-ChildItem $local -File -Filter '*.nupkg') {
 
 # This repository must be what GitHub has: every workflow commit names the commit here.
 $null = Invoke-Git $repo fetch -q
-if ([int](Invoke-Git $repo rev-list --count '@{u}..HEAD')) { throw "lib-open-rigs has unpushed commits. Push them first (scripts\push.ps1)." }
+if ([int](Invoke-Git $repo rev-list --count '@{u}..HEAD')) { throw "lib-open-rigs has unpushed commits. Push them first (scripts\push-and-update-workflows.ps1)." }
 if (Invoke-Git $repo status --porcelain -- local_packages) { throw "local_packages\ here has uncommitted changes. Commit and push them first." }
 # These scripts run against every workflow, so an edit not yet pushed would too.
 if (Invoke-Git $repo status --porcelain -- scripts) { throw "scripts\ here has uncommitted changes. Commit and push them first." }
@@ -205,7 +205,7 @@ $source = (Invoke-Git $repo rev-parse --short HEAD) | Select-Object -First 1
 $pin = (Invoke-Git $repo log -1 --format=%H -- src ':!src/**/*.md' ':!src/*.Tests/**' pyproject.toml local_packages) | Select-Object -First 1
 $pinLine = "open-rigs = {git = `"https://github.com/Coen-Lab/lib-open-rigs`", rev = `"$pin`"}"
 
-# One run at a time: push.ps1's and the hourly one share the clones. A run already going may
+# One run at a time: push-and-update-workflows.ps1's and the hourly one share the clones. A run already going may
 # have read local_packages\ before this push, so this one waits for it rather than trusting it.
 $mutex = New-Object Threading.Mutex($false, 'Global\lib-open-rigs-update-workflows')
 try { $mine = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $mine = $true }
@@ -392,15 +392,15 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
         # What this script wrote, staged before the check, so whatever the check changes is stray.
         $null = Invoke-Git $Dir add -A
 
-        # check-bonsai always (it holds the lab's names, data_dictionary.yml), after the workflow's own
+        # check-workflow-builds always (it holds the lab's names, data_dictionary.yml), after the workflow's own
         # check when it has one.
         $own = Join-Path $Dir 'scripts\check-workflow.ps1'
-        $check = if (Test-Path $own) { 'scripts\check-workflow.ps1 and lib-open-rigs scripts\check-bonsai.ps1' } else { 'lib-open-rigs scripts\check-bonsai.ps1' }
+        $check = if (Test-Path $own) { 'scripts\check-workflow.ps1 and lib-open-rigs scripts\check-workflow-builds.ps1' } else { 'lib-open-rigs scripts\check-workflow-builds.ps1' }
         "  checking with $check..."
         $passed = $true
         $log = @()
         if (Test-Path $own) { $log += Invoke-Native powershell -NoProfile -ExecutionPolicy Bypass -File $own; $passed = $LASTEXITCODE -eq 0 }
-        if ($passed) { $log += Invoke-Native powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'check-bonsai.ps1') -Repo $Dir; $passed = $LASTEXITCODE -eq 0 }
+        if ($passed) { $log += Invoke-Native powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'check-workflow-builds.ps1') -Repo $Dir; $passed = $LASTEXITCODE -eq 0 }
         $log | ForEach-Object { "  | $_" }
         if (-not $passed) {
             # The first lines that say what broke: an exception, a compiler error or a failed test.

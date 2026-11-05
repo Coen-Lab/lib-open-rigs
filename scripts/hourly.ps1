@@ -15,7 +15,7 @@
 # 2026, and a branch checked out there would have pinned every workflow to it (audit-rigs set C).
 # The task runs this file from that clone too, so the reset below rewrites the file running:
 # PowerShell parses a -File script whole before running it, so this run finishes as it began
-# and the next takes the new one. push.ps1 still runs from the working copy, where its refusals
+# and the next takes the new one. push-and-update-workflows.ps1 still runs from the working copy, where its refusals
 # belong.
 $logDir = Join-Path $env:LOCALAPPDATA 'lib-open-rigs'
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -37,7 +37,7 @@ $started = UtcNow
     # On main, following origin/main, which update-workflows' checks read as @{u}.
     git -C $self checkout -q -f -B main origin/main 2>&1 | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0) { "Stopped: could not set $self to origin/main."; 'Exit 1'; return }
-    # A child, as push.ps1 runs it: called in this process, a script that does not parse left
+    # A child, as push-and-update-workflows.ps1 runs it: called in this process, a script that does not parse left
     # $LASTEXITCODE at git's 0, and the run was recorded as a pass (audit-rigs set B, 4 Nov 2026).
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $self 'scripts\update-workflows.ps1') 2>&1 | ForEach-Object { "$_" }
     'Exit ' + $LASTEXITCODE
