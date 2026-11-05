@@ -18,6 +18,8 @@ This fork's `main` is what every Coen Lab workflow runs: upstream open-rigs (bra
 
 They moved here from coen-openrigs-custom on 2 Nov 2026.
 
+An experiment is one workflow run and a session the mouse's sitting, which can hold several (Pip, 5 Nov 2026); each experiment's folder is `ses-<SessionId>_<DateTime>`, named for its session. The run's nodes were renamed to match on 5 Nov 2026 (`1eee0ad`: `SessionControl`, `SessionGo`, `SessionManifest` and the rest became `Experiment...`), and history lines here and in `BACKLOG.md` use the new names, also for versions that shipped the old ones.
+
 ## Every lab workflow runs this
 
 A lab workflow is any repository on [rig-setup](https://github.com/Coen-Lab/rig-setup), for any profile, or in [`workflows.txt`](workflows.txt), that is a Bonsai project in the open-rigs layout (`.bonsai\Bonsai.config` and `src\main.bonsai`). `scripts\update-workflows.ps1` keeps each one's `main`, and each branch ticked for it in rig-setup (or named after it in `workflows.txt`). Ticking Leave Main Alone on the repo's right-click menu in rig-setup's Repos, or `!main` in `workflows.txt`, leaves `main` alone, on this repository. A ticked branch gone from GitHub (merged or deleted) is reported `gone`, not failed, until Repos takes the tick off:

@@ -7,7 +7,7 @@
 #     log names, ExperimentControl parameters, BonsaiData_Trial columns), so update-workflows does
 #     not update it and reports why.
 #   - rig-setup's machines window marks each key of a rig's rig.yml against its rig's devices
-#     and settings (update-workflows copies this file to K:\config\lab-names.yml).
+#     and settings (update-workflows writes this file as JSON to K:\config\lab-names.json).
 #
 # Naming rules:
 #   - A device is Kind-Instance, both PascalCase, with an instance even where a rig has one
@@ -17,8 +17,9 @@
 #   - Experiment settings (ExperimentControl parameters) are PascalCase, as the controller shows them.
 #   - Trial columns are camelCase. A unit goes in the name when the value has one
 #     (stimulusOnsetSeconds, itiDuration in seconds, rewardSize in microlitres).
-#   - A setting that is the same for the whole session is not a trial column: the manifest has
-#     the settings at Go and TaskConfig/TaskSchema the task file as loaded.
+#   - A setting that is the same for the whole experiment is not a trial column: the manifest has
+#     the settings at Go and TaskSchema the task as run (the task file with the controller's
+#     overrides applied).
 
 # BonsaiData_Trial columns every rig may write, name: what it holds. LogData adds Seconds (the
 # Harp time the row was stamped, the trial's end) itself; it is never a field of the record.
