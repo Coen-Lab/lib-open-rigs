@@ -62,7 +62,7 @@ namespace OpenRigs.LiveView.Tests
                 Check("liveView enabled false is skipped", plan.Skipped.Any(s => s.StartsWith("Camera-Side: liveView enabled is false")), string.Join(" | ", plan.Skipped));
                 Check("a kind with no recipe is skipped", plan.Skipped.Any(s => s.StartsWith("Lickometer-Left: no live-view recipe")), string.Join(" | ", plan.Skipped));
                 Check("settings that are not devices (rootPath, version) are not devices", !plan.Skipped.Any(s => s.StartsWith("RootPath") || s.StartsWith("Version")), string.Join(" | ", plan.Skipped));
-                Check("a string PathPrefix gives the session key and elapsed", plan.HasSessionFolder, "no session folder");
+                Check("a string PathPrefix gives the session key and elapsed", plan.HasExperimentFolder, "no experiment folder");
                 Check("nothing to note in a good rig.yml", plan.Notes.Count == 0, string.Join(" | ", plan.Notes));
                 Check("a Logging with LoggedRows has its rows streamed as logs", plan.StreamsLoggedRows, "not streamed");
                 var olderLogging = LiveViewPlan.Create(root, name => name == "PathPrefix" ? typeof(string) : null, name => null);
@@ -88,7 +88,7 @@ namespace OpenRigs.LiveView.Tests
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
 
                 Console.WriteLine("Session key:");
-                Check("the session folder's last two names", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_2026-10-30T19-57-12\") == "sub-TC002/ses-003B1_2026-10-30T19-57-12", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_2026-10-30T19-57-12\"));
+                Check("the experiment folder's last two names", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_2026-10-30T19-57-12\") == "sub-TC002/ses-003B1_2026-10-30T19-57-12", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_2026-10-30T19-57-12\"));
                 var refused = false;
                 try { SessionKey.FromPathPrefix(@"C:\data\TC002\003B1"); } catch (ArgumentException) { refused = true; }
                 Check("a folder not named sub-/ses- is refused", refused, "taken");

@@ -113,8 +113,8 @@ namespace OpenRigs.Control.Tests
                 Check("an empty value is refused as a set", new Parameter { Name = "Blank", Minimum = 1, Maximum = 2 }.Refusal("") != null, "taken");
                 Check("set again within it, Go goes on", Ok(Ask(socket, new { cmd = "set", name = "RewardUl", value = "2" })), "refused");
                 Check("Go is taken once Ready", Ok(Ask(socket, new { cmd = "go", by = new { id = "JoB", name = "Jo Bloggs" }, launched_by = new { id = "PipC", name = "Pip Coen" } })), "refused");
-                // 0.1.0-local.9: who launched and released the session, for the manifest.
-                Check("Go keeps who launched the session and who sent it", state.LaunchedBy?.ToString() == "Pip Coen (PipC)" && state.GoBy?.ToString() == "Jo Bloggs (JoB)", state.LaunchedBy + " / " + state.GoBy);
+                // 0.1.0-local.9: who launched and released the experiment, for the manifest.
+                Check("Go keeps who launched the experiment and who sent it", state.LaunchedBy?.ToString() == "Pip Coen (PipC)" && state.GoBy?.ToString() == "Jo Bloggs (JoB)", state.LaunchedBy + " / " + state.GoBy);
                 var named = Ask(socket, new { cmd = "status" });
                 Check("status names them", (string)named["launched_by"]["id"] == "PipC" && (string)named["go_by"]["name"] == "Jo Bloggs" && named["stopped_by"].Type == JTokenType.Null, named.ToString());
                 Check("... and only once", !Ok(Ask(socket, new { cmd = "go" })), "taken twice");
@@ -137,12 +137,12 @@ namespace OpenRigs.Control.Tests
                 var status = Ask(socket, new { cmd = "status" });
                 Check("status reports the phase, which only moves forward", (string)status["phase"] == "Recording", (string)status["phase"]);
                 Check("a metric is reported in the invariant culture, whatever the rig's", (string)status["metrics"]["water_ml"] == "0.25", status["metrics"]?.ToString());
-                // Before 0.1.0-local.13 the second frame was left unread, the reply threw and the session ended.
+                // Before 0.1.0-local.13 the second frame was left unread, the reply threw and the experiment ended.
                 socket.SendMoreFrame("{\"cmd\": \"status\"}").SendFrame("{\"cmd\": \"status\"}");
                 string twoFrames;
                 var gotTwoFrames = socket.TryReceiveFrameString(TimeSpan.FromSeconds(5), out twoFrames);
                 Check("a request of two frames is refused, saying so", gotTwoFrames && !Ok(JObject.Parse(twoFrames)) && ((string)JObject.Parse(twoFrames)["why"]) == "one frame per request, got 2", twoFrames ?? "no reply in 5 s");
-                Check("... and the session goes on", Ok(Ask(socket, new { cmd = "status" })) && ended == null, ended == null ? "no status" : ended.Message);
+                Check("... and the experiment goes on", Ok(Ask(socket, new { cmd = "status" })) && ended == null, ended == null ? "no status" : ended.Message);
 
                 Console.WriteLine("Stop:");
                 var watch = Stopwatch.StartNew();
@@ -163,7 +163,7 @@ namespace OpenRigs.Control.Tests
 
             Console.WriteLine("Work downstream of Go or a command:");
             {
-                // A subscriber that takes 3 s over each, as a session folder or file writer may. A port of
+                // A subscriber that takes 3 s over each, as an experiment folder or file writer may. A port of
                 // its own: the last server's may not be released yet.
                 const string slowEndpoint = "tcp://127.0.0.1:5642";
                 var done = new AutoResetEvent(false);

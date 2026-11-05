@@ -7,9 +7,9 @@ using Bonsai.Harp;
 namespace OpenRigs.HarpDevices
 {
     /// <summary>
-    /// Asks a Harp device for a register dump each time a session folder appears, so the session
+    /// Asks a Harp device for a register dump each time an experiment folder appears, so the experiment
     /// logs every register's value at its start. The dump Bonsai.Harp asks for when it opens the
-    /// port arrives before the session folder exists, so no session would otherwise have one
+    /// port arrives before the experiment folder exists, so no experiment would otherwise have one
     /// (open-rigs/open-rigs#9, which would do this in LogHarpDevice for every workflow; this node
     /// goes when that is released). The dump request is a bit of OperationControl, which also
     /// holds the operation mode, LEDs, heartbeat and reply muting, so the register is read first
@@ -17,16 +17,16 @@ namespace OpenRigs.HarpDevices
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Transform)]
-    [Description("Asks a Harp device for a register dump a moment after each session folder appears, keeping its other OperationControl settings. Inputs: the device's messages and the session folder (PathPrefix). Output: the commands to send it.")]
+    [Description("Asks a Harp device for a register dump a moment after each experiment folder appears, keeping its other OperationControl settings. Inputs: the device's messages and the experiment folder (PathPrefix). Output: the commands to send it.")]
     public class RequestRegisterDump
     {
-        /// <summary>Gets or sets how long after the session folder appears to ask, so the device's loggers are writing into it.</summary>
-        [Description("How long after the session folder appears to ask, so the device's loggers are already writing into it.")]
+        /// <summary>Gets or sets how long after the experiment folder appears to ask, so the device's loggers are writing into it.</summary>
+        [Description("How long after the experiment folder appears to ask, so the device's loggers are already writing into it.")]
         public TimeSpan Delay { get; set; } = TimeSpan.FromSeconds(0.5);
 
-        /// <summary>For each session folder, a read of OperationControl, then the write that asks for the dump when the reply arrives.</summary>
+        /// <summary>For each experiment folder, a read of OperationControl, then the write that asks for the dump when the reply arrives.</summary>
         /// <param name="messages">The device's messages.</param>
-        /// <param name="pathPrefix">The session folder, each time one appears.</param>
+        /// <param name="pathPrefix">The experiment folder, each time one appears.</param>
         /// <returns>The commands to send the device.</returns>
         public IObservable<HarpMessage> Process(IObservable<HarpMessage> messages, IObservable<string> pathPrefix)
         {

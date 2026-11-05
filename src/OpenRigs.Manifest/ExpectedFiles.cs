@@ -6,7 +6,7 @@ using OpenRigs.Shared;
 
 namespace OpenRigs.Manifest
 {
-    /// <summary>One file or folder the session must leave: a path in the session folder, a folder ending in /.</summary>
+    /// <summary>One file or folder the experiment must leave: a path in the experiment folder, a folder ending in /.</summary>
     class ExpectedEntry
     {
         public string Path;
@@ -14,7 +14,7 @@ namespace OpenRigs.Manifest
     }
 
     /// <summary>
-    /// What the session must leave, decided at build as StreamDevices decides what to stream: for
+    /// What the experiment must leave, decided at build as StreamDevices decides what to stream: for
     /// each device entry in rig.yml (kind: instance:, named &lt;Kind&gt;-&lt;Instance&gt;) whose subject
     /// the workflow publishes before this node, as &lt;Name&gt; or &lt;Name&gt;.Data, a folder of that
     /// name holding at least one file, which is where OpenRigs.Logging logs a device. Never
@@ -47,15 +47,15 @@ namespace OpenRigs.Manifest
             foreach (var raw in (expectedFiles ?? "").Split(';'))
             {
                 var entry = raw.Trim().Replace('\\', '/');
-                // rig-sync matches paths relative to the session folder (RigSchema/x.json), so ./ is dropped.
+                // rig-sync matches paths relative to the experiment folder (RigSchema/x.json), so ./ is dropped.
                 while (entry.StartsWith("./")) entry = entry.Substring(2);
                 if (entry.Length == 0) continue;
                 if (string.Equals(entry, Auto, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, false);
                 else if (string.Equals(entry, Harp, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, true);
-                // rig-sync matches a path or a folder, never a pattern: a wildcard would match nothing and hold the session back.
+                // rig-sync matches a path or a folder, never a pattern: a wildcard would match nothing and hold the experiment back.
                 else if (entry.IndexOfAny(new[] { '*', '?' }) >= 0) plan.Notes.Add("ExpectedFiles entry " + entry + " is not expected: a wildcard is not a path. Name the folder (Camera-Box/) instead.");
                 else if (entry.StartsWith("/") || entry.Contains(":") || entry.Split('/').Contains(".."))
-                    plan.Notes.Add("ExpectedFiles entry " + entry + " is not expected: it is not a path inside the session folder.");
+                    plan.Notes.Add("ExpectedFiles entry " + entry + " is not expected: it is not a path inside the experiment folder.");
                 else plan.Add(entry, "listed in ExpectedFiles");
             }
             return plan;
@@ -109,7 +109,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>
-        /// The files under the session folder an entry matches: the file itself, or every file in the folder
+        /// The files under the experiment folder an entry matches: the file itself, or every file in the folder
         /// that no other entry names (0.1.0-local.7), so a device's register map, expected by name in the
         /// device's folder, never stands in for the device's data.
         /// </summary>

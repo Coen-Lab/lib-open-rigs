@@ -162,22 +162,22 @@ namespace OpenRigs.LiveView
                 { "DataPort", DataPort.ToString() },
                 { "VideoPort", VideoPort.ToString() },
             });
-            if (!plan.HasSessionFolder) RemoveSessionKey(controller);
-            workflow.Add(Group("StreamController", plan.HasSessionFolder
-                ? "Opens the data and video publishers and declares DataMessage, VideoMessage and StreamIdentity (RigId, session key). The key is \"ready\" until PathPrefix names the session folder, then that folder's last two names."
+            if (!plan.HasExperimentFolder) RemoveSessionKey(controller);
+            workflow.Add(Group("StreamController", plan.HasExperimentFolder
+                ? "Opens the data and video publishers and declares DataMessage, VideoMessage and StreamIdentity (RigId, session key). The key is \"ready\" until PathPrefix names the experiment folder, then that folder's last two names."
                 : "Opens the data and video publishers and declares DataMessage, VideoMessage and StreamIdentity (RigId, session key). The workflow publishes no PathPrefix, so the key stays \"ready\".",
                 controller));
 
-            if (plan.HasSessionFolder)
+            if (plan.HasExperimentFolder)
             {
-                workflow.Add(Group("elapsed", "Seconds since the session folder (PathPrefix) appeared, once a second.",
+                workflow.Add(Group("elapsed", "Seconds since the experiment folder (PathPrefix) appeared, once a second.",
                     Load("Elapsed", new Dictionary<string, string>())));
             }
 
             if (plan.StreamsLoggedRows)
             {
                 workflow.Add(Group(LiveViewPlan.LoggedRowsStream,
-                    "Every row a log with PublishRows writes (OpenRigs.Logging's LogTrial and LogAsync), as it is written: its session, log name, row number, header and line, as the logs stream.",
+                    "Every row a log with PublishRows writes (OpenRigs.Logging's LogTrial and LogAsync), as it is written: its experiment, log name, row number, header and line, as the logs stream.",
                     Load("LoggedRows", new Dictionary<string, string> { { "Stream", LiveViewPlan.LoggedRowsStream } })));
             }
 
@@ -200,7 +200,7 @@ namespace OpenRigs.LiveView
             return new GroupWorkflowBuilder(workflow) { Name = name, Description = description };
         }
 
-        // Without a session folder the key is only "ready": drop PathPrefix and SessionKey, which
+        // Without an experiment folder the key is only "ready": drop PathPrefix and SessionKey, which
         // would otherwise stop the build looking for a subject the workflow does not have, and the
         // Merge after them. A Merge left with one string input takes Rx's flattening overload and
         // sends the key one character at a time ("y" last), so "ready" goes straight on instead.

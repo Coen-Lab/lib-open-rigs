@@ -8,7 +8,7 @@ using Bonsai;
 namespace OpenRigs.Logging
 {
     /// <summary>
-    /// Represents one event of a session that does not belong to a trial, such as a manual reward,
+    /// Represents one event of an experiment that does not belong to a trial, such as a manual reward,
     /// a flush or a spout move, written as one row of BonsaiData_Async by LogAsync.
     /// </summary>
     public class AsyncEvent

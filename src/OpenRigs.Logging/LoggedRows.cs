@@ -10,13 +10,13 @@ using Bonsai;
 namespace OpenRigs.Logging
 {
     /// <summary>
-    /// One row a log wrote, as it was written: the session and log it belongs to, its number in
+    /// One row a log wrote, as it was written: the experiment and log it belongs to, its number in
     /// that log, the log's header and the line itself.
     /// </summary>
     public class LoggedRow
     {
         /// <summary>
-        /// Gets or sets the session the row was written into, as its folder's last two names
+        /// Gets or sets the experiment the row was written into, as its folder's last two names
         /// (sub-&lt;SubjectId&gt;/ses-&lt;SessionId&gt;_&lt;DateTime&gt;), the key OpenRigs.Streaming's messages carry.
         /// </summary>
         public string Session { get; set; }
@@ -26,7 +26,7 @@ namespace OpenRigs.Logging
 
         /// <summary>
         /// Gets or sets the row's number in its log, from 0, counted across the log's hourly files
-        /// in this session, so it is the row's index in the log read whole.
+        /// in this experiment, so it is the row's index in the log read whole.
         /// </summary>
         public long Row { get; set; }
 
@@ -42,20 +42,20 @@ namespace OpenRigs.Logging
     /// written, from anywhere in the workflow.
     /// </summary>
     /// <remarks>
-    /// A live view needs a session's trials as they happen, and the rows are written deep in a
+    /// A live view needs an experiment's trials as they happen, and the rows are written deep in a
     /// workflow (av-dome's LogTrial sits inside a SelectMany, whose subjects nothing at the top
     /// level can see). So the rows go through one place in the process instead of a subject: every
     /// CsvWriter with PublishRows on hands its rows here, and OpenRigs.LiveView's StreamDevices,
     /// last in the workflow, streams them without the workflow wiring anything. One Bonsai runs one
-    /// workflow, so the process is the session.
+    /// workflow, so the process is the experiment.
     /// </remarks>
     [XmlType(Namespace = "clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging")]
-    [Description("Emits every row a log with PublishRows on writes (LogTrial and LogAsync turn it on), as it is written, from anywhere in the workflow: its session, log name, row number, header and line.")]
+    [Description("Emits every row a log with PublishRows on writes (LogTrial and LogAsync turn it on), as it is written, from anywhere in the workflow: its experiment, log name, row number, header and line.")]
     public class LoggedRows : Source<LoggedRow>
     {
         static readonly object Gate = new object();
         static readonly Subject<LoggedRow> Rows = new Subject<LoggedRow>();
-        // Rows written so far in each session's log, by session folder and log name: the next row's number.
+        // Rows written so far in each experiment's log, by experiment folder and log name: the next row's number.
         static readonly Dictionary<string, long> Counts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Emits every row a log with PublishRows on writes from now on.</summary>
@@ -84,11 +84,11 @@ namespace OpenRigs.Logging
             var path = FilePath(writer);
             if (path == null) return;
             var logFolder = Path.GetDirectoryName(path);
-            var session = Path.GetDirectoryName(logFolder);
-            var subject = Path.GetDirectoryName(session);
-            if (string.IsNullOrEmpty(session) || string.IsNullOrEmpty(subject)) return;
+            var experiment = Path.GetDirectoryName(logFolder);
+            var subject = Path.GetDirectoryName(experiment);
+            if (string.IsNullOrEmpty(experiment) || string.IsNullOrEmpty(subject)) return;
             var log = LogName(path);
-            var key = session + "|" + log;
+            var key = experiment + "|" + log;
             // Under one lock, numbering and emitting together, so rows from two logs written on
             // two threads reach subscribers one at a time and each log's in its own order.
             lock (Gate)
@@ -98,7 +98,7 @@ namespace OpenRigs.Logging
                 Counts[key] = row + 1;
                 Rows.OnNext(new LoggedRow
                 {
-                    Session = Path.GetFileName(subject) + "/" + Path.GetFileName(session),
+                    Session = Path.GetFileName(subject) + "/" + Path.GetFileName(experiment),
                     Log = log,
                     Row = row,
                     Header = header ?? string.Empty,

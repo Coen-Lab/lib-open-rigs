@@ -9,11 +9,11 @@
 | `Detail` | any text that qualifies it, for example `Manual`; empty if none |
 | `Value` | the number it carries, for example microlitres or steps; empty if none |
 
-Its trial counterpart is [LogTrial](log-trial.md); the two share the session's `BonsaiData` folder.
+Its trial counterpart is [LogTrial](log-trial.md); the two share the experiment's `BonsaiData` folder.
 
 ## Usage
 
-Place `LogAsync` once, at the top level of the workflow or in a top-level group, ahead of every node that sends to it, and never inside a `SelectMany`. It declares the `AsyncEvents` subject (a `ReplaySubject` of `Timestamped<AsyncEvent>`) and starts writing once `PathPrefix` exists. Because the subject replays, events sent before the session folder exists, such as a flush before Go, are kept and written when it appears.
+Place `LogAsync` once, at the top level of the workflow or in a top-level group, ahead of every node that sends to it, and never inside a `SelectMany`. It declares the `AsyncEvents` subject (a `ReplaySubject` of `Timestamped<AsyncEvent>`) and starts writing once `PathPrefix` exists. Because the subject replays, events sent before the experiment folder exists, such as a flush before Go, are kept and written when it appears.
 
 To send an event:
 
@@ -27,4 +27,4 @@ A typed subject declaration names itself with `<rx:Name>`, not `<Name>`; with th
 
 ## Live, and on disk at once
 
-Since Logging 0.1.0-bbox.5 each row is flushed to disk as it is written (`AutoFlush`) and published to `LoggedRows` (`PublishRows`), both on in this include. Before, the rows reached disk 4 KB at a time, so rig-control's window ran tens of trials behind and a Bonsai ended by force lost its unflushed tail. OpenRigs.LiveView's `StreamDevices` (0.1.0-local.13 on) sends every published row as the `logs` stream on the data port, with its session, log name, row number (from 0, across the log's hourly files), header and line, so a live view has each row as it is written, with nothing wired in the workflow.
+Since Logging 0.1.0-bbox.5 each row is flushed to disk as it is written (`AutoFlush`) and published to `LoggedRows` (`PublishRows`), both on in this include. Before, the rows reached disk 4 KB at a time, so rig-control's window ran tens of trials behind and a Bonsai ended by force lost its unflushed tail. OpenRigs.LiveView's `StreamDevices` (0.1.0-local.13 on) sends every published row as the `logs` stream on the data port, with its experiment, log name, row number (from 0, across the log's hourly files), header and line, so a live view has each row as it is written, with nothing wired in the workflow.

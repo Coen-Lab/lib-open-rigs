@@ -16,7 +16,7 @@ namespace OpenRigs.HarpDevices
     /// device. At build it reads this machine's rig.yml and, for each device entry with a
     /// portName whose data the workflow publishes as HarpMessage under &lt;Kind-Instance&gt;.Data,
     /// adds to its own inner workflow a RecordHarpDevice (the board's USB serial checked at Start;
-    /// its registers and register map written into each session) and, when the workflow publishes
+    /// its registers and register map written into each experiment) and, when the workflow publishes
     /// &lt;Kind-Instance&gt;.Commands, a RequestRegisterDump on it. Each device's record's path is
     /// published as &lt;Kind-Instance&gt;.Identity. Only subjects built before this node can be
     /// found, so it goes after the devices and LogController. ExperimentManifest expects the two files
@@ -24,7 +24,7 @@ namespace OpenRigs.HarpDevices
     /// </summary>
     [DefaultProperty(nameof(ConfigRoot))]
     [TypeDescriptionProvider(typeof(RecordHarpDevicesTypeDescriptionProvider))]
-    [Description("Checks every Harp device in this machine's rig.yml at Start (its USB serial, usbSerial in rig.yml) and writes its registers and register map into each session folder, as <Name>/<Name>_device.json and <Name>/<Name>.yml. Finds each device as <Kind-Instance>.Data and asks for a register dump on <Kind-Instance>.Commands. Put it after the devices and LogController; give ExperimentManifest's ExpectedFiles harp to expect the files.")]
+    [Description("Checks every Harp device in this machine's rig.yml at Start (its USB serial, usbSerial in rig.yml) and writes its registers and register map into each experiment folder, as <Name>/<Name>_device.json and <Name>/<Name>.yml. Finds each device as <Kind-Instance>.Data and asks for a register dump on <Kind-Instance>.Commands. Put it after the devices and LogController; give ExperimentManifest's ExpectedFiles harp to expect the files.")]
     public class RecordHarpDevices : GroupWorkflowBuilder
     {
         // The plan the inner workflow was last made from. The editor builds on every change, so

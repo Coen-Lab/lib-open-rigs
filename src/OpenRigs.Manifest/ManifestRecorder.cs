@@ -7,7 +7,7 @@ namespace OpenRigs.Manifest
 {
     /// <summary>
     /// The subscription ExperimentManifest builds: reads what is fixed at Start, writes the manifest
-    /// when the session folder's path arrives, and again with the outcome when the run ends.
+    /// when the experiment folder's path arrives, and again with the outcome when the run ends.
     /// </summary>
     public class ManifestRecorder
     {
@@ -15,7 +15,7 @@ namespace OpenRigs.Manifest
         readonly string configFiles;
         readonly ExpectedPlan expected;
 
-        // How often the controller's stop is looked for while the run goes on: ControlSession is read by name, with nothing to subscribe to.
+        // How often the controller's stop is looked for while the run goes on: ControlExperiment is read by name, with nothing to subscribe to.
         internal static TimeSpan StopPoll = TimeSpan.FromMilliseconds(250);
 
         internal ManifestRecorder(string ingestScript, string configFiles, ExpectedPlan expected)
@@ -26,24 +26,24 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>No run input: the end is read from OpenRigs.Control's phase, if it is there.</summary>
-        /// <param name="sessionPath">The session folder's path, from PathPrefix.</param>
+        /// <param name="experimentPath">The experiment folder's path, from PathPrefix.</param>
         /// <returns>The manifest's path, once the first write is done.</returns>
-        public IObservable<string> Process(IObservable<string> sessionPath)
+        public IObservable<string> Process(IObservable<string> experimentPath)
         {
-            return Record<object>(sessionPath, null);
+            return Record<object>(experimentPath, null);
         }
 
         /// <summary>With the run: its completion is completed, its error the run's error, its elements run.items.</summary>
         /// <typeparam name="TRun">The type of the run's elements.</typeparam>
-        /// <param name="sessionPath">The session folder's path, from PathPrefix.</param>
+        /// <param name="experimentPath">The experiment folder's path, from PathPrefix.</param>
         /// <param name="run">The run.</param>
         /// <returns>The manifest's path, once the first write is done.</returns>
-        public IObservable<string> Process<TRun>(IObservable<string> sessionPath, IObservable<TRun> run)
+        public IObservable<string> Process<TRun>(IObservable<string> experimentPath, IObservable<TRun> run)
         {
-            return Record(sessionPath, run);
+            return Record(experimentPath, run);
         }
 
-        IObservable<string> Record<TRun>(IObservable<string> sessionPath, IObservable<TRun> run)
+        IObservable<string> Record<TRun>(IObservable<string> experimentPath, IObservable<TRun> run)
         {
             return Observable.Create<string>(observer =>
             {
@@ -57,7 +57,7 @@ namespace OpenRigs.Manifest
                 // How the run ended, kept until the folder's path arrives: the run may end before
                 // LogController has made the folder, and the manifest must still say so.
                 RunEnd pending = null;
-                ControlSession control = null;
+                ControlExperiment control = null;
                 var subscriptions = new CompositeDisposable();
 
                 Action<RunEnd> finish = end =>
@@ -75,7 +75,7 @@ namespace OpenRigs.Manifest
                 // node's would. Thrown instead, it would go back up the thread that delivered the
                 // path or the run's end: from Go, that is ControlServer's own thread, where an
                 // exception kills Bonsai with nothing closed.
-                subscriptions.Add(sessionPath.Take(1).Subscribe(path =>
+                subscriptions.Add(experimentPath.Take(1).Subscribe(path =>
                 {
                     string manifestPath;
                     RunEnd ended;
@@ -86,7 +86,7 @@ namespace OpenRigs.Manifest
                             if (begun) return;
                             begun = true;
                             // PathPrefix comes after Go, so a running ExperimentControl has its Go by now.
-                            control = ControlSession.Current();
+                            control = ControlExperiment.Current();
                             manifestPath = writer.Begin(path, control);
                             ended = pending;
                             if (ended != null)
@@ -134,7 +134,7 @@ namespace OpenRigs.Manifest
                         {
                             try { finish(new RunEnd(RunEnd.Failed, error.Message)); }
                             catch (Exception ex) { NotWritten("the final manifest", ex); }
-                            // Before the folder exists there is no session to record, so the error
+                            // Before the folder exists there is no experiment to record, so the error
                             // goes on at once: held until the folder appeared, a run that failed at
                             // Ready left the workflow standing with a dead run, and a Go then made a
                             // folder for it (audit, 4 Nov 2026). A completion still waits for the folder.
@@ -153,7 +153,7 @@ namespace OpenRigs.Manifest
                 // controller's phase, the only witness this node has.
                 subscriptions.Add(Disposable.Create(() =>
                 {
-                    try { finish(RunEnd.AtDisposal(control ?? ControlSession.Current())); }
+                    try { finish(RunEnd.AtDisposal(control ?? ControlExperiment.Current())); }
                     catch (Exception ex) { NotWritten("the final manifest", ex); }
                 }));
                 return subscriptions;
@@ -204,7 +204,7 @@ namespace OpenRigs.Manifest
         /// the run ended early from something this node cannot see (an error elsewhere, the
         /// editor's Stop button). Without one, stopped: the editor's Stop is how such a run ends.
         /// </summary>
-        internal static RunEnd AtDisposal(ControlSession control)
+        internal static RunEnd AtDisposal(ControlExperiment control)
         {
             if (control == null) return new RunEnd(Stopped, null);
             if (control.FinishedAt.HasValue) return new RunEnd(Completed, null);

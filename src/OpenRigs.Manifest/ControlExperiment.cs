@@ -6,13 +6,13 @@ using System.Linq;
 namespace OpenRigs.Manifest
 {
     /// <summary>
-    /// The running OpenRigs.Control session (ExperimentControl's ControlState.Current), read by name,
+    /// The running OpenRigs.Control experiment (ExperimentControl's ControlState.Current), read by name,
     /// so that OpenRigs.Manifest does not depend on OpenRigs.Control: a workflow can have the
-    /// manifest without the session controller's package, and then there is no session to read.
+    /// manifest without the experiment controller's package, and then there is no experiment to read.
     /// src\OpenRigs.Manifest.Tests runs against the real ControlState, and fails if a member
     /// named here is renamed there.
     /// </summary>
-    class ControlSession
+    class ControlExperiment
     {
         /// <summary>The ControlState members read here, for the test to check against OpenRigs.Control.</summary>
         internal static readonly string[] StateMembers = { "Current", "SubjectId", "SessionId", "Go", "StopReason", "FinishedAt", "LaunchedBy", "GoBy", "StoppedBy" };
@@ -25,13 +25,13 @@ namespace OpenRigs.Manifest
 
         readonly object state;
 
-        ControlSession(object state)
+        ControlExperiment(object state)
         {
             this.state = state;
         }
 
-        /// <summary>The running ControlServer's session, or null when OpenRigs.Control is not loaded or no ControlServer runs.</summary>
-        public static ControlSession Current()
+        /// <summary>The running ControlServer's experiment, or null when OpenRigs.Control is not loaded or no ControlServer runs.</summary>
+        public static ControlExperiment Current()
         {
             var type = AppDomain.CurrentDomain.GetAssemblies()
                 .Where(a => a.GetName().Name == "OpenRigs.Control")
@@ -39,7 +39,7 @@ namespace OpenRigs.Manifest
                 .FirstOrDefault(t => t != null);
             var property = type != null ? type.GetProperty("Current") : null;
             var state = property != null ? property.GetValue(null, null) : null;
-            return state != null ? new ControlSession(state) : null;
+            return state != null ? new ControlExperiment(state) : null;
         }
 
         /// <summary>The subject ID ControlServer was given.</summary>
@@ -48,13 +48,13 @@ namespace OpenRigs.Manifest
         /// <summary>The session ID ControlServer was given.</summary>
         public string SessionId { get { return Read(state, "SessionId") as string; } }
 
-        /// <summary>The why of a controller's stop; null unless the controller stopped the session.</summary>
+        /// <summary>The why of a controller's stop; null unless the controller stopped the experiment.</summary>
         public string StopReason { get { return Read(state, "StopReason") as string; } }
 
         /// <summary>When the workflow reported Finished; null if it never did.</summary>
         public DateTime? FinishedAt { get { return Read(state, "FinishedAt") as DateTime?; } }
 
-        /// <summary>Who the controller said launched the session, as (ID, name); null if it named
+        /// <summary>Who the controller said launched the experiment, as (ID, name); null if it named
         /// nobody, or OpenRigs.Control is older than 0.1.0-local.9.</summary>
         public KeyValuePair<string, string>? LaunchedBy { get { return Person("LaunchedBy"); } }
 

@@ -12,7 +12,7 @@ using OpenRigs.Control;
 using OpenRigs.Manifest;
 using OpenRigs.Shared;
 
-// Runs ExperimentManifest's writer and recorder against a temporary session folder, without Bonsai's
+// Runs ExperimentManifest's writer and recorder against a temporary experiment folder, without Bonsai's
 // editor or hardware: exit 0 when every check passes. dotnet run --project src\OpenRigs.Manifest.Tests
 namespace OpenRigs.Manifest.Tests
 {
@@ -70,8 +70,8 @@ namespace OpenRigs.Manifest.Tests
             state.SetPhase(ExperimentPhase.Stopping);
         }
 
-        // One session with no run input: the folder appears, then whatever the controller does, then the workflow ends.
-        static string Session(string root, string name, ControlState control, Action<ControlState> during)
+        // One experiment with no run input: the folder appears, then whatever the controller does, then the workflow ends.
+        static string RunExperiment(string root, string name, ControlState control, Action<ControlState> during)
         {
             // The folder as the patched Logging package names it (ses-<Session>_<DateTime>, badd9ca).
             var folder = Path.Combine(root, "sub-TC002", "ses-" + name + "_2026-10-30T19-57-12");
@@ -135,30 +135,30 @@ namespace OpenRigs.Manifest.Tests
             try
             {
                 Console.WriteLine("How the run ended, with no run input:");
-                var finishedThenStopped = Session(root, "a", Controller(), c => { c.SetPhase(ExperimentPhase.Finished); Stop(c, "run finished"); });
+                var finishedThenStopped = RunExperiment(root, "a", Controller(), c => { c.SetPhase(ExperimentPhase.Finished); Stop(c, "run finished"); });
                 Check("a run that finished, then was stopped by rig-control, is completed", Field(finishedThenStopped, "run.outcome") == "completed", Field(finishedThenStopped, "run.outcome"));
                 Check("... in a folder named ses-<Session>_<DateTime>, its session read from the name", Field(finishedThenStopped, "session.id") == "a" && Field(finishedThenStopped, "session.subject") == "TC002" && Field(finishedThenStopped, "session.started") == "2026-10-30T19:57:12Z", Field(finishedThenStopped, "session.id") + " " + Field(finishedThenStopped, "session.started"));
                 Check("... with no stop reason", Field(finishedThenStopped, "run.stop_reason") == "null", Field(finishedThenStopped, "run.stop_reason"));
-                var finished = Session(root, "b", Controller(), c => c.SetPhase(ExperimentPhase.Finished));
+                var finished = RunExperiment(root, "b", Controller(), c => c.SetPhase(ExperimentPhase.Finished));
                 Check("a run that finished is completed", Field(finished, "run.outcome") == "completed", Field(finished, "run.outcome"));
-                var stopped = Session(root, "c", Controller(), c => Stop(c, "mouse unwell"));
+                var stopped = RunExperiment(root, "c", Controller(), c => Stop(c, "mouse unwell"));
                 Check("a controller stop before Finished is stopped, with its reason", Field(stopped, "run.outcome") == "stopped" && Field(stopped, "run.stop_reason") == "mouse unwell", Field(stopped, "run.outcome") + " " + Field(stopped, "run.stop_reason"));
-                var early = Session(root, "d", Controller(), null);
+                var early = RunExperiment(root, "d", Controller(), null);
                 Check("a workflow that ends before Finished, unstopped, is ended-early", Field(early, "run.outcome") == "ended-early", Field(early, "run.outcome"));
-                var stoppingUnasked = Session(root, "h", Controller(), c => c.SetPhase(ExperimentPhase.Stopping));
+                var stoppingUnasked = RunExperiment(root, "h", Controller(), c => c.SetPhase(ExperimentPhase.Stopping));
                 Check("a Stopping phase with no stop from the controller is ended-early, not stopped", Field(stoppingUnasked, "run.outcome") == "ended-early", Field(stoppingUnasked, "run.outcome"));
-                var alone = Session(root, "e", null, null);
+                var alone = RunExperiment(root, "e", null, null);
                 Check("without ExperimentControl it is stopped", Field(alone, "run.outcome") == "stopped" && Field(alone, "control") == "null", Field(alone, "run.outcome"));
                 Check("the settings at Go are recorded", Field(finished, "control.parameters.RunLengthMins") == "30", Field(finished, "control.parameters.RunLengthMins"));
-                // 0.1.0-local.5: who launched, released and stopped the session, as the controller named them.
-                var named = Session(root, "h", Controller(), c =>
+                // 0.1.0-local.5: who launched, released and stopped the experiment, as the controller named them.
+                var named = RunExperiment(root, "h", Controller(), c =>
                 {
                     Set(c, "LaunchedBy", new Person { Id = "PipC", Name = "Pip Coen" });
                     Set(c, "GoBy", new Person { Id = "JoB", Name = "Jo Bloggs" });
                     Set(c, "StoppedBy", new Person { Id = "", Name = "Jo Bloggs" });
                     Stop(c, "stopped by Jo Bloggs");
                 });
-                Check("control names who launched the session and who sent Go", Field(named, "control.launched_by.id") == "PipC" && Field(named, "control.launched_by.name") == "Pip Coen" && Field(named, "control.go_by.id") == "JoB", named);
+                Check("control names who launched the experiment and who sent Go", Field(named, "control.launched_by.id") == "PipC" && Field(named, "control.launched_by.name") == "Pip Coen" && Field(named, "control.go_by.id") == "JoB", named);
                 Check("... and who stopped it", Field(named, "control.stopped_by.name") == "Jo Bloggs" && Field(named, "control.stopped_by.id") == "", Field(named, "control.stopped_by.name"));
                 {
                     // S3-L3: rig-control kills a workflow slow to stop, so the running write is the last.
@@ -209,12 +209,12 @@ namespace OpenRigs.Manifest.Tests
 
                 // Round 5: the manifest reads OpenRigs.Control by name, so that it does not depend on it;
                 // the checks above run through that read, and a renamed member fails here too.
-                Check("every ControlState member the manifest reads is there", ControlSession.StateMembers.All(m => typeof(ControlState).GetProperty(m) != null),
-                    string.Join(", ", ControlSession.StateMembers.Where(m => typeof(ControlState).GetProperty(m) == null)));
-                Check("... and every Go event member", ControlSession.GoMembers.All(m => typeof(ControlEvent).GetProperty(m) != null),
-                    string.Join(", ", ControlSession.GoMembers.Where(m => typeof(ControlEvent).GetProperty(m) == null)));
-                Check("... and every Person member", ControlSession.PersonMembers.All(m => typeof(Person).GetProperty(m) != null),
-                    string.Join(", ", ControlSession.PersonMembers.Where(m => typeof(Person).GetProperty(m) == null)));
+                Check("every ControlState member the manifest reads is there", ControlExperiment.StateMembers.All(m => typeof(ControlState).GetProperty(m) != null),
+                    string.Join(", ", ControlExperiment.StateMembers.Where(m => typeof(ControlState).GetProperty(m) == null)));
+                Check("... and every Go event member", ControlExperiment.GoMembers.All(m => typeof(ControlEvent).GetProperty(m) != null),
+                    string.Join(", ", ControlExperiment.GoMembers.Where(m => typeof(ControlEvent).GetProperty(m) == null)));
+                Check("... and every Person member", ControlExperiment.PersonMembers.All(m => typeof(Person).GetProperty(m) != null),
+                    string.Join(", ", ControlExperiment.PersonMembers.Where(m => typeof(Person).GetProperty(m) == null)));
                 Check("the package does not reference OpenRigs.Control", !typeof(ManifestWriter).Assembly.GetReferencedAssemblies().Any(a => a.Name == "OpenRigs.Control"), "it does");
 
                 Console.WriteLine("The run input:");
@@ -249,7 +249,7 @@ namespace OpenRigs.Manifest.Tests
 
                 Console.WriteLine("A write that fails:");
                 {
-                    // A file where the session folder should be, so Begin cannot make it.
+                    // A file where the experiment folder should be, so Begin cannot make it.
                     var blocked = Path.Combine(root, "sub-TC002", "ses-g_date-2026-10-30T19-57-12");
                     Directory.CreateDirectory(Path.GetDirectoryName(blocked));
                     File.WriteAllText(blocked, "not a folder");
@@ -305,7 +305,7 @@ namespace OpenRigs.Manifest.Tests
                 var outside = ExpectedPlan.Create(@".\RigSchema\x.json;/abs.json;C:\data\x.json;../up.json;a/../b.json", null, n => null);
                 var outsidePaths = string.Join(", ", outside.Entries.Select(e => e.Path));
                 Check("a leading ./ is dropped, as rig-sync names the file", outsidePaths == "RigSchema/x.json", outsidePaths);
-                Check("... and a rooted entry or one with .. is noted, not expected", outside.Notes.Count == 4 && outside.Notes.All(n => n.EndsWith("not a path inside the session folder.")), string.Join(" | ", outside.Notes));
+                Check("... and a rooted entry or one with .. is noted, not expected", outside.Notes.Count == 4 && outside.Notes.All(n => n.EndsWith("not a path inside the experiment folder.")), string.Join(" | ", outside.Notes));
                 // A Harp device's data is HarpMessage, told by name: the manifest does not reference Bonsai.Harp.
                 // 0.1.0-local.9: which entries are Harp devices is src\Shared\HarpRig.cs, the rule RecordHarpDevices
                 // uses (a portName: null is none), and the register map is expected only when a loaded package decodes the kind.

@@ -8,7 +8,7 @@ namespace OpenRigs.Shared
 {
     /// <summary>
     /// The workflow file Bonsai was started with. OpenRigs.LiveView and OpenRigs.Manifest both
-    /// compile this file in, so the live view and the session's manifest name the same workflow.
+    /// compile this file in, so the live view and the experiment's manifest name the same workflow.
     /// </summary>
     internal static class WorkflowFile
     {

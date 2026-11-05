@@ -111,15 +111,15 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>The first write, status partial and outcome running. Makes the folder if the loggers have not yet: PathPrefix names it before any of them writes and they make the same folder. Throws if the file cannot be written: nothing recorded is the thing to stop for.</summary>
-        public string Begin(string sessionFolder, ControlSession control)
+        public string Begin(string experimentFolder, ControlExperiment control)
         {
-            if (string.IsNullOrEmpty(sessionFolder)) throw new ArgumentException("ExperimentManifest was given no session folder.");
-            var full = Path.GetFullPath(sessionFolder.TrimEnd('\\', '/'));
+            if (string.IsNullOrEmpty(experimentFolder)) throw new ArgumentException("ExperimentManifest was given no experiment folder.");
+            var full = Path.GetFullPath(experimentFolder.TrimEnd('\\', '/'));
             Directory.CreateDirectory(full);
             var path = Path.Combine(full, FileName);
             folder = full;
             started = DateTime.UtcNow;
-            if (control == null) start.Notes.Add("No ExperimentControl running when the session folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it.");
+            if (control == null) start.Notes.Add("No ExperimentControl running when the experiment folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it.");
             try
             {
                 manifestPath = path;
@@ -135,20 +135,20 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>A running write again, once the controller's stop has come: the stop's reason and who sent it are on disk even if the workflow is killed before its end. A Begin that never happened, or failed, writes nothing.</summary>
-        public void Stopping(ControlSession control)
+        public void Stopping(ControlExperiment control)
         {
             if (manifestPath == null) return;
             Write(new RunEnd(RunEnd.Running, null), null, control, null);
         }
 
         /// <summary>The second write, with the outcome. A Begin that never happened, or failed, writes nothing.</summary>
-        public void Finish(RunEnd end, long? items, ControlSession control)
+        public void Finish(RunEnd end, long? items, ControlExperiment control)
         {
             if (manifestPath == null) return;
             Write(end, items, control, DateTime.UtcNow);
         }
 
-        void Write(RunEnd end, long? items, ControlSession control, DateTime? ended)
+        void Write(RunEnd end, long? items, ControlExperiment control, DateTime? ended)
         {
             var doc = new JsonObject();
             doc.Add("version", (long)Version);
@@ -179,7 +179,7 @@ namespace OpenRigs.Manifest
             WriteAtomically(manifestPath, Json.Serialize(doc));
         }
 
-        /// <summary>Each file or folder the session must leave, why, and how many files in the folder match it now.</summary>
+        /// <summary>Each file or folder the experiment must leave, why, and how many files in the folder match it now.</summary>
         public static List<object> ExpectedSection(ExpectedPlan plan, List<object> files)
         {
             var paths = files.Cast<JsonObject>().Select(f => (string)f.First(p => p.Key == "path").Value).ToList();
@@ -195,7 +195,7 @@ namespace OpenRigs.Manifest
             return section;
         }
 
-        /// <summary>manifest.json.tmp, then the rename, so no reader sees half a file, nor a moment with no manifest (rig-sync would copy the session as one without). A write that fails takes its .tmp with it.</summary>
+        /// <summary>manifest.json.tmp, then the rename, so no reader sees half a file, nor a moment with no manifest (rig-sync would copy the experiment as one without). A write that fails takes its .tmp with it.</summary>
         public static void WriteAtomically(string path, string text)
         {
             AtomicFile.Write(path, text);
@@ -214,7 +214,7 @@ namespace OpenRigs.Manifest
 
         /// <summary>
         /// One configuration file as it was at Start: path and sha256, or missing. Not its text (0.1.0-local.7):
-        /// the workflow logs the settings it parsed from it into the session (the Open Rigs logging spec's
+        /// the workflow logs the settings it parsed from it into the experiment (the Open Rigs logging spec's
         /// settings JSON), and the manifest names which file that was.
         /// </summary>
         public static JsonObject ConfigFile(string configured, string baseFolder)
@@ -236,11 +236,11 @@ namespace OpenRigs.Manifest
 
         static readonly Regex SessionName = new Regex(@"^ses-(?<id>.+?)_(?:date-)?(?<dt>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})$", RegexOptions.CultureInvariant);
 
-        public static JsonObject SessionSection(string sessionFolder)
+        public static JsonObject SessionSection(string experimentFolder)
         {
             var session = new JsonObject();
-            var name = Path.GetFileName(sessionFolder);
-            var parent = Path.GetFileName(Path.GetDirectoryName(sessionFolder) ?? string.Empty);
+            var name = Path.GetFileName(experimentFolder);
+            var parent = Path.GetFileName(Path.GetDirectoryName(experimentFolder) ?? string.Empty);
             session.Add("subject", parent.StartsWith("sub-", StringComparison.Ordinal) ? parent.Substring(4) : null);
             var m = SessionName.Match(name);
             session.Add("id", m.Success ? m.Groups["id"].Value : null);
@@ -255,7 +255,7 @@ namespace OpenRigs.Manifest
                 }
             }
             session.Add("started", started);
-            session.Add("folder", sessionFolder);
+            session.Add("folder", experimentFolder);
             return session;
         }
 
@@ -311,9 +311,9 @@ namespace OpenRigs.Manifest
             return launch;
         }
 
-        /// <summary>The session controller's settings at Go: subject, session, who launched it, sent
+        /// <summary>The experiment controller's settings at Go: subject, session, who launched it, sent
         /// Go and stopped it, and every parameter. Null without ExperimentControl.</summary>
-        public static JsonObject ControlSection(ControlSession control)
+        public static JsonObject ControlSection(ControlExperiment control)
         {
             if (control == null) return null;
             var section = new JsonObject();
@@ -339,11 +339,11 @@ namespace OpenRigs.Manifest
             return section;
         }
 
-        public static List<object> FilesSection(string sessionFolder)
+        public static List<object> FilesSection(string experimentFolder)
         {
             var files = new List<object>();
-            var prefix = sessionFolder.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
-            var paths = Directory.GetFiles(sessionFolder, "*", SearchOption.AllDirectories);
+            var prefix = experimentFolder.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            var paths = Directory.GetFiles(experimentFolder, "*", SearchOption.AllDirectories);
             Array.Sort(paths, StringComparer.Ordinal);
             foreach (var path in paths)
             {

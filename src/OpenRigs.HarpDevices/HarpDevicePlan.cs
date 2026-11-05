@@ -47,7 +47,7 @@ namespace OpenRigs.HarpDevices
             var plan = new HarpDevicePlan();
             if (publishedType("PathPrefix") != typeof(string))
             {
-                plan.Notes.Add("the workflow publishes no PathPrefix (OpenRigs.Logging's LogController) before this node, so there is no session folder to record into");
+                plan.Notes.Add("the workflow publishes no PathPrefix (OpenRigs.Logging's LogController) before this node, so there is no experiment folder to record into");
                 return plan;
             }
             if (string.IsNullOrWhiteSpace(configRoot))
@@ -81,7 +81,7 @@ namespace OpenRigs.HarpDevices
             }
             var whoAmI = HarpRig.WhoAmI(device.Kind);
             var commands = publishedType(device.Name + CommandsSuffix);
-            if (commands == null) Notes.Add(device.Name + ": the workflow publishes no " + device.Name + CommandsSuffix + ", so no register dump is asked for at the session's start");
+            if (commands == null) Notes.Add(device.Name + ": the workflow publishes no " + device.Name + CommandsSuffix + ", so no register dump is asked for at the experiment's start");
             else if (commands.FullName != HarpRig.MessageType) Notes.Add(device.Name + ": " + device.Name + CommandsSuffix + " is " + commands.Name + ", not HarpMessage, so no register dump is asked for");
             if (whoAmI == 0) Notes.Add(device.Name + ": no WhoAmI is known for " + device.Kind + ", so the board's type is recorded, not checked");
             Recorded.Add(new PlannedHarpDevice

@@ -127,7 +127,7 @@ namespace OpenRigs.LiveView
     class LiveViewPlan
     {
         public string RigId;
-        public bool HasSessionFolder;
+        public bool HasExperimentFolder;
         // Whether the workflow's OpenRigs.Logging has LoggedRows (0.1.0-bbox.5 on): every row a
         // log with PublishRows writes (LogTrial, LogAsync) is then streamed as `logs`.
         public bool StreamsLoggedRows;
@@ -149,11 +149,11 @@ namespace OpenRigs.LiveView
             // find a rig's streams by the machine they connect to, and rig.yml is read by it too.
             plan.RigId = Environment.GetEnvironmentVariable("COMPUTERNAME") ?? Environment.MachineName;
             var pathPrefix = publishedType("PathPrefix");
-            plan.HasSessionFolder = pathPrefix == typeof(string);
+            plan.HasExperimentFolder = pathPrefix == typeof(string);
             if (pathPrefix != null && pathPrefix != typeof(string))
                 plan.Notes.Add("PathPrefix is " + pathPrefix.Name + ", not a path: the session key stays ready and elapsed is not sent");
-            if (plan.HasSessionFolder && !plan.StreamsLoggedRows)
-                plan.Notes.Add("OpenRigs.Logging has no LoggedRows (before 0.1.0-bbox.5): the session's trial and event rows are not streamed");
+            if (plan.HasExperimentFolder && !plan.StreamsLoggedRows)
+                plan.Notes.Add("OpenRigs.Logging has no LoggedRows (before 0.1.0-bbox.5): the experiment's trial and event rows are not streamed");
 
             if (string.IsNullOrWhiteSpace(configRoot))
             {
@@ -279,7 +279,7 @@ namespace OpenRigs.LiveView
         public string Signature(int dataPort, int videoPort)
         {
             var text = new StringBuilder();
-            text.Append(RigId).Append('|').Append(dataPort).Append('|').Append(videoPort).Append('|').Append(HasSessionFolder)
+            text.Append(RigId).Append('|').Append(dataPort).Append('|').Append(videoPort).Append('|').Append(HasExperimentFolder)
                 .Append('|').Append(StreamsLoggedRows);
             foreach (var device in Streamed) text.Append("\n+").Append(device);
             foreach (var skipped in Skipped) text.Append("\n-").Append(skipped);

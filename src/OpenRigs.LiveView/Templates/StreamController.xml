@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- OpenRigs.Streaming's StreamController (open-rigs 77094a4), with the session key taken from
-     the session folder (PathPrefix, through SessionKey) rather than from a date of its own, as
+     the experiment folder (PathPrefix, through SessionKey) rather than from a date of its own, as
      coen-behaviour-box had it inline. StreamDevices removes nodes 1 and 2 when the workflow
      publishes no PathPrefix, leaving the key "ready". -->
 <WorkflowBuilder Version="2.9.0"

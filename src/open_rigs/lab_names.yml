@@ -24,7 +24,7 @@
 # BonsaiData_Trial columns every rig may write, name: what it holds. LogData adds Seconds (the
 # Harp time the row was stamped, the trial's end) itself; it is never a field of the record.
 trialColumns:
-  trialNumber: The trial's number in the session, from 1.
+  trialNumber: The trial's number in the experiment, from 1.
   trialType: The kind of trial, as the rig's number for it (each rig lists its codes below).
   target: The side that was right, Left or Right.
   choice: The side the mouse chose, Left or Right, or NoResponse.
@@ -48,7 +48,7 @@ rigs:
     # Logs that are not devices or BonsaiData_Trial/BonsaiData_Async.
     streams: []
     experimentSettings:
-      RunLengthMins: How long the session runs, in minutes.
+      RunLengthMins: How long the experiment runs, in minutes.
       ExposureTime: Camera exposure, in microseconds.
       Gain: Camera gain, in dB.
     trialColumns: {}

@@ -37,7 +37,7 @@ namespace OpenRigs.Logging
         /// </summary>
         /// <remarks>
         /// The Bonsai CsvWriter writes through a StreamWriter that flushes only when its 4 KB buffer
-        /// fills or the file closes. A session's trial log, a few rows a minute, then reached disk
+        /// fills or the file closes. An experiment's trial log, a few rows a minute, then reached disk
         /// tens of trials late, and a Bonsai ended by force lost its unflushed tail (rig-control,
         /// 1 Nov 2026: 411 rows against 503 frames). A flush per row costs a write per row, so it
         /// is for slow logs only (LogTrial and LogAsync turn it on), never a Harp log at 1 kHz.
@@ -49,7 +49,7 @@ namespace OpenRigs.Logging
         /// Gets or sets a value indicating whether each row written is also published to
         /// <see cref="LoggedRows"/>, for a live view to stream.
         /// </summary>
-        [Description("Whether each row written is also published to LoggedRows, with its session, log name and row number, for a live view (OpenRigs.LiveView's StreamDevices) to stream as it happens. For slow logs only, as AutoFlush.")]
+        [Description("Whether each row written is also published to LoggedRows, with its experiment, log name and row number, for a live view (OpenRigs.LiveView's StreamDevices) to stream as it happens. For slow logs only, as AutoFlush.")]
         public bool PublishRows { get; set; }
 
         /// <inheritdoc/>

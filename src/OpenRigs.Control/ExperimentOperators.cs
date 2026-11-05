@@ -152,14 +152,14 @@ namespace OpenRigs.Control
     }
 
     /// <summary>
-    /// Reports the session's phase to the controller on each element, and passes every element
+    /// Reports the experiment's phase to the controller on each element, and passes every element
     /// through. Phases only move forward (Starting, Ready, Recording, Finished, Stopping): a
     /// report of an earlier phase than the current one is ignored. Put Ready on the first camera
-    /// frame, Recording on the session folder, Finished on the end of the run.
+    /// frame, Recording on the experiment folder, Finished on the end of the run.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Sink)]
-    [Description("Reports the session phase to the controller on each element, passing the element through. Phases only move forward.")]
+    [Description("Reports the experiment phase to the controller on each element, passing the element through. Phases only move forward.")]
     public class ReportPhase
     {
         /// <summary>Gets or sets the phase to report.</summary>
@@ -178,7 +178,7 @@ namespace OpenRigs.Control
     }
 
     /// <summary>
-    /// Reports a named value to the controller on each element (the session folder, water
+    /// Reports a named value to the controller on each element (the experiment folder, water
     /// delivered, trials done), passing the element through. Status carries the latest value of each.
     /// </summary>
     [Combinator]

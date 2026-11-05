@@ -15,7 +15,7 @@ using Newtonsoft.Json.Linq;
 namespace OpenRigs.Control
 {
     /// <summary>
-    /// Where a session is, as the controller sees it.
+    /// Where an experiment is, as the controller sees it.
     /// </summary>
     public enum ExperimentPhase
     {
@@ -23,13 +23,13 @@ namespace OpenRigs.Control
         Starting,
         /// <summary>Hardware armed and streaming; nothing recorded; parameters still editable.</summary>
         Ready,
-        /// <summary>Go received and the session folder exists.</summary>
+        /// <summary>Go received and the experiment folder exists.</summary>
         Recording,
         /// <summary>The run has ended; the workflow waits to be stopped.</summary>
         Finished,
         /// <summary>A stop was requested and the workflow is ending.</summary>
         Stopping
-        // The order is the order a session moves through: phases only move forward.
+        // The order is the order an experiment moves through: phases only move forward.
     }
 
     /// <summary>
@@ -106,7 +106,7 @@ namespace OpenRigs.Control
     }
 
     /// <summary>
-    /// A person a controller names on a request: who launched the session, sent Go or stopped it.
+    /// A person a controller names on a request: who launched the experiment, sent Go or stopped it.
     /// The controller vouches for them (rig-control checks a PIN first); the workflow only records.
     /// </summary>
     public class Person
@@ -160,7 +160,7 @@ namespace OpenRigs.Control
     /// </summary>
     public enum ControlEventKind
     {
-        /// <summary>The session was released, once.</summary>
+        /// <summary>The experiment was released, once.</summary>
         Go,
         /// <summary>A declared command, each time it is sent.</summary>
         Command,
@@ -214,12 +214,12 @@ namespace OpenRigs.Control
     public class ExperimentStoppedException : Exception
     {
         /// <summary>Initializes a new instance with the controller's reason.</summary>
-        /// <param name="message">Why the session was stopped.</param>
+        /// <param name="message">Why the experiment was stopped.</param>
         public ExperimentStoppedException(string message) : base(message) { }
     }
 
     /// <summary>
-    /// The one session's state, shared by ControlServer and the report operators in the same process.
+    /// The one experiment's state, shared by ControlServer and the report operators in the same process.
     /// </summary>
     public sealed class ControlState
     {
@@ -228,7 +228,7 @@ namespace OpenRigs.Control
         public static ControlState Current { get; internal set; }
         readonly object gate = new object();
 
-        /// <summary>Gets the session's phase.</summary>
+        /// <summary>Gets the experiment's phase.</summary>
         public ExperimentPhase Phase { get; private set; } = ExperimentPhase.Starting;
 
         /// <summary>Gets when the phase last moved, in UTC.</summary>
@@ -255,10 +255,10 @@ namespace OpenRigs.Control
         /// <summary>The Go event, with every parameter as it stood; null before Go.</summary>
         public ControlEvent Go { get; internal set; }
 
-        /// <summary>The why the controller's stop gave; null unless the controller stopped the session.</summary>
+        /// <summary>The why the controller's stop gave; null unless the controller stopped the experiment.</summary>
         public string StopReason { get; internal set; }
 
-        /// <summary>Who launched the session, as the controller's Go named them; null if it named nobody.</summary>
+        /// <summary>Who launched the experiment, as the controller's Go named them; null if it named nobody.</summary>
         public Person LaunchedBy { get; internal set; }
 
         /// <summary>Who sent Go, as the controller named them; null if it named nobody.</summary>
@@ -269,7 +269,7 @@ namespace OpenRigs.Control
         public Person StoppedBy { get; internal set; }
 
         /// <summary>When the workflow reported Finished; null if it never did. Kept because the
-        /// phase moves on to Stopping when the controller stops a finished session, as rig-control
+        /// phase moves on to Stopping when the controller stops a finished experiment, as rig-control
         /// does after every run, and a run that finished is still one that finished.</summary>
         public DateTime? FinishedAt { get; private set; }
 
@@ -396,7 +396,7 @@ namespace OpenRigs.Control
     /// </summary>
     [Combinator(MethodName = nameof(Generate))]
     [WorkflowElementCategory(ElementCategory.Source)]
-    [Description("Answers a session controller over ZeroMQ: status, parameters while ready, declared commands, Go and Stop.")]
+    [Description("Answers an experiment controller over ZeroMQ: status, parameters while ready, declared commands, Go and Stop.")]
     public class ControlServer
     {
         /// <summary>
@@ -497,7 +497,7 @@ namespace OpenRigs.Control
                         observer.OnError(error);
                         return;
                     }
-                    // After the reply: everything downstream of Go (the session folder, file
+                    // After the reply: everything downstream of Go (the experiment folder, file
                     // writers, anything that waits) runs on this thread, and a reply held
                     // behind it reads to the controller as a workflow that did not answer.
                     if (emit != null) observer.OnNext(emit);
@@ -584,7 +584,7 @@ namespace OpenRigs.Control
                         return null;
                     });
                     if (refused != null) return Refuse(refused);
-                    // Named on Go, the moment the session becomes a record: the workflow was
+                    // Named on Go, the moment the experiment becomes a record: the workflow was
                     // started by whoever launched it, and is released by whoever sends this.
                     state.LaunchedBy = Person.From(request["launched_by"]);
                     state.GoBy = Person.From(request["by"]);

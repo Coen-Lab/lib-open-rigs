@@ -16,9 +16,9 @@ using OpenRigs.Shared;
 namespace OpenRigs.HarpDevices
 {
     /// <summary>
-    /// One Harp device's identity, checked at Start and recorded into each session. At Start: the
+    /// One Harp device's identity, checked at Start and recorded into each experiment. At Start: the
     /// board on the port rig.yml gives must be the one rig.yml names by its USB serial, or the
-    /// workflow stops. When the session folder appears: the registers the device reports (WhoAmI,
+    /// workflow stops. When the experiment folder appears: the registers the device reports (WhoAmI,
     /// hardware, firmware and core versions, its Harp serial number) are written to
     /// &lt;Name&gt;\&lt;Name&gt;_device.json, and the register map of the Harp package that
     /// decodes it to &lt;Name&gt;\&lt;Name&gt;.yml. A board of the wrong kind stops the workflow.
@@ -26,14 +26,14 @@ namespace OpenRigs.HarpDevices
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Sink)]
-    [Description("Checks a Harp device's USB serial at Start against rig.yml, then writes <Name>\\<Name>_device.json (WhoAmI, versions, serials) and <Name>\\<Name>.yml (its register map) into each session folder. Inputs: the device's messages and the session folder (PathPrefix). Output: the device.json's path.")]
+    [Description("Checks a Harp device's USB serial at Start against rig.yml, then writes <Name>\\<Name>_device.json (WhoAmI, versions, serials) and <Name>\\<Name>.yml (its register map) into each experiment folder. Inputs: the device's messages and the experiment folder (PathPrefix). Output: the device.json's path.")]
     public class RecordHarpDevice
     {
         /// <summary>The port's serial ports and USB serials, read at Start. The tests' own in place of Windows'.</summary>
         internal static Func<Dictionary<string, string>> PresentPorts = UsbSerials.Present;
 
         /// <summary>Gets or sets the device's name in the data, Kind-Instance.</summary>
-        [Description("The device's name in the data, Kind-Instance (BehaviorBoard-Main): its folder in the session and the start of its files' names.")]
+        [Description("The device's name in the data, Kind-Instance (BehaviorBoard-Main): its folder in the experiment and the start of its files' names.")]
         public string Name { get; set; }
 
         /// <summary>Gets or sets where rig.yml has the device, for messages.</summary>
@@ -52,21 +52,21 @@ namespace OpenRigs.HarpDevices
         [Description("The WhoAmI a device of this kind reports. Another stops the workflow; 0 records it unchecked.")]
         public int ExpectedWhoAmI { get; set; }
 
-        /// <summary>Gets or sets whether a register dump is asked for when the session folder appears.</summary>
-        [Description("Whether a register dump is asked for on <Name>.Commands when the session folder appears. Without one, the record is written at once from what the device reported when its port opened.")]
+        /// <summary>Gets or sets whether a register dump is asked for when the experiment folder appears.</summary>
+        [Description("Whether a register dump is asked for on <Name>.Commands when the experiment folder appears. Without one, the record is written at once from what the device reported when its port opened.")]
         public bool HasCommands { get; set; } = true;
 
-        /// <summary>Gets or sets how long to wait for the register dump after the session folder appears.</summary>
-        [Description("How long to wait for the device's registers after the session folder appears before writing what it reported at connection instead.")]
+        /// <summary>Gets or sets how long to wait for the register dump after the experiment folder appears.</summary>
+        [Description("How long to wait for the device's registers after the experiment folder appears before writing what it reported at connection instead.")]
         public TimeSpan DumpTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
         /// <summary>Gets or sets how long the device must be quiet after FirmwareVersionLow for the dump to have finished.</summary>
         [Description("How long after FirmwareVersionLow (register 7) no register may come for the dump to have finished. The dump interleaves the core's registers with the device's own, so the device name, Harp serial and unique id (12, 13, 16) come after 7.")]
         public TimeSpan DumpQuiet { get; set; } = TimeSpan.FromMilliseconds(200);
 
-        /// <summary>Checks the board at Start, then records it into each session folder.</summary>
+        /// <summary>Checks the board at Start, then records it into each experiment folder.</summary>
         /// <param name="messages">The device's messages (&lt;Name&gt;.Data).</param>
-        /// <param name="pathPrefix">The session folder, each time one appears.</param>
+        /// <param name="pathPrefix">The experiment folder, each time one appears.</param>
         /// <returns>The path of each device.json written.</returns>
         public IObservable<string> Process(IObservable<HarpMessage> messages, IObservable<string> pathPrefix)
         {
@@ -85,8 +85,8 @@ namespace OpenRigs.HarpDevices
                 }
 
                 // What the device reported at connection (Bonsai.Harp asks for a dump when it opens
-                // the port), kept in case the dump asked for at the session's start never comes.
-                // A board of the wrong kind stops the workflow here, before Go; once a session has
+                // the port), kept in case the dump asked for at the experiment's start never comes.
+                // A board of the wrong kind stops the workflow here, before Go; once an experiment has
                 // started, Write records it first.
                 var gate = new object();
                 var atConnection = new Dictionary<int, HarpMessage>();
@@ -179,19 +179,19 @@ namespace OpenRigs.HarpDevices
         string Write(string pathPrefix, string usbSerial, Dictionary<int, HarpMessage> registers, bool dumped, bool checkedAtConnection)
         {
             var notes = new List<object>();
-            if (!dumped) notes.Add(registers.Count == 0 ? "The device reported no registers, at connection or after the session folder appeared."
-                : !HasCommands ? "No register dump was asked for at the session's start (the workflow publishes no " + Name + HarpDevicePlan.CommandsSuffix + "): these are the registers the device reported when its port opened."
-                : "No register dump came within " + DumpTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture) + " s of the session folder appearing: these are the registers the device reported when its port opened.");
+            if (!dumped) notes.Add(registers.Count == 0 ? "The device reported no registers, at connection or after the experiment folder appeared."
+                : !HasCommands ? "No register dump was asked for at the experiment's start (the workflow publishes no " + Name + HarpDevicePlan.CommandsSuffix + "): these are the registers the device reported when its port opened."
+                : "No register dump came within " + DumpTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture) + " s of the experiment folder appearing: these are the registers the device reported when its port opened.");
 
             var whoAmI = U16(registers, WhoAmI.Address);
-            // A board that reported no WhoAmI gets its kind's map, said to be so, so the session is
+            // A board that reported no WhoAmI gets its kind's map, said to be so, so the experiment is
             // not held back every night. A board of another kind would have stopped the workflow.
             var map = HarpRig.MapToWrite(whoAmI, ExpectedWhoAmI);
             if (whoAmI.HasValue && map == null) notes.Add("No Harp package loaded in this workflow decodes WhoAmI " + whoAmI.Value + ", so its register map is not written.");
             else if (!whoAmI.HasValue && map != null) notes.Add("The device reported no WhoAmI, so the register map written is the one for the kind rig.yml names (WhoAmI " + ExpectedWhoAmI + ").");
             else if (!whoAmI.HasValue) notes.Add("The device reported no WhoAmI, and no Harp package loaded in this workflow decodes its kind's (" + ExpectedWhoAmI + "), so no register map is written.");
             // A wrong kind stops the workflow before Go only when the WhoAmI came at connection.
-            if (whoAmI.HasValue && !checkedAtConnection) notes.Add("The board reported no WhoAmI at connection, so its kind was checked only after the session started.");
+            if (whoAmI.HasValue && !checkedAtConnection) notes.Add("The board reported no WhoAmI at connection, so its kind was checked only after the experiment started.");
 
             var folder = Path.Combine(pathPrefix, Name);
             Directory.CreateDirectory(folder);

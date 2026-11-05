@@ -14,7 +14,7 @@ using Bonsai.Harp;
 using OpenRigs.HarpDevices;
 
 // Runs RecordHarpDevices' plan, its record and its dump request against fake device messages and a
-// temporary session folder, and builds a workflow with it, without Bonsai's editor or hardware:
+// temporary experiment folder, and builds a workflow with it, without Bonsai's editor or hardware:
 // exit 0 when every check passes. dotnet run --project src\OpenRigs.HarpDevices.Tests
 namespace OpenRigs.HarpDevices.Tests
 {
@@ -147,17 +147,17 @@ namespace OpenRigs.HarpDevices.Tests
                     using (Recorder().Process(messages, path).Subscribe(written.Add, ex => error = ex))
                     {
                         foreach (var m in Board(1216)) messages.OnNext(m);  // at connection
-                        var session = Path.Combine(root, "ses-1");
-                        path.OnNext(session);
+                        var experiment = Path.Combine(root, "ses-1");
+                        path.OnNext(experiment);
                         foreach (var m in Board(1216)) messages.OnNext(m);  // the dump asked for
                         Check("waits until the dump has finished", written.Count == 0, written.Count.ToString());
                         WaitFor(() => written.Count > 0 || error != null);
-                        var json = File.ReadAllText(Path.Combine(session, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
+                        var json = File.ReadAllText(Path.Combine(experiment, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
                         Check("writes <Name>/<Name>_device.json when the dump has come", written.Count == 1 && error == null, written.Count + " " + error);
                         Check("... with the board's versions and serials", json.Contains("\"who_am_i\": 1216") && json.Contains("\"firmware\": \"3.1\"") && json.Contains("\"hardware\": \"1.2\"") && json.Contains("\"core\": \"1.11\"")
                             && json.Contains("\"harp_serial\": 65535") && json.Contains("\"usb_serial\": \"AB0M7PLB\"") && json.Contains("\"device_name\": \"Behavior\"") && json.Contains("\"uid\": null") && json.Contains("\"dumped\": true"), json);
-                        Check("... with no note that the kind was checked late, as WhoAmI came at connection", !json.Contains("checked only after the session started"), json);
-                        var map = Path.Combine(session, "BehaviorBoard-Main", "BehaviorBoard-Main.yml");
+                        Check("... with no note that the kind was checked late, as WhoAmI came at connection", !json.Contains("checked only after the experiment started"), json);
+                        var map = Path.Combine(experiment, "BehaviorBoard-Main", "BehaviorBoard-Main.yml");
                         Check("... and the register map of the Harp package with its WhoAmI", File.Exists(map) && File.ReadAllText(map).Contains("whoAmI: 1216") && json.Contains("\"register_map_from\": \"Harp.Behavior 0.2.0\""), json);
 
                         var quiet = Path.Combine(root, "ses-2");
@@ -173,12 +173,12 @@ namespace OpenRigs.HarpDevices.Tests
                     Exception error = null;
                     using (Recorder().Process(messages, path).Subscribe(_ => { }, ex => error = ex))
                     {
-                        var session = Path.Combine(root, "ses-3");
-                        path.OnNext(session);
+                        var experiment = Path.Combine(root, "ses-3");
+                        path.OnNext(experiment);
                         foreach (var m in Board(1158)) messages.OnNext(m);
                         WaitFor(() => error != null);
                         Check("a board of another kind stops the workflow, naming it", error != null && error.Message.Contains("WhoAmI 1158") && error.Message.Contains("reports 1216"), error == null ? "no error" : error.Message);
-                        Check("... after recording it", File.Exists(Path.Combine(session, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json")), "no record");
+                        Check("... after recording it", File.Exists(Path.Combine(experiment, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json")), "no record");
                     }
                 }
                 {
@@ -188,15 +188,15 @@ namespace OpenRigs.HarpDevices.Tests
                     var written = new List<string>();
                     using (Recorder().Process(messages, path).Subscribe(written.Add))
                     {
-                        var session = Path.Combine(root, "ses-4");
-                        path.OnNext(session);
+                        var experiment = Path.Combine(root, "ses-4");
+                        path.OnNext(experiment);
                         foreach (var m in Interleaved(1216)) messages.OnNext(m);  // no dump at connection
                         WaitFor(() => written.Count > 0);
                         var json = written.Count == 1 ? File.ReadAllText(written[0]) : "";
                         Check("a dump with the core's registers after 7 is recorded whole", json.Contains("\"device_name\": \"Behavior\"") && json.Contains("\"harp_serial\": 65535")
                             && json.Contains("\"uid\": \"0102030405060708090a0b0c0d0e0f10\"") && json.Contains("\"dumped\": true"), written.Count + " " + json);
                         // L2-I1: a wrong kind could stop the workflow before Go only from a WhoAmI at connection.
-                        Check("... and says the kind was checked only after the session started, as nothing came at connection", json.Contains("checked only after the session started"), json);
+                        Check("... and says the kind was checked only after the experiment started, as nothing came at connection", json.Contains("checked only after the experiment started"), json);
                     }
                 }
                 {
@@ -216,7 +216,7 @@ namespace OpenRigs.HarpDevices.Tests
                 }
                 {
                     // 0.1.0-local.3: a board that reported no WhoAmI still leaves the map the manifest
-                    // expects for its kind (audit, 3 Nov 2026: the session was held back every night).
+                    // expects for its kind (audit, 3 Nov 2026: the experiment was held back every night).
                     var messages = new Subject<HarpMessage>();
                     var path = new Subject<string>();
                     Exception error = null;
@@ -234,13 +234,13 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
-                    // L2-L3: an error on the board's messages before any session was dropped.
+                    // L2-L3: an error on the board's messages before any experiment was dropped.
                     var messages = new Subject<HarpMessage>();
                     Exception error = null;
                     using (Recorder().Process(messages, new Subject<string>()).Subscribe(_ => { }, ex => error = ex))
                     {
                         messages.OnError(new InvalidOperationException("port closed"));
-                        Check("an error on the board's messages before any session stops the workflow", error != null && error.Message == "port closed", error == null ? "no error" : error.Message);
+                        Check("an error on the board's messages before any experiment stops the workflow", error != null && error.Message == "port closed", error == null ? "no error" : error.Message);
                     }
                 }
                 {
@@ -250,7 +250,7 @@ namespace OpenRigs.HarpDevices.Tests
                     using (Recorder().Process(messages, new Subject<string>()).Subscribe(_ => { }, ex => error = ex))
                     {
                         foreach (var m in Board(1158)) messages.OnNext(m);
-                        Check("a board of another kind stops the workflow before any session, from the dump at connection", error != null && error.Message.Contains("WhoAmI 1158") && error.Message.Contains("reports 1216"), error == null ? "no error" : error.Message);
+                        Check("a board of another kind stops the workflow before any experiment, from the dump at connection", error != null && error.Message.Contains("WhoAmI 1158") && error.Message.Contains("reports 1216"), error == null ? "no error" : error.Message);
                     }
                     error = null;
                     using (Recorder().Process(messages, new Subject<string>()).Subscribe(_ => { }, ex => error = ex))
@@ -276,7 +276,7 @@ namespace OpenRigs.HarpDevices.Tests
                         path.OnNext("x");
                         // L2-I3: polled, not a fixed 100 ms, so a slow machine does not fail it.
                         for (var waited = Stopwatch.StartNew(); sent.Count != 1 && waited.ElapsedMilliseconds < 2000; ) Thread.Sleep(10);
-                        Check("reads OperationControl when the session folder appears", sent.Count == 1 && sent[0].Address == OperationControl.Address && sent[0].MessageType == MessageType.Read, sent.Count.ToString());
+                        Check("reads OperationControl when the experiment folder appears", sent.Count == 1 && sent[0].Address == OperationControl.Address && sent[0].MessageType == MessageType.Read, sent.Count.ToString());
                         // Active, heartbeat on, operation LED on: what the device answers with.
                         messages.OnNext(OperationControl.FromPayload(MessageType.Read, new OperationControlPayload(OperationMode.Active, false, false, LedState.On, LedState.On, EnableFlag.Enabled)));
                         var write = sent.Count == 2 ? OperationControl.GetPayload(sent[1]) : default(OperationControlPayload);

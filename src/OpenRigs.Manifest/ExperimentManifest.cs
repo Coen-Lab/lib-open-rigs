@@ -12,7 +12,7 @@ using OpenRigs.Shared;
 namespace OpenRigs.Manifest
 {
     /// <summary>
-    /// Writes manifest.json into each session folder, with nothing wired to it. At build it finds
+    /// Writes manifest.json into each experiment folder, with nothing wired to it. At build it finds
     /// the PathPrefix subject (OpenRigs.Logging's LogController), so it goes after LogController.
     /// At Start it reads the configuration files and the launch; when PathPrefix names the folder
     /// it writes the manifest (status partial, outcome running), and again when the run ends.
@@ -23,10 +23,10 @@ namespace OpenRigs.Manifest
     [DefaultProperty(nameof(ConfigFiles))]
     [TypeDescriptionProvider(typeof(ExperimentManifestTypeDescriptionProvider))]
     [WorkflowElementCategory(ElementCategory.Sink)]
-    [Description("Writes manifest.json into the session folder (PathPrefix) when it appears and when the run ends: rig, workflow commit, launch, settings at Go, config files as loaded at Start, outcome and every file. Put it after LogController. An input, if connected, is the run: its completion, error and element count.")]
+    [Description("Writes manifest.json into the experiment folder (PathPrefix) when it appears and when the run ends: rig, workflow commit, launch, settings at Go, config files as loaded at Start, outcome and every file. Put it after LogController. An input, if connected, is the run: its completion, error and element count.")]
     public class ExperimentManifest : GroupWorkflowBuilder
     {
-        /// <summary>The subject LogController publishes the session folder's path under.</summary>
+        /// <summary>The subject LogController publishes the experiment folder's path under.</summary>
         public const string PathSubject = "PathPrefix";
 
         /// <summary>Initializes a new instance of the <see cref="ExperimentManifest"/> class.</summary>
@@ -62,8 +62,8 @@ namespace OpenRigs.Manifest
             set { Settings.ConfigFiles = value; }
         }
 
-        /// <summary>Gets or sets what the session must leave, separated by ;, or auto.</summary>
-        [Description("What the session must leave, separated by ;: a path in the session folder, a folder ending in /. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. rig-sync alarms on an entry that left no file. Blank: nothing expected.")]
+        /// <summary>Gets or sets what the experiment must leave, separated by ;, or auto.</summary>
+        [Description("What the experiment must leave, separated by ;: a path in the experiment folder, a folder ending in /. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. rig-sync alarms on an entry that left no file. Blank: nothing expected.")]
         public string ExpectedFiles
         {
             get { return Settings.ExpectedFiles; }
@@ -93,12 +93,12 @@ namespace OpenRigs.Manifest
             var path = GroupNode.Subject(this, PathSubject);
             if (path == null)
             {
-                throw new InvalidOperationException("ExperimentManifest found no " + PathSubject + " subject. It names the session folder and comes from OpenRigs.Logging's LogController: put ExperimentManifest after LogController, at the same level or below it.");
+                throw new InvalidOperationException("ExperimentManifest found no " + PathSubject + " subject. It names the experiment folder and comes from OpenRigs.Logging's LogController: put ExperimentManifest after LogController, at the same level or below it.");
             }
             var pathType = GroupNode.ObservedType(path.Type);
             if (pathType != typeof(string))
             {
-                throw new InvalidOperationException("ExperimentManifest needs " + PathSubject + " to be a string, the session folder's path; this workflow's is " + pathType + ".");
+                throw new InvalidOperationException("ExperimentManifest needs " + PathSubject + " to be a string, the experiment folder's path; this workflow's is " + pathType + ".");
             }
             var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles), name => GroupNode.PublishedType(this, name));
             var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, expected));

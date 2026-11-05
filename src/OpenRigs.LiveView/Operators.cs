@@ -13,36 +13,36 @@ namespace OpenRigs.LiveView
 {
     /// <summary>
     /// The live view's session key, sub-&lt;SubjectId&gt;/ses-&lt;SessionId&gt;_&lt;start&gt;, taken from the
-    /// session folder OpenRigs.Logging made (PathPrefix), so the key names that folder.
+    /// experiment folder OpenRigs.Logging made (PathPrefix), so the key names that folder.
     /// OpenRigs.Streaming's StreamController stamps its own date at Start, about a second before
     /// LogController stamps the folder's, so a key made from its own date can name no folder.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Transform)]
-    [Description("The live view's session key, sub-<SubjectId>/ses-<SessionId>_<start>, from the session folder's path.")]
+    [Description("The live view's session key, sub-<SubjectId>/ses-<SessionId>_<start>, from the experiment folder's path.")]
     public class SessionKey
     {
-        /// <summary>Turns each session folder's path into its session key.</summary>
-        /// <param name="source">The session folder's path, from PathPrefix.</param>
+        /// <summary>Turns each experiment folder's path into its session key.</summary>
+        /// <param name="source">The experiment folder's path, from PathPrefix.</param>
         /// <returns>The key, sub-&lt;SubjectId&gt;/ses-&lt;SessionId&gt;_&lt;start&gt;.</returns>
         public IObservable<string> Process(IObservable<string> source)
         {
             return source.Select(FromPathPrefix);
         }
 
-        /// <summary>The last two folders of the session path, joined by a forward slash.</summary>
+        /// <summary>The last two folders of the experiment path, joined by a forward slash.</summary>
         public static string FromPathPrefix(string pathPrefix)
         {
             var path = (pathPrefix ?? string.Empty).TrimEnd('\\', '/');
-            var session = Path.GetFileName(path);
+            var experiment = Path.GetFileName(path);
             var subject = Path.GetFileName(Path.GetDirectoryName(path) ?? string.Empty);
-            if (!subject.StartsWith("sub-", StringComparison.Ordinal) || !session.StartsWith("ses-", StringComparison.Ordinal))
+            if (!subject.StartsWith("sub-", StringComparison.Ordinal) || !experiment.StartsWith("ses-", StringComparison.Ordinal))
             {
                 throw new ArgumentException(string.Format(
-                    "The session folder '{0}' does not end in sub-<SubjectId>\\ses-<SessionId>_<start>, so the live view has no session key. A / or \\ in SubjectId or SessionId does this: remove it and Start again.",
+                    "The experiment folder '{0}' does not end in sub-<SubjectId>\\ses-<SessionId>_<start>, so the live view has no session key. A / or \\ in SubjectId or SessionId does this: remove it and Start again.",
                     pathPrefix));
             }
-            return subject + "/" + session;
+            return subject + "/" + experiment;
         }
     }
 
@@ -166,7 +166,7 @@ namespace OpenRigs.LiveView
 
     /// <summary>
     /// The workflow running and the commit it came from, found as OpenRigs.Manifest finds them
-    /// (both compile in src\Shared\WorkflowFile.cs), so the live view and the session's
+    /// (both compile in src\Shared\WorkflowFile.cs), so the live view and the experiment's
     /// manifest.json name the same workflow.
     /// </summary>
     class WorkflowSource

@@ -157,26 +157,26 @@ namespace OpenRigs.Logging.Tests
     [TestClass]
     public class LoggedRowsTests
     {
-        string session;
+        string experiment;
 
         [TestInitialize]
         public void MakeSession()
         {
-            session = Path.Combine(Path.GetTempPath(), "OpenRigs.Logging.Tests", Guid.NewGuid().ToString("N"),
+            experiment = Path.Combine(Path.GetTempPath(), "OpenRigs.Logging.Tests", Guid.NewGuid().ToString("N"),
                 "sub-test", "ses-001D1_2026-11-05T08-53-26");
-            Directory.CreateDirectory(Path.Combine(session, "BonsaiData"));
+            Directory.CreateDirectory(Path.Combine(experiment, "BonsaiData"));
         }
 
         [TestCleanup]
         public void RemoveSession()
         {
-            try { Directory.Delete(Path.GetDirectoryName(Path.GetDirectoryName(session)), true); }
+            try { Directory.Delete(Path.GetDirectoryName(Path.GetDirectoryName(experiment)), true); }
             catch (IOException) { }
         }
 
         string LogFile(string log, string hour)
         {
-            return Path.Combine(session, "BonsaiData", log + "_" + hour + ".csv");
+            return Path.Combine(experiment, "BonsaiData", log + "_" + hour + ".csv");
         }
 
         // The file as another reader sees it while the writer still holds it open.
