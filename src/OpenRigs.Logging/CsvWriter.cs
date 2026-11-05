@@ -101,6 +101,26 @@ namespace OpenRigs.Logging
                 writeAction);
         }
 
+        /// <summary>
+        /// Returns the column names this writer gives a sequence of the given element type, as its
+        /// header would name them, without writing anything.
+        /// </summary>
+        /// <param name="elementType">The type of the elements the writer receives.</param>
+        /// <param name="selector">The writer's Selector, or null or empty for every member.</param>
+        /// <returns>The column names in order.</returns>
+        /// <remarks>
+        /// For checks that hold a log's columns to a list (lib-open-rigs' check-bonsai holds
+        /// BonsaiData_Trial to lab_names.yml), so the names are the ones the file will have.
+        /// </remarks>
+        public static string[] ColumnNames(Type elementType, string selector = null)
+        {
+            var writer = new CsvWriter { IncludeHeader = true, Delimiter = "\t", Selector = selector };
+            var source = Expression.Parameter(typeof(IObservable<>).MakeGenericType(elementType));
+            var call = (MethodCallExpression)writer.BuildCombinator(new Expression[] { source });
+            var header = (string)((ConstantExpression)call.Arguments[1]).Value;
+            return header.Length == 0 ? new string[0] : header.Split('\t');
+        }
+
         // The write Bonsai built is writer.WriteLine(line). With either option on, the same line
         // goes through LoggedRows.WriteRow instead, which writes it, then flushes and publishes it
         // as asked. With both off the lambda is left as Bonsai built it, so every log that does

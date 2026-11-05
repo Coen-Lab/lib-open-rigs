@@ -1,5 +1,13 @@
 # Backlog
 
+## Approved names, 5 Nov 2026 (`lab_names.yml`)
+
+- **A package's dependency on Core names its own version, not Core's.** `build-package.ps1` passes `-p:Version` globally (`build\Common.csproj.targets` sets `<Version>` after each project's), so it reaches the referenced Core: Logging `0.1.1-coen.2` asks for Core `>= 0.1.1-coen.2`, which does not exist. Harmless while Bonsai restores only what `Bonsai.config` lists (Logging `bbox.6` asked for Core `bbox.6` the same way), wrong for anything that resolves dependencies. Fix: a lab `<LabVersion>` in each `.csproj` that `Common.csproj.targets` takes over its default, and no global `-p:Version`.
+- **Not yet in av-dome's `BonsaiData_Trial`: `lickCount`, `responseTime` and the reward delivered per trial.** Each needs logic in the trial loop that only a session on the dome can check; what was delivered is already `RewardDelivered` in `BonsaiData_Async`. Add each to `lab_names.yml` when it is built.
+- **Sessions recorded before av-dome took the new column names** (`TrialCnt`, `correctResponse`, `response`, `targetSide`, `BothSpouts`) no longer map in its `rig-control.toml`, which names only the new ones; `older_logs` covers `TrialSettings` only. Test sessions so far.
+- **Async event names** (`RewardDelivered`, `RngSeed`, the controller's) are not in `lab_names.yml` yet.
+- **A workflow's own `check-workflow.ps1` does not hold the names**: only `update-workflows.ps1` runs `check-bonsai.ps1` after it, so a name off the list shows as that workflow failing the hourly update, not before its author pushes.
+
 ## Test package changes on one rig first (Pip, 5 Nov 2026)
 
 - A change pushed here reaches every lab workflow's ticked branches and `main` within the hour, gated only by each workflow's build check, which passes a change in behaviour. Proposed: a `dev` branch here whose `push.ps1` updates only targets marked in `profile-repos.json` (e.g. `"labPackages": "dev"` on one workflow branch, later a rig-setup tick), each target on exactly one channel so the hourly `main` run does not revert it; promotion fast-forwards `main` to `dev` and runs `push.ps1`. Every dev build gets a new version, since Bonsai caches by version, and `push.ps1` checks that promotion ships only versions that were on dev. Check first whether rig-setup deploys a ticked branch on one machine or every rig of the profile.

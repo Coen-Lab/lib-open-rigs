@@ -11,7 +11,9 @@ param(
 #      compiles it with.
 #   2. Builds src\main.bonsai with Bonsai's own expression builders, as Bonsai does at Start
 #      before it subscribes anything: every type, selector, include, subject and mapping; and,
-#      when the workflow tracks config\main.layout, that each window sits on a node it fits.
+#      when the workflow tracks config\main.layout, that each window sits on a node it fits;
+#      and that every device, log, session setting and BonsaiData_Trial column is named as
+#      src\open_rigs\lab_names.yml allows for the workflow's rig.
 # It cannot check hardware, the visualizers themselves or the data a run writes. Exit 0 when
 # both pass.
 $ErrorActionPreference = 'Stop'
@@ -66,15 +68,78 @@ if ($Step -eq 'Build') {
         while ($x) { "  $($x.GetType().Name): $($x.Message)"; $x = $x.InnerException }
         exit 1
     }
+    $inspectable = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::ToInspectableGraph($wb.Workflow)
+    $null = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::Build($inspectable)
+
+    # The lab's approved names (src\open_rigs\lab_names.yml, this repository's copy): device
+    # subjects and log names, other log names, SessionControl parameters and the columns of each
+    # BonsaiData_Trial, for the rig whose repos list holds this workflow's repository.
+    $namesLines = @(& {
+        $namesPath = Join-Path (Split-Path (Split-Path $self -Parent) -Parent) 'src\open_rigs\lab_names.yml'
+        $null = [Reflection.Assembly]::Load('YamlDotNet')
+        $names = (New-Object YamlDotNet.Serialization.Deserializer).Deserialize([IO.StringReader]::new([IO.File]::ReadAllText($namesPath)))
+        $origin = & { $ErrorActionPreference = 'Continue'; & git -C $Repo remote get-url origin 2>$null }
+        $repoName = if ($origin) { ($origin.Trim() -split '[/\\]')[-1] -replace '\.git$', '' } else { Split-Path $Repo -Leaf }
+        $rig = $null; $rigName = ''
+        foreach ($k in $names['rigs'].Keys) { if (@($names['rigs'][$k]['repos']) -contains $repoName) { $rig = $names['rigs'][$k]; $rigName = $k } }
+        if (-not $rig) { "  FAIL  names: $repoName is in no rig's repos in lab_names.yml"; return }
+        $devices = @(foreach ($kind in $rig['devices'].Keys) { foreach ($i in @($rig['devices'][$kind])) { "$kind-$i" } })
+        $streams = @($rig['streams']) + @('BonsaiData_Trial', 'BonsaiData_Async')
+        $text = (@($workflow) + @(Get-ChildItem (Join-Path $Repo 'src\Extensions') -Filter *.bonsai -ErrorAction SilentlyContinue | ForEach-Object FullName) |
+            ForEach-Object { [IO.File]::ReadAllText($_) }) -join "`n"
+        foreach ($n in @([regex]::Matches($text, '<(?:\w+:)?(?:Name|LogName)>([A-Z][A-Za-z0-9]*-[A-Z][A-Za-z0-9]*)(?:\.[A-Za-z]+)?</') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)) {
+            if ($devices -notcontains $n) { "  FAIL  names: device $n is not one of $rigName's ($($devices -join ', '))" }
+        }
+        foreach ($m in [regex]::Matches($text, 'Path="OpenRigs\.Logging:LogData(?:Schema)?\.bonsai">(?:(?!</Expression>).)*?<LogName>([^<]+)</LogName>', 'Singleline')) {
+            $n = $m.Groups[1].Value
+            if ($n -notmatch '-' -and $streams -notcontains $n) { "  FAIL  names: log $n is not one of $rigName's streams ($($streams -join ', '))" }
+        }
+        $settings = @($rig['sessionSettings'].Keys)
+        foreach ($m in [regex]::Matches($text, 'OpenRigs\.Control:SessionControl\.bonsai">.*?</Parameters>', 'Singleline')) {
+            foreach ($p in [regex]::Matches($m.Value, '<Parameter>\s*<Name>([^<]+)</Name>')) {
+                if ($settings -notcontains $p.Groups[1].Value) { "  FAIL  names: session setting $($p.Groups[1].Value) is not one of $rigName's sessionSettings" }
+            }
+        }
+        # BonsaiData_Trial's columns are the CsvWriter's inside each LogTrial, from the type that
+        # reaches it, so a record built any way (ExpressionTransform, class, Zip) is held the same.
+        $columns = @($names['trialColumns'].Keys) + @($rig['trialColumns'].Keys) + @('Seconds')
+        # The record's type is read where LogTrial is placed (an included workflow's own nodes are
+        # not inspectable), from the node feeding it; the Selector from the writer inside.
+        function Find-Writer($graph) {
+            foreach ($node in @($graph)) {
+                $b = [Bonsai.Expressions.ExpressionBuilder]::Unwrap($node.Value)
+                if ($b -is [OpenRigs.Logging.CsvWriter]) { return $b }
+                if ($b -is [Bonsai.Expressions.IWorkflowExpressionBuilder]) { $w = Find-Writer $b.Workflow; if ($w) { return $w } }
+            }
+        }
+        function Find-Trials($graph) {
+            foreach ($node in @($graph)) {
+                $b = [Bonsai.Expressions.ExpressionBuilder]::Unwrap($node.Value)
+                if ($b -is [Bonsai.Expressions.IncludeWorkflowBuilder] -and $b.Path -eq 'OpenRigs.Logging:LogTrial.bonsai') {
+                    $type = @(foreach ($p in @($graph)) { foreach ($s in $p.Successors) { if ([object]::ReferenceEquals($s.Target, $node) -and $p.Value.ObservableType) { $p.Value.ObservableType } } }) | Select-Object -First 1
+                    if (-not $type) { throw "a LogTrial with no record reaching it" }
+                    ,@((Find-Writer $b.Workflow), $type)
+                }
+                elseif ($b -is [Bonsai.Expressions.IWorkflowExpressionBuilder]) { Find-Trials $b.Workflow }
+            }
+        }
+        foreach ($w in @(Find-Trials $inspectable)) {
+            $found = [OpenRigs.Logging.CsvWriter]::ColumnNames($w[1], $w[0].Selector)
+            foreach ($c in $found) { if ($columns -notcontains $c) { "  FAIL  names: BonsaiData_Trial column $c is not in lab_names.yml's trialColumns or $rigName's" } }
+            "  ok    BonsaiData_Trial columns: $($found -join ', ')"
+        }
+        "  ok    names checked against lab_names.yml's $rigName"
+    })
+    $namesLines
+
     # config\main.layout's windows, on the nodes as the editor has them (the lab's rule: every
     # open-rigs workflow tracks its layout there and .bonsai\Setup.ps1 copies it in). Bonsai loads
     # each group in topological order, not file order, so a restructure shifts window indices; a
     # window on a missing node or a wrong type makes the editor offer to delete the layout, and
     # --start waits. Visualizer types this check does not know are listed, not failed.
+    $namesFailed = @($namesLines | Where-Object { $_ -like '  FAIL*' }).Count
     $layoutPath = Join-Path $Repo 'config\main.layout'
-    if (-not (Test-Path $layoutPath)) { exit 0 }
-    $inspectable = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::ToInspectableGraph($wb.Workflow)
-    $null = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::Build($inspectable)
+    if (-not (Test-Path $layoutPath)) { exit $(if ($namesFailed) { 3 } else { 0 }) }
     $wanted = @{ 'Bonsai.Vision.Design.IplImageVisualizer' = 'OpenCV.Net.IplImage'; 'Bonsai.Design.ObjectTextVisualizer' = '' }
     function Test-Layout($settings, $graph, $where) {
         $nodes = @($graph)
@@ -98,7 +163,7 @@ if ($Step -eq 'Build') {
     [xml]$layout = Get-Content $layoutPath -Raw
     $lines = @(Test-Layout $layout.VisualizerLayout $inspectable '')
     $lines
-    exit $(if (@($lines | Where-Object { $_ -like '  FAIL*' }).Count) { 2 } else { 0 })
+    exit $(if (@($lines | Where-Object { $_ -like '  FAIL*' }).Count) { 2 } elseif ($namesFailed) { 3 } else { 0 })
 }
 
 if (-not (Test-Path (Join-Path $bonsaiDir 'Packages'))) { throw "No .bonsai\Packages in $Repo. Run its .bonsai\Setup.ps1 first." }
@@ -125,6 +190,7 @@ if (Test-Path $extensions) {
 "2. Building src\main.bonsai with Bonsai's builders..."
 & { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Build 2>&1 | ForEach-Object { "$_" } }
 if ($LASTEXITCODE -eq 2) { "  FAILED"; "check-bonsai: config\main.layout does not fit the workflow."; exit 1 }
+if ($LASTEXITCODE -eq 3) { "  FAILED"; "check-bonsai: a name is not in src\open_rigs\lab_names.yml (above)."; exit 1 }
 if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-bonsai: the workflow does not build."; exit 1 }
 "  ok"
 "check-bonsai: both steps passed."

@@ -17,7 +17,7 @@ Build the trial's record once the trial has ended, with one field per column (an
 
 The file is `<session>\BonsaiData\BonsaiData_Trial_<date>.csv`: the folder is named by the log name up to its first underscore, so `BonsaiData_Trial` and `BonsaiData_Async` share the `BonsaiData` folder. A session running past the hour boundary that LogData chunks by leaves a second file in the same folder; read the folder's files in name order as one table.
 
-Name the columns as the analysis will read them, and never a field called `Seconds`: LogData writes the timestamp under that name.
+Name the columns as the lab's [`lab_names.yml`](../../../src/open_rigs/lab_names.yml) allows: its `trialColumns` for every rig and the rig's own under `rigs`, camelCase with the unit in the name. `scripts\check-bonsai.ps1` fails a workflow whose record has any other column, and a setting that is the same all session is not a column (the manifest has the settings at Go). Never a field called `Seconds`: LogData writes the timestamp under that name.
 
 ## Live, and on disk at once
 

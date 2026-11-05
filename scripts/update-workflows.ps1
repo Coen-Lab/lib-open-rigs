@@ -31,8 +31,8 @@ param(
 #     that changed src\, pyproject.toml or local_packages\, then uv.lock is relocked and, if
 #     the workflow has regenerate-schemas, its schema and generated classes are regenerated,
 #     and its rig template (examples\rig.py) where it has one.
-# A branch that changed is checked with its own scripts\check-workflow.ps1, or else with
-# scripts\check-bonsai.ps1 here; if that passes, those files and nothing else are committed and
+# A branch that changed is checked with its own scripts\check-workflow.ps1, if it has one, then
+# with scripts\check-bonsai.ps1 here (which holds its names to src\open_rigs\lab_names.yml); if that passes, those files and nothing else are committed and
 # pushed to that branch, and rig-setup's 30-minute update takes main to the rigs. A failure is
 # not committed and is named in the table; the next run tries again from what GitHub has.
 # Exits 1 unless every branch of every lab workflow is up to date.
@@ -221,6 +221,13 @@ if (-not $mine) {
 if (-not (Test-Path $RepoList)) { throw "Cannot read rig-setup's repo list at $RepoList (is the lab share mapped?)." }
 if (-not (Test-Path $Rules)) { throw "Cannot read rig-setup's rules at $Rules." }
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
+
+# The lab's approved names, where rig-setup reads them (beside the repo list), as JSON so it
+# needs no YAML reader; open_rigs.lab_names writes it beside and renames it over the old one.
+$namesTarget = Join-Path (Split-Path $RepoList -Parent) 'lab-names.json'
+& uv run --project $repo --frozen python -m open_rigs.lab_names --json $namesTarget
+if ($LASTEXITCODE -ne 0) { throw "Could not write the approved names to $namesTarget." }
+"lab_names.yml written to $namesTarget"
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
 # Main is left alone for a workflow whose main runs live experiments while a branch moves to
@@ -385,12 +392,15 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
         # What this script wrote, staged before the check, so whatever the check changes is stray.
         $null = Invoke-Git $Dir add -A
 
+        # check-bonsai always (it holds the lab's names, lab_names.yml), after the workflow's own
+        # check when it has one.
         $own = Join-Path $Dir 'scripts\check-workflow.ps1'
-        $check = if (Test-Path $own) { 'scripts\check-workflow.ps1' } else { 'lib-open-rigs scripts\check-bonsai.ps1' }
+        $check = if (Test-Path $own) { 'scripts\check-workflow.ps1 and lib-open-rigs scripts\check-bonsai.ps1' } else { 'lib-open-rigs scripts\check-bonsai.ps1' }
         "  checking with $check..."
-        $log = if (Test-Path $own) { Invoke-Native powershell -NoProfile -ExecutionPolicy Bypass -File $own }
-            else { Invoke-Native powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'check-bonsai.ps1') -Repo $Dir }
-        $passed = $LASTEXITCODE -eq 0
+        $passed = $true
+        $log = @()
+        if (Test-Path $own) { $log += Invoke-Native powershell -NoProfile -ExecutionPolicy Bypass -File $own; $passed = $LASTEXITCODE -eq 0 }
+        if ($passed) { $log += Invoke-Native powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'check-bonsai.ps1') -Repo $Dir; $passed = $LASTEXITCODE -eq 0 }
         $log | ForEach-Object { "  | $_" }
         if (-not $passed) {
             # The first lines that say what broke: an exception, a compiler error or a failed test.

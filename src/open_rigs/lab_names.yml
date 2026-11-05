@@ -1,0 +1,90 @@
+# The Coen Lab's approved names: what a rig's devices, logs, session settings and trial columns
+# may be called. One file for every rig, so the same thing has the same name wherever it is
+# recorded. Change it by commit: scripts\push.ps1 then rechecks every lab workflow against it.
+#
+# Who reads it:
+#   - scripts\check-bonsai.ps1 fails a workflow that uses a name not here (device subjects and
+#     log names, SessionControl parameters, BonsaiData_Trial columns), so update-workflows does
+#     not update it and reports why.
+#   - rig-setup's machines window marks each key of a rig's rig.yml against its rig's devices
+#     and settings (update-workflows copies this file to K:\config\lab-names.yml).
+#
+# Naming rules:
+#   - A device is Kind-Instance, both PascalCase, with an instance even where a rig has one
+#     (BehaviorBoard-Main), so a second never renames the first. A hyphen, never an underscore:
+#     FormatFileName takes a device's folder from its name up to the first underscore.
+#     In rig.yml the kind is a camelCase group with the instances inside (camera: face:).
+#   - Session settings (SessionControl parameters) are PascalCase, as the controller shows them.
+#   - Trial columns are camelCase. A unit goes in the name when the value has one
+#     (stimulusOnsetSeconds, itiDuration in seconds, rewardSize in microlitres).
+#   - A setting that is the same for the whole session is not a trial column: the manifest has
+#     the settings at Go and TaskConfig/TaskSchema the task file as loaded.
+
+# BonsaiData_Trial columns every rig may write, name: what it holds. LogData adds Seconds (the
+# Harp time the row was stamped, the trial's end) itself; it is never a field of the record.
+trialColumns:
+  trialNumber: The trial's number in the session, from 1.
+  trialType: The kind of trial, as the rig's number for it (each rig lists its codes below).
+  target: The side that was right, Left or Right.
+  choice: The side the mouse chose, Left or Right, or NoResponse.
+  outcome: Correct, Incorrect, IncorrectAutoRewarded or NoResponse.
+  autoReward: True when this trial rewards automatically.
+  bothSpouts: True when both spouts were offered (otherwise only the correct one).
+  stimulusOnsetSeconds: Harp time of the stimulus onset, in seconds.
+  rewardSize: Microlitres a reward on this trial gives. What was delivered is RewardDelivered in BonsaiData_Async.
+
+# Each kind of rig. repos: the workflow repositories that run on it (check-bonsai finds a
+# workflow's rig by its repository's name). profiles: rig-setup's profiles for it.
+rigs:
+  behaviour-box:
+    repos: [coen-behaviour-box]
+    profiles: [rig-behaviour-box]
+    devices:
+      BehaviorBoard: [Main]
+      Camera: [Box]
+    # rig.yml keys that are not devices.
+    settings: [rootPath, rigId]
+    # Logs that are not devices or BonsaiData_Trial/BonsaiData_Async.
+    streams: []
+    sessionSettings:
+      RunLengthMins: How long the session runs, in minutes.
+      ExposureTime: Camera exposure, in microseconds.
+      Gain: Camera gain, in dB.
+    trialColumns: {}
+
+  av-dome:
+    repos: [av-dome]
+    profiles: [rig-av-dome]
+    devices:
+      BehaviorBoard: [Main]
+      TimestampGeneratorGen3: [Main]
+      StepperDriver: [A, B]
+      LicketySplit: [Left, Right]
+      Camera: [Face, Pupil, Body]
+    settings: [rootPath, rigId, interPulseInterval, lickSpoutDefaultPosition, projectionCalibration, speakerArray, zapit]
+    streams: [Zapit, RigSchema, TaskSchema, TaskConfig, ValveCalibrationDO1, ValveCalibrationDO2, RenderHeartbeat, ResponseEvents, TrialStartEvents]
+    sessionSettings:
+      TrainingStage: Row of the task file's trainingStages to run.
+      TaskFile: The task file, in the repository's config folder.
+      RewardSizeUl: Reward size in microlitres for every stage; blank keeps the task file's.
+      ItiMin: Shortest inter-trial interval in seconds; blank keeps the task file's.
+      ItiMax: Longest inter-trial interval in seconds; blank keeps the task file's.
+      Zapit: Optogenetics on or off.
+      StepSize: Stepper step size for the spout nudges.
+    # trialType: 0 Visual, 1 Audio, 2 AV Coherent, 3 AV Conflict, 4 Neutral (InitialiseTrial.cs).
+    trialColumns:
+      rewardIfCorrect: True when a correct choice is rewarded (drawn per trial from the reward probability).
+      largeReward: True when this trial's reward is the large one.
+      isRepeat: True when this trial repeats the last one.
+      repeatCount: How many times in a row the trial has been repeated.
+      itiDuration: Inter-trial interval before this trial, in seconds.
+      quiescentDuration: Time the mouse had to stay still before the stimulus, in seconds.
+      visualAzimuth: Grating azimuth, in degrees.
+      visualElevation: Grating elevation, in degrees.
+      visualContrast: Grating contrast, 0 to 1.
+      visualPhase: Grating phase, in radians.
+      audioAzimuth: Speaker azimuth, in degrees.
+      audioElevation: Speaker elevation, in degrees.
+      audioWaveformIndex: Index into the auditory stimulus set (calibration\AuditoryStimuli).
+      optoStimulated: True when this trial had optogenetic stimulation.
+      optoCondition: The Zapit condition stimulated, 0 when none.
