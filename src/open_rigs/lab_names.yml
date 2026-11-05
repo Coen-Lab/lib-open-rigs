@@ -8,6 +8,8 @@
 #     not update it and reports why.
 #   - rig-setup's machines window marks each key of a rig's rig.yml against its rig's devices
 #     and settings (update-workflows writes this file as JSON to K:\config\lab-names.json).
+#   - open_rigs.trials reads BonsaiData_Trial by the columns here: old names through formerly,
+#     each column as its type, codes decoded through values.
 #
 # Naming rules:
 #   - A device is Kind-Instance, both PascalCase, with an instance even where a rig has one
@@ -15,24 +17,65 @@
 #     FormatFileName takes a device's folder from its name up to the first underscore.
 #     In rig.yml the kind is a camelCase group with the instances inside (camera: face:).
 #   - Experiment settings (ExperimentControl parameters) are PascalCase, as the controller shows them.
-#   - Trial columns are camelCase. A unit goes in the name when the value has one
-#     (stimulusOnsetSeconds, itiDuration in seconds, rewardSize in microlitres).
+#   - Trial columns are camelCase. A time on the Harp clock ends in Time and is in seconds
+#     (stimulusOnsetTime); a duration ends in its unit (itiSeconds), as does any other quantity
+#     with a unit (rewardSizeUl). Seconds, the row's own Harp time, is the one exception. Never
+#     store a latency (derive it from two times); if one is ever stored, it ends in Seconds,
+#     never Time.
+#   - The trial row holds two times, stimulusOnsetTime and choiceTime, besides Seconds. Licks,
+#     spout moves, water (RewardDelivered) and the physical onset stay in the hardware and async
+#     logs, matched to trials by time when read.
 #   - A setting that is the same for the whole experiment is not a trial column: the manifest has
 #     the settings at Go and TaskSchema the task as run (the task file with the controller's
 #     overrides applied).
+#   - A column two rigs write is a lab-wide one, never two rigs' own.
+#
+# Each trial column: type (int, double, bool or string; check-bonsai compares the record's
+# member type), unit (when it has one), values (the strings it may hold, or a code: meaning
+# map), formerly (names it was recorded under before, newest first), required (every rig's row
+# has it), description.
 
-# BonsaiData_Trial columns every rig may write, name: what it holds. LogData adds Seconds (the
-# Harp time the row was stamped, the trial's end) itself; it is never a field of the record.
+# BonsaiData_Trial columns every rig may write.
 trialColumns:
-  trialNumber: The trial's number in the experiment, from 1.
-  trialType: The kind of trial, as the rig's number for it (each rig lists its codes below).
-  target: The side that was right, Left or Right.
-  choice: The side the mouse chose, Left or Right, or NoResponse.
-  outcome: Correct, Incorrect, IncorrectAutoRewarded or NoResponse.
-  autoReward: True when this trial rewards automatically.
-  bothSpouts: True when both spouts were offered (otherwise only the correct one).
-  stimulusOnsetSeconds: Harp time of the stimulus onset, in seconds.
-  rewardSize: Microlitres a reward on this trial gives. What was delivered is RewardDelivered in BonsaiData_Async.
+  trialNumber:
+    type: int
+    required: true
+    formerly: [TrialCnt]
+    description: The trial's number in the experiment, from 1.
+  target:
+    type: string
+    values: [Left, Right]
+    formerly: [targetSide]
+    description: The side that was right.
+  choice:
+    type: string
+    values: [Left, Right, NoResponse]
+    formerly: [response]
+    description: The side the mouse chose.
+  outcome:
+    type: string
+    required: true
+    values: [Correct, Incorrect, NoResponse]
+    description: The trial's result.
+  stimulusOnsetTime:
+    type: double
+    unit: s
+    formerly: [stimulusOnsetSeconds]
+    description: Harp time the workflow commanded the stimulus on, the marker that ties hardware events to the trial. The physical onset is in the hardware logs.
+  choiceTime:
+    type: double
+    unit: s
+    description: Harp time of the lick the workflow counted as the choice; NaN on NoResponse.
+  rewardSizeUl:
+    type: double
+    unit: ul
+    formerly: [rewardSize]
+    description: Microlitres a reward on this trial gives. What was delivered is RewardDelivered in BonsaiData_Async.
+  Seconds:
+    type: double
+    unit: s
+    required: true
+    description: Harp time the row was stamped (WithLatestTimestamp before LogTrial), when the outcome is known.
 
 # Each kind of rig. repos: the workflow repositories that run on it (check-bonsai finds a
 # workflow's rig by its repository's name). profiles: rig-setup's profiles for it.
@@ -72,20 +115,55 @@ rigs:
       ItiMax: Longest inter-trial interval in seconds; blank keeps the task file's.
       Zapit: Optogenetics on or off.
       StepSize: Stepper step size for the spout nudges.
-    # trialType: 0 Visual, 1 Audio, 2 AV Coherent, 3 AV Conflict, 4 Neutral (InitialiseTrial.cs).
     trialColumns:
-      rewardIfCorrect: True when a correct choice is rewarded (drawn per trial from the reward probability).
-      largeReward: True when this trial's reward is the large one.
-      isRepeat: True when this trial repeats the last one.
-      repeatCount: How many times in a row the trial has been repeated.
-      itiDuration: Inter-trial interval before this trial, in seconds.
-      quiescentDuration: Time the mouse had to stay still before the stimulus, in seconds.
-      visualAzimuth: Grating azimuth, in degrees.
-      visualElevation: Grating elevation, in degrees.
-      visualContrast: Grating contrast, 0 to 1.
-      visualPhase: Grating phase, in radians.
-      audioAzimuth: Speaker azimuth, in degrees.
-      audioElevation: Speaker elevation, in degrees.
-      audioWaveformIndex: Index into the auditory stimulus set (calibration\AuditoryStimuli).
-      optoStimulated: True when this trial had optogenetic stimulation.
-      optoCondition: The Zapit condition stimulated, 0 when none.
+      trialType:
+        type: int
+        values: {0: Visual, 1: Audio, 2: AVCoherent, 3: AVConflict, 4: Neutral}
+        description: The kind of trial, as InitialiseTrial.cs draws it.
+      bothSpouts:
+        type: bool
+        formerly: [BothSpouts]
+        description: True when both spouts were offered (otherwise only the correct one).
+      largeReward:
+        type: bool
+        description: True when this trial's reward is the large one.
+      repeatCount:
+        type: int
+        description: How many times in a row the trial has been repeated, 0 for a new draw.
+      itiSeconds:
+        type: double
+        unit: s
+        formerly: [itiDuration]
+        description: Gap from this trial's outcome to the next trial, plus the error timeout after an error.
+      visualAzimuth:
+        type: double
+        unit: deg
+        description: Grating azimuth.
+      visualElevation:
+        type: double
+        unit: deg
+        description: Grating elevation.
+      visualContrast:
+        type: double
+        description: Grating contrast, 0 to 1.
+      visualPhase:
+        type: double
+        unit: rad
+        description: Grating phase.
+      audioAzimuth:
+        type: double
+        unit: deg
+        description: Azimuth of the speaker that played, after snapping to the nearest wired one.
+      audioElevation:
+        type: double
+        unit: deg
+        description: Elevation of the speaker that played.
+      audioWaveformIndex:
+        type: int
+        description: Index into the auditory stimulus set (calibration\AuditoryStimuli).
+      optoStimulated:
+        type: bool
+        description: True when this trial had optogenetic stimulation.
+      optoCondition:
+        type: int
+        description: The Zapit condition stimulated, 0 when none.

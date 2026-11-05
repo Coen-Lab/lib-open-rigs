@@ -17,7 +17,7 @@ Build the trial's record once the trial has ended, with one field per column (an
 
 The file is `<experiment>\BonsaiData\BonsaiData_Trial_<date>.csv`: the folder is named by the log name up to its first underscore, so `BonsaiData_Trial` and `BonsaiData_Async` share the `BonsaiData` folder. An experiment running past the hour boundary that LogData chunks by leaves a second file in the same folder; read the folder's files in name order as one table.
 
-Name the columns as the lab's [`lab_names.yml`](../../../src/open_rigs/lab_names.yml) allows: its `trialColumns` for every rig and the rig's own under `rigs`, camelCase with the unit in the name. `scripts\check-bonsai.ps1` fails a workflow whose record has any other column, and a setting that is the same all experiment is not a column (the manifest has the settings at Go). Never a field called `Seconds`: LogData writes the timestamp under that name.
+Name and type the columns as the lab's [`lab_names.yml`](../../../src/open_rigs/lab_names.yml) allows: its `trialColumns` for every rig and the rig's own under `rigs`, camelCase, a Harp time ending in `Time`, a duration or other quantity ending in its unit. `scripts\check-bonsai.ps1` fails a workflow whose record has any other column, a column of another type, or lacks a required one (`trialNumber`, `outcome`, `Seconds`), and fails a plain `LogData` named `BonsaiData_Trial` or `BonsaiData_Async`. A setting that is the same all experiment is not a column (the manifest has the settings at Go). Never a field called `Seconds`: `WithLatestTimestamp` adds it, and CsvWriter names it so. `open_rigs.trials.read` reads the files back as one typed table.
 
 ## Live, and on disk at once
 
