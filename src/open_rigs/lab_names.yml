@@ -75,7 +75,7 @@ trialColumns:
     type: double
     unit: s
     required: true
-    description: Harp time the row was stamped (WithLatestTimestamp before LogTrial), when the outcome is known.
+    description: Harp time the row was stamped (the Seconds of the Timestamped record LogTrial receives), when the outcome is known.
 
 # Each kind of rig. repos: the workflow repositories that run on it (check-bonsai finds a
 # workflow's rig by its repository's name). profiles: rig-setup's profiles for it.
