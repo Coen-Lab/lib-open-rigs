@@ -1,0 +1,104 @@
+%YAML 1.1
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/harp-tech/reflex-generator/main/schema/device.json
+device: TimestampGeneratorGen3
+whoAmI: 1158
+firmwareVersion: "1.2"
+hardwareTargets: "1.2"
+registers:
+  Config:
+    address: 32
+    type: U8
+    access: Write
+    maskType: ConfigurationFlags
+    description: Specifies the device configuration
+  DevicesConnected:
+    address: 33
+    type: U8
+    access: Read
+    maskType: ConnectedDevices
+    description: Specifies which CLK_OUT ports have devices connected.
+  RepeaterStatus:
+    address: 34
+    type: U8
+    access: Write
+    maskType: RepeaterFlags
+    description: Check whether device is a repeater or spreading internal timestamp
+  BatteryRate:
+    address: 35
+    type: U8
+    access: Write
+    maskType: BatteryRateConfiguration
+    description: Configure how often the battery value is sent to computer
+  Battery:
+    address: 36
+    type: Float
+    access: Event
+    description: Reads the current battery charge
+  BatteryThresholdLow:
+    address: 37
+    type: Float
+    access: Write
+    description: Specifies the low threshold from where the battery should start to be charged
+  BatteryThresholdHigh:
+    address: 38
+    type: Float
+    access: Write
+    description: Specifies the high threshold from where the battery stops being charged
+  BatteryCalibration0:
+    address: 39
+    type: U16
+    access: Write
+  BatteryCalibration1:
+    address: 40
+    type: U16
+    access: Write
+  Timer:
+    address: 41
+    type: U32
+    access: [Write, Event]
+    description: Unitary counter that periodically produces a value at the frequency defined by register TimerFrequency.
+  TimerFrequency:
+    address: 42
+    type: U8
+    access: Write
+    maskType: TimerRate
+    description: Frequency at which the Timer will generate new values.
+bitMasks:
+  ConfigurationFlags:
+    description: Specifies configuration flags for the device.
+    bits:
+      StartBatteryCycle: {0x1, description: Starts battery cycle to extend batteries life.}
+      StartDischarge: {0x2, description: Starts to discharge right away.}
+      StartCharge: {0x4, description: Starts to charge right away.}
+      Stop: {0x8, description: Stop any control of the battery and resume normal function.}
+  ConnectedDevices:
+    description: Specifies if an output port has a device connected.
+    bits:
+      Out0: 0x01
+      Out1: 0x02
+      Out2: 0x04
+      Out3: 0x08
+      Out4: 0x10
+      Out5: 0x20
+  RepeaterFlags:
+    description: Specifies whether the device is a clock repeater.
+    bits:
+      Repeater: 0x01
+groupMasks:
+  BatteryRateConfiguration:
+    description: Specifies the rate at which the battery charge event is sent.
+    values:
+      EveryMinute: 0
+      Every10Seconds: 1
+      EverySecond: 2
+      Never: 3
+  TimerRate:
+    description: Specifies the rate at which the timer counter is sent.
+    values:
+      Disabled: 0
+      Timer50Hz: 1
+      Timer100Hz: 2
+      Timer200Hz: 3
+      Timer500Hz: 4
+      Timer1000Hz: 5

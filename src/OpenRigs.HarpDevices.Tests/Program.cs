@@ -99,6 +99,7 @@ namespace OpenRigs.HarpDevices.Tests
             // Loaded before any record looks for a register map, as a workflow decoding the board has it.
             // The type, not its WhoAmI: a const is copied in at compile time and loads nothing.
             Console.WriteLine("Loaded " + typeof(Harp.Behavior.Device).Assembly.GetName().Name);
+            Console.WriteLine("Loaded " + typeof(Harp.TimestampGeneratorGen3.Device).Assembly.GetName().Name);
             var root = Path.Combine(Path.GetTempPath(), "harpdevices-tests-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
             try
@@ -112,6 +113,14 @@ namespace OpenRigs.HarpDevices.Tests
                 var present = Error(() => Console.WriteLine("        this machine's ports: " + string.Join(", ", UsbSerials.Present().Select(p => p.Key + "=" + (p.Value.Length > 0 ? p.Value : "(none)")))));
                 Check("this machine's ports read from Windows without error", present == null, present);
                 Check("the port from a device's name",UsbSerials.PortOf("USB Serial Port (COM3)") == "COM3" && UsbSerials.PortOf("Communications Port (COM12)") == "COM12" && UsbSerials.PortOf("Printer Port (LPT1)") == null, "wrong");
+
+                Console.WriteLine("Register maps:");
+                var behavior = OpenRigs.Shared.RegisterMaps.Find(1216);
+                Check("a package that carries its device.yml gives it", behavior != null && behavior.From == "Harp.Behavior 0.2.0" && behavior.Metadata.Contains("whoAmI: 1216"), behavior == null ? "none" : behavior.From);
+                var tsg = OpenRigs.Shared.RegisterMaps.Find(1158);
+                Check("Harp.TimestampGeneratorGen3 0.1.1, which carries none, gets the lab's copy of its release's, saying so", tsg != null && tsg.Metadata.Contains("whoAmI: 1158") && tsg.Metadata.Contains("firmwareVersion: \"1.2\"") && tsg.From.StartsWith("Harp.TimestampGeneratorGen3 0.1.1 (device.yml from harp-tech/device.timestampgeneratorgen3 a463d1d"), tsg == null ? "none" : tsg.From);
+                Check("... and no other version does", OpenRigs.Shared.RegisterMaps.LabCopy("Harp.TimestampGeneratorGen3 0.1.2") == null, "found one");
+                Check("every lab copy is embedded", OpenRigs.Shared.RegisterMaps.LabCopies.Keys.All(k => OpenRigs.Shared.RegisterMaps.LabCopy(k) != null), "one is missing");
 
                 Console.WriteLine("The board at Start:");
                 var r = Recorder();

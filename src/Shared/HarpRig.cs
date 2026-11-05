@@ -105,10 +105,24 @@ namespace OpenRigs.Shared
     /// The register maps of the Harp packages loaded in this workflow, by WhoAmI. Each generated
     /// Harp package's Device class carries its WhoAmI and its device.yml (Metadata), so a board's
     /// map is the one of the package that decodes it, and cannot drift from it. Read by reflection,
-    /// so a package here need not reference Bonsai.Harp to ask.
+    /// so a package here need not reference Bonsai.Harp to ask. A package released before its
+    /// generator embedded device.yml gets the lab's copy of that release's file
+    /// (<see cref="LabCopies"/>), for that exact version only.
     /// </summary>
     internal static class RegisterMaps
     {
+        /// <summary>
+        /// device.yml for released Harp packages that carry none, by "&lt;package&gt; &lt;version&gt;",
+        /// to the commit it was taken from. Each is src\Shared\RegisterMaps\&lt;package&gt;-&lt;version&gt;.device.yml,
+        /// embedded as OpenRigs.Shared.RegisterMaps.&lt;file name&gt;.
+        /// </summary>
+        public static readonly Dictionary<string, string> LabCopies = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            // Released 12 Jun 2024, two minutes after a463d1d ("Bump interface version"); upstream
+            // embeds device.yml since c0e29e9 (9 Nov 2024), not yet released.
+            { "Harp.TimestampGeneratorGen3 0.1.1", "harp-tech/device.timestampgeneratorgen3 a463d1d" },
+        };
+
         public static RegisterMap Find(int whoAmI)
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -117,17 +131,28 @@ namespace OpenRigs.Shared
                 var device = assembly.GetType(assembly.GetName().Name + ".Device", false);
                 if (device == null || device.BaseType == null || device.BaseType.FullName != "Bonsai.Harp.Device") continue;
                 var id = device.GetField("WhoAmI", BindingFlags.Public | BindingFlags.Static);
-                var metadata = device.GetField("Metadata", BindingFlags.Public | BindingFlags.Static);
-                if (id == null || metadata == null || !Equals(id.GetValue(null), whoAmI)) continue;
+                if (id == null || !Equals(id.GetValue(null), whoAmI)) continue;
+                var name = assembly.GetName().Name;
                 var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-                return new RegisterMap
-                {
-                    Device = assembly.GetName().Name.Replace("Harp.", ""),
-                    From = assembly.GetName().Name + " " + (version != null ? version.InformationalVersion.Split('+')[0] : assembly.GetName().Version.ToString()),
-                    Metadata = (string)metadata.GetValue(null),
-                };
+                var package = name + " " + (version != null ? version.InformationalVersion.Split('+')[0] : assembly.GetName().Version.ToString());
+                var metadata = device.GetField("Metadata", BindingFlags.Public | BindingFlags.Static);
+                if (metadata != null) return new RegisterMap { Device = name.Replace("Harp.", ""), From = package, Metadata = (string)metadata.GetValue(null) };
+                var copy = LabCopy(package);
+                if (copy != null) return new RegisterMap { Device = name.Replace("Harp.", ""), From = package + " (device.yml from " + LabCopies[package] + ", kept in lib-open-rigs: the package carries none)", Metadata = copy };
             }
             return null;
+        }
+
+        /// <summary>The lab's copy of a package's device.yml, null when there is none.</summary>
+        public static string LabCopy(string package)
+        {
+            if (!LabCopies.ContainsKey(package)) return null;
+            var resource = "OpenRigs.Shared.RegisterMaps." + package.Replace(' ', '-') + ".device.yml";
+            using (var stream = typeof(RegisterMaps).Assembly.GetManifestResourceStream(resource))
+            {
+                if (stream == null) return null;
+                using (var reader = new System.IO.StreamReader(stream)) return reader.ReadToEnd();
+            }
         }
     }
 }
