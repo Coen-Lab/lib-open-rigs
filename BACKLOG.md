@@ -1,5 +1,11 @@
 # Backlog
 
+## Found 5 Nov 2026, on GREEN-DOME-1 (av-dome `pip/main-switchover` session ses-test-0852)
+
+- Camera files are named differently by each workflow (Pip: "We need that camera naming abstracted and consistent across workflows"). coen-behaviour-box uses `LogVideo` and writes `Camera-Box\Camera-Box_<hour>.avi`; av-dome's branch has three pasted copies of an older LogVideo whose own FormatFileName drops the hour (`Camera-Face\Camera-Face.avi`), with other CSV columns. Proposed, for Pip to confirm: a lab node, `RecordCameras`, generated from rig.yml as `StreamDevices` is: every `camera: <name>:` whose `Camera-<Name>.Data` the workflow publishes gets `Camera-<Name>\Camera-<Name>_<hour>.avi` and `.csv` (Seconds, FrameID, Timestamp, ExposureTime, Gain) through `RigDevices`, the naming LiveView, the manifest and HarpDevices share; the frame rate from rig.yml or the node; `check-workflow` failing a workflow that writes camera video another way.
+- `LickSpoutStage-Main` gets no `_device.json` or register map: its rig.yml entry is two boards (`driverA`, COM4; `driverB`, COM5), and `RecordHarpDevices` reads one `portName` per device, so it never sees them, though both boards' data is logged (`LickSpoutStage-Main_DriverA_<reg>_<hour>.bin`). A device of several boards should get one record and map per board. TimestampGeneratorGen3 gets a record but no map: no Harp package in the workflow decodes WhoAmI 1158 (the manifest says so).
+- The Logging tests' `LogHarpDevice_SimulatedBehavior_*` fail 1 or 2 of 27 in most full runs and pass alone, on the code before Logging 0.1.0-bbox.5 as after (4 runs each, GREEN-DOME-1).
+
 ## Tell Tom Ryan: `tr-open-rigs` (8406573) does not build (4 Nov 2026)
 
 Found while merging it into av-dome `pip/main-switchover`; fixed there, not on his branch. Both fail on his own pinned packages (`openrigs.* 0.0.0-ci17`, built from upstream `f313716`), so they are his branch's, not the fork's:
@@ -45,7 +51,7 @@ Not changed, do not raise again without new information:
 
 Deferred, for Pip:
 
-- **`BonsaiData_Trial` and `BonsaiData_Async` reach disk about 4 KB at a time** (S3-M2): `OpenRigs.Logging.CsvWriter` rewraps Bonsai's own `CsvWriter`, which never flushes. The session page runs 15-25 trials behind, and a run killed past its stop deadline loses its unflushed tail, so `async_water_ml` undercounts with nothing saying so. A flush per row on `LogTrial`/`LogAsync` only (a few rows a second) is a patch to the bbox Logging package; a Harp log at full rate must not have it.
+- Done on Pip's word (5 Nov 2026), in Logging 0.1.0-bbox.5 and LiveView 0.1.0-local.13 (CsvWriter's `AutoFlush` and `PublishRows`, `LoggedRows`, the `logs` stream): **`BonsaiData_Trial` and `BonsaiData_Async` reach disk about 4 KB at a time** (S3-M2): `OpenRigs.Logging.CsvWriter` rewraps Bonsai's own `CsvWriter`, which never flushes. The session page runs 15-25 trials behind, and a run killed past its stop deadline loses its unflushed tail, so `async_water_ml` undercounts with nothing saying so. A flush per row on `LogTrial`/`LogAsync` only (a few rows a second) is a patch to the bbox Logging package; a Harp log at full rate must not have it.
 - A `Detail` starting with `"` swallows every later row of `BonsaiData_Async` in rig-control's `csv.reader` (S3-L3): `AsyncEvent.Clean` replaces commas and line breaks, not quotes; no sender today starts one. `Clean` could replace `"` with `'`, and rig-control read with `QUOTE_NONE`.
 - av-dome `pip/main-switchover` (S4-M1): add `regenerate-schemas = "ucl_open_av_dome.regenerate:main"` to `[project.scripts]`, and make `examples\rig.py` write `config\rig-template.yml` (today it writes `.\local\UclOpenAvDomeRig.json` and calls `UclOpenAvDomeRig()` with no arguments, which throws) or delete it; with the script line alone, every hourly run would read FAILED.
 

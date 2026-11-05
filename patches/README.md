@@ -2,7 +2,7 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core, Devices 0.1.0-bbox.2; Logging 0.1.0-bbox.4; Streaming 0.1.0-bbox.2; Video 0.1.0-bbox.3
+## OpenRigs.Core, Devices 0.1.0-bbox.2; Logging 0.1.0-bbox.5; Streaming 0.1.0-bbox.2; Video 0.1.0-bbox.3
 
 Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), from this repository's own `src\`: upstream branch `rig-config-resolver` at `3788bfb` (main plus the per-machine config operators `ResolveRigConfigDirectory`, `ReadRigConfig` and `ResolveRigFile`) and two fixes, both reported upstream, which are commits on this repository's `main`:
 
@@ -17,16 +17,16 @@ Logging and Streaming 0.1.0-bbox.2 (2 Nov 2026) also name the session folder `se
 
 Video 0.1.0-bbox.3 (2 Nov 2026, a92cde7 and 19e39cb) is a lab change rather than a patch: a new `ExposureTime` or `Gain` goes to the open camera, and `VideoChunkData` carries both per frame. It has a `<Version>` in its `.csproj`, so `scripts\build-package.ps1` builds it.
 
-Logging 0.1.0-bbox.4 (4 Nov 2026, 4e79e7f) is a lab change rather than a patch: `LogTrial`, `LogAsync` and `CreateAsyncEvent`, the lab's two session files (`COEN-LAB.md`).
+Logging 0.1.0-bbox.4 (4 Nov 2026, 4e79e7f) is a lab change rather than a patch: `LogTrial`, `LogAsync` and `CreateAsyncEvent`, the lab's two session files (`COEN-LAB.md`). 0.1.0-bbox.5 (5 Nov 2026) adds CsvWriter's `AutoFlush` and `PublishRows` and the `LoggedRows` source, both on in `LogTrial` and `LogAsync`, so their rows are on disk and streamed as they are written.
 
 Core and Devices have a `<Version>` in their `.csproj` since bbox.2, so `scripts\build-package.ps1` builds them like the rest.
 
-SHA-256 of the packages as committed (built with .NET SDK 8.0.424; Streaming bbox.2 and Video bbox.3 on 2 Nov 2026, Core and Devices bbox.2 and Logging bbox.4 on 4 Nov 2026):
+SHA-256 of the packages as committed (built with .NET SDK 8.0.424; Streaming bbox.2 and Video bbox.3 on 2 Nov 2026, Core and Devices bbox.2 on 4 Nov 2026; Logging bbox.5 on 5 Nov 2026 with .NET SDK 10.0.201, the only SDK on GREEN-DOME-1):
 
 ```
 f5281b204ffa5dbc626672bed650c2b4680c23e4b55ef9900c30ce67d331f4f4  OpenRigs.Core.0.1.0-bbox.2.nupkg
 4cf46df908db595b3309843174c7f728d9e23e5dd0b0d262201dfca7f2d0e705  OpenRigs.Devices.0.1.0-bbox.2.nupkg
-fe836c7f41c9e9e7092c974879a072e3ae63c561d5900b7ee061c2f32fdf9289  OpenRigs.Logging.0.1.0-bbox.4.nupkg
+6a3281c06eb23152d0c5ab055f4aba42d8f395a0b7defaf81cf7813f80357b46  OpenRigs.Logging.0.1.0-bbox.5.nupkg
 d961f3e80cb45e68cf4846d54f0c6a2fa1a67c142ee17363c0acf5fc46b01c65  OpenRigs.Video.0.1.0-bbox.3.nupkg
 bd7fd1177f3ce29f35c90072eb1ac800e04314bf5a8bf2556a729a79be70c462  OpenRigs.Streaming.0.1.0-bbox.2.nupkg
 ```

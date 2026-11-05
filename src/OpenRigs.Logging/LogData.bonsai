@@ -23,6 +23,8 @@
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Name" DisplayName="LogName" Description="The base name of the data log, without extension." />
         <Property Name="Selector" />
+        <Property Name="AutoFlush" />
+        <Property Name="PublishRows" />
       </Expression>
       <Expression xsi:type="rx:CreateObservable">
         <Name>LogData</Name>
@@ -60,6 +62,8 @@
             </Expression>
             <Expression xsi:type="ExternalizedMapping">
               <Property Name="Selector" />
+              <Property Name="AutoFlush" />
+              <Property Name="PublishRows" />
             </Expression>
             <Expression xsi:type="orl:CsvWriter">
               <io:FileName />
@@ -68,6 +72,8 @@
               <io:Suffix>None</io:Suffix>
               <io:IncludeHeader>true</io:IncludeHeader>
               <io:Selector>Seconds, Value.X, Value.Y, Value.Z</io:Selector>
+              <orl:AutoFlush>false</orl:AutoFlush>
+              <orl:PublishRows>false</orl:PublishRows>
             </Expression>
             <Expression xsi:type="WorkflowOutput" />
           </Nodes>

@@ -128,13 +128,23 @@ namespace OpenRigs.LiveView
     {
         public string RigId;
         public bool HasSessionFolder;
+        // Whether the workflow's OpenRigs.Logging has LoggedRows (0.1.0-bbox.5 on): every row a
+        // log with PublishRows writes (LogTrial, LogAsync) is then streamed as `logs`.
+        public bool StreamsLoggedRows;
+
+        public const string LoggedRowsType = "OpenRigs.Logging.LoggedRows";
+        public const string LoggedRowsStream = "logs";
         public readonly List<PlannedDevice> Streamed = new List<PlannedDevice>();
         public readonly List<string> Skipped = new List<string>();
         public readonly List<string> Notes = new List<string>();
 
-        public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType)
+        public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType, Func<string, Type> loadedType = null)
         {
             var plan = new LiveViewPlan();
+            // Looked for among the assemblies already loaded rather than referenced: LiveView
+            // depends on no other lab package, and a workflow with an older Logging, or none,
+            // streams what it did before.
+            plan.StreamsLoggedRows = (loadedType ?? LoadedType)(LoggedRowsType) != null;
             // The machine name, not rig.yml's two-letter rigId, on purpose: the live-view windows
             // find a rig's streams by the machine they connect to, and rig.yml is read by it too.
             plan.RigId = Environment.GetEnvironmentVariable("COMPUTERNAME") ?? Environment.MachineName;
@@ -142,6 +152,8 @@ namespace OpenRigs.LiveView
             plan.HasSessionFolder = pathPrefix == typeof(string);
             if (pathPrefix != null && pathPrefix != typeof(string))
                 plan.Notes.Add("PathPrefix is " + pathPrefix.Name + ", not a path: the session key stays ready and elapsed is not sent");
+            if (plan.HasSessionFolder && !plan.StreamsLoggedRows)
+                plan.Notes.Add("OpenRigs.Logging has no LoggedRows (before 0.1.0-bbox.5): the session's trial and event rows are not streamed");
 
             if (string.IsNullOrWhiteSpace(configRoot))
             {
@@ -160,6 +172,19 @@ namespace OpenRigs.LiveView
                 plan.Consider(device, publishedType);
             }
             return plan;
+        }
+
+        // A type by full name from the assemblies this process has loaded; null if none has it.
+        static Type LoadedType(string fullName)
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type type;
+                try { type = assembly.GetType(fullName, false); }
+                catch (Exception) { continue; }  // a dynamic or half-loaded assembly: not this one
+                if (type != null) return type;
+            }
+            return null;
         }
 
         void Consider(RigDevice rigDevice, Func<string, Type> publishedType)
@@ -254,7 +279,8 @@ namespace OpenRigs.LiveView
         public string Signature(int dataPort, int videoPort)
         {
             var text = new StringBuilder();
-            text.Append(RigId).Append('|').Append(dataPort).Append('|').Append(videoPort).Append('|').Append(HasSessionFolder);
+            text.Append(RigId).Append('|').Append(dataPort).Append('|').Append(videoPort).Append('|').Append(HasSessionFolder)
+                .Append('|').Append(StreamsLoggedRows);
             foreach (var device in Streamed) text.Append("\n+").Append(device);
             foreach (var skipped in Skipped) text.Append("\n-").Append(skipped);
             foreach (var note in Notes) text.Append("\n!").Append(note);

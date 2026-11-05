@@ -174,6 +174,13 @@ namespace OpenRigs.LiveView
                     Load("Elapsed", new Dictionary<string, string>())));
             }
 
+            if (plan.StreamsLoggedRows)
+            {
+                workflow.Add(Group(LiveViewPlan.LoggedRowsStream,
+                    "Every row a log with PublishRows writes (OpenRigs.Logging's LogTrial and LogAsync), as it is written: its session, log name, row number, header and line, as the logs stream.",
+                    Load("LoggedRows", new Dictionary<string, string> { { "Stream", LiveViewPlan.LoggedRowsStream } })));
+            }
+
             foreach (var device in plan.Streamed)
             {
                 workflow.Add(Group(device.Stream, device.Summary, Load(device.Recipe.Template, device.TemplateValues())));
@@ -182,7 +189,7 @@ namespace OpenRigs.LiveView
             workflow.Add(Group("liveview", "Every 5 s, the devices streamed and skipped and why, as the liveview stream.",
                 Load("Report", new Dictionary<string, string>
                 {
-                    { "Streamed", string.Join("|", plan.Streamed.Select(d => d.Stream)) },
+                    { "Streamed", string.Join("|", (plan.StreamsLoggedRows ? new[] { LiveViewPlan.LoggedRowsStream } : new string[0]).Concat(plan.Streamed.Select(d => d.Stream))) },
                     { "Skipped", string.Join("|", plan.Skipped) },
                     { "Notes", string.Join("|", plan.Notes) },
                 })));

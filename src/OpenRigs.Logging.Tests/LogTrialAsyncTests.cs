@@ -149,4 +149,109 @@ namespace OpenRigs.Logging.Tests
             Assert.AreEqual("A;B,x  y,1", e.ToString());
         }
     }
+
+    /// <summary>
+    /// What CsvWriter's AutoFlush and PublishRows do to each row, without Bonsai: LoggedRows.WriteRow
+    /// is what the write CsvWriter builds calls when either is on.
+    /// </summary>
+    [TestClass]
+    public class LoggedRowsTests
+    {
+        string session;
+
+        [TestInitialize]
+        public void MakeSession()
+        {
+            session = Path.Combine(Path.GetTempPath(), "OpenRigs.Logging.Tests", Guid.NewGuid().ToString("N"),
+                "sub-test", "ses-001D1_2026-11-05T08-53-26");
+            Directory.CreateDirectory(Path.Combine(session, "BonsaiData"));
+        }
+
+        [TestCleanup]
+        public void RemoveSession()
+        {
+            try { Directory.Delete(Path.GetDirectoryName(Path.GetDirectoryName(session)), true); }
+            catch (IOException) { }
+        }
+
+        string LogFile(string log, string hour)
+        {
+            return Path.Combine(session, "BonsaiData", log + "_" + hour + ".csv");
+        }
+
+        // The file as another reader sees it while the writer still holds it open.
+        static string ReadShared(string path)
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var reader = new StreamReader(stream))
+            {
+                return reader.ReadToEnd();
+            }
+        }
+
+        [TestMethod]
+        public void AutoFlush_PutsEachRowOnDiskBeforeTheFileCloses()
+        {
+            var path = LogFile("BonsaiData_Trial", "2026-11-05T08-00-00");
+            using (var writer = new StreamWriter(path))
+            {
+                LoggedRows.WriteRow(writer, "1.5,Correct", "Seconds,response", flush: true, publish: false);
+                Assert.AreEqual("1.5,Correct" + Environment.NewLine, ReadShared(path));
+            }
+        }
+
+        [TestMethod]
+        public void WithoutAutoFlush_ARowWaitsInTheBuffer()
+        {
+            // What the trial log did before: a reader saw nothing until 4 KB had built up or the file closed.
+            var path = LogFile("BonsaiData_Trial", "2026-11-05T08-00-00");
+            using (var writer = new StreamWriter(path))
+            {
+                LoggedRows.WriteRow(writer, "1.5,Correct", "Seconds,response", flush: false, publish: false);
+                Assert.AreEqual(string.Empty, ReadShared(path));
+            }
+        }
+
+        [TestMethod]
+        public void PublishRows_NamesTheSessionAndLog_AndNumbersRowsAcrossHourlyFiles()
+        {
+            var rows = new List<LoggedRow>();
+            using (new LoggedRows().Generate().Subscribe(rows.Add))
+            {
+                using (var first = new StreamWriter(LogFile("BonsaiData_Trial", "2026-11-05T08-00-00")))
+                {
+                    LoggedRows.WriteRow(first, "1,Correct", "Seconds,response", true, true);
+                    LoggedRows.WriteRow(first, "2,Incorrect", "Seconds,response", true, true);
+                }
+                using (var async = new StreamWriter(LogFile("BonsaiData_Async", "2026-11-05T08-00-00")))
+                {
+                    LoggedRows.WriteRow(async, "1.2,Go,,", "Seconds,Event,Detail,Value", true, true);
+                }
+                using (var second = new StreamWriter(LogFile("BonsaiData_Trial", "2026-11-05T09-00-00")))
+                {
+                    LoggedRows.WriteRow(second, "3,NoResponse", "Seconds,response", true, true);
+                }
+                // A log with PublishRows off is written and not published.
+                using (var quiet = new StreamWriter(LogFile("BonsaiData_Other", "2026-11-05T08-00-00")))
+                {
+                    LoggedRows.WriteRow(quiet, "4,x", "Seconds,a", true, false);
+                }
+            }
+
+            Assert.AreEqual(4, rows.Count);
+            Assert.IsTrue(rows.All(r => r.Session == "sub-test/ses-001D1_2026-11-05T08-53-26"), rows[0].Session);
+            CollectionAssert.AreEqual(new[] { "BonsaiData_Trial", "BonsaiData_Trial", "BonsaiData_Async", "BonsaiData_Trial" }, rows.Select(r => r.Log).ToArray());
+            // The trial log's rows go on from 0 to 2 across its two hourly files; the async log counts its own.
+            CollectionAssert.AreEqual(new long[] { 0, 1, 0, 2 }, rows.Select(r => r.Row).ToArray());
+            Assert.AreEqual("3,NoResponse", rows[3].Line);
+            Assert.AreEqual("Seconds,Event,Detail,Value", rows[2].Header);
+        }
+
+        [TestMethod]
+        public void LogName_IsTheFileNameBeforeItsHour()
+        {
+            Assert.AreEqual("BonsaiData_Trial", LoggedRows.LogName(@"C:\s\BonsaiData\BonsaiData_Trial_2026-11-05T08-00-00.csv"));
+            Assert.AreEqual("Data", LoggedRows.LogName(@"C:\s\Data\Data.csv"));
+        }
+    }
 }

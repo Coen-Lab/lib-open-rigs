@@ -7,6 +7,8 @@ using OpenRigs.LiveView;
 // be tested without Bonsai.Harp or OpenCV.Net installed.
 namespace Bonsai.Harp { public class HarpMessage { } }
 namespace OpenCV.Net { public class IplImage { } }
+// OpenRigs.Logging's LoggedRows (0.1.0-bbox.5 on), found by full name among the loaded assemblies.
+namespace OpenRigs.Logging { public class LoggedRows { } }
 
 // Decides StreamDevices' plan from a rig.yml in a temporary folder, without Bonsai's editor or
 // hardware: exit 0 when every check passes. dotnet run --project src\OpenRigs.LiveView.Tests
@@ -62,6 +64,12 @@ namespace OpenRigs.LiveView.Tests
                 Check("settings that are not devices (rootPath, version) are not devices", !plan.Skipped.Any(s => s.StartsWith("RootPath") || s.StartsWith("Version")), string.Join(" | ", plan.Skipped));
                 Check("a string PathPrefix gives the session key and elapsed", plan.HasSessionFolder, "no session folder");
                 Check("nothing to note in a good rig.yml", plan.Notes.Count == 0, string.Join(" | ", plan.Notes));
+                Check("a Logging with LoggedRows has its rows streamed as logs", plan.StreamsLoggedRows, "not streamed");
+                var olderLogging = LiveViewPlan.Create(root, name => name == "PathPrefix" ? typeof(string) : null, name => null);
+                Check("an older Logging, without LoggedRows, streams no rows and says so",
+                    !olderLogging.StreamsLoggedRows && olderLogging.Notes.Any(n => n.Contains("has no LoggedRows")), string.Join(" | ", olderLogging.Notes));
+                Check("the plan changes when LoggedRows comes or goes, so the inner workflow is remade",
+                    olderLogging.Signature(5556, 5558) != LiveViewPlan.Create(root, name => name == "PathPrefix" ? typeof(string) : null).Signature(5556, 5558), "same signature");
 
                 Console.WriteLine("Bad settings:");
                 var bad = Plan(root, "camera:\n  box:\n    liveView:\n      rate: fast\n      width: 100.5\n      colour: red\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);

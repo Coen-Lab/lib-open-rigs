@@ -19,6 +19,8 @@ The workflow takes a data stream as its `Source1` input, constructs the output p
 | `LogName` | - | Stem added after the path prefix (e.g. `_lick_spout`) |
 | `Extension` | `.csv` | File extension including the leading dot |
 | `Selector` | `Seconds` | Comma-separated list of member names to write as columns |
+| `AutoFlush` | `false` | Flush each row to disk as it is written (Logging 0.1.0-bbox.5 on). For slow logs only, such as trials and events: at a Harp log's rate it costs a disk write per row |
+| `PublishRows` | `false` | Publish each row written to `LoggedRows`, which OpenRigs.LiveView's `StreamDevices` streams as `logs` (0.1.0-bbox.5 on). For slow logs only, as `AutoFlush` |
 
 ---
 

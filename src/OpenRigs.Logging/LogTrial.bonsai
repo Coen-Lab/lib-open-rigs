@@ -2,7 +2,7 @@
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Writes one row per trial into BonsaiData_Trial: every field of the timestamped trial record, its settings and its outcome together. Build the record once the trial has ended, stamp it last with WithLatestTimestamp, and send it here.</Description>
+  <Description>Writes one row per trial into BonsaiData_Trial: every field of the timestamped trial record, its settings and its outcome together. Build the record once the trial has ended, stamp it last with WithLatestTimestamp, and send it here. Each row is flushed to disk as it is written (AutoFlush) and published to LoggedRows (PublishRows), which OpenRigs.LiveView's StreamDevices streams, so a live view has each trial as it ends.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -13,6 +13,8 @@
         <ClosingDuration xsi:nil="true" />
         <LogName>BonsaiData_Trial</LogName>
         <Selector />
+        <AutoFlush>true</AutoFlush>
+        <PublishRows>true</PublishRows>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
     </Nodes>

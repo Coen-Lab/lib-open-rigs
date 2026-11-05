@@ -30,6 +30,28 @@ namespace OpenRigs.Logging
         static readonly MethodInfo BuildCombinatorMethod = typeof(CombinatorExpressionBuilder)
             .GetMethod(nameof(BuildCombinator), BindingFlags.Instance | BindingFlags.NonPublic);
 
+        static readonly MethodInfo WriteRowMethod = typeof(LoggedRows).GetMethod(nameof(LoggedRows.WriteRow));
+
+        /// <summary>
+        /// Gets or sets a value indicating whether each row is flushed to disk as it is written.
+        /// </summary>
+        /// <remarks>
+        /// The Bonsai CsvWriter writes through a StreamWriter that flushes only when its 4 KB buffer
+        /// fills or the file closes. A session's trial log, a few rows a minute, then reached disk
+        /// tens of trials late, and a Bonsai ended by force lost its unflushed tail (rig-control,
+        /// 1 Nov 2026: 411 rows against 503 frames). A flush per row costs a write per row, so it
+        /// is for slow logs only (LogTrial and LogAsync turn it on), never a Harp log at 1 kHz.
+        /// </remarks>
+        [Description("Whether each row is flushed to disk as it is written, so the file is never behind and a Bonsai ended by force loses no rows. For slow logs only (trials, events): a flush per row at a Harp log's rate costs a disk write per row.")]
+        public bool AutoFlush { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether each row written is also published to
+        /// <see cref="LoggedRows"/>, for a live view to stream.
+        /// </summary>
+        [Description("Whether each row written is also published to LoggedRows, with its session, log name and row number, for a live view (OpenRigs.LiveView's StreamDevices) to stream as it happens. For slow logs only, as AutoFlush.")]
+        public bool PublishRows { get; set; }
+
         /// <inheritdoc/>
         protected override Expression BuildCombinator(IEnumerable<Expression> arguments)
         {
@@ -70,12 +92,40 @@ namespace OpenRigs.Logging
             }
 
             var headerText = IncludeHeader ? BuildHeader(writeAction) : (string)header.Value;
+            if (AutoFlush || PublishRows) writeAction = WithRowActions(writeAction, headerText, AutoFlush, PublishRows);
             return Expression.Call(
                 Expression.Constant(this),
                 process.Method,
                 process.Arguments[0],
                 Expression.Constant(headerText),
                 writeAction);
+        }
+
+        // The write Bonsai built is writer.WriteLine(line). With either option on, the same line
+        // goes through LoggedRows.WriteRow instead, which writes it, then flushes and publishes it
+        // as asked. With both off the lambda is left as Bonsai built it, so every log that does
+        // not ask writes exactly as before.
+        static LambdaExpression WithRowActions(LambdaExpression writeAction, string header, bool flush, bool publish)
+        {
+            if (!(writeAction.Body is MethodCallExpression writeLine) ||
+                writeLine.Method.Name != nameof(System.IO.TextWriter.WriteLine) ||
+                writeLine.Object == null ||
+                writeLine.Arguments.Count != 1 ||
+                writeLine.Arguments[0].Type != typeof(string))
+            {
+                throw new InvalidOperationException(
+                    "The Bonsai CsvWriter built a write this operator does not recognise, so AutoFlush and PublishRows cannot be applied. " +
+                    "Check the Bonsai.System version against OpenRigs.Logging.");
+            }
+
+            var body = Expression.Call(
+                WriteRowMethod,
+                Expression.Convert(writeLine.Object, typeof(System.IO.TextWriter)),
+                writeLine.Arguments[0],
+                Expression.Constant(header, typeof(string)),
+                Expression.Constant(flush),
+                Expression.Constant(publish));
+            return Expression.Lambda(writeAction.Type, body, writeAction.Parameters);
         }
 
         static string BuildHeader(LambdaExpression writeAction)

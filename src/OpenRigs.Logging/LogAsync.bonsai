@@ -5,7 +5,7 @@
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Declares the AsyncEvents subject and writes every event sent to it into BonsaiData_Async (Seconds,Event,Detail,Value): everything of a session that is not a trial, such as manual rewards, flushes and spout moves. AsyncEvents replays, so events sent before the session folder exists (before Go) are kept and written once it does. Place LogAsync once, at the top level or in a top-level group and ahead of every sender, never inside a SelectMany. Send events with CreateAsyncEvent, then WithLatestTimestamp, then MulticastSubject AsyncEvents.</Description>
+  <Description>Declares the AsyncEvents subject and writes every event sent to it into BonsaiData_Async (Seconds,Event,Detail,Value): everything of a session that is not a trial, such as manual rewards, flushes and spout moves. AsyncEvents replays, so events sent before the session folder exists (before Go) are kept and written once it does. Place LogAsync once, at the top level or in a top-level group and ahead of every sender, never inside a SelectMany. Send events with CreateAsyncEvent, then WithLatestTimestamp, then MulticastSubject AsyncEvents. Each row is flushed to disk as it is written (AutoFlush) and published to LoggedRows (PublishRows), which OpenRigs.LiveView's StreamDevices streams.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="rx:ReplaySubject" TypeArguments="harp:Timestamped(orl:AsyncEvent)">
@@ -22,6 +22,8 @@
         <ClosingDuration xsi:nil="true" />
         <LogName>BonsaiData_Async</LogName>
         <Selector />
+        <AutoFlush>true</AutoFlush>
+        <PublishRows>true</PublishRows>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
     </Nodes>
