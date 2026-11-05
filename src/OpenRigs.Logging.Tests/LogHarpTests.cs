@@ -108,7 +108,10 @@ namespace OpenRigs.Logging.Tests
             {
                 // The workflow should externalize LogHarpDevice's LogName under this display name.
                 { "HarpLogName", logName },
-                { "Count", count.ToString(CultureInfo.InvariantCulture) }
+                { "Count", count.ToString(CultureInfo.InvariantCulture) },
+                // The workflow's 0.5 s default made 100 samples a 50 s wait; what is checked is the
+                // count, not the rate.
+                { "Period", "0.01" }
             });
         }
     }
