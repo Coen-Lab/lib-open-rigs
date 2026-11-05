@@ -2,7 +2,7 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core, Devices, Logging, Streaming and Video 0.1.1-coen.1
+## OpenRigs.Core, Devices, Streaming and Video 0.1.1-coen.1; Logging 0.1.1-coen.2
 
 Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) and the lab's own packages `0.1.0-local.N`. Every lab package is now `0.1.1-coen.N` (`COEN-LAB.md`); the history below names the versions as they were.
 
@@ -21,6 +21,8 @@ Video 0.1.0-bbox.3 (2 Nov 2026, a92cde7 and 19e39cb) is a lab change rather than
 
 Logging 0.1.0-bbox.4 (4 Nov 2026, 4e79e7f) is a lab change rather than a patch: `LogTrial`, `LogAsync` and `CreateAsyncEvent`, the lab's two session files (`COEN-LAB.md`). 0.1.0-bbox.5 (5 Nov 2026) adds CsvWriter's `AutoFlush` and `PublishRows` and the `LoggedRows` source, both on in `LogTrial` and `LogAsync`, so their rows are on disk and streamed as they are written. Those two properties are the one part of it inside an upstream operator, `CsvWriter` (upstream's since `f313716`), and neither Bonsai's CsvWriter nor open-rigs has anything like them (Bonsai's `Buffered` moves writing to another thread, not to disk). Kept here off by default (Pip, 5 Nov 2026), to be offered upstream: not yet reported.
 
+Logging 0.1.1-coen.2 (5 Nov 2026) adds `CsvWriter.ColumnNames`, the header's columns for a type without writing, for check-bonsai's hold of `BonsaiData_Trial` to `lab_names.yml`.
+
 Logging 0.1.0-bbox.6 (5 Nov 2026) fixes upstream's `LogVideo`: its two inline `FormatFileName` copies left out the chunk start, so files were `<LogName>\<LogName>.avi` and a session crossing the hour opened the same file twice. It now includes `OpenRigs.Logging:FormatFileName.bonsai` as `LogRawVideo` does, giving `<LogName>\<LogName>_<DateTime>.avi` and `.csv`; a test holds it equal to `LogRawVideo` apart from its frame selector and CSV columns. An upstream file, to be offered upstream: not yet reported.
 
 Core and Devices have a `<Version>` in their `.csproj` since bbox.2, so `scripts\build-package.ps1` builds them like the rest.
@@ -30,7 +32,7 @@ SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on PIPOFFICERI
 ```
 e4c568a295c91b91a2553331d8d64f953135030307a196a5f50ed0b18c1dca02  OpenRigs.Core.0.1.1-coen.1.nupkg
 64feb703e03e1538b03311db342724e80da45c2a2dd7307e33d6e1c86ea0a4bb  OpenRigs.Devices.0.1.1-coen.1.nupkg
-862c94d7247c0286158085a1327d18e8cb59ba8ea0bedcbf19ca13acd290ec36  OpenRigs.Logging.0.1.1-coen.1.nupkg
+0a2826832467fa77e3fef2fb25f385c747f05e96681b6877aa098bef90bf39be  OpenRigs.Logging.0.1.1-coen.2.nupkg
 e0d07b700ad1a6d18090e1a7713e51bf23f8c029df1c491db50e98667522f73d  OpenRigs.Video.0.1.1-coen.1.nupkg
 e7ec0d808241666ed45db825e4abe8546bdbc083fef8afac296204e9f0719622  OpenRigs.Streaming.0.1.1-coen.1.nupkg
 ```
