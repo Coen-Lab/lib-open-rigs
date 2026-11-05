@@ -6,8 +6,9 @@
 #   - scripts\check-workflow-builds.ps1 fails a workflow that uses a name not here (device subjects and
 #     log names, ExperimentControl parameters, BonsaiData_Trial columns), so update-workflows does
 #     not update it and reports why.
-#   - rig-setup's machines window marks each key of a rig's rig.yml against its rig's devices
-#     and settings (update-workflows writes this file as JSON to K:\config\data-dictionary.json).
+#   - Since 6 Nov 2026 the names list itself is K:\config\device-dictionary.json and
+#     K:\config\data-dictionary.json, one lab-wide superset each, edited from rig-setup's Repos page
+#     (DECISIONS.md, stage 2); this file is no longer copied there. What stays here leaves in stage 3.
 #   - open_rigs.trials reads BonsaiData_Trial by the columns here: old names through formerly,
 #     each column as its type, codes decoded through values.
 #

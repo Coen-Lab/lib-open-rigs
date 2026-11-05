@@ -222,12 +222,6 @@ if (-not (Test-Path $RepoList)) { throw "Cannot read rig-setup's repo list at $R
 if (-not (Test-Path $Rules)) { throw "Cannot read rig-setup's rules at $Rules." }
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 
-# The lab's data dictionary, where rig-setup reads them (beside the repo list), as JSON so it
-# needs no YAML reader; open_rigs.data_dictionary writes it beside and renames it over the old one.
-$namesTarget = Join-Path (Split-Path $RepoList -Parent) 'data-dictionary.json'
-& uv run --project $repo --frozen python -m open_rigs.data_dictionary --json $namesTarget
-if ($LASTEXITCODE -ne 0) { throw "Could not write the data dictionary to $namesTarget." }
-"data_dictionary.yml written to $namesTarget"
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
 # Main is left alone for a workflow whose main runs live experiments while a branch moves to

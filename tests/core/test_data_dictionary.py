@@ -1,6 +1,5 @@
-"""data_dictionary.yml holds to its own rules, and its JSON copy for rig-setup is the same list."""
+"""data_dictionary.yml holds to its own rules."""
 
-import json
 import re
 
 from open_rigs import data_dictionary
@@ -68,9 +67,3 @@ def test_no_old_name_is_a_current_one():
     old = [o for t in tables for c in t.values() for o in c.get("formerly") or []]
     assert not current & set(old), current & set(old)
     assert len(old) == len(set(old)), "one old name maps to two columns"
-
-
-def test_json_copy_is_the_same_list(tmp_path):
-    target = tmp_path / "data-dictionary.json"
-    data_dictionary.write_json(target)
-    assert json.loads(target.read_text(encoding="utf-8")) == data_dictionary.load()
