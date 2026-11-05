@@ -30,7 +30,7 @@ A manifest after the finishing step, from a session on GEEK-BBOX1 (`files` cut t
     "subject": "TC002",
     "id": "003B1",
     "started": "2026-10-30T19:57:12Z",
-    "folder": "C:\\Coen-Lab-Local\\Acquired-Data\\Behaviour_Box\\sub-TC002\\ses-003B1_2026-10-30T19-57-12"
+    "folder": "C:\\Coen-Lab-Local\\Acquired-Data\\sub-TC002\\ses-003B1_2026-10-30T19-57-12"
   },
   "source": {
     "workflow": "src\\main.bonsai",
