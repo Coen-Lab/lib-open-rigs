@@ -2,7 +2,9 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core 0.1.0-bbox.2, Devices 0.1.0-bbox.3; Logging 0.1.0-bbox.6; Streaming 0.1.0-bbox.2; Video 0.1.0-bbox.3
+## OpenRigs.Core, Devices, Logging, Streaming and Video 0.1.1-coen.1
+
+Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) and the lab's own packages `0.1.0-local.N`. Every lab package is now `0.1.1-coen.N` (`COEN-LAB.md`); the history below names the versions as they were.
 
 Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), from this repository's own `src\`: upstream branch `rig-config-resolver` at `3788bfb` (main plus the per-machine config operators `ResolveRigConfigDirectory`, `ReadRigConfig` and `ResolveRigFile`) and two fixes, both reported upstream, which are commits on this repository's `main`:
 
@@ -23,14 +25,14 @@ Logging 0.1.0-bbox.6 (5 Nov 2026) fixes upstream's `LogVideo`: its two inline `F
 
 Core and Devices have a `<Version>` in their `.csproj` since bbox.2, so `scripts\build-package.ps1` builds them like the rest.
 
-SHA-256 of the packages as committed (built with .NET SDK 8.0.424; Streaming bbox.2 and Video bbox.3 on 2 Nov 2026, Core and Devices bbox.2 on 4 Nov 2026; Logging bbox.5 on 5 Nov 2026, with the 8.0.424 SDK put beside the repo on GREEN-DOME-1, whose only installed SDK is 10.0.201; its first build, with that, never left the rig; Logging bbox.6 and Devices bbox.3 on 5 Nov 2026 on PIPOFFICERIG):
+SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on PIPOFFICERIG, 5 Nov 2026):
 
 ```
-f5281b204ffa5dbc626672bed650c2b4680c23e4b55ef9900c30ce67d331f4f4  OpenRigs.Core.0.1.0-bbox.2.nupkg
-76f7fa494da4bb73adca492cec326e3e12f3d322233b050404b296b3db5c9819  OpenRigs.Devices.0.1.0-bbox.3.nupkg
-10925eee11cdbe3c857ed228fc86e04cd81a6003b4c1a1f073a6c22d2c871e94  OpenRigs.Logging.0.1.0-bbox.6.nupkg
-d961f3e80cb45e68cf4846d54f0c6a2fa1a67c142ee17363c0acf5fc46b01c65  OpenRigs.Video.0.1.0-bbox.3.nupkg
-bd7fd1177f3ce29f35c90072eb1ac800e04314bf5a8bf2556a729a79be70c462  OpenRigs.Streaming.0.1.0-bbox.2.nupkg
+e4c568a295c91b91a2553331d8d64f953135030307a196a5f50ed0b18c1dca02  OpenRigs.Core.0.1.1-coen.1.nupkg
+64feb703e03e1538b03311db342724e80da45c2a2dd7307e33d6e1c86ea0a4bb  OpenRigs.Devices.0.1.1-coen.1.nupkg
+862c94d7247c0286158085a1327d18e8cb59ba8ea0bedcbf19ca13acd290ec36  OpenRigs.Logging.0.1.1-coen.1.nupkg
+e0d07b700ad1a6d18090e1a7713e51bf23f8c029df1c491db50e98667522f73d  OpenRigs.Video.0.1.1-coen.1.nupkg
+e7ec0d808241666ed45db825e4abe8546bdbc083fef8afac296204e9f0719622  OpenRigs.Streaming.0.1.1-coen.1.nupkg
 ```
 
 `OpenRigs.Streaming` is upstream's `src/OpenRigs.Streaming` at the base commit, unchanged by either patch. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.

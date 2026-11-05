@@ -20,7 +20,7 @@ A manifest after the finishing step, from a session on GEEK-BBOX1 (`files` cut t
   "created": "2026-10-30T19:57:13Z",
   "status": "complete",
   "ingest_script": "coen-behaviour-box",
-  "writer": { "package": "OpenRigs.Manifest", "version": "0.1.0-local.15" },
+  "writer": { "package": "OpenRigs.Manifest", "version": "0.1.1-coen.1" },
   "rig": {
     "machine": "GEEK-BBOX1",
     "user": "Coen lab",
