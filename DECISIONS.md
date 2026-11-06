@@ -38,4 +38,8 @@ Decided by Pip with Claude, 5 Nov 2026. Built in four stages, in this order; eac
 - `config\login-used\` (one stale Lab PIN stamp from 23 Oct; the stamps live in `K:\logins\login-used\`) was deleted, with a backup in `config\_backups\`. `config\RigTransfer\` (ASUS chipset and Serial IO drivers copied by hand on 20 Aug, used by no code) moved to `K:\setup\drivers\`.
 - Order: the code in rig-setup, rig-control, ClaudioVisual and `scripts\hourly.ps1` first, then the folders moved; a rig that had not yet taken rig-setup's update wrote to its old folder for up to 30 minutes, merged in afterwards.
 
+### Stage 2, the deploy check flags and does not roll back (6 Nov 2026; supersedes "a failure keeps the previous deployed version" above)
+
+- rig-setup runs rig-control's `check-workflow-names.ps1` on a rig's clone after it takes a new version (once per commit and lists, recorded beside the clone), and a failure is an outstanding row in the Machines window and ClaudioVisual's rig health. The new version stays in place, so that workflow cannot launch (rig-control blocks it) until the names are added or the workflow is changed. Pip chose this over rolling back: the check needs the new version's packages, so it can only run after the pull and Setup, and a rollback would have to reset the clone, set up the old packages again and refuse that commit on every later update.
+
 **Out of scope, noted.** Rigs restore ucl-open packages with a token on Pip's personal GitHub account (rig-setup-rules.json, until ucl-open publishes to nuget.org, ucl-open/ucl-open#12). pip-hub's Monday rota emails also run on PIPOFFICERIG.
