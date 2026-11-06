@@ -111,8 +111,8 @@ namespace OpenRigs.Manifest
 
         /// <summary>
         /// The files under the experiment folder an entry matches: the file itself, every file whose path starts
-        /// with a prefix entry (ending in _, 0.1.1-coen.5: each of the three settings files in Settings/ expected on
-        /// its own, as one Settings/ entry was met by any one of them), or every file in the folder that no other
+        /// with a prefix entry (ending in _, 0.1.1-coen.5: each of the three settings files, in Schemas/ until coen.7
+        /// and Settings/ since, expected on its own, as one folder entry was met by any one of them), or every file in the folder that no other
         /// entry names (0.1.0-local.7), so a device's register map, expected by name in the device's folder,
         /// never stands in for the device's data.
         /// </summary>

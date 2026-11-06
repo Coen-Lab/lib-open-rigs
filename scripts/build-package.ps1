@@ -29,11 +29,15 @@ $was = & git -C $repo log --all -1 --format=%h -- "local_packages/$name"
 if ($was) { throw "$name was committed before ($was). Raise <Version> in src\$Package\$Package.csproj before building." }
 
 "Packing $id $version..."
-# open-rigs' build stamps 42.42.42-dev0 on any package not given its version on the command line.
-& dotnet pack $project -c Release -nologo -v q -o $out -p:Version=$version
+# Each package keeps its own .csproj <Version> (build\Common.csproj.targets). No -p:Version: a global
+# property reaches the ProjectReferences too, so each dependency named the packed package's version
+# (Logging coen-lab.4 wanted Core coen-lab.4 while Core was coen-lab.3; audit 2026-11-06).
+& dotnet pack $project -c Release -nologo -v q -o $out
 if ($LASTEXITCODE -ne 0) { throw "dotnet pack failed" }
 $nupkg = Join-Path $out $name
 if (-not (Test-Path $nupkg)) { throw "no $nupkg after pack" }
+try { & (Join-Path $PSScriptRoot 'check-package-dependencies.ps1') -Nupkg $nupkg }
+catch { Remove-Item $nupkg; throw "$_ Nothing was kept." }
 Get-ChildItem $out -File -Filter '*.nupkg' | Where-Object { $_.Name -match "^$([regex]::Escape($id))\.\d" -and $_.Name -ne $name } |
     ForEach-Object { Remove-Item $_.FullName; "  removed $($_.Name)" }
 "  $nupkg"

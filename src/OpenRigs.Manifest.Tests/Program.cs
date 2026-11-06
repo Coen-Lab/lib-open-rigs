@@ -234,7 +234,7 @@ namespace OpenRigs.Manifest.Tests
                 Check("a folder is not met by a file another entry names", ExpectedPlan.Matches(board, new[] { "Board/Board.yml" }, both) == 0
                     && ExpectedPlan.Matches(map, new[] { "Board/Board.yml" }, both) == 1, "the register map stood in for the board's data");
                 Check("... and is by any other file in it", ExpectedPlan.Matches(board, new[] { "Board/Board.yml", "Board/Board_44_x.bin" }, both) == 1, "not met");
-                // 0.1.1-coen.5: each settings file in Settings/ expected on its own, by a prefix entry.
+                // 0.1.1-coen.5: each settings file expected on its own, by a prefix entry (in Schemas/ until coen.7, Settings/ since).
                 var schemas = ExpectedPlan.Create("Settings/Settings_Rig_;Settings/Settings_Task_;Settings/", null, n => null).Entries;
                 var inSchemas = new[] { "Settings/Settings_Rig_2026-11-07T09-30-12.json" };
                 Check("a prefix entry is met by a file whose path starts with it, and only by one", ExpectedPlan.Matches(schemas[0], inSchemas, schemas) == 1

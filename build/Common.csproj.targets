@@ -29,7 +29,8 @@
       If you feel compelled to change this version number for local testing you're almost certainly doing something wrong!
     -->
     <DevVersion Condition="'$(DevVersion)' == ''">0</DevVersion>
-    <Version>42.42.42-dev$(DevVersion)</Version>
+    <!-- Lab: a package's own <Version> (0.1.1-coen-lab.N, COEN-LAB.md) is kept, so a ProjectReference's dependency names the referenced package's version, not the one being packed. -->
+    <Version Condition="!$(Version.Contains('-coen-lab.'))">42.42.42-dev$(DevVersion)</Version>
 
     <Version Condition="'$(ContinuousIntegrationBuild)' == 'true'">$(CiBuildVersion)</Version>
   </PropertyGroup>
