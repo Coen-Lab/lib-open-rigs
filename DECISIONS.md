@@ -59,7 +59,7 @@ Pip: "bonsai repo just sends everything, and visualisation should be decided by 
 
 ## 2026-11-06: Calibrations are the machine's, run from one page, each kind by its own workflow
 
-Pip: calibrations should be "all ... part of one interface in rig control", and "it needs to learn the valve channels etc. from rig.yml". Until now open-rigs' dispense calibration (`OpenRigs.Core:DispenseCalibration.bonsai`, merged 3 Nov 2026) had no runnable workflow anywhere.
+Pip: calibrations should be "all ... part of one interface in rig control", and "it needs to learn the valve channels etc. from rig.yml". Until now open-rigs' dispense calibration (`OpenRigs.Core:DispenseCalibration.bonsai`, merged 3 Nov 2026) ran only from av-dome's `src\CalibrateValve.bonsai` (Tom, 8 Oct 2026), by hand in Bonsai with its ports typed in, reading nothing from rig.yml.
 
 - **The machine's, not an experiment's:** an artefact sits in `calibration\` beside the rig's rig.yml and every workflow on that rig reads it, so a calibration is never part of an experiment workflow or its form.
 - **One workflow per kind, each in its own ucl-open repository** (valves: `ucl-open/coen-calibrate-valve`; Tom's `qc-calibrate-valve` scaffold left as his), since each kind needs its own hardware and packages. Each is an open-rigs project under `ExperimentControl`, so rig-control launches, watches and stops it like an experiment.
