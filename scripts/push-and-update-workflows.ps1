@@ -74,8 +74,8 @@ if ($twice) { throw "Two versions in local_packages\ of: $($twice -join ', '). K
 # pass it and push without it (audit-rigs set C); update-workflows.ps1 refuses one after the push.
 if (git -C $repo status --porcelain -- scripts) { throw "scripts\ has uncommitted changes. Commit or discard them first." }
 
-# The hourly task runs these from origin/main, and a script that does not parse fails every
-# hour there (audit-rigs set B): no CI here checks the lab's scripts, so this push does.
+# Whoever pushes next runs these from origin/main, and a script that does not parse fails there
+# (audit-rigs set B): no CI here checks the lab's scripts, so this push does.
 $broken = @(Get-ChildItem (Join-Path $repo 'scripts') -Filter '*.ps1' | ForEach-Object {
     $errors = $null
     $null = [Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors)

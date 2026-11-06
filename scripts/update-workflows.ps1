@@ -3,11 +3,12 @@ param(
     # for main and a worktree <Work>\<Org>\<repo>@<branch> for each other branch, each set to
     # exactly what GitHub has at every run.
     [string]$Work = (Join-Path $env:LOCALAPPDATA 'lib-open-rigs\clones'),
-    # rig-setup's lists of the lab's repositories, every profile's: the ones its Repos button
-    # writes on the share, and its own rules file's (rig-setup-rules.json). Every one that is a Bonsai project
-    # (rig-setup's rule: .bonsai\Bonsai.config and src\main.bonsai) is a lab workflow here.
+    # rig-setup's list of the lab's repositories, every profile's, as its Repos button writes it
+    # on the share. Every one that is a Bonsai project (rig-setup's rule: .bonsai\Bonsai.config
+    # and src\main.bonsai) is a lab workflow here. rig-setup-rules.json's own repos are not read:
+    # none is a workflow, and its path is one machine's layout (DECISIONS.md stage 4).
+    # lab-package-versions.json is written beside it.
     [string]$RepoList = 'K:\config\profile-repos.json',
-    [string]$Rules = 'C:\Github\Coen-Lab\rig-setup\rig-setup-rules.json',
     # Lab workflows not (yet) on rig-setup: workflows.txt here, one GitHub <org>/<repo> a line.
     [string]$Extra = '',
     # The workflow whose Bonsai.config, written by Bonsai's own package manager and run on a
@@ -16,9 +17,14 @@ param(
 )
 # Keeps every lab Bonsai workflow on the lab's packages, on main and on each branch ticked for
 # it in rig-setup: every package in local_packages\ here, at the version here, with what they
-# depend on. Run by scripts\push-and-update-workflows.ps1 after each push here, and hourly (scripts\hourly.ps1, the task scripts\schedule.ps1 registers),
-# so a repository added with rig-setup's Repos button, or a branch ticked there, gets them
-# unasked.
+# depend on. Run by scripts\push-and-update-workflows.ps1 after each push here, by whoever
+# pushes, from any machine with Bonsai, .NET and write access to ucl-open; nothing runs it on a
+# schedule (DECISIONS.md stage 4). A repository added with rig-setup's Repos button, or a branch
+# ticked there, gets the packages at the next run: run this script alone for that, no push needed.
+#
+# Each run first writes K:\config\lab-package-versions.json (beside -RepoList): each lab
+# package's version here and the open-rigs pin. rig-setup flags a rig's workflow clone that is
+# not on them as behind, and rig-control warns on it; that is how a failed or missing run is seen.
 #
 # For each of those branches:
 #   - each package here is updated to the version here, or added if the branch lacks it
@@ -37,9 +43,8 @@ param(
 # not committed and is named in the table; the next run tries again from what GitHub has.
 # Exits 1 unless every branch of every lab workflow is up to date.
 $ErrorActionPreference = 'Stop'
-# A throw (unpushed commits here, no lab share) is written to the output and exits 1: the hourly
-# task's *> redirect does not catch a terminating error, so its log stopped after "Packages:"
-# with nothing saying why (audit, 2 Nov 2026).
+# A throw (unpushed commits here, no lab share) is written to the output and exits 1, so a log
+# of the run says why it stopped (audit, 2 Nov 2026).
 trap { "Stopped: $($_.Exception.Message)"; exit 1 }
 $repo = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $local = Join-Path $repo 'local_packages'
@@ -194,7 +199,7 @@ if ([int](Invoke-Git $repo rev-list --count 'HEAD..@{u}')) {
     if (Invoke-Git $repo status --porcelain) { throw "lib-open-rigs is behind GitHub and has local changes. Commit or discard them first." }
     $null = Invoke-Git $repo merge --ff-only -q '@{u}'
     "lib-open-rigs brought up to date with GitHub; running the updated script."
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path -Work $Work -RepoList $RepoList -Rules $Rules -Extra $Extra -Reference $Reference
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path -Work $Work -RepoList $RepoList -Extra $Extra -Reference $Reference
     exit $LASTEXITCODE
 }
 $source = (Invoke-Git $repo rev-parse --short HEAD) | Select-Object -First 1
@@ -205,22 +210,33 @@ $source = (Invoke-Git $repo rev-parse --short HEAD) | Select-Object -First 1
 $pin = (Invoke-Git $repo log -1 --format=%H -- src ':!src/**/*.md' ':!src/*.Tests/**' pyproject.toml local_packages) | Select-Object -First 1
 $pinLine = "open-rigs = {git = `"https://github.com/Coen-Lab/lib-open-rigs`", rev = `"$pin`"}"
 
-# One run at a time: push-and-update-workflows.ps1's and the hourly one share the clones. A run already going may
-# have read local_packages\ before this push, so this one waits for it rather than trusting it.
+# One run at a time on this machine: two pushes in a row share the clones. A run already going
+# may have read local_packages\ before this push, so this one waits for it rather than trusting it.
 $mutex = New-Object Threading.Mutex($false, 'Global\lib-open-rigs-update-workflows')
 try { $mine = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $mine = $true }
 if (-not $mine) {
-    # Well inside the hourly task's three-hour limit (schedule.ps1), so a wait that runs out says so
-    # here rather than being stopped by Task Scheduler with nothing logged.
     "Another run of update-workflows.ps1 is going; waiting for it to finish (at most 40 minutes)..."
     try { $mine = $mutex.WaitOne([TimeSpan]::FromMinutes(40)) } catch [Threading.AbandonedMutexException] { $mine = $true }
-    if (-not $mine) { throw "The other run of update-workflows.ps1 has held the clones for 40 minutes; nothing done. The next hourly run tries again." }
+    if (-not $mine) { throw "The other run of update-workflows.ps1 has held the clones for 40 minutes; nothing done. Run this script again once it has finished." }
 }
 
 # rig-setup's repos for every profile, then workflows.txt, each repository once.
 if (-not (Test-Path $RepoList)) { throw "Cannot read rig-setup's repo list at $RepoList (is the lab share mapped?)." }
-if (-not (Test-Path $Rules)) { throw "Cannot read rig-setup's rules at $Rules." }
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
+
+# What every lab workflow should be on, written before any is updated: a run that stops or fails
+# part way then shows on the rigs as workflows behind it, not as nothing. Written beside, then
+# renamed over, so a rig never reads half a file.
+$versionsFile = Join-Path (Split-Path $RepoList) 'lab-package-versions.json'
+$versions = [ordered]@{
+    about = 'Written by lib-open-rigs scripts\update-workflows.ps1 at each run. rig-setup flags a workflow clone whose lab packages or open-rigs pin differ as behind; rig-control warns. Never edit by hand.'
+    packages = [ordered]@{}; openRigs = $pin; commit = $source
+    written = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture); machine = $env:COMPUTERNAME }
+foreach ($id in $packages.Keys | Sort-Object) { $versions.packages[$id] = "$($packages[$id].Version)" }
+$tmp = "$versionsFile.tmp"
+[IO.File]::WriteAllText($tmp, ($versions | ConvertTo-Json -Depth 3) + "`n", (New-Object Text.UTF8Encoding $false))
+if (Test-Path $versionsFile) { [IO.File]::Replace($tmp, $versionsFile, [NullString]::Value) } else { [IO.File]::Move($tmp, $versionsFile) }
+"Wrote $versionsFile."
 
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
 # "branches" list on its entry), or named after it in workflows.txt.
@@ -228,7 +244,6 @@ if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 # open-rigs (av-dome): Leave Main Alone ticked in rig-setup's Repos menu
 # ("labPackagesMain": false on its entry), or !main on its workflows.txt line.
 $entries = @((Get-Content $RepoList -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $_.labPackagesMain -eq $false } }) +
-    @((Get-Content $Rules -Raw | ConvertFrom-Json).repos | ForEach-Object { [pscustomobject]@{ Url = $_.url; Branches = @($_.branches | Where-Object { $_ }); SkipMain = $false } }) +
     @(Get-Content $Extra | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object {
         $slug, $rest = $_ -split '\s+'
         [pscustomobject]@{ Url = "https://github.com/$slug.git"; Branches = @($rest | Where-Object { $_ -and $_ -ne '!main' }); SkipMain = '!main' -in $rest } })
@@ -431,7 +446,7 @@ try {
         if ($clone.SkipMain -and -not $clone.Branches) { $rows += [pscustomobject]@{ Workflow = $clone.Slug; Result = 'not kept'; Detail = 'main left alone and no branch ticked: nothing of this repo is kept on the lab''s packages' } }
         foreach ($branch in @(if (-not $clone.SkipMain) { 'main' }) + @($clone.Branches)) {
             # Merged or deleted: rig-setup reads the same tick as nothing to clone (ok), and Repos
-            # takes it off at its next save, so it is not a failure every hour until then.
+            # takes it off at its next save, so it is not a failure at every run until then.
             if ($branch -notin $branches) { $rows += [pscustomobject]@{ Workflow = "$($clone.Slug)@$branch"; Result = 'gone'; Detail = "ticked in rig-setup, but GitHub has no branch $branch (merged or deleted); Repos takes it off at its next save" }; continue }
             try { $dir = Set-Branch $clone.Dir $branch }
             catch { $rows += [pscustomobject]@{ Workflow = "$($clone.Slug)@$branch"; Result = 'FAILED'; Detail = "$($_.Exception.Message)" }; continue }
@@ -458,5 +473,5 @@ try {
 $bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai', 'not kept', 'gone' })
 if ($bad) { "`n$($bad.Count) of $($rows.Count) branches are not on the lab's packages."; exit 1 }
 "`nEvery lab Bonsai workflow is on the lab's packages, on main and every ticked branch."
-# Said, not left to the last git call's code, which the hourly task reads as the run's.
+# Said, not left to the last git call's code, which push-and-update-workflows.ps1 reads as the run's.
 exit 0

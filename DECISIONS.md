@@ -31,6 +31,7 @@ Decided by Pip with Claude, 5 Nov 2026. Built in four stages, in this order; eac
 - The repo list stays `K:\config\profile-repos.json`, not a repo. Pip: "people from any pc might change repo list at any time. How can it be a repo?"
 - Rejected: a GitHub Actions or GitHub App updater (needs a bot login and the ucl-open owners' approval; too complicated), and a scheduled task on a rig.
 - Then `scripts\hourly.ps1` and `scripts\schedule.ps1` go, the task is unregistered on PIPOFFICERIG, and the `*_Workflows*` files on K: are deleted.
+- Built 6 Nov 2026 (Pip: "Build as planned"). `update-workflows.ps1` writes `lab-package-versions.json` beside `-RepoList` at the start of each run, before any workflow is updated, so a run that stops part way shows as workflows behind it rather than as nothing. `-Rules` is gone rather than given another default: `rig-setup-rules.json`'s repos (claude-tools, lib-keyring, rig-control) are none of them workflows. Behind means a set-up clone's `Bonsai.config` versions of the listed packages, or its `pyproject.toml` open-rigs pin, differ from the file; a branch left alone (Leave Main Alone) is never behind. Accepted cost: a repository added on the Repos page, or a branch ticked, waits for the next run, and its rigs show it behind until then; `update-workflows.ps1` alone (no push) is the fix.
 
 ### Stage 2, first: the share's config folder holds machines in one place (6 Nov 2026)
 
