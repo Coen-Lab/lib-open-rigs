@@ -148,7 +148,7 @@ foreach ($file in Get-ChildItem (Join-Path $Repo 'src') -Recurse -Filter '*.bons
 }
 $undeclared = @($listened | Where-Object { $declared -cnotcontains ($_ -replace ' \([^)]+\)$', '') })
 if ($undeclared) { "  FAIL  listened for but not declared on ExperimentControl: $($undeclared -join ', ')"; "check-workflow-builds: a command or parameter the workflow listens for is not declared."; exit 1 }
-"  ok"
+"  ok    $($listened.Count) OnCommand/OnParameterSet name(s) declared on ExperimentControl"
 "3. Checking config\*.yml against their schemas..."
 $schemaCheck = Join-Path $PSScriptRoot 'check-config-schemas.py'
 & { $ErrorActionPreference = 'Continue'; & uv run --no-project --with jsonschema --with pyyaml python -I $schemaCheck $Repo 2>&1 | ForEach-Object { "$_" } }
