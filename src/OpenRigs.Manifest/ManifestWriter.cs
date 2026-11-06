@@ -63,12 +63,15 @@ namespace OpenRigs.Manifest
             var root = Git.FindRoot(workflowFolder);
             snapshot.Source = SourceSection(workflowFull, root);
             snapshot.Launch = LaunchSection(args);
+            var subject = LaunchProperty(snapshot.Launch, "SubjectId");
             foreach (var configured in ConfigEntries(configFiles))
             {
-                var file = ConfigFile(configured, root ?? workflowFolder);
-                snapshot.ConfigFiles.Add(file);
-                var missing = file.FirstOrDefault(p => p.Key == "missing");
-                if (missing.Key != null) snapshot.Notes.Add("Config file not found at Start: " + configured + ".");
+                foreach (var file in ConfigFiles(configured, root ?? workflowFolder, subject))
+                {
+                    snapshot.ConfigFiles.Add(file);
+                    var missing = file.FirstOrDefault(p => p.Key == "missing");
+                    if (missing.Key != null) snapshot.Notes.Add("Config file not found at Start: " + configured + (configured.Contains(SubjectToken) ? " (" + SubjectToken + " " + (subject ?? "not on the command line") + ")" : "") + ".");
+                }
             }
             string trialNote;
             snapshot.TrialColumns = Manifest.TrialColumns.Read(trialColumns, root ?? workflowFolder, out trialNote);
@@ -104,6 +107,42 @@ namespace OpenRigs.Manifest
             if (configured == null) return null;
             var folder = WorkflowFile.Folder(WorkflowFile.Find(Environment.GetCommandLineArgs(), Environment.CurrentDirectory), Environment.CurrentDirectory);
             return ResolvePath(configured, Git.FindRoot(folder) ?? folder);
+        }
+
+        /// <summary>The part of a ConfigFiles entry that is the subject, from the launch's --property:SubjectId
+        /// (the mouse's spout positions, calibration\LickSpoutPositions\{SubjectId}.csv, 0.1.1-coen.6).</summary>
+        public const string SubjectToken = "{SubjectId}";
+
+        static string LaunchProperty(JsonObject launch, string name)
+        {
+            var properties = launch.FirstOrDefault(p => p.Key == "properties").Value as JsonObject;
+            var found = properties != null ? properties.FirstOrDefault(p => string.Equals(p.Key, name, StringComparison.OrdinalIgnoreCase)) : default(KeyValuePair<string, object>);
+            return found.Key != null ? found.Value as string : null;
+        }
+
+        /// <summary>One ConfigFiles entry's files: the file, or every file in a folder (calibration\AuditoryStimuli),
+        /// in order, each with its sha256 (0.1.1-coen.6). {SubjectId} is the launch's; with none, the entry is missing.</summary>
+        public static List<JsonObject> ConfigFiles(string configured, string baseFolder, string subject)
+        {
+            if (configured.Contains(SubjectToken))
+            {
+                if (string.IsNullOrEmpty(subject))
+                {
+                    var none = new JsonObject();
+                    none.Add("path", configured);
+                    none.Add("missing", true);
+                    none.Add("why", "no --property:SubjectId on the command line to name the subject's file");
+                    return new List<JsonObject> { none };
+                }
+                configured = configured.Replace(SubjectToken, subject);
+            }
+            var full = ResolvePath(configured, baseFolder);
+            if (Directory.Exists(full))
+            {
+                return Directory.GetFiles(full, "*", SearchOption.AllDirectories)
+                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase).Select(f => ConfigFile(f, baseFolder)).ToList();
+            }
+            return new List<JsonObject> { ConfigFile(configured, baseFolder) };
         }
 
         /// <summary>A configured path with environment variables expanded, a relative one from the base folder.</summary>

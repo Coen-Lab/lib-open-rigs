@@ -12,11 +12,15 @@ param(
 #   2. Builds src\main.bonsai with Bonsai's own expression builders, as Bonsai does at Start
 #      before it subscribes anything: every type, selector, include, subject and mapping; and,
 #      when the workflow tracks config\main.layout, that each window sits on a node it fits.
+#   3. Checks each config\*.yml against its own schema (scripts\check-config-schemas.py: the one
+#      its yaml-language-server line names), every object closed to keys the schema does not
+#      list, as the generated DeserializeFromYaml is: a misspelt key in a task file ended the
+#      experiment at Go (settings-files plan, audit M5).
 # The names a workflow uses are checked where it runs, not here (DECISIONS.md, stage 2):
 # rig-control's scripts\check-workflow-names.ps1, by rig-setup when a rig takes a new version
 # and by rig-control's agent before each launch, against the lab's lists on the share.
 # It cannot check hardware, the visualizers themselves or the data a run writes. Exit 0 when
-# both pass.
+# all three pass.
 $ErrorActionPreference = 'Stop'
 $self = $MyInvocation.MyCommand.Path
 $Repo = (Resolve-Path $Repo).Path
@@ -131,4 +135,8 @@ if (Test-Path $extensions) {
 if ($LASTEXITCODE -eq 2) { "  FAILED"; "check-workflow-builds: config\main.layout does not fit the workflow."; exit 1 }
 if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-workflow-builds: the workflow does not build."; exit 1 }
 "  ok"
-"check-workflow-builds: both steps passed."
+"3. Checking config\*.yml against their schemas..."
+$schemaCheck = Join-Path $PSScriptRoot 'check-config-schemas.py'
+& { $ErrorActionPreference = 'Continue'; & uv run --no-project --with jsonschema --with pyyaml python -I $schemaCheck $Repo 2>&1 | ForEach-Object { "$_" } }
+if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-workflow-builds: a config file does not fit its schema."; exit 1 }
+"check-workflow-builds: all three steps passed."

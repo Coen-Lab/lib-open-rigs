@@ -55,7 +55,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>Gets or sets the configuration files the workflow runs with, separated by ;.</summary>
-        [Description("The configuration files the workflow runs with, separated by ;. Each is read once at Start and copied into the manifest with its sha256, so the manifest has them as loaded. Environment variables are expanded (%COMPUTERNAME%); a relative path is from the workflow's repository. A missing file is noted, not an error.")]
+        [Description("The configuration files the workflow runs with, separated by ;. Each is read once at Start and recorded in the manifest with its sha256, so the manifest has them as loaded. Environment variables are expanded (%COMPUTERNAME%), and {SubjectId} is the launch's --property:SubjectId (a mouse's own file); a folder is every file in it; a relative path is from the workflow's repository. A missing file is noted, not an error.")]
         public string ConfigFiles
         {
             get { return Settings.ConfigFiles; }

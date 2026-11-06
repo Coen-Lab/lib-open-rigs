@@ -216,6 +216,18 @@ namespace OpenRigs.Manifest.Tests
                 File.WriteAllText(cfgPath, "a: 1\n");
                 var cfgKeys = string.Join(",", ManifestWriter.ConfigFile(cfgPath, root).Select(p => p.Key));
                 Check("a config file is its path and sha256, not its text", cfgKeys == "path,sha256", cfgKeys);
+                // 0.1.1-coen.6: a mouse's own file by {SubjectId}, and a folder as every file in it.
+                Directory.CreateDirectory(Path.Combine(root, "Spouts"));
+                File.WriteAllText(Path.Combine(root, "Spouts", "M7.csv"), "1,2");
+                var mine = ManifestWriter.ConfigFiles(@"Spouts\{SubjectId}.csv", root, "M7");
+                Check("{SubjectId} names the subject's own file", mine.Count == 1 && ((string)mine[0][0].Value).EndsWith(@"Spouts\M7.csv") && mine[0][1].Key == "sha256", string.Join(" | ", mine.Select(f => string.Join(",", f.Select(p => p.Key + "=" + p.Value)))));
+                var nobody = ManifestWriter.ConfigFiles(@"Spouts\{SubjectId}.csv", root, null);
+                Check("... and with no SubjectId on the command line it is missing, saying why", nobody.Count == 1 && nobody[0].Any(p => p.Key == "missing") && ((string)nobody[0].First(p => p.Key == "why").Value).Contains("SubjectId"), "found");
+                Directory.CreateDirectory(Path.Combine(root, "Stimuli", "set"));
+                File.WriteAllText(Path.Combine(root, "Stimuli", "b.wav"), "b");
+                File.WriteAllText(Path.Combine(root, "Stimuli", "set", "a.wav"), "a");
+                var stimuli = ManifestWriter.ConfigFiles("Stimuli", root, null);
+                Check("a folder is every file in it, each with its sha256", stimuli.Count == 2 && stimuli.All(f => f[1].Key == "sha256"), string.Join(" | ", stimuli.Select(f => f[0].Value)));
                 var map = new ExpectedEntry { Path = "Board/Board.yml" };
                 var board = new ExpectedEntry { Path = "Board/" };
                 var both = new[] { board, map };
