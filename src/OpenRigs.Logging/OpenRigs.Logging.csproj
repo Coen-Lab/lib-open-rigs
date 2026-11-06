@@ -4,7 +4,7 @@
     <Description>OpenRigs Logging Bonsai library.</Description>
     <PackageTags>$(PackageTags) Logging</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen.3</Version>
+    <Version>0.1.1-coen-lab.4</Version>
   </PropertyGroup>
 
 
