@@ -65,3 +65,13 @@ Pip: calibrations should be "all ... part of one interface in rig control", and 
 - **One workflow per kind, each in its own ucl-open repository** (valves: `ucl-open/coen-calibrate-valve`; Tom's `qc-calibrate-valve` scaffold left as his), since each kind needs its own hardware and packages. Each is an open-rigs project under `ExperimentControl`, so rig-control launches, watches and stops it like an experiment.
 - **It reads the rig's own rig.yml**, only the entries it needs (the valve workflow: `behaviorBoard: main:`'s port, `outputPulseEnable` and `outputs`), never a rig.yml or schema of its own: a strict deserializer of its own would refuse av-dome's other entries.
 - **One page in rig-control** (Setup's Calibrations), from `calibrations.toml` there: every kind, one row per line, each line's curve and history, and Calibrate launching that kind's workflow. Every other launch says, never refuses, when a calibrated line's curve is missing, old or another machine's.
+
+## 2026-11-06: The valve calibration stays Bonsai, with no C# of its own
+
+Pip asked "this is a bonsai workflow... should it be?" before it had run on hardware. Decided by Pip with Claude, 6 Nov 2026. Supersedes the entry above's "it reads the rig's own rig.yml": rig-control reads it instead.
+
+- **Bonsai, not Python in rig-control.** The pulses go through the same `BehaviorBoard`/`PulseController` path a session fires, and Tom's `DispenseCalibration` is the procedure. The only hardware drivers are Bonsai's: `open_rigs.devices` holds config schemas, not drivers. Rejected: a Python procedure in rig-control, which would need a second Harp writer and balance reader that could drift from the Bonsai ones. The artefact (a `CalibrationCurve`, points only) was never the obstacle.
+- **The lab workflow repo holds no C#.** `coen-calibrate-valve` carried 530 lines: a rig.yml reader, the line check and a manual balance. Pip: "Manual balance would then be a \"device\" in open-rigs effectively?" Yes:
+  - `OpenRigs.Devices:ManualBalance.bonsai` beside `SerialBalance.bonsai`. It publishes typed weights as `WeightMeasurement` readings, built on `ManualWeighing`/`ManualReadings` and `ApplyBalancePort` (settings for a COM port or `manual`) in OpenRigs.Core. This is a lab patch on the open-rigs packages. Pip chose not to take it to Tom's open-rigs ("Nothing of Tom's").
+  - `GoByName` (who pressed Go) is in OpenRigs.Control. `DescribeCalibrationCurve` is in OpenRigs.Core.
+  - rig-control reads rig.yml, refuses a line it does not enable, and launches with the board's `PortName`, `OutputPulseEnable`, the line's `Channel` and artefact `FileName`, and `Notes` as launch properties. That replaces the launch-poll-set sequence.

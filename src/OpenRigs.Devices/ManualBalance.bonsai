@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:cal="clr-namespace:OpenRigs.Core.Calibration;assembly=OpenRigs.Core"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A balance read by eye, for the platform's dispense calibration when the balance has no data port: the stand-in for OpenRigs.Devices:SerialBalance.bonsai. Input is the DispenseCalibration settings when the run starts, after OpenRigs.Core ApplyBalancePort with 'manual' (settleWindow 1, a long weighTimeoutS). It follows the procedure's bursts by the pulse requests on RequestSubjectName and, once each burst has landed, asks for a weight: the baseline after priming, then each sample's. The next text on EntriesSubjectName (grams, such as 20.415) is that burst's reading, published as a stable WeightMeasurement on ReadingsSubjectName, which OpenRigs.Core:DispenseCalibration.bonsai subscribes to. A weight given when none is due, or text that is not a weight, is refused. Output is the prompt: what the person should do now, and what became of the last weight given.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="RequestSubjectName" Description="The (channel, size) pulse requests the procedure fires, such as the PulseController's TriggerCalibratedPulse; the same subject DispenseCalibration's RequestSubjectName names." Category="Subjects" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TriggerCalibratedPulse</Name>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="EntriesSubjectName" Description="The subject of the weights the person gives, as text in grams, such as a command's text." Category="Subjects" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>WeightEntries</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="cal:ManualWeighing" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="cal:ManualReadings" />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="ReadingsSubjectName" Description="The subject this balance publishes its WeightMeasurement readings on." Category="Subjects" />
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>BalanceReading</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Prompt</Selector>
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="5" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="5" Label="Source2" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source3" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="8" Label="Source1" />
+      <Edge From="7" To="8" Label="Source2" />
+      <Edge From="5" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

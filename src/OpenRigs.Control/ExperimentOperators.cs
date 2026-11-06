@@ -152,6 +152,31 @@ namespace OpenRigs.Control
     }
 
     /// <summary>
+    /// Who pressed Go, as the controller vouched for them (rig-control: from the Lab PIN or the
+    /// launch's control token), else who launched the experiment, else empty: a name for
+    /// provenance, such as a calibration's calibratedBy.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    [Description("Who pressed Go, by name (else ID), from the controller; else who launched the experiment; else empty. Input is the Go event (ExperimentGo).")]
+    public class GoByName
+    {
+        /// <summary>Names the person behind each Go event.</summary>
+        /// <param name="source">The Go event (ExperimentGo).</param>
+        /// <returns>The person's name, else their ID, else empty.</returns>
+        public IObservable<string> Process(IObservable<ControlEvent> source)
+        {
+            return source.Select(go =>
+            {
+                var state = ControlState.Current;
+                var person = state == null ? null : state.GoBy ?? state.LaunchedBy;
+                if (person == null) return "";
+                return !string.IsNullOrEmpty(person.Name) ? person.Name : (person.Id ?? "");
+            });
+        }
+    }
+
+    /// <summary>
     /// Reports the experiment's phase to the controller on each element, and passes every element
     /// through. Phases only move forward (Starting, Ready, Recording, Finished, Stopping): a
     /// report of an earlier phase than the current one is ignored. Put Ready on the first camera

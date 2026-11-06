@@ -9,6 +9,7 @@ A rig turns a quantity the task asks for, such as a reward volume, into somethin
 - **The dispense calibration procedure**, `OpenRigs.Core:DispenseCalibration.bonsai`, for anything that delivers a dose per pulse: valves and pumps. It primes the line, weighs a baseline, fires each sample a known number of times, weighs the gain, checks the curve and writes the artefact where the rig reads it. The include is a workflow of small operators you can open and adapt: `PulseBurst` fires one sample's pulses, `WeighStable` takes a weight once the burst is over and the balance has settled, stock nodes turn the weights into gains and volumes per pulse, `BuildCalibrationCurve` checks and stamps the artefact, `WriteCalibrationArtefact` files it.
 - **Settings types** `DispenseProcedure` and `SerialBalance`, committed by the experiment repository as one `DispenseCalibration` YAML.
 - **A serial balance include**, `OpenRigs.Devices:SerialBalance.bonsai`.
+- **A manual balance include**, `OpenRigs.Devices:ManualBalance.bonsai` (lab addition), for a balance with no data port. It follows the procedure's pulse requests, asks for a weight once each burst has landed, and publishes each weight typed on its entries subject as a stable `WeightMeasurement`. Run its settings through `ApplyBalancePort` with `manual` first, so each weighing takes one reading and waits long enough for a person to type it.
 
 ## Where artefacts live
 

@@ -115,6 +115,8 @@ namespace OpenRigs.Control.Tests
                 Check("Go is taken once Ready", Ok(Ask(socket, new { cmd = "go", by = new { id = "JoB", name = "Jo Bloggs" }, launched_by = new { id = "PipC", name = "Pip Coen" } })), "refused");
                 // 0.1.0-local.9: who launched and released the experiment, for the manifest.
                 Check("Go keeps who launched the experiment and who sent it", state.LaunchedBy?.ToString() == "Pip Coen (PipC)" && state.GoBy?.ToString() == "Jo Bloggs (JoB)", state.LaunchedBy + " / " + state.GoBy);
+                var goBy = new GoByName().Process(Observable.Return(new ControlEvent { Kind = ControlEventKind.Go })).Wait();
+                Check("GoByName names who sent Go", goBy == "Jo Bloggs", goBy);
                 var named = Ask(socket, new { cmd = "status" });
                 Check("status names them", (string)named["launched_by"]["id"] == "PipC" && (string)named["go_by"]["name"] == "Jo Bloggs" && named["stopped_by"].Type == JTokenType.Null, named.ToString());
                 Check("... and only once", !Ok(Ask(socket, new { cmd = "go" })), "taken twice");
