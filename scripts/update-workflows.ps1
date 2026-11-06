@@ -40,7 +40,9 @@ param(
 # A branch that changed is checked with its own scripts\check-workflow.ps1, if it has one, then
 # with scripts\check-workflow-builds.ps1 here (its build and layout; its names are checked on the rig, DECISIONS.md stage 2); if that passes, those files and nothing else are committed and
 # pushed to that branch, and rig-setup's 30-minute update takes main to the rigs. A failure is
-# not committed and is named in the table; the next run tries again from what GitHub has.
+# not committed and is named in the table; the next run tries again from what GitHub has. One
+# is not pushed, as superseded, when lib-open-rigs' main has moved since this run began: the run
+# on the newer commit, from whichever machine, updates it. Runs only from main here.
 # Exits 1 unless every branch of every lab workflow is up to date.
 $ErrorActionPreference = 'Stop'
 # A throw (unpushed commits here, no lab share) is written to the output and exits 1, so a log
@@ -191,6 +193,10 @@ foreach ($f in Get-ChildItem $local -File -Filter '*.nupkg') {
 
 # This repository must be what GitHub has: every workflow commit names the commit here.
 $null = Invoke-Git $repo fetch -q
+# And main: a pushed feature branch here would put its packages into every lab workflow and the
+# share's lab-package-versions.json (audit, 6 Nov 2026).
+$onBranch = (Invoke-Git $repo rev-parse --abbrev-ref HEAD) | Select-Object -First 1
+if ($onBranch -ne 'main') { throw "lib-open-rigs is on $onBranch, not main. Switch to main first." }
 if ([int](Invoke-Git $repo rev-list --count '@{u}..HEAD')) { throw "lib-open-rigs has unpushed commits. Push them first (scripts\push-and-update-workflows.ps1)." }
 if (Invoke-Git $repo status --porcelain -- local_packages) { throw "local_packages\ here has uncommitted changes. Commit and push them first." }
 # These scripts run against every workflow, so an edit not yet pushed would too.
@@ -203,6 +209,7 @@ if ([int](Invoke-Git $repo rev-list --count 'HEAD..@{u}')) {
     exit $LASTEXITCODE
 }
 $source = (Invoke-Git $repo rev-parse --short HEAD) | Select-Object -First 1
+$sourceSha = (Invoke-Git $repo rev-parse HEAD) | Select-Object -First 1
 # The commit every workflow's open-rigs Python package is pinned to: the last one here that
 # changed what the workflows run (src\, pyproject.toml, local_packages\), so the schema and the
 # Bonsai packages come from the same open-rigs and a docs or scripts commit moves no pin (a
@@ -235,7 +242,17 @@ $versions = [ordered]@{
 foreach ($id in $packages.Keys | Sort-Object) { $versions.packages[$id] = "$($packages[$id].Version)" }
 $tmp = "$versionsFile.tmp"
 [IO.File]::WriteAllText($tmp, ($versions | ConvertTo-Json -Depth 3) + "`n", (New-Object Text.UTF8Encoding $false))
-if (Test-Path $versionsFile) { [IO.File]::Replace($tmp, $versionsFile, [NullString]::Value) } else { [IO.File]::Move($tmp, $versionsFile) }
+# Replace fails while a rig is reading the file (a sharing violation, probed on the share, 6 Nov
+# 2026); a read takes milliseconds, so it is tried again.
+for ($try = 1; ; $try++) {
+    try {
+        if (Test-Path $versionsFile) { [IO.File]::Replace($tmp, $versionsFile, [NullString]::Value) } else { [IO.File]::Move($tmp, $versionsFile) }
+        break
+    } catch [IO.IOException] {
+        if ($try -ge 5) { throw "Could not write ${versionsFile}: $($_.Exception.Message)" }
+        Start-Sleep -Seconds 1
+    }
+}
 "Wrote $versionsFile."
 
 # Each repository's branches besides main are the ones ticked for it in rig-setup (a
@@ -428,6 +445,11 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
         $msgFile = [IO.Path]::GetTempFileName()
         [IO.File]::WriteAllText($msgFile, $message, (New-Object Text.UTF8Encoding($false)))
         try { $null = Invoke-Git $Dir commit -q -F $msgFile } finally { Remove-Item $msgFile }
+        # A run on another machine, of a newer lib-open-rigs, may have updated this branch since this
+        # run fetched it: pushing would take it back to this run's versions (audit, 6 Nov 2026). The
+        # mutex above holds only on this machine.
+        $now = ((Invoke-Git $repo ls-remote origin refs/heads/main) | Select-Object -First 1) -split '\s+' | Select-Object -First 1
+        if ($now -ne $sourceSha) { $row.Result = 'superseded'; $row.Detail = "lib-open-rigs main moved to $("$now".Substring(0, [Math]::Min(7, "$now".Length))) during this run; not pushed, as the run on that commit updates it: $($changes -join '; ')"; return $row }
         # Refused if somebody pushed to the branch meanwhile; the next run starts from theirs.
         $null = Invoke-Git $Dir push -q origin "HEAD:refs/heads/$Branch"
         $row.Result = 'updated'; $row.Detail = "$($changes.Count) change(s), pushed $((Invoke-Git $Dir rev-parse --short HEAD) | Select-Object -First 1): $($changes -join '; ')"
@@ -470,7 +492,7 @@ try {
 } finally { $mutex.ReleaseMutex() }
 
 "`n" + ($rows | Format-Table -AutoSize -Wrap | Out-String).TrimEnd()
-$bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai', 'not kept', 'gone' })
+$bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai', 'not kept', 'gone', 'superseded' })
 if ($bad) { "`n$($bad.Count) of $($rows.Count) branches are not on the lab's packages."; exit 1 }
 "`nEvery lab Bonsai workflow is on the lab's packages, on main and every ticked branch."
 # Said, not left to the last git call's code, which push-and-update-workflows.ps1 reads as the run's.

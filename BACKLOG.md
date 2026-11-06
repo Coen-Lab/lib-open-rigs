@@ -1,5 +1,16 @@
 # Backlog
 
+## Audit 2026-11-06 (independent audit of stage 4: one updater, the hourly task retired)
+
+Changed: `lab-package-versions.json`'s Replace is tried five times a second apart, since it fails while a rig is reading the file (M1, probed on the share: Replace works, and fails with a reader open); update-workflows runs only from `main` here (L3); a branch is not pushed, as superseded, when lib-open-rigs' `main` has moved since the run began, so a run on another machine cannot take a workflow back to older versions (L2). rig-setup and rig-control items are in their own BACKLOGs.
+
+Not changed, do not raise again without new information:
+
+- rig-control not knowing Leave Main Alone: its warning comes only after the names check passes, on a project's main workflow, and the domes run av-dome `main` from its Bonsai shortcut, not through rig-control.
+- The share file written at the start of a run: deliberate, so a run that stops part way shows as workflows behind; a clean run clears within one 30-minute pull.
+- The `trap` in update-workflows: it still gives whoever pushes a "Stopped:" reason.
+- rig-control silent when the share or the file is missing: warn-only was the decision, and rig-setup's rows cover the share.
+
 ## Settings files written by rig-control, as open-rigs intends (plan, Pip, 5 Nov 2026)
 
 open-rigs keeps parameters in files written before Bonsai and checked against their schemas (`specs/logging.md` section 6; `RigPath`, `SessionPath`, `TaskPath` in the reaction-time tutorial). The lab's rigs will do the same, with rig-control writing the task file. Not started. Words (Pip, 5 Nov 2026): an experiment is one workflow run; a session is the mouse's sitting, which can hold several. Each experiment has its own folder, `sub-<mouse>\ses-<SessionId>_<DateTime>`, named for the session it belongs to.
