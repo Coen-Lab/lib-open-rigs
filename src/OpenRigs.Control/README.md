@@ -16,6 +16,7 @@ Bonsai operators that put a workflow under an experiment controller: the workflo
 | `ParameterMaximum` | Sets a declared parameter's maximum at run time (an exposure that must fit the trigger period), so a `set` above it is refused with the reason rather than stopping the workflow. |
 | `ReportPhase` | Tells the controller the experiment's phase (`Ready`, `Recording`, `Finished`) on each element. Phases only move forward: a report of an earlier phase is ignored. |
 | `ReportMetric` | Tells the controller the latest value of a named metric (the experiment folder, water delivered). |
+| `ExperimentSettings` | From `ExperimentGo`, the experiment's settings as JSON text for OpenRigs.Logging's `LogDataSchema` named `Schemas_Experiment`, so they are `Schemas\Schemas_Experiment_<DateTime>.json` beside the rig's and task's: `subject_id`, `session_id`, `rig`, `workflow`, `repo`, `branch`, `commit` and `dirty` (read at Start, as OpenRigs.Manifest reads them), `launched_by`, `go_by`, `go` (UTC) and `parameters`, every declared parameter as it stood at Go (0.1.1-coen.4, 7 Nov 2026; the manifest no longer copies them). |
 
 ## Protocol
 

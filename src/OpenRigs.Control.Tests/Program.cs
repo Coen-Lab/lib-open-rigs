@@ -124,6 +124,12 @@ namespace OpenRigs.Control.Tests
                 lock (events) go = events.Find(e => e.Kind == ControlEventKind.Go);
                 Check("the Go event carries the parameters as they stood", go != null && go.Parameters["RunLengthMins"] == "45" && go.Parameters["Note"] == "left eye shut", go == null ? "no Go event" : go.ToString());
                 Check("ControlState.Go is that event", state.Go == go, "differs");
+                var settings = ExperimentSettings.Settings(go, state, new JObject { ["workflow"] = "src/main.bonsai", ["commit"] = "abc123" });
+                Check("ExperimentSettings has the subject, session, rig and workflow", (string)settings["subject_id"] == "TC002" && (string)settings["session_id"] == "003B1" && (string)settings["rig"] == Environment.MachineName && (string)settings["workflow"] == "src/main.bonsai" && (string)settings["commit"] == "abc123", settings.ToString());
+                Check("... who launched it and sent Go, and when", (string)settings["launched_by"]["id"] == "PipC" && (string)settings["go_by"]["name"] == "Jo Bloggs" && ((string)settings["go"]).EndsWith("Z"), settings.ToString());
+                Check("... and every parameter at Go, in order", string.Join(",", ((JObject)settings["parameters"]).Properties().Select(p => p.Name + "=" + p.Value)) == "RunLengthMins=45,RewardUl=2,Note=left eye shut,Blank=", settings["parameters"].ToString());
+                var written = new ExperimentSettings().Process(new[] { go }.ToObservable()).ToList().Wait();
+                Check("ExperimentSettings gives one JSON text for the Go event, with the repository read at Start", written.Count == 1 && JObject.Parse(written[0])["parameters"]["RunLengthMins"].ToString() == "45" && JObject.Parse(written[0]).Property("commit") != null, string.Join(" | ", written));
 
                 Console.WriteLine("Commands and status:");
                 state.SetPhase(ExperimentPhase.Recording);

@@ -4,13 +4,18 @@
     <Description>OpenRigs Control Bonsai library. Holds a workflow in a ready state, answers commands from a controller over ZeroMQ, and releases the experiment on Go.</Description>
     <PackageTags>$(PackageTags) Control</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen.3</Version>
+    <Version>0.1.1-coen.4</Version>
     <!-- Every public type and member is documented: the summaries are what the Bonsai editor shows. -->
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="**\*.bonsai" />
+  </ItemGroup>
+
+  <!-- The workflow's commit, read as OpenRigs.Manifest reads it, for ExperimentSettings: compiled in, internal. -->
+  <ItemGroup>
+    <Compile Include="..\Shared\WorkflowFile.cs" Link="Shared\WorkflowFile.cs" />
   </ItemGroup>
 
   <ItemGroup>

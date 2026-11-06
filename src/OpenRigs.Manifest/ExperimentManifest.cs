@@ -23,7 +23,7 @@ namespace OpenRigs.Manifest
     [DefaultProperty(nameof(ConfigFiles))]
     [TypeDescriptionProvider(typeof(ExperimentManifestTypeDescriptionProvider))]
     [WorkflowElementCategory(ElementCategory.Sink)]
-    [Description("Writes manifest.json into the experiment folder (PathPrefix) when it appears and when the run ends: rig, workflow commit, launch, settings at Go, config files as loaded at Start, outcome and every file. Put it after LogController. An input, if connected, is the run: its completion, error and element count.")]
+    [Description("Writes manifest.json into the experiment folder (PathPrefix) when it appears and when the run ends: rig, workflow commit, launch, who launched and sent Go, config files as loaded at Start, outcome and every file. Put it after LogController. An input, if connected, is the run: its completion, error and element count.")]
     public class ExperimentManifest : GroupWorkflowBuilder
     {
         /// <summary>The subject LogController publishes the experiment folder's path under.</summary>
@@ -63,7 +63,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>Gets or sets what the experiment must leave, separated by ;, or auto.</summary>
-        [Description("What the experiment must leave, separated by ;: a path in the experiment folder, a folder ending in /. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. rig-sync alarms on an entry that left no file. Blank: nothing expected.")]
+        [Description("What the experiment must leave, separated by ;: a path in the experiment folder, a folder ending in /, or the start of a file's path ending in _ (Schemas/Schemas_Task_), met by any file whose path starts with it. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. rig-sync alarms on an entry that left no file. Blank: nothing expected.")]
         public string ExpectedFiles
         {
             get { return Settings.ExpectedFiles; }

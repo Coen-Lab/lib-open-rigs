@@ -171,7 +171,7 @@ namespace OpenRigs.Manifest.Tests
                 Check("a Stopping phase with no stop from the controller is ended-early, not stopped", Field(stoppingUnasked, "run.outcome") == "ended-early", Field(stoppingUnasked, "run.outcome"));
                 var alone = RunExperiment(root, "e", null, null);
                 Check("without ExperimentControl it is stopped", Field(alone, "run.outcome") == "stopped" && Field(alone, "control") == "null", Field(alone, "run.outcome"));
-                Check("the settings at Go are recorded", Field(finished, "control.parameters.RunLengthMins") == "30", Field(finished, "control.parameters.RunLengthMins"));
+                Check("the parameters at Go are not in the manifest (they are Schemas_Experiment's)", !finished.Contains("\"parameters\"") && Field(finished, "control.subject_id") != null, Field(finished, "control"));
                 // 0.1.0-local.5: who launched, released and stopped the experiment, as the controller named them.
                 var named = RunExperiment(root, "h", Controller(), c =>
                 {
@@ -222,6 +222,12 @@ namespace OpenRigs.Manifest.Tests
                 Check("a folder is not met by a file another entry names", ExpectedPlan.Matches(board, new[] { "Board/Board.yml" }, both) == 0
                     && ExpectedPlan.Matches(map, new[] { "Board/Board.yml" }, both) == 1, "the register map stood in for the board's data");
                 Check("... and is by any other file in it", ExpectedPlan.Matches(board, new[] { "Board/Board.yml", "Board/Board_44_x.bin" }, both) == 1, "not met");
+                // 0.1.1-coen.5: each settings file in Schemas/ expected on its own, by a prefix entry.
+                var schemas = ExpectedPlan.Create("Schemas/Schemas_Rig_;Schemas/Schemas_Task_;Schemas/", null, n => null).Entries;
+                var inSchemas = new[] { "Schemas/Schemas_Rig_2026-11-07T09-30-12.json" };
+                Check("a prefix entry is met by a file whose path starts with it, and only by one", ExpectedPlan.Matches(schemas[0], inSchemas, schemas) == 1
+                    && ExpectedPlan.Matches(schemas[1], inSchemas, schemas) == 0, "the rig's file met the task's entry, or not its own");
+                Check("... and does not keep that file from meeting its folder", ExpectedPlan.Matches(schemas[2], inSchemas, schemas) == 1, "the folder was not met");
                 // 0.1.0-local.10: the writer and its version, and what a dirty checkout changed.
                 // The version the build stamped: open-rigs' build sets it (scripts\build-package.ps1
                 // passes the .csproj's <Version>; a plain build is 42.42.42-dev0).

@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -21,7 +20,7 @@ namespace OpenRigs.Manifest
         internal static readonly string[] PersonMembers = { "Id", "Name" };
 
         /// <summary>The ControlEvent members of the Go event read here.</summary>
-        internal static readonly string[] GoMembers = { "SubjectId", "SessionId", "Time", "Parameters" };
+        internal static readonly string[] GoMembers = { "SubjectId", "SessionId", "Time" };
 
         readonly object state;
 
@@ -82,22 +81,6 @@ namespace OpenRigs.Manifest
 
         /// <summary>When Go was taken, in UTC; null before Go.</summary>
         public DateTime? GoTime { get { return HasGo ? Read(Read(state, "Go"), "Time") as DateTime? : null; } }
-
-        /// <summary>Every parameter as it stood at Go, in its order; empty before Go.</summary>
-        public List<KeyValuePair<string, string>> GoParameters
-        {
-            get
-            {
-                var parameters = new List<KeyValuePair<string, string>>();
-                var dictionary = HasGo ? Read(Read(state, "Go"), "Parameters") as IDictionary : null;
-                if (dictionary == null) return parameters;
-                foreach (DictionaryEntry entry in dictionary)
-                {
-                    parameters.Add(new KeyValuePair<string, string>(Convert.ToString(entry.Key), Convert.ToString(entry.Value)));
-                }
-                return parameters;
-            }
-        }
 
         static object Read(object target, string member)
         {

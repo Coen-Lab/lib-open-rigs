@@ -316,8 +316,10 @@ namespace OpenRigs.Manifest
             return launch;
         }
 
-        /// <summary>The experiment controller's settings at Go: subject, session, who launched it, sent
-        /// Go and stopped it, and every parameter. Null without ExperimentControl.</summary>
+        /// <summary>The experiment controller's record: subject, session, when Go was taken, and who
+        /// launched it, sent Go and stopped it. Null without ExperimentControl. The parameters at Go are
+        /// in the experiment's Schemas_Experiment file (OpenRigs.Control's ExperimentSettings, since
+        /// 0.1.1-coen.5), so the settings live once, in the experiment folder.</summary>
         public static JsonObject ControlSection(ControlExperiment control)
         {
             if (control == null) return null;
@@ -329,9 +331,6 @@ namespace OpenRigs.Manifest
             section.Add("launched_by", PersonSection(control.LaunchedBy));
             section.Add("go_by", PersonSection(control.GoBy));
             section.Add("stopped_by", PersonSection(control.StoppedBy));
-            var parameters = new JsonObject();
-            foreach (var p in control.GoParameters) parameters.Set(p.Key, p.Value);
-            section.Add("parameters", parameters);
             return section;
         }
 
