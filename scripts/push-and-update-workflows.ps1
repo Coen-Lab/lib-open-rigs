@@ -5,18 +5,9 @@
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
-# The lab's packages: only they carry a <Version>; open-rigs' own are versioned when packed. A
-# package's source is its folder (not its READMEs), every folder it compiles files from
-# (..\Shared\*.cs) and the build files every project imports.
-$lab = @(Get-ChildItem (Join-Path $repo 'src') -Directory | ForEach-Object {
-    $project = Join-Path $_.FullName "$($_.Name).csproj"
-    if (-not (Test-Path $project)) { return }
-    $xml = [xml](Get-Content $project -Raw)
-    $version = $xml.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
-    if (-not $version) { return }
-    $inputs = @("src/$($_.Name)", ":!src/$($_.Name)/*.md") + @($xml.Project.ItemGroup.Compile.Include | Where-Object { $_ -match '^\.\.\\([^\\]+)\\' } |
-        ForEach-Object { "src/$($Matches[1])" } | Sort-Object -Unique) + @('Directory.Build.props', 'Directory.Build.targets' | Where-Object { Test-Path (Join-Path $repo $_) })
-    [pscustomobject]@{ Name = "$($_.Name) $version"; Nupkg = "local_packages/$($_.Name).$version.nupkg"; Inputs = $inputs } })
+# The lab's packages and their source (scripts\lab-packages.ps1, shared with build-package.ps1).
+. (Join-Path $PSScriptRoot 'lab-packages.ps1')
+$lab = Get-LabPackages $repo
 
 # What is published is local_packages\, so a package whose <Version> was raised and never built
 # would push and report every workflow up to date (round 6, 0a90299). Each package's version
@@ -25,14 +16,16 @@ $unbuilt = @($lab | Where-Object { -not (Test-Path (Join-Path $repo $_.Nupkg)) }
 if ($unbuilt) { throw "Not built: $($unbuilt -join ', '). Run scripts\build-package.ps1 -Package <name> and commit local_packages\ first." }
 
 # And the reverse: source changed after its .nupkg was committed, with <Version> left as it was,
-# would push and ship nothing (audit-rigs set C).
+# would push and ship nothing (audit-rigs set C). A comment-only change is not a change.
 $stale = @($lab | ForEach-Object {
     $inputs = $_.Inputs
     $built = git -C $repo log -1 --format=%H -- $_.Nupkg
-    $changed = git -C $repo log -1 --format=%H -- @inputs
-    if ($built -and $changed -and $built -ne $changed) {
-        & git -C $repo merge-base --is-ancestor $built $changed
-        if ($LASTEXITCODE -eq 0) { "$($_.Name) (source changed in $($changed.Substring(0, 7)))" }
+    if ($built) {
+        & git -C $repo diff --quiet @script:CommentOnly $built HEAD -- @inputs
+        if ($LASTEXITCODE -ne 0) {
+            $changed = git -C $repo log -1 --format=%H -- @inputs
+            "$($_.Name) (source changed in $("$changed".Substring(0, 7)))"
+        }
     } })
 if ($stale) { throw "Changed since built: $($stale -join ', '). Raise <Version>, run scripts\build-package.ps1 -Package <name> and commit local_packages\ first." }
 
@@ -61,7 +54,7 @@ $misbuilt = @($lab | ForEach-Object {
     if (-not $commit) { "$($_.Name) (its nuspec names no commit)" }
     elseif (-not (git -C $repo rev-parse -q --verify "$commit^{commit}")) { "$($_.Name) (built on $($commit.Substring(0, 7)), which this clone does not have)" }
     else {
-        & git -C $repo diff --quiet $commit $onto -- @inputs
+        & git -C $repo diff --quiet @script:CommentOnly $commit $onto -- @inputs
         if ($LASTEXITCODE -ne 0) { "$($_.Name) (built on $($commit.Substring(0, 7)), but its source differs from what it was committed onto)" }
     } })
 if ($misbuilt) { throw "Built on other source: $($misbuilt -join ', '). Raise <Version>, rebuild and commit local_packages\ first." }

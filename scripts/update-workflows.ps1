@@ -231,6 +231,12 @@ if (-not $mine) {
 if (-not (Test-Path $RepoList)) { throw "Cannot read rig-setup's repo list at $RepoList (is the lab share mapped?)." }
 if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 
+# The wait above can last 40 minutes, in which main may have moved: a run of an older
+# lib-open-rigs would then write older versions over the file the newer run wrote, and every
+# rig on the newer packages would read as behind until the next run (audit-rigs set C).
+$now = ((Invoke-Git $repo ls-remote origin refs/heads/main) | Select-Object -First 1) -split '\s+' | Select-Object -First 1
+if ($now -ne $sourceSha) { "lib-open-rigs main moved to $("$now".Substring(0, [Math]::Min(7, "$now".Length))) while this run waited; nothing written or updated, as the run on that commit does it."; exit 0 }
+
 # What every lab workflow should be on, written before any is updated: a run that stops or fails
 # part way then shows on the rigs as workflows behind it, not as nothing. Written beside, then
 # renamed over, so a rig never reads half a file.

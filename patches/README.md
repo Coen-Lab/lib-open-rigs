@@ -2,9 +2,9 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core, Devices, Streaming and Video 0.1.1-coen.1; Logging 0.1.1-coen.2
+## OpenRigs.Core and Devices 0.1.1-coen-lab.3; Logging 0.1.1-coen-lab.4; Streaming and Video 0.1.1-coen-lab.2
 
-Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) and the lab's own packages `0.1.0-local.N`. Every lab package is now `0.1.1-coen.N` (`COEN-LAB.md`); the history below names the versions as they were.
+Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) and the lab's own packages `0.1.0-local.N`; from 5 to 6 Nov `0.1.1-coen.N`. Every lab package is now `0.1.1-coen-lab.N` (`COEN-LAB.md`); the history below names the versions as they were.
 
 Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), from this repository's own `src\`: upstream branch `rig-config-resolver` at `3788bfb` (main plus the per-machine config operators `ResolveRigConfigDirectory`, `ReadRigConfig` and `ResolveRigFile`) and two fixes, both reported upstream, which are commits on this repository's `main`:
 
@@ -30,11 +30,11 @@ Core and Devices have a `<Version>` in their `.csproj` since bbox.2, so `scripts
 SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on PIPOFFICERIG, 5 Nov 2026):
 
 ```
-e4c568a295c91b91a2553331d8d64f953135030307a196a5f50ed0b18c1dca02  OpenRigs.Core.0.1.1-coen.1.nupkg
-64feb703e03e1538b03311db342724e80da45c2a2dd7307e33d6e1c86ea0a4bb  OpenRigs.Devices.0.1.1-coen.1.nupkg
-0a2826832467fa77e3fef2fb25f385c747f05e96681b6877aa098bef90bf39be  OpenRigs.Logging.0.1.1-coen.2.nupkg
-e0d07b700ad1a6d18090e1a7713e51bf23f8c029df1c491db50e98667522f73d  OpenRigs.Video.0.1.1-coen.1.nupkg
-e7ec0d808241666ed45db825e4abe8546bdbc083fef8afac296204e9f0719622  OpenRigs.Streaming.0.1.1-coen.1.nupkg
+c767876afd881060784984d21f1e909ac78201c5ead9af8ddcdf09269074f48b  OpenRigs.Core.0.1.1-coen-lab.3.nupkg
+be1fcb2a71ebfdd0179d793ed49e0e2de4cdd07e7b2e8d81ff6a1a891701e63f  OpenRigs.Devices.0.1.1-coen-lab.3.nupkg
+44637e5780b2895fd66a252a4b2b6d8842a706820302a830691d71809249e471  OpenRigs.Logging.0.1.1-coen-lab.4.nupkg
+2512aaf1048e369e44c59e41341b8874f7f7b2cbe511b86e14ac48e0ae89b2e3  OpenRigs.Video.0.1.1-coen-lab.2.nupkg
+9989db25d286ebb01f60bcb80b11cc4a191335696f87f1fe3d9cd5c1f7e599af  OpenRigs.Streaming.0.1.1-coen-lab.2.nupkg
 ```
 
 `OpenRigs.Streaming` is upstream's `src/OpenRigs.Streaming` at the base commit, unchanged by either patch. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.

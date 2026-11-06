@@ -28,6 +28,14 @@ $name = "$id.$version.nupkg"
 $was = & git -C $repo log --all -1 --format=%h -- "local_packages/$name"
 if ($was) { throw "$name was committed before ($was). Raise <Version> in src\$Package\$Package.csproj before building." }
 
+# dotnet pack builds what is on disk, while the nuspec names HEAD as the commit it was built on:
+# packed over uncommitted source, the package matches no commit, and every push check passes it
+# (audit-rigs set C, 6 Nov 2026). So the package's source is committed first, then built.
+. (Join-Path $PSScriptRoot 'lab-packages.ps1')
+$inputs = (Get-LabPackages $repo | Where-Object { $_.Id -eq $id }).Inputs
+$dirty = @(& git -C $repo status --porcelain -- @inputs)
+if ($dirty) { throw "src\$Package has uncommitted changes ($($dirty.Count) file(s)). Commit them first, so the package names the commit it was built from." }
+
 "Packing $id $version..."
 # Each package keeps its own .csproj <Version> (build\Common.csproj.targets). No -p:Version: a global
 # property reaches the ProjectReferences too, so each dependency named the packed package's version

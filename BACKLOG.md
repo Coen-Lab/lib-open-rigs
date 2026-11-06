@@ -1,5 +1,27 @@
 # Backlog
 
+## Audit 2026-11-06, evening (/audit-rigs, set C: the seams, windows, help and live view, tests, trust, scripts and packaging)
+
+Changed:
+
+- **`push-and-update-workflows.ps1` refused every push after `86daefc`** (S1-M1, L3-M1, reproduced): that commit changed only comments in two Manifest `.cs` files and was pushed with plain `git push`, so the stale check read Manifest as changed since built, and the share's `lab-package-versions.json` stayed at `9702b51`. The stale and misbuilt checks now ignore a change whose lines are all comments or blank (`git diff -I`), through `scripts\lab-packages.ps1`, which `build-package.ps1` shares.
+- **`build-package.ps1` packed uncommitted source while the nuspec named HEAD** (L3-M2, probed on a scratch clone: a package matching no commit passed every push gate): it refuses when the package's inputs have uncommitted changes, so the source is committed first (COEN-LAB.md step 3).
+- An older run of `update-workflows.ps1`, after waiting for the lock, wrote its versions over a newer run's `lab-package-versions.json` (L3-L2): it checks origin's main again before writing and stops as superseded.
+- `check-workflow-builds.ps1` passed a workflow listening for a command or parameter ExperimentControl does not declare (L3-L4, probed: a misspelt Snapshot passed all three steps): the names are compared, in every `src\**\*.bonsai`, and a stray one fails the check. Every lab workflow passes today.
+- `patches\README.md` named `0.1.1-coen.N` versions and hashes no file has (L3-L5); the HarpDevices README's `_Hardware.json` path (S5).
+
+Not changed, do not raise again without new information:
+
+- `build\` is not among a package's stale inputs (L3-L3): adding it would read every package as stale from `86daefc`'s `Common.csproj.targets` change, so all nine would need a rebuild for the three wrong dependency versions the late-afternoon audit accepted until each next changes; for Pip to decide.
+- A `build-package.ps1` run during `update-workflows.ps1` in the same clone removes the `.nupkg` the run recorded (L3-L3): it fails loudly and the next run repairs it.
+- coen-calibrate-valve listed in `workflows.txt` and `profile-repos.json` both (L3-I1): it is updated even if removed from one.
+- A `trial-columns.yml` with two keys differing only in case would hold its session every night (S3-L1): no file has one, and it is an alarm naming the session, not a silent hold.
+
+Open:
+
+- lib-open-rigs: remove `ApplyBalancePort` and `BalancePort` (OpenRigs.Core `ManualBalance.cs`, their tests, and the mentions in `ManualBalance.bonsai` and `docs/articles/calibration.md`), unused since coen-calibrate-valve went manual-only (Pip, 6 Nov 2026; moved here from rig-control's BACKLOG).
+- coen-calibrate-valve has no `config\main.layout` in git, so the build check's layout step is skipped (L3-I2): to be tracked in that repository.
+
 ## Audit 2026-11-06, late afternoon (the Settings rename and the coen-lab versions)
 
 Changed: each package's lab dependencies now carry the depending package's own `.csproj` version (`build\Common.csproj.targets` keeps a `-coen-lab.` `<Version>`, `build-package.ps1` no longer passes `-p:Version` and refuses a mismatch through `scripts\check-package-dependencies.ps1`). The packages built today keep their wrong dependencies (Logging `coen-lab.4` names Core `coen-lab.4`) until each one next changes; Bonsai installs what `Bonsai.config` lists, so no workflow is affected (M2). The `Schemas\` layout of 6 Nov 2026 is named, with its commits, in every history line that skipped it, and the dates are corrected from 7 Nov (M1). The current rule in rig-setup `docs\manifests.md` now uses the new names (L1). The retroactive mapping now lists the settings files as paths (L2). "Left" now names `Schemas_*` in the dictionary (L3).

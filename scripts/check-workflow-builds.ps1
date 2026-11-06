@@ -134,6 +134,20 @@ if (Test-Path $extensions) {
 & { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Build 2>&1 | ForEach-Object { "$_" } }
 if ($LASTEXITCODE -eq 2) { "  FAILED"; "check-workflow-builds: config\main.layout does not fit the workflow."; exit 1 }
 if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-workflow-builds: the workflow does not build."; exit 1 }
+# OnCommand and OnParameterSet filter the controller's events by name, so one listening for a name
+# ExperimentControl does not declare builds and never fires (a misspelt Snapshot passed every
+# step; audit-rigs set C, 6 Nov 2026). Read from the XML of every workflow file under src\.
+$declared = @(); $listened = @()
+foreach ($file in Get-ChildItem (Join-Path $Repo 'src') -Recurse -Filter '*.bonsai') {
+    $text = Get-Content $file.FullName -Raw
+    foreach ($block in [regex]::Matches($text, '(?s)<(?:Commands|Parameters)>(.*?)</(?:Commands|Parameters)>')) {
+        $declared += @([regex]::Matches($block.Groups[1].Value, '<Name>([^<]+)</Name>') | ForEach-Object { $_.Groups[1].Value })
+    }
+    $listened += @([regex]::Matches($text, 'xsi:type="orcl:On(?:Command|ParameterSet)">\s*<orcl:Name>([^<]+)</orcl:Name>') |
+        ForEach-Object { "$($_.Groups[1].Value) ($($file.Name))" })
+}
+$undeclared = @($listened | Where-Object { $declared -cnotcontains ($_ -replace ' \([^)]+\)$', '') })
+if ($undeclared) { "  FAIL  listened for but not declared on ExperimentControl: $($undeclared -join ', ')"; "check-workflow-builds: a command or parameter the workflow listens for is not declared."; exit 1 }
 "  ok"
 "3. Checking config\*.yml against their schemas..."
 $schemaCheck = Join-Path $PSScriptRoot 'check-config-schemas.py'
