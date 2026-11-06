@@ -27,8 +27,8 @@ open-rigs keeps parameters in files written before Bonsai and checked against th
 
 - **A package's dependency on Core names its own version, not Core's.** `build-package.ps1` passes `-p:Version` globally (`build\Common.csproj.targets` sets `<Version>` after each project's), so it reaches the referenced Core: Logging `0.1.1-coen.2` asks for Core `>= 0.1.1-coen.2`, which does not exist. Harmless while Bonsai restores only what `Bonsai.config` lists (Logging `bbox.6` asked for Core `bbox.6` the same way), wrong for anything that resolves dependencies. Fix: a lab `<LabVersion>` in each `.csproj` that `Common.csproj.targets` takes over its default, and no global `-p:Version`.
 - **Experiments recorded before av-dome took the new column names** (`TrialCnt`, `correctResponse`, `response`, `targetSide`, `BothSpouts`) no longer map in its `rig-control.toml`, which names only the new ones; `older_logs` covers `TrialSettings` only. Test experiments so far.
-- **Async event names** (`RewardDelivered`, `RngSeed`, the controller's) are not in `data_dictionary.yml` yet.
-- **A workflow's own `check-workflow.ps1` does not hold the names**: only `update-workflows.ps1` runs `check-workflow-builds.ps1` after it, so a name off the list shows as that workflow failing the hourly update, not before its author pushes.
+- **Async event names** (`RewardDelivered`, `RngSeed`, the controller's) are not in the lab's data list (`K:\config\data-dictionary.json`) yet.
+- **Names are checked on the rig only, since 6 Nov 2026** (DECISIONS.md stage 2): rig-control's `check-workflow-names.ps1` at deploy and before each launch, against `K:\config`'s lists. An author learns of a name off the list when a rig refuses the version, not before pushing; running that script by hand on a lab machine checks first. `src\OpenRigs.Logging\CsvWriter.cs` (~112) still says `ColumnNames` is for check-bonsai: it is for rig-control's check now; reword it with the next Logging version raise, since any source change needs one.
 
 ## Test package changes on one rig first (Pip, 5 Nov 2026)
 

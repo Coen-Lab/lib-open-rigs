@@ -32,7 +32,7 @@ param(
 #     the workflow has regenerate-schemas, its schema and generated classes are regenerated,
 #     and its rig template (examples\rig.py) where it has one.
 # A branch that changed is checked with its own scripts\check-workflow.ps1, if it has one, then
-# with scripts\check-workflow-builds.ps1 here (which holds its names to src\open_rigs\data_dictionary.yml); if that passes, those files and nothing else are committed and
+# with scripts\check-workflow-builds.ps1 here (its build and layout; its names are checked on the rig, DECISIONS.md stage 2); if that passes, those files and nothing else are committed and
 # pushed to that branch, and rig-setup's 30-minute update takes main to the rigs. A failure is
 # not committed and is named in the table; the next run tries again from what GitHub has.
 # Exits 1 unless every branch of every lab workflow is up to date.
@@ -386,7 +386,7 @@ function Update-Branch([string]$Slug, [string]$Branch, [string]$Dir, [string]$Ma
         # What this script wrote, staged before the check, so whatever the check changes is stray.
         $null = Invoke-Git $Dir add -A
 
-        # check-workflow-builds always (it holds the lab's names, data_dictionary.yml), after the workflow's own
+        # check-workflow-builds always (the build with Bonsai's own builders, and the layout), after the workflow's own
         # check when it has one.
         $own = Join-Path $Dir 'scripts\check-workflow.ps1'
         $check = if (Test-Path $own) { 'scripts\check-workflow.ps1 and lib-open-rigs scripts\check-workflow-builds.ps1' } else { 'lib-open-rigs scripts\check-workflow-builds.ps1' }
