@@ -70,6 +70,14 @@ namespace OpenRigs.Manifest
             set { Settings.ExpectedFiles = value; }
         }
 
+        /// <summary>Gets or sets the workflow's trial columns file, copied into the manifest at Start.</summary>
+        [Description("The workflow's trial columns file (schemas\\trial-columns.yml): what each BonsaiData_Trial column means, its type, and where they apply its values or codes, unit and former names. Read once at Start and copied into the manifest as trial_columns, so the experiment carries the meaning of its trial log. A relative path is from the workflow's repository. Blank: the workflow logs no trials. A missing or unreadable file is noted, not an error.")]
+        public string TrialColumns
+        {
+            get { return Settings.TrialColumns; }
+            set { Settings.TrialColumns = value; }
+        }
+
         ExperimentManifestSettings Settings
         {
             get { return GroupNode.Settings<ExperimentManifestSettings>(Workflow); }
@@ -101,7 +109,7 @@ namespace OpenRigs.Manifest
                 throw new InvalidOperationException("ExperimentManifest needs " + PathSubject + " to be a string, the experiment folder's path; this workflow's is " + pathType + ".");
             }
             var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles), name => GroupNode.PublishedType(this, name));
-            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, expected));
+            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, expected, TrialColumns));
             var observablePath = Expression.Convert(path, typeof(IObservable<string>));
             var run = arguments.FirstOrDefault();
             if (run == null)
@@ -118,7 +126,7 @@ namespace OpenRigs.Manifest
     /// ExperimentManifest's settings, kept as a node in its inner workflow so that they survive
     /// Bonsai's copies of the group. Set them on ExperimentManifest; this node builds to nothing.
     /// </summary>
-    [Description("ExperimentManifest's settings (IngestScript, ConfigFiles, ExpectedFiles), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
+    [Description("ExperimentManifest's settings (IngestScript, ConfigFiles, ExpectedFiles, TrialColumns), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
     public class ExperimentManifestSettings : ZeroArgumentExpressionBuilder
     {
         /// <summary>Gets or sets ExperimentManifest's IngestScript.</summary>
@@ -129,6 +137,9 @@ namespace OpenRigs.Manifest
 
         /// <summary>Gets or sets ExperimentManifest's ExpectedFiles.</summary>
         public string ExpectedFiles { get; set; } = ExpectedPlan.Auto;
+
+        /// <summary>Gets or sets ExperimentManifest's TrialColumns.</summary>
+        public string TrialColumns { get; set; }
 
         /// <summary>Builds to an empty sequence: the node only holds the settings.</summary>
         /// <param name="arguments">None.</param>
@@ -143,7 +154,7 @@ namespace OpenRigs.Manifest
     class ExperimentManifestTypeDescriptionProvider : ShownPropertiesProvider
     {
         public ExperimentManifestTypeDescriptionProvider()
-            : base("IngestScript", "ConfigFiles", "ExpectedFiles")
+            : base("IngestScript", "ConfigFiles", "ExpectedFiles", "TrialColumns")
         {
         }
     }

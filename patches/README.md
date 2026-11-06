@@ -21,7 +21,7 @@ Video 0.1.0-bbox.3 (2 Nov 2026, a92cde7 and 19e39cb) is a lab change rather than
 
 Logging 0.1.0-bbox.4 (4 Nov 2026, 4e79e7f) is a lab change rather than a patch: `LogTrial`, `LogAsync` and `CreateAsyncEvent`, the lab's two experiment files (`COEN-LAB.md`). 0.1.0-bbox.5 (5 Nov 2026) adds CsvWriter's `AutoFlush` and `PublishRows` and the `LoggedRows` source, both on in `LogTrial` and `LogAsync`, so their rows are on disk and streamed as they are written. Those two properties are the one part of it inside an upstream operator, `CsvWriter` (upstream's since `f313716`), and neither Bonsai's CsvWriter nor open-rigs has anything like them (Bonsai's `Buffered` moves writing to another thread, not to disk). Kept here off by default (Pip, 5 Nov 2026), to be offered upstream: not yet reported.
 
-Logging 0.1.1-coen.2 (5 Nov 2026) adds `CsvWriter.ColumnNames`, the header's columns for a type without writing, for check-workflow-builds's hold of `BonsaiData_Trial` to `data_dictionary.yml`.
+Logging 0.1.1-coen.2 (5 Nov 2026) adds `CsvWriter.ColumnNames`, the header's columns for a type without writing, for the hold of `BonsaiData_Trial` to the lab's names (check-workflow-builds's until 6 Nov 2026, rig-control's `check-workflow-names.ps1` since).
 
 Logging 0.1.0-bbox.6 (5 Nov 2026) fixes upstream's `LogVideo`: its two inline `FormatFileName` copies left out the chunk start, so files were `<LogName>\<LogName>.avi` and an experiment crossing the hour opened the same file twice. It now includes `OpenRigs.Logging:FormatFileName.bonsai` as `LogRawVideo` does, giving `<LogName>\<LogName>_<DateTime>.avi` and `.csv`; a test holds it equal to `LogRawVideo` apart from its frame selector and CSV columns. An upstream file, to be offered upstream: not yet reported.
 

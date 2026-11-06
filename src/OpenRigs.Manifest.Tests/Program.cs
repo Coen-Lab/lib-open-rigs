@@ -128,6 +128,28 @@ namespace OpenRigs.Manifest.Tests
             Directory.Delete(repo, true);
         }
 
+        // Stage 3 (6 Nov 2026): the workflow's trial columns file, copied into the manifest at Start.
+        static void TrialColumnsFile(string root, string blankManifest)
+        {
+            Console.WriteLine("Trial columns:");
+            Check("a workflow with TrialColumns blank has trial_columns null", Field(blankManifest, "trial_columns") == "null", Field(blankManifest, "trial_columns"));
+            var file = Path.Combine(root, "trial-columns.yml");
+            File.WriteAllText(file, "trialType:\n  type: int\n  values: {0: Visual, 1: Audio}\nitiSeconds:\n  type: double\n  unit: s\n  formerly: [itiDuration]\n");
+            string note;
+            var read = Json.Serialize(TrialColumns.Read("trial-columns.yml", root, out note));
+            Check("a file is copied with its hash, each column as written", note == null && Field(read, "columns.trialType.values.1") == "Audio"
+                && Field(read, "columns.itiSeconds.unit") == "s" && read.Contains("\"itiDuration\"") && Regex.IsMatch(Field(read, "sha256") ?? "", "^[0-9a-f]{64}$"), read);
+            File.WriteAllText(file, "trialType:\n  type: integer\n");
+            read = Json.Serialize(TrialColumns.Read(file, root, out note));
+            Check("a column whose type is not int, double, bool or string is not copied, and noted", Field(read, "missing") == "true" && note != null && note.Contains("trialType"), read);
+            read = Json.Serialize(TrialColumns.Read("nowhere.yml", root, out note));
+            Check("a missing file is noted, not an error", Field(read, "missing") == "true" && note != null, read);
+            Check("blank reads nothing", TrialColumns.Read(" ", root, out note) == null && note == null, "read");
+            var snapshot = ManifestWriter.Snapshot("", true, file);
+            Check("Snapshot carries the section and its note", snapshot.TrialColumns != null && snapshot.Notes.Cast<string>().Any(n => n.StartsWith("Trial columns not read")), "missing");
+            File.Delete(file);
+        }
+
         static int Main()
         {
             var root = Path.Combine(Path.GetTempPath(), "openrigs-manifest-test-" + Guid.NewGuid().ToString("N").Substring(0, 8));
@@ -206,6 +228,7 @@ namespace OpenRigs.Manifest.Tests
                 var built = ((AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(typeof(ManifestWriter).Assembly, typeof(AssemblyInformationalVersionAttribute))).InformationalVersion.Split('+')[0];
                 Check("writer names the package and its version as built", Field(finished, "writer.package") == "OpenRigs.Manifest" && Field(finished, "writer.version") == built, Field(finished, "writer.version") + " vs " + built);
                 DirtySource(root);
+                TrialColumnsFile(root, finished);
 
                 // Round 5: the manifest reads OpenRigs.Control by name, so that it does not depend on it;
                 // the checks above run through that read, and a renamed member fails here too.

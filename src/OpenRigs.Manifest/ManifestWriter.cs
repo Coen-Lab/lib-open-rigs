@@ -23,6 +23,7 @@ namespace OpenRigs.Manifest
         public JsonObject Source;
         public JsonObject Launch;
         public List<object> ConfigFiles = new List<object>();
+        public JsonObject TrialColumns;
         public List<object> Notes = new List<object>();
     }
 
@@ -51,8 +52,8 @@ namespace OpenRigs.Manifest
 
         public string ManifestPath { get { return manifestPath; } }
 
-        /// <summary>Reads what the manifest takes from Start: the workflow, its repository and commit, the command line, and each configuration file.</summary>
-        public static StartSnapshot Snapshot(string configFiles, bool hasRunInput)
+        /// <summary>Reads what the manifest takes from Start: the workflow, its repository and commit, the command line, each configuration file and the trial columns file.</summary>
+        public static StartSnapshot Snapshot(string configFiles, bool hasRunInput, string trialColumns = null)
         {
             var snapshot = new StartSnapshot();
             var args = Environment.GetCommandLineArgs();
@@ -69,6 +70,9 @@ namespace OpenRigs.Manifest
                 var missing = file.FirstOrDefault(p => p.Key == "missing");
                 if (missing.Key != null) snapshot.Notes.Add("Config file not found at Start: " + configured + ".");
             }
+            string trialNote;
+            snapshot.TrialColumns = Manifest.TrialColumns.Read(trialColumns, root ?? workflowFolder, out trialNote);
+            if (trialNote != null) snapshot.Notes.Add(trialNote);
             if (!hasRunInput) snapshot.Notes.Add("No run input: the outcome is read from OpenRigs.Control's phase when the workflow stops.");
             var note = ConfigRootNote(snapshot.Launch, RigConfigPath(configFiles));
             if (note != null) snapshot.Notes.Add(note);
@@ -162,6 +166,7 @@ namespace OpenRigs.Manifest
             doc.Add("launch", start.Launch);
             doc.Add("control", ControlSection(control));
             doc.Add("config_files", start.ConfigFiles);
+            doc.Add("trial_columns", start.TrialColumns);
             var run = new JsonObject();
             run.Add("outcome", end.Outcome);
             run.Add("started", Iso(started));
