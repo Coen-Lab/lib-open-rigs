@@ -45,3 +45,14 @@ Decided by Pip with Claude, 5 Nov 2026. Built in four stages, in this order; eac
 - rig-setup runs rig-control's `check-workflow-names.ps1` on a rig's clone after it takes a new version (once per commit and lists, recorded beside the clone), and a failure is an outstanding row in the Machines window and ClaudioVisual's rig health. The new version stays in place, so that workflow cannot launch (rig-control blocks it) until the names are added or the workflow is changed. Pip chose this over rolling back: the check needs the new version's packages, so it can only run after the pull and Setup, and a rollback would have to reset the clone, set up the old packages again and refuse that commit on every later update.
 
 **Out of scope, noted.** Rigs restore ucl-open packages with a token on Pip's personal GitHub account (rig-setup-rules.json, until ucl-open publishes to nuget.org, ucl-open/ucl-open#12). pip-hub's Monday rota emails also run on PIPOFFICERIG.
+
+## 2026-11-06: A workflow sends; rig-control decides how it is shown
+
+Pip: "bonsai repo just sends everything, and visualisation should be decided by a file that is either part of rig control, or a separate git repo". Until now a project's `config\rig-control.toml` held both its contract and its presentation, so changing a chart meant a commit in the Bonsai repo.
+
+- **The workflow keeps its contract:** the parameters it takes (name, type, units, limits, labels, help), the commands it takes, and the columns and metrics it sends. These change with the Bonsai in one commit. The aim is for the `ExperimentControl` include to declare them, so the workflow repo carries no rig-control file.
+- **rig-control keeps the presentation:** `views\<project>.toml` in rig-control holds the tiles, the current-trial line, chart tabs and order, the parameter form's order and folding, and any layout settings added later. The views ship with the code that draws them, so a chart kind and every view that uses it change together.
+- **Not a separate repo,** for now: views only mean something to rig-control's renderer, and rigs already pull rig-control. Split them out if another lab needs to edit views without rig-control, at the open-rigs move.
+- **Drift:** a rig-control test checks each view against what its workflow declares, and the window says plainly when a view names something the workflow does not send.
+- **No view:** a workflow with none gets a default page built from its parameters, commands and metrics.
+- **To do (rig-control):** move the existing `config\rig-control.toml` files' presentation into `views\`, their parameter metadata toward the include; the agent and `/design-rig-control-view` follow.
