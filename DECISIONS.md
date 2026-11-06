@@ -56,3 +56,12 @@ Pip: "bonsai repo just sends everything, and visualisation should be decided by 
 - **Drift is said, never refused:** at each experiment the agent checks the view's parameters and commands against the include and its `[trials]` columns against the schema; what does not match is in the `view` reply and one amber line on the Experiment page. `tests\test_views.py` checks every view against any local clone of its workflow.
 - **No view:** a workflow whose schema lists the core trial columns gets a default view (the lab's tiles, Performance and Across Experiments); any other shows its parameters, commands and metrics as declared. Trial type names come from the schema's `values` when a view names none.
 - **Moved:** av-dome's `config\rig-control.toml` (`pip/main-switchover`) became rig-control's `views\av-dome.toml`; av-dome's copy is deleted once the rigs run the rig-control that reads `views\`.
+
+## 2026-11-06: Calibrations are the machine's, run from one page, each kind by its own workflow
+
+Pip: calibrations should be "all ... part of one interface in rig control", and "it needs to learn the valve channels etc. from rig.yml". Until now open-rigs' dispense calibration (`OpenRigs.Core:DispenseCalibration.bonsai`, merged 3 Nov 2026) had no runnable workflow anywhere.
+
+- **The machine's, not an experiment's:** an artefact sits in `calibration\` beside the rig's rig.yml and every workflow on that rig reads it, so a calibration is never part of an experiment workflow or its form.
+- **One workflow per kind, each in its own ucl-open repository** (valves: `ucl-open/coen-calibrate-valve`; Tom's `qc-calibrate-valve` scaffold left as his), since each kind needs its own hardware and packages. Each is an open-rigs project under `ExperimentControl`, so rig-control launches, watches and stops it like an experiment.
+- **It reads the rig's own rig.yml**, only the entries it needs (the valve workflow: `behaviorBoard: main:`'s port, `outputPulseEnable` and `outputs`), never a rig.yml or schema of its own: a strict deserializer of its own would refuse av-dome's other entries.
+- **One page in rig-control** (Setup's Calibrations), from `calibrations.toml` there: every kind, one row per line, each line's curve and history, and Calibrate launching that kind's workflow. Every other launch says, never refuses, when a calibrated line's curve is missing, old or another machine's.
