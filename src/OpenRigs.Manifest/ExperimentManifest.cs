@@ -63,7 +63,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>Gets or sets what the experiment must leave, separated by ;, or auto.</summary>
-        [Description("What the experiment must leave, separated by ;: a path in the experiment folder, a folder ending in /, or the start of a file's path ending in _ (Schemas/Schemas_Task_), met by any file whose path starts with it. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. rig-sync alarms on an entry that left no file. Blank: nothing expected.")]
+        [Description("What the experiment must leave, separated by ;: a path in the experiment folder, a folder ending in /, or the start of a file's path ending in _ (Settings/Settings_Task_), met by any file whose path starts with it. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. rig-sync alarms on an entry that left no file. Blank: nothing expected.")]
         public string ExpectedFiles
         {
             get { return Settings.ExpectedFiles; }

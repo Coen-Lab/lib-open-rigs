@@ -12,15 +12,15 @@ namespace OpenRigs.Control
 {
     /// <summary>
     /// The experiment's settings at Go, as JSON text for OpenRigs.Logging's LogDataSchema named
-    /// Schemas_Experiment, so the experiment folder holds them beside the rig's and the task's
-    /// (Schemas\Schemas_Experiment_&lt;DateTime&gt;.json): the subject and session, the rig, the
+    /// Settings_Experiment, so the experiment folder holds them beside the rig's and the task's
+    /// (Settings\Settings_Experiment_&lt;DateTime&gt;.json): the subject and session, the rig, the
     /// workflow with its repository and commit as OpenRigs.Manifest reads them, who launched it and
     /// who sent Go, and every declared parameter as it stood at Go, ParameterDefault's included.
     /// The repository is read once at Start, so the Go reply never waits on it.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Transform)]
-    [Description("The experiment's settings at Go as JSON text (subject, session, rig, workflow, commit, who launched and sent Go, every parameter at Go), for LogDataSchema named Schemas_Experiment. Its input is ExperimentGo.")]
+    [Description("The experiment's settings at Go as JSON text (subject, session, rig, workflow, commit, who launched and sent Go, every parameter at Go), for LogDataSchema named Settings_Experiment. Its input is ExperimentGo.")]
     public class ExperimentSettings
     {
         /// <summary>The experiment's settings as JSON text, once for each Go event.</summary>

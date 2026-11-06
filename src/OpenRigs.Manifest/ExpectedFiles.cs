@@ -7,7 +7,7 @@ using OpenRigs.Shared;
 namespace OpenRigs.Manifest
 {
     /// <summary>One file or folder the experiment must leave: a path in the experiment folder, a folder ending in /,
-    /// or a file name's start ending in _ (Schemas/Schemas_Task_), met by a file whose path starts with it.</summary>
+    /// or a file name's start ending in _ (Settings/Settings_Task_), met by a file whose path starts with it.</summary>
     class ExpectedEntry
     {
         public string Path;
@@ -111,8 +111,8 @@ namespace OpenRigs.Manifest
 
         /// <summary>
         /// The files under the experiment folder an entry matches: the file itself, every file whose path starts
-        /// with a prefix entry (ending in _, 0.1.1-coen.5: each of the three settings files in Schemas/ expected on
-        /// its own, as one Schemas/ entry was met by any one of them), or every file in the folder that no other
+        /// with a prefix entry (ending in _, 0.1.1-coen.5: each of the three settings files in Settings/ expected on
+        /// its own, as one Settings/ entry was met by any one of them), or every file in the folder that no other
         /// entry names (0.1.0-local.7), so a device's register map, expected by name in the device's folder,
         /// never stands in for the device's data.
         /// </summary>
