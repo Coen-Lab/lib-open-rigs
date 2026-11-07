@@ -1,5 +1,22 @@
 # Backlog
 
+## Audit 2026-11-07, early hours (/audit-rigs, set A: the seams, Control and Manifest)
+
+Changed (scripts and docs only; no package source, so no version raised):
+
+- `check-workflow-builds.ps1`'s names step assumed the `orcl:` prefix (any other read as "ok 0"), pooled commands and parameters into one list, and missed `ParameterValue`, `ParameterDefault` and `ParameterMaximum`, whose wrong name throws only at Go after the reply said ok (L1-L1): the prefix is read from each file's xmlns (a file with the package's nodes and none fails), the two lists are kept apart, and the five nodes are checked. Probed: the four lab workflows pass; a misspelt Snapshot under another prefix fails.
+- `FORMAT.md`'s example named `0.1.1-coen.1` with prefix entries it never had and no `trial_columns`; `config_files` dated 7 Nov for a 6 Nov commit; a note that after an `XXX` rename `session` is the authority and `control`, `launch` and the settings file keep what was typed (L1-L3, S3-I1). The Control README has a `GoByName` row and the right date for ExperimentSettings (L1-L4, S5-L); COEN-LAB.md names the current versions and the build check's four steps (S5-M2, S5-L1); DECISIONS.md notes `Notes` left the launch on 6 Nov (S5-L); the Manifest README's `RigSchema/x.json` is dated history (S5-I).
+
+Not changed, do not raise again without new information:
+
+- The comment-only filter (`lab-packages.ps1`) ignores `///` doc comments too, so a summary edit ships at the next behaviour change (L1-L2): the IL is the same, and a raise per summary edit redeploys every workflow.
+
+Open, with the next change of each package:
+
+- Manifest: the `Failed` branch for a held end and `ExperimentManifestException` can no longer run since 7d22408's immediate `OnError` (L1-I1): drop both.
+- Control: `LaunchedBy` and `GoBy` are set after `GoRequested = true` outside the lock, so a status poll can see `go_requested` with no `go_by` for microseconds (L1-I2): set them inside the `Locked` block first.
+- Core README: no mention of `DescribeCalibrationCurve` (S2-L3); with the `ApplyBalancePort` removal below.
+
 ## Audit 2026-11-06, evening (/audit-rigs, set C: the seams, windows, help and live view, tests, trust, scripts and packaging)
 
 Changed:

@@ -16,11 +16,13 @@ param(
 #      its yaml-language-server line names), every object closed to keys the schema does not
 #      list, as the generated DeserializeFromYaml is: a misspelt key in a task file ended the
 #      experiment at Go (settings-files plan, audit M5).
-# The names a workflow uses are checked where it runs, not here (DECISIONS.md, stage 2):
+#   4. Compares every OnCommand and OnParameterSet name in src\**\*.bonsai with what the
+#      workflow's ExperimentControl declares: a stray one would listen for ever.
+# The lab's names a workflow uses are checked where it runs, not here (DECISIONS.md, stage 2):
 # rig-control's scripts\check-workflow-names.ps1, by rig-setup when a rig takes a new version
 # and by rig-control's agent before each launch, against the lab's lists on the share.
 # It cannot check hardware, the visualizers themselves or the data a run writes. Exit 0 when
-# all three pass.
+# all four pass.
 $ErrorActionPreference = 'Stop'
 $self = $MyInvocation.MyCommand.Path
 $Repo = (Resolve-Path $Repo).Path
@@ -136,21 +138,38 @@ if ($LASTEXITCODE -eq 2) { "  FAILED"; "check-workflow-builds: config\main.layou
 if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-workflow-builds: the workflow does not build."; exit 1 }
 # OnCommand and OnParameterSet filter the controller's events by name, so one listening for a name
 # ExperimentControl does not declare builds and never fires (a misspelt Snapshot passed every
-# step; audit-rigs set C, 6 Nov 2026). Read from the XML of every workflow file under src\.
-$declared = @(); $listened = @()
+# step; audit-rigs set C, 6 Nov 2026). ParameterValue, ParameterDefault and ParameterMaximum name
+# a parameter too, and a wrong one throws only at Go, after the Go reply said ok (set A, 7 Nov).
+# Commands and parameters are two lists: an OnParameterSet named after a command never fires
+# either. The package's XML prefix is read from each file's own xmlns (orcl: in every lab
+# workflow today), never assumed: a file with the package's nodes and no prefix is a failure,
+# not "ok 0". Read from the XML of every workflow file under src\.
+$commands = @(); $parameters = @(); $listened = @(); $unprefixed = @()
 foreach ($file in Get-ChildItem (Join-Path $Repo 'src') -Recurse -Filter '*.bonsai') {
     $text = Get-Content $file.FullName -Raw
-    foreach ($block in [regex]::Matches($text, '(?s)<(?:Commands|Parameters)>(.*?)</(?:Commands|Parameters)>')) {
-        $declared += @([regex]::Matches($block.Groups[1].Value, '<Name>([^<]+)</Name>') | ForEach-Object { $_.Groups[1].Value })
+    foreach ($kind in 'Commands', 'Parameters') {
+        foreach ($block in [regex]::Matches($text, "(?s)<$kind>(.*?)</$kind>")) {
+            $names = @([regex]::Matches($block.Groups[1].Value, '<Name>([^<]+)</Name>') | ForEach-Object { $_.Groups[1].Value })
+            if ($kind -eq 'Commands') { $commands += $names } else { $parameters += $names }
+        }
     }
-    $listened += @([regex]::Matches($text, 'xsi:type="orcl:On(?:Command|ParameterSet)">\s*<orcl:Name>([^<]+)</orcl:Name>') |
-        ForEach-Object { "$($_.Groups[1].Value) ($($file.Name))" })
+    $prefix = [regex]::Match($text, 'xmlns:(\w+)="clr-namespace:OpenRigs\.Control;')
+    if (-not $prefix.Success) {
+        if ($text -match 'clr-namespace:OpenRigs\.Control;') { $unprefixed += $file.Name }
+        continue
+    }
+    $p = [regex]::Escape($prefix.Groups[1].Value)
+    foreach ($m in [regex]::Matches($text, "xsi:type=`"${p}:(OnCommand|OnParameterSet|ParameterValue|ParameterDefault|ParameterMaximum)`">\s*<${p}:Name>([^<]+)</${p}:Name>")) {
+        $listened += [pscustomobject]@{ Node = $m.Groups[1].Value; Name = $m.Groups[2].Value; File = $file.Name }
+    }
 }
-$undeclared = @($listened | Where-Object { $declared -cnotcontains ($_ -replace ' \([^)]+\)$', '') })
+if ($unprefixed) { "  FAIL  the OpenRigs.Control prefix could not be read from: $($unprefixed -join ', ')"; "check-workflow-builds: a workflow file's OpenRigs.Control xmlns could not be read."; exit 1 }
+$undeclared = @($listened | Where-Object { $(if ($_.Node -eq 'OnCommand') { $commands } else { $parameters }) -cnotcontains $_.Name } |
+    ForEach-Object { "$($_.Node) $($_.Name) ($($_.File))" })
 if ($undeclared) { "  FAIL  listened for but not declared on ExperimentControl: $($undeclared -join ', ')"; "check-workflow-builds: a command or parameter the workflow listens for is not declared."; exit 1 }
-"  ok    $($listened.Count) OnCommand/OnParameterSet name(s) declared on ExperimentControl"
+"  ok    $($listened.Count) command and parameter name(s) declared on ExperimentControl"
 "3. Checking config\*.yml against their schemas..."
 $schemaCheck = Join-Path $PSScriptRoot 'check-config-schemas.py'
 & { $ErrorActionPreference = 'Continue'; & uv run --no-project --with jsonschema --with pyyaml python -I $schemaCheck $Repo 2>&1 | ForEach-Object { "$_" } }
 if ($LASTEXITCODE -ne 0) { "  FAILED"; "check-workflow-builds: a config file does not fit its schema."; exit 1 }
-"check-workflow-builds: all three steps passed."
+"check-workflow-builds: all four steps passed."
