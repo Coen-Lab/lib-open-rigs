@@ -86,7 +86,7 @@ Pip, choosing where the projector gamma fit lives: "rig-control, Python". Then: 
 
 ## 2026-11-07: QC repositories are coen-qc-<verb>-<thing>; the pre-training check is the preflight
 
-Pip, naming the pre-training rig check: "I think we should distinguish from experimental workflows clearly though... and calibrate seems good for that. But maybe we insert qc into all of them", after Thom's `ucl-open/qc-calibrate-valve` scaffold. Then, of "check": "Is ""Check"" right word?"; preflight was chosen over checkout, verify, signoff and the rest. "Do it."
+Pip, naming the pre-training rig check: "I think we should distinguish from experimental workflows clearly though... and calibrate seems good for that", then suggested putting qc into all of their names, as Thom's `ucl-open/qc-calibrate-valve` scaffold has it. Pip then asked whether "check" was the right word; preflight was chosen over checkout, verify, signoff and the rest. "Do it."
 
 - **Every quality-control repository is `coen-qc-<verb>-<thing>`:** `coen-calibrate-valve` and `coen-calibrate-projector` were renamed `coen-qc-calibrate-valve` and `coen-qc-calibrate-projector` (GitHub redirects the old URLs), and the new check is `ucl-open/coen-qc-preflight-rig`. The entries above keep the old names as they were written.
 - **The name is the rule:** rig-setup gives a `qc` or `calibrat` repository no desktop shortcut, and rig-control never offers one in its Workflow list (`is_qc_name`); rig-setup's `retiredRepos` offers each rig's clone under an old name for quarantine.
