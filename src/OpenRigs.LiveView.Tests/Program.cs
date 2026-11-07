@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reactive.Linq;
 using OpenRigs.LiveView;
 
 // Stand-ins for the device data types, which the recipes recognise by full name, so the plan can
@@ -55,6 +56,15 @@ namespace OpenRigs.LiveView.Tests
                     : null);
                 var streamed = string.Join(", ", plan.Streamed.Select(d => d.Stream));
                 Check("each published device with a recipe is streamed", streamed == "BehaviorBoard-Main.encoder, Camera-Box.video", streamed);
+                var board = plan.Streamed.FirstOrDefault(d => d.Name == "BehaviorBoard-Main");
+                var boardStreams = board == null ? "" : string.Join(", ", board.Streams);
+                Check("a board streams its encoder and, as a second stream, its channels", boardStreams == "BehaviorBoard-Main.encoder, BehaviorBoard-Main.channels", boardStreams);
+                var values = board == null ? null : board.TemplateValues();
+                Check("the board's template gets its channels stream and a 100/s analog interval",
+                    values != null && values["Channels"] == "BehaviorBoard-Main.channels" && values["AnalogInterval"] == "PT0.01S",
+                    values == null ? "not streamed" : values["Channels"] + " " + values["AnalogInterval"]);
+                var cameraValues = plan.Streamed.First(d => d.Name == "Camera-Box").TemplateValues();
+                Check("a camera has no channels stream", cameraValues["Channels"] == "" && plan.Streamed.First(d => d.Name == "Camera-Box").Streams.Count() == 1, cameraValues["Channels"]);
                 var box = plan.Streamed.FirstOrDefault(d => d.Name == "Camera-Box");
                 Check("a camera's image is found by type, in a frame paired with its trigger", box != null && box.ImagePath == "Value.Image", box == null ? "not streamed" : box.ImagePath);
                 Check("rig.yml's liveView rate and width are taken, the height kept", box != null && box.Rate == 10 && box.Width == 160 && box.Height == 240, box == null ? "" : box.ToString());
@@ -86,6 +96,16 @@ namespace OpenRigs.LiveView.Tests
                 Check("a board with portName: null is not streamed, though its data is HarpMessage", !idle.Streamed.Any() && idle.Skipped.Any(s => s.StartsWith("BehaviorBoard-Idle: it has no portName")), string.Join(" | ", idle.Skipped));
                 var none = LiveViewPlan.Create(Path.Combine(root, "nowhere"), name => null);
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
+
+                Console.WriteLine("Board channels:");
+                var once = new TagRegister { Register = "OutputSet" }.Process(new[] { 5 }.ToObservable()).ToList().Wait();
+                Check("an event register is named and sent once", once.Count == 1 && once[0].Register == "OutputSet" && (int)once[0].Value == 5, once.Count.ToString());
+                var held = new TagRegister { Register = "OutputState", Repeat = TimeSpan.FromMilliseconds(50) }
+                    .Process(Observable.Return(7).Concat(Observable.Never<int>())).Take(TimeSpan.FromMilliseconds(400)).ToList().Wait();
+                Check("a state register's latest value is sent again every Repeat, unchanged",
+                    held.Count >= 4 && held.All(m => m.Register == "OutputState" && (int)m.Value == 7), held.Count.ToString());
+                var tag = new TagRegister { RepeatXml = "PT2S" };
+                Check("Repeat is read from the workflow file's duration", tag.Repeat == TimeSpan.FromSeconds(2), tag.Repeat.ToString());
 
                 Console.WriteLine("Session key:");
                 Check("the experiment folder's last two names", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_2026-10-30T19-57-12\") == "sub-TC002/ses-003B1_2026-10-30T19-57-12", SessionKey.FromPathPrefix(@"C:\data\sub-TC002\ses-003B1_2026-10-30T19-57-12\"));

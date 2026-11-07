@@ -21,6 +21,8 @@ namespace OpenRigs.LiveView
         public int Height;
         public Func<Type, string> Accepts;  // null if the data can be streamed, else why not
         public bool Harp;        // a Harp board, streamed only when HarpRig.NotHarp says it is one, as it is recorded
+        public string Channels;  // a second stream, every channel of the board (BehaviorBoard-Main.channels); null for none
+        public double AnalogRate; // the channels stream's analog inputs, samples per second
 
         public bool IsVideo { get { return Width > 0; } }
 
@@ -34,6 +36,7 @@ namespace OpenRigs.LiveView
             new DeviceRecipe
             {
                 Kind = "behaviorBoard", Template = "BehaviorBoard", Stream = "encoder", Rate = 10, Harp = true,
+                Channels = "channels", AnalogRate = 100,
             },
         };
 
@@ -90,13 +93,27 @@ namespace OpenRigs.LiveView
 
         public string Stream { get { return Name + "." + Recipe.Stream; } }
 
+        // Every channel of a board, as a second stream; null for a kind that has none.
+        public string ChannelsStream { get { return Recipe.Channels == null ? null : Name + "." + Recipe.Channels; } }
+
+        public IEnumerable<string> Streams
+        {
+            get
+            {
+                yield return Stream;
+                if (ChannelsStream != null) yield return ChannelsStream;
+            }
+        }
+
         public string Summary
         {
             get
             {
                 return Recipe.IsVideo
                     ? string.Format(CultureInfo.InvariantCulture, "{0}.Data, {1} frames/s at {2} x {3}, JPEG, as {4}.", Name, Rate, Width, Height, Stream)
-                    : string.Format(CultureInfo.InvariantCulture, "{0}.Data, {1}/s, as {2}.", Name, Rate, Stream);
+                    : ChannelsStream == null
+                    ? string.Format(CultureInfo.InvariantCulture, "{0}.Data, {1}/s, as {2}.", Name, Rate, Stream)
+                    : string.Format(CultureInfo.InvariantCulture, "{0}.Data, {1}/s, as {2}; and every digital input, output and DIO change, camera trigger and pulse setting, with the board's timestamp, and the analog inputs at {3}/s, as {4}.", Name, Rate, Stream, Recipe.AnalogRate, ChannelsStream);
             }
         }
 
@@ -110,6 +127,8 @@ namespace OpenRigs.LiveView
                 { "Width", Width.ToString(CultureInfo.InvariantCulture) },
                 { "Height", Height.ToString(CultureInfo.InvariantCulture) },
                 { "ImagePath", ImagePath ?? string.Empty },
+                { "Channels", ChannelsStream ?? string.Empty },
+                { "AnalogInterval", Recipe.AnalogRate > 0 ? XmlConvert.ToString(TimeSpan.FromSeconds(1.0 / Recipe.AnalogRate)) : string.Empty },
             };
         }
 

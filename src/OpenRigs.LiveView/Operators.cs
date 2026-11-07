@@ -80,6 +80,58 @@ namespace OpenRigs.LiveView
         }
     }
 
+    /// <summary>One message of a board's channels stream: the register it came from and its value with the board's timestamp.</summary>
+    public class BoardChannelMessage
+    {
+        /// <summary>The register's name, as the board's package names it (DigitalInputState, OutputSet).</summary>
+        public string Register { get; set; }
+        /// <summary>The register's value, with the board's timestamp in seconds (Harp's Timestamped: Seconds, Value).</summary>
+        public object Value { get; set; }
+    }
+
+    /// <summary>
+    /// Names each value with the register it came from, for a board's channels stream. A register
+    /// that holds a state rather than an event (OutputState, a pulse length) is sent again every
+    /// Repeat, unchanged and with its own timestamp, so a window that connects mid-experiment
+    /// still learns it; the board reports such a register only when it is read or written.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    [Description("Names each value with its register, and sends a state register's latest value again every Repeat.")]
+    public class TagRegister
+    {
+        /// <summary>Gets or sets the register's name.</summary>
+        [Description("The register's name.")]
+        public string Register { get; set; }
+
+        /// <summary>Gets or sets how often the latest value is sent again; zero never.</summary>
+        [XmlIgnore]
+        [Description("How often the latest value is sent again; zero never.")]
+        public TimeSpan Repeat { get; set; }
+
+        /// <summary>Gets or sets <see cref="Repeat"/> in XML's duration form, for the workflow file.</summary>
+        [Browsable(false)]
+        [XmlElement(nameof(Repeat))]
+        public string RepeatXml
+        {
+            get { return XmlConvert.ToString(Repeat); }
+            set { Repeat = XmlConvert.ToTimeSpan(value); }
+        }
+
+        /// <summary>Names each value with the register, sending the latest again every Repeat.</summary>
+        /// <typeparam name="TSource">The register's timestamped value.</typeparam>
+        /// <param name="source">The register's values.</param>
+        /// <returns>Each value named with its register, and the latest again every Repeat.</returns>
+        public IObservable<BoardChannelMessage> Process<TSource>(IObservable<TSource> source)
+        {
+            var register = Register;
+            var repeat = Repeat;
+            var tagged = source.Select(value => new BoardChannelMessage { Register = register, Value = value });
+            if (repeat <= TimeSpan.Zero) return tagged;
+            return tagged.Select(message => Observable.Return(message).Concat(Observable.Interval(repeat).Select(_ => message))).Switch();
+        }
+    }
+
     /// <summary>What the live view is showing: the workflow running and the devices streamed and skipped.</summary>
     public class LiveViewReport
     {

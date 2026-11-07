@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A Harp Behavior board: the raw encoder count from AnalogData, sampled, on the data port. -->
+<!-- A Harp Behavior board: the raw encoder count from AnalogData, sampled, on the data port; and
+     its channels, every digital input, output and port DIO change with the board's timestamp,
+     the camera triggers it sends, the pulse settings that shape its outputs, and the two analog
+     inputs sampled, as one stream. State registers are sent again every 2 s for a late viewer. -->
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Workflow>
     <Nodes>
+      <!-- 0 -->
       <Expression xsi:type="SubscribeSubject">
         <Name>{{Subject}}</Name>
       </Expression>
+      <!-- 1-4: the encoder, as before -->
       <Expression xsi:type="beh:Parse">
         <harp:Register xsi:type="beh:AnalogData" />
       </Expression>
@@ -25,12 +31,201 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
         <StreamName>{{Stream}}</StreamName>
       </Expression>
+      <!-- 5-6: digital inputs, every change -->
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedDigitalInputState" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>DigitalInputState</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 7-8: port DIO lines read as inputs, every change -->
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedPortDIOStateEvent" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>PortDIOStateEvent</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 9-16: outputs, as the board acknowledges each write -->
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedOutputSet" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>OutputSet</lv:Register>
+          <lv:Repeat>PT0S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedOutputClear" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>OutputClear</lv:Register>
+          <lv:Repeat>PT0S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedOutputToggle" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>OutputToggle</lv:Register>
+          <lv:Repeat>PT0S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedOutputState" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>OutputState</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 17-18: which outputs pulse by themselves after a set -->
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedOutputPulseEnable" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>OutputPulseEnable</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 19-26: each DO line's pulse length, in milliseconds -->
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedPulseDO0" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>PulseDO0</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedPulseDO1" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>PulseDO1</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedPulseDO2" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>PulseDO2</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedPulseDO3" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>PulseDO3</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 27-30: each camera trigger the board sends (DO0, DO1 when cameras run) -->
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedCamera0Frame" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>Camera0Frame</lv:Register>
+          <lv:Repeat>PT0S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedCamera1Frame" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>Camera1Frame</lv:Register>
+          <lv:Repeat>PT0S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 31-33: the analog inputs, sampled -->
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedAnalogData" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SampleInterval">
+          <rx:Interval>{{AnalogInterval}}</rx:Interval>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>AnalogData</lv:Register>
+          <lv:Repeat>PT0S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 34-35: one stream -->
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
+        <StreamName>{{Channels}}</StreamName>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
       <Edge From="3" To="4" Label="Source1" />
+      <Edge From="0" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="0" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="0" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="0" To="11" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="0" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
+      <Edge From="0" To="15" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="0" To="17" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
+      <Edge From="0" To="19" Label="Source1" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="0" To="21" Label="Source1" />
+      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="0" To="23" Label="Source1" />
+      <Edge From="23" To="24" Label="Source1" />
+      <Edge From="0" To="25" Label="Source1" />
+      <Edge From="25" To="26" Label="Source1" />
+      <Edge From="0" To="27" Label="Source1" />
+      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="0" To="29" Label="Source1" />
+      <Edge From="29" To="30" Label="Source1" />
+      <Edge From="0" To="31" Label="Source1" />
+      <Edge From="31" To="32" Label="Source1" />
+      <Edge From="32" To="33" Label="Source1" />
+      <Edge From="6" To="34" Label="Source1" />
+      <Edge From="8" To="34" Label="Source2" />
+      <Edge From="10" To="34" Label="Source3" />
+      <Edge From="12" To="34" Label="Source4" />
+      <Edge From="14" To="34" Label="Source5" />
+      <Edge From="16" To="34" Label="Source6" />
+      <Edge From="18" To="34" Label="Source7" />
+      <Edge From="20" To="34" Label="Source8" />
+      <Edge From="22" To="34" Label="Source9" />
+      <Edge From="24" To="34" Label="Source10" />
+      <Edge From="26" To="34" Label="Source11" />
+      <Edge From="28" To="34" Label="Source12" />
+      <Edge From="30" To="34" Label="Source13" />
+      <Edge From="33" To="34" Label="Source14" />
+      <Edge From="34" To="35" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

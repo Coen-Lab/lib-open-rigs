@@ -189,7 +189,7 @@ namespace OpenRigs.LiveView
             workflow.Add(Group("liveview", "Every 5 s, the devices streamed and skipped and why, as the liveview stream.",
                 Load("Report", new Dictionary<string, string>
                 {
-                    { "Streamed", string.Join("|", (plan.StreamsLoggedRows ? new[] { LiveViewPlan.LoggedRowsStream } : new string[0]).Concat(plan.Streamed.Select(d => d.Stream))) },
+                    { "Streamed", string.Join("|", (plan.StreamsLoggedRows ? new[] { LiveViewPlan.LoggedRowsStream } : new string[0]).Concat(plan.Streamed.SelectMany(d => d.Streams))) },
                     { "Skipped", string.Join("|", plan.Skipped) },
                     { "Notes", string.Join("|", plan.Notes) },
                 })));
