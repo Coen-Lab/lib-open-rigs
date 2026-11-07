@@ -9,10 +9,9 @@ Changed:
 - An older run of `update-workflows.ps1`, after waiting for the lock, wrote its versions over a newer run's `lab-package-versions.json` (L3-L2): it checks origin's main again before writing and stops as superseded.
 - `check-workflow-builds.ps1` passed a workflow listening for a command or parameter ExperimentControl does not declare (L3-L4, probed: a misspelt Snapshot passed all three steps): the names are compared, in every `src\**\*.bonsai`, and a stray one fails the check. Every lab workflow passes today.
 - `patches\README.md` named `0.1.1-coen.N` versions and hashes no file has (L3-L5); the HarpDevices README's `_Hardware.json` path (S5).
+- `build\` is among every package's stale inputs (L3-L3; Pip, 7 Nov 2026: rebuild all nine now): `86daefc`'s `Common.csproj.targets` change had flagged nothing, so every lab package was raised one and rebuilt in one go, which also gave Logging, Streaming and Video the right dependency versions.
 
 Not changed, do not raise again without new information:
-
-- `build\` is not among a package's stale inputs (L3-L3): adding it would read every package as stale from `86daefc`'s `Common.csproj.targets` change, so all nine would need a rebuild for the three wrong dependency versions the late-afternoon audit accepted until each next changes; for Pip to decide.
 - A `build-package.ps1` run during `update-workflows.ps1` in the same clone removes the `.nupkg` the run recorded (L3-L3): it fails loudly and the next run repairs it.
 - coen-calibrate-valve listed in `workflows.txt` and `profile-repos.json` both (L3-I1): it is updated even if removed from one.
 - A `trial-columns.yml` with two keys differing only in case would hold its session every night (S3-L1): no file has one, and it is an alarm naming the session, not a silent hold.
