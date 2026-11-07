@@ -48,13 +48,13 @@ Changed:
 
 Not changed, do not raise again without new information:
 - A `build-package.ps1` run during `update-workflows.ps1` in the same clone removes the `.nupkg` the run recorded (L3-L3): it fails loudly and the next run repairs it.
-- coen-calibrate-valve listed in `workflows.txt` and `profile-repos.json` both (L3-I1): it is updated even if removed from one.
+- coen-qc-calibrate-valve listed in `workflows.txt` and `profile-repos.json` both (L3-I1): it is updated even if removed from one.
 - A `trial-columns.yml` with two keys differing only in case would hold its session every night (S3-L1): no file has one, and it is an alarm naming the session, not a silent hold.
 
 Open:
 
-- lib-open-rigs: remove `ApplyBalancePort` and `BalancePort` (OpenRigs.Core `ManualBalance.cs`, their tests, and the mentions in `ManualBalance.bonsai` and `docs/articles/calibration.md`), unused since coen-calibrate-valve went manual-only (Pip, 6 Nov 2026; moved here from rig-control's BACKLOG).
-- coen-calibrate-valve has no `config\main.layout` in git, so the build check's layout step is skipped (L3-I2): to be tracked in that repository.
+- lib-open-rigs: remove `ApplyBalancePort` and `BalancePort` (OpenRigs.Core `ManualBalance.cs`, their tests, and the mentions in `ManualBalance.bonsai` and `docs/articles/calibration.md`), unused since coen-qc-calibrate-valve went manual-only (Pip, 6 Nov 2026; moved here from rig-control's BACKLOG).
+- coen-qc-calibrate-valve has no `config\main.layout` in git, so the build check's layout step is skipped (L3-I2): to be tracked in that repository.
 
 ## Audit 2026-11-06, late afternoon (the Settings rename and the coen-lab versions)
 
