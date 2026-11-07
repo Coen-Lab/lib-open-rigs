@@ -17,10 +17,12 @@ namespace OpenRigs.HarpDevices
         public string UsbSerial;   // from rig.yml, null when it has none
         public int ExpectedWhoAmI; // 0 when the kind is not in the table
         public bool HasCommands;   // the workflow publishes <Name>.Commands
+        public string Wiring;        // what the wiring check found (WiringCheck), for the record; null for a board it does not cover
+        public string WiringRefusal; // every disagreement, which stops the workflow at Start; null when none
 
         public override string ToString()
         {
-            return string.Join("|", Name, Kind, PortName, UsbSerial ?? "-", ExpectedWhoAmI, HasCommands);
+            return string.Join("|", Name, Kind, PortName, UsbSerial ?? "-", ExpectedWhoAmI, HasCommands, Wiring ?? "-", WiringRefusal ?? "-");
         }
     }
 
@@ -41,8 +43,19 @@ namespace OpenRigs.HarpDevices
 
         public readonly List<PlannedHarpDevice> Recorded = new List<PlannedHarpDevice>();
         public readonly List<string> Notes = new List<string>();
+        YamlDotNet.RepresentationModel.YamlMappingNode rig;
+        List<string> deviceNames;
+        string lines;
+        string workflow;
 
-        public static HarpDevicePlan Create(string configRoot, Func<string, Type> publishedType)
+        // The repository of the workflow running, found as OpenRigs.Manifest and LiveView find it.
+        static string WorkflowRepository()
+        {
+            var full = WorkflowFile.Find(Environment.GetCommandLineArgs(), Environment.CurrentDirectory);
+            return Git.FindRoot(WorkflowFile.Folder(full, Environment.CurrentDirectory));
+        }
+
+        public static HarpDevicePlan Create(string configRoot, Func<string, Type> publishedType, Func<string> repositoryRoot = null)
         {
             var plan = new HarpDevicePlan();
             if (publishedType("PathPrefix") != typeof(string))
@@ -62,6 +75,10 @@ namespace OpenRigs.HarpDevices
                 plan.Notes.Add(problem);
                 return plan;
             }
+            // The wiring check's inputs, read once: rig.yml's top level and the workflow's board-lines.yml.
+            plan.rig = WiringCheck.ReadRig(RigDevices.PathFor(configRoot));
+            plan.deviceNames = devices.Select(d => d.Name).ToList();
+            plan.lines = WiringCheck.ReadLines((repositoryRoot ?? WorkflowRepository)(), out plan.workflow);
             foreach (var device in devices)
             {
                 plan.Consider(device, publishedType);
@@ -84,8 +101,20 @@ namespace OpenRigs.HarpDevices
             if (commands == null) Notes.Add(device.Name + ": the workflow publishes no " + device.Name + CommandsSuffix + ", so no register dump is asked for at the experiment's start");
             else if (commands.FullName != HarpRig.MessageType) Notes.Add(device.Name + ": " + device.Name + CommandsSuffix + " is " + commands.Name + ", not HarpMessage, so no register dump is asked for");
             if (whoAmI == 0) Notes.Add(device.Name + ": no WhoAmI is known for " + device.Kind + ", so the board's type is recorded, not checked");
+            string wiring = null, refusal = null;
+            if (device.Kind == "behaviorBoard")
+            {
+                var result = rig == null
+                    ? new WiringResult { Summary = "not checked: rig.yml's top level could not be read" }
+                    : WiringCheck.Check(rig, device, deviceNames, lines, workflow);
+                wiring = result.Summary;
+                refusal = result.Refusal(device.Name);
+                if (refusal != null) Notes.Add(device.Name + ": " + result.Summary + " (the workflow stops at Start)");
+            }
             Recorded.Add(new PlannedHarpDevice
             {
+                Wiring = wiring,
+                WiringRefusal = refusal,
                 Name = device.Name,
                 Entry = "rig.yml " + device.Kind + ": " + device.Instance + ":",
                 Kind = device.Kind,

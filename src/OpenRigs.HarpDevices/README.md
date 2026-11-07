@@ -15,6 +15,28 @@ A Harp device is a device entry in rig.yml (`behaviorBoard: main:`, named `Behav
 
 `ExperimentManifest` (OpenRigs.Manifest 0.1.0-local.8 on) expects these files for each Harp device when its `ExpectedFiles` holds `harp` (`auto;harp`), so rig-sync holds back a completed experiment missing one (a run that ended any other way is copied with a note and an alarm): the record always, the register map only when a loaded Harp package has the kind's WhoAmI (0.1.0-local.9; before, a Lickety Split or any kind with no package was expected to leave a map it never writes, and every one of its experiments was held back). Which entries are Harp devices is one rule, `src\Shared\HarpRig.cs`, compiled into both packages: a `portName` that is not empty or `null`, and `<Name>.Data` published as `HarpMessage`. It is decided from rig.yml and the subjects, not from this node: Bonsai may build `ExperimentManifest` first, whatever their order in the workflow (a node fed from one built earlier is built sooner, measured 2 Nov 2026), so a subject this node publishes cannot be relied on there.
 
+## The Wiring Check
+
+A Behavior board's `wiring:` in rig.yml says what is plugged into each line; a workflow's `schemasoard-lines.yml` says what it uses each line for. At Start, before the board's USB serial is checked, every line the workflow uses must be in the wiring with the same `device`, the same `side` when the workflow gives one, and every `target` it needs; otherwise the workflow stops with every disagreement listed (0.1.1-coen-lab.6 on; lib-open-rigs DECISIONS.md, 7 Nov 2026). A line the workflow does not use may be unknown. A workflow without the file, or a board the file does not list, is not checked. Each board's `<Name>_device.json` records the result as `wiring` ("checked: DO1 left RewardValve, ... agree with rig.yml's wiring", or "not checked: ..."). `part` and `note` are never compared.
+
+```yaml
+# rig.yml
+behaviorBoard:
+  main:
+    wiring:
+      DIPort0: { device: Photodiode }
+      DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
+      DO1: { device: RewardValve, side: left }
+
+# the workflow's schemasoard-lines.yml
+BehaviorBoard-Main:
+  - { line: cameraTriggerController.trigger0, device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
+  - { line: rewardValves.left, device: RewardValve, side: left }   # a rig.yml key holding the line
+  - { line: DIPort0, device: Photodiode }
+```
+
+A line is given as a channel (`DIPort0`, `DO1`), as `cameraTriggerController.trigger0` or `trigger1` (DO0 or DO1, only while rig.yml enables that trigger), or as a rig.yml key holding a DO line, looked for in the board's entry first and then at the top level (`rewardValves.left: DO1`, `zapit.triggerLine: 3`). Whether each device word is on the lab's list is rig-control's names check, before launch.
+
 ## Settings
 
 | Property | Default | |
