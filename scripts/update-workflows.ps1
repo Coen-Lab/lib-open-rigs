@@ -235,7 +235,12 @@ if (-not $Extra) { $Extra = Join-Path $repo 'workflows.txt' }
 # lib-open-rigs would then write older versions over the file the newer run wrote, and every
 # rig on the newer packages would read as behind until the next run (audit-rigs set C).
 $now = ((Invoke-Git $repo ls-remote origin refs/heads/main) | Select-Object -First 1) -split '\s+' | Select-Object -First 1
-if ($now -ne $sourceSha) { "lib-open-rigs main moved to $("$now".Substring(0, [Math]::Min(7, "$now".Length))) while this run waited; nothing written or updated, as the run on that commit does it."; exit 0 }
+if ($now -ne $sourceSha) {
+    # Exit 1, not 0: the run on the newer commit happens only if somebody runs it (a plain
+    # `git push` runs nothing), so this must read as not done (set B, 7 Nov 2026, S1-M1).
+    "lib-open-rigs main moved to $("$now".Substring(0, [Math]::Min(7, "$now".Length))) while this run waited; nothing written or updated. Run push-and-update-workflows.ps1 (or this script) again from that commit."
+    exit 1
+}
 
 # What every lab workflow should be on, written before any is updated: a run that stops or fails
 # part way then shows on the rigs as workflows behind it, not as nothing. Written beside, then
@@ -500,6 +505,10 @@ try {
 "`n" + ($rows | Format-Table -AutoSize -Wrap | Out-String).TrimEnd()
 $bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai', 'not kept', 'gone', 'superseded' })
 if ($bad) { "`n$($bad.Count) of $($rows.Count) branches are not on the lab's packages."; exit 1 }
+# A superseded branch was left for the run on the newer commit, which happens only if somebody
+# runs it: said, and the run is not "every workflow" (set B, 7 Nov 2026, S1-M1).
+$left = @($rows | Where-Object { $_.Result -eq 'superseded' })
+if ($left) { "`n$($left.Count) of $($rows.Count) branches were left for the run on the newer lib-open-rigs commit: run push-and-update-workflows.ps1 (or this script) again from it."; exit 1 }
 "`nEvery lab Bonsai workflow is on the lab's packages, on main and every ticked branch."
 # Said, not left to the last git call's code, which push-and-update-workflows.ps1 reads as the run's.
 exit 0

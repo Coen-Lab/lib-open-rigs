@@ -1,5 +1,23 @@
 # Backlog
 
+## Audit 2026-11-07, morning (/audit-rigs, set B: the seams, HarpDevices, LiveView and Shared)
+
+Changed (scripts and docs only; no package source, so no version raised):
+
+- `update-workflows.ps1` exited 0 when main had moved while it waited, and ended "every lab Bonsai workflow is on the lab's packages" with superseded branches left for "the run on that commit", which happens only if somebody runs it (S1-M1; a plain `git push` runs nothing, and 86daefc's file stayed stale a day): both exit 1 and say to run `push-and-update-workflows.ps1` again from the newer commit.
+- The Manifest README said the manifest's `control` section holds every parameter at Go (S5-M1): they are in `Settings\Settings_Experiment_<DateTime>.json` since 0.1.1-coen.5.
+
+Not changed, do not raise again without new information:
+
+- `RecordHarpDevice.cs` keeps writing every reply into `atConnection` after Start, so a timed-out dump's fallback may be the previous experiment's registers under "when its port opened" (L2-I1): the same board, the same registers; wording, with the next HarpDevices change.
+- `LiveViewPlan.cs`'s rate note says "0 to 1000" where `TryPositive` refuses 0 (L2-I2): with the next LiveView change.
+- DECISIONS.md's stage-2 line lists `rollouts.json`, which the share has not got yet (S5-I1): decisions are append-only, and the file appears at the first rollout.
+
+Open, with the next change of each package (a raise redeploys every workflow, and GREEN-DOME-1 is mid-test):
+
+- Manifest: `ExperimentManifest.cs:136` hard-codes the ConfigRoot default that `RigDevices.DefaultConfigRoot` holds (L2-L1): build it from the shared constant, with a test.
+- HarpDevices: `RecordHarpDevices` placed before `PathPrefix` records nothing, saying so only in its description, while the manifest expects the Harp files, so every run is held back overnight with an alarm (L2-L2): fail at Start with the note's text.
+
 ## Audit 2026-11-07, early hours (/audit-rigs, set A: the seams, Control and Manifest)
 
 Changed (scripts and docs only; no package source, so no version raised):
