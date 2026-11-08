@@ -1,5 +1,21 @@
 # Backlog
 
+## Audit 2026-11-08, morning (/audit-rigs, set C, run 4: the seams, scripts and packaging)
+
+Changed (scripts and COEN-LAB.md only; no package source, so no version raised):
+
+- The comment-only filter passed every change (L3-H1, reproduced): git hands `-I` each line with its newline and lets `^` match after it, so `'^\s*$'` matched the empty end of every line, and the push's "changed since built" and "built on other source" checks have passed any source change since ce786bc (6 Nov). `-I` and `--ignore-blank-lines` also each ignore only a hunk wholly of their own kind, so a comment added with a blank line still counted. `$script:CommentOnly` is now one pattern ending in the line's own newline (`^[ \t\r]*(//[^\n]*)?\n`), checked across nine cases (code, mid-line code, trailing comment, commented-out code, blank, blank and comment, `///`), and `Test-CommentOnlyFilter` holds it against two known commits at every run. Every package passes the stricter checks at HEAD, so nothing stale or misbuilt shipped.
+- `update-workflows.ps1` run alone shipped whatever `local_packages\` held, unchecked (L3-M1): the push's package checks are `Assert-LabPackagesShippable` in `lab-packages.ps1`, run by both.
+- The "main moved while this run waited" `exit 1` kept the run lock in an in-process run (L3-L1, set C's L3-L2 through `exit`): it lets the lock go first.
+
+Not changed, do not raise again without new information:
+
+- `update-workflows.ps1`'s clone cleanup deletes any unlisted folder under `-Work` (L3-I1): nobody passes `-Work` but the script's own re-run, and `Set-Branch` already resets listed folders there.
+
+Open, with the next change of each package:
+
+- HarpDevices or Manifest: a rig.yml device kind missing from `WhoAmIByKind` gives `ExpectedWhoAmI` 0, so the manifest does not name `<Name>/<Name>.yml`, yet `RecordHarpDevice.Write` still writes it when a loaded package decodes the board's WhoAmI, and with `auto;harp` that file then meets the `<Name>/` folder entry (S3-I1, the register-map shape of 2 Nov; no rig today: every published Harp device is in the table). Have `ExpectedPlan` always exclude `<Name>/<Name>.yml` from a Harp device's folder entry, or `MapToWrite` return null when nothing is expected; a test with an unknown kind.
+
 ## Audit 2026-11-08, early morning (/audit-rigs, set B: the seams, HarpDevices, LiveView and Shared)
 
 Changed (docs and tests only; no package source, so no version raised):
