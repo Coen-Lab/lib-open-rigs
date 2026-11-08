@@ -12,6 +12,9 @@ $lab = Get-LabPackages $repo
 # What is published is local_packages\, so a package whose <Version> was raised and never built
 # would push and report every workflow up to date (round 6, 0a90299). Each package's version
 # must be the .nupkg there.
+# A build not committed passed every check below (the file is on disk, git names no commit for
+# it), so the raised <Version> went up without its .nupkg (audit, 8 Nov 2026).
+if (git -C $repo status --porcelain -- local_packages) { throw "local_packages\ has uncommitted changes. Commit them first." }
 $unbuilt = @($lab | Where-Object { -not (Test-Path (Join-Path $repo $_.Nupkg)) } | ForEach-Object { $_.Name })
 if ($unbuilt) { throw "Not built: $($unbuilt -join ', '). Run scripts\build-package.ps1 -Package <name> and commit local_packages\ first." }
 

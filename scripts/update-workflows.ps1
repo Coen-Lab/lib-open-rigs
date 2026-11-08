@@ -47,7 +47,9 @@ param(
 $ErrorActionPreference = 'Stop'
 # A throw (unpushed commits here, no lab share) is written to the output and exits 1, so a log
 # of the run says why it stopped (audit, 2 Nov 2026).
-trap { "Stopped: $($_.Exception.Message)"; exit 1 }
+# The run lock is let go here too: a throw after it is taken skipped the finally below for an
+# in-process run, and the next push waited 40 minutes for it (audit, 8 Nov 2026).
+trap { "Stopped: $($_.Exception.Message)"; if ($mine -and $mutex) { $mutex.ReleaseMutex() }; exit 1 }
 $repo = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $local = Join-Path $repo 'local_packages'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -205,7 +207,10 @@ if ([int](Invoke-Git $repo rev-list --count 'HEAD..@{u}')) {
     if (Invoke-Git $repo status --porcelain) { throw "lib-open-rigs is behind GitHub and has local changes. Commit or discard them first." }
     $null = Invoke-Git $repo merge --ff-only -q '@{u}'
     "lib-open-rigs brought up to date with GitHub; running the updated script."
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path -Work $Work -RepoList $RepoList -Extra $Extra -Reference $Reference
+    # Windows PowerShell drops an empty argument, so an empty -Extra took -Reference as its value (audit, 8 Nov 2026).
+    $pass = @('-Work', $Work, '-RepoList', $RepoList, '-Reference', $Reference)
+    if ($Extra) { $pass += '-Extra', $Extra }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path @pass
     exit $LASTEXITCODE
 }
 $source = (Invoke-Git $repo rev-parse --short HEAD) | Select-Object -First 1
@@ -500,7 +505,18 @@ try {
             }
         $null = Invoke-Native git -C $clone.Dir worktree prune
     }
-} finally { $mutex.ReleaseMutex() }
+    # A repository no longer listed (renamed or dropped: coen-calibrate-valve, 7 Nov 2026) keeps
+    # its clone here for ever otherwise (audit, 8 Nov 2026).
+    $kept = @($clones | ForEach-Object { $_.Slug.ToLower() }) + @($ref.Slug.ToLower())
+    Get-ChildItem $Work -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+        $org = $_.Name
+        Get-ChildItem $_.FullName -Directory | Where-Object { "$org/$($_.Name -replace '@.*$', '')".ToLower() -notin $kept } | ForEach-Object {
+            $gone = $_
+            "  removing $org/$($gone.Name): no longer a listed repository"
+            try { Remove-Item $gone.FullName -Recurse -Force -ErrorAction Stop } catch { "  could not remove $org/$($gone.Name): $($_.Exception.Message)" }
+        }
+    }
+} finally { $mutex.ReleaseMutex(); $mine = $false }
 
 "`n" + ($rows | Format-Table -AutoSize -Wrap | Out-String).TrimEnd()
 $bad = @($rows | Where-Object { $_.Result -notin 'up to date', 'updated', 'not Bonsai', 'not kept', 'gone', 'superseded' })

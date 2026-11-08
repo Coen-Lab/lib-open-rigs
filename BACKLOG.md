@@ -1,5 +1,24 @@
 # Backlog
 
+## Audit 2026-11-08, night (/audit-rigs, set C: the seams, scripts and packaging)
+
+Changed (scripts and docs only; no package source, so no version raised):
+
+- `update-workflows.ps1`: its self-update re-run passed `-Extra ''`, which Windows PowerShell drops, so the child took `-Reference` as `-Extra` and stopped (L3-L1, probed); a throw between taking the run lock and its `try` left the lock held for an in-process run (the trap releases it now, the `finally` clears `$mine`; probed: `finally` runs before the trap) (L3-L2); clones of a repository no longer listed are removed at the end of a run (coen-calibrate-valve's 337 MB) (L3-I3).
+- `push-and-update-workflows.ps1` refuses uncommitted changes in `local_packages\` (L3-L3): a build not committed passed every check (on disk, no commit for git to compare), so the raised `<Version>` went up without its `.nupkg`.
+- COEN-LAB.md: the blue opto rigs' rig.yml is in av-dome's keyed layout since 7 Nov with no `rigId` yet (S5-L3); the pin excepts READMEs and test projects, as the script does (S1-I1). The HarpDevices README says rig-setup scans half-hourly (S5-I1).
+
+Not changed, do not raise again without new information:
+
+- `Get-LabPackages` counts every change under `src\Shared` as Control's though Control compiles only `WorkflowFile.cs` (L3-I1): it errs towards a raise, and a narrower pathspec per Compile item is one more thing to keep right.
+- The push does not re-run `check-package-dependencies.ps1` over `local_packages\` (L3-I2): Bonsai installs exactly the versions `Bonsai.config` lists, so a nuspec dependency is metadata; today all four Core dependants name Core's version.
+
+Open, with the next change of each package:
+
+- Shared: `RigDevices.Value` reads only `null` as empty, where YamlDotNet's deserializer, rig-setup and PyYAML also read `Null` and `NULL` as null, so `usbSerial: NULL` refuses Start naming the board "NULL" (S4-L1). Return null for all three, with a test, and correct rig-setup's `rig-config.ps1` comment that the readers agree.
+- Manifest: `FilesSection` lists another writer's `.tmp` (RecordHarpDevice's `.yml.tmp`, `_device.json.tmp`, renamed 0.7 to 5 s after Go) and throws on a file that vanishes mid-listing; a Stop in that window gives a manifest rig-sync holds as `missing` every night, or loses the stop's reason since `stopWritten` is set first (S3-L1). Skip `*.tmp`, drop a vanished file, set `stopWritten` after `writer.Stopping` succeeds, with a test.
+- Control: no count of a command taken, so after a timed-out `command` the status cannot say whether it ran (S2-L2; rig-control now says resending may repeat it). Add `commands[i].taken`, counted in `Handle`, for rig-control to compare.
+
 ## Independent audit of 7 Nov work, 8 Nov 2026 (the wiring check and the board channels)
 
 Changed:
