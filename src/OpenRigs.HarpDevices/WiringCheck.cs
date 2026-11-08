@@ -27,9 +27,10 @@ namespace OpenRigs.HarpDevices
         public string Refusal(string board)
         {
             if (Problems.Count == 0) return null;
-            return board + "'s wiring in rig.yml does not agree with the lines this workflow uses (" + WiringCheck.LinesFile + "), so it does not start:\n- " +
-                string.Join("\n- ", Problems) +
-                "\nFix whichever is wrong: rig.yml's " + "wiring" + " says what is plugged in on this rig, the workflow's file what it drives or reads on each line.";
+            // One line: rig-control keeps only the first line of a workflow's error (audit, 8 Nov 2026).
+            return board + "'s wiring in rig.yml does not agree with the lines this workflow uses (" + WiringCheck.LinesFile + "), so it does not start: " +
+                string.Join("; ", Problems) +
+                ". Fix whichever is wrong: rig.yml's wiring says what is plugged in on this rig, the workflow's file what it drives or reads on each line.";
         }
     }
 
@@ -95,7 +96,7 @@ namespace OpenRigs.HarpDevices
                 string why;
                 var line = Resolve(from, rig, board.Settings, out why);
                 if (why != null) { result.Problems.Add(why); continue; }
-                if (line == null) continue;  // a camera trigger rig.yml does not enable: the line is not used
+                if (line == null) continue;  // a camera trigger rig.yml does not enable, or a Zapit TTL not hardware triggered: the line is not used
                 uses.Add(new BoardLineUse
                 {
                     Line = line,
@@ -112,8 +113,11 @@ namespace OpenRigs.HarpDevices
 
             var wiring = Child(board.Settings, "wiring") as YamlMappingNode;
             var names = new HashSet<string>(rigDeviceNames, StringComparer.Ordinal);
-            foreach (var use in uses.GroupBy(u => u.Line).Select(g => g.First()))
+            foreach (var group in uses.GroupBy(u => u.Line))
             {
+                // Entries for one line agree on device and side (above); every entry's targets are needed.
+                var use = group.First();
+                var needed = group.SelectMany(u => u.Targets ?? new List<string>()).Distinct().ToList();
                 var wired = wiring == null ? null : Child(wiring, use.Line) as YamlMappingNode;
                 var where = use.From == use.Line ? use.Line : use.Line + " (" + use.From + ")";
                 if (wired == null)
@@ -128,7 +132,7 @@ namespace OpenRigs.HarpDevices
                     result.Problems.Add(where + " is used as " + Describe(use) + ", but rig.yml's wiring has " + (device ?? "no device") + " on it");
                 else if (use.Side != null && side != use.Side)
                     result.Problems.Add(where + " is used as the " + use.Side + " " + use.Device + ", but rig.yml's wiring has the " + (side ?? "unsided") + " one on it");
-                foreach (var missing in (use.Targets ?? new List<string>()).Where(t => !targets.Contains(t)))
+                foreach (var missing in needed.Where(t => !targets.Contains(t)))
                     result.Problems.Add(where + " must drive or read " + missing + ", which rig.yml's wiring for " + use.Line + " does not list");
                 foreach (var unknown in targets.Where(t => !names.Contains(t)))
                     result.Problems.Add("rig.yml's wiring for " + use.Line + " names " + unknown + ", which is not a device in this rig.yml");
@@ -141,7 +145,8 @@ namespace OpenRigs.HarpDevices
 
         /// <summary>
         /// The channel a workflow's line names: a channel itself (DIPort0); cameraTriggerController.trigger0 or
-        /// trigger1, DO0 or DO1 when rig.yml enables it, else null (not used); or a key in rig.yml, the board's
+        /// trigger1, DO0 or DO1 when rig.yml enables it, else null (not used); zapit.triggerLine only while
+        /// rig.yml's zapit.hardwareTriggered is true, else null (not cabled); or a key in rig.yml, the board's
         /// entry first and then the top level, holding a DO line (rewardValves.left: DO1; zapit.triggerLine: 3).
         /// </summary>
         public static string Resolve(string from, YamlMappingNode rig, YamlMappingNode board, out string why)
@@ -158,6 +163,12 @@ namespace OpenRigs.HarpDevices
                 // open-rigs' defaults: trigger 0 on, trigger 1 off.
                 var on = enabled == null ? n == '0' : string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase);
                 return on ? "DO" + n : null;
+            }
+            if (from == "zapit.triggerLine")
+            {
+                // The Zapit TTL is cabled only where hardwareTriggered is true (audit, 8 Nov 2026).
+                var triggered = Path(board, "zapit.hardwareTriggered") ?? Path(rig, "zapit.hardwareTriggered");
+                if (!string.Equals(triggered, "true", StringComparison.OrdinalIgnoreCase)) return null;
             }
             var value = Path(board, from) ?? Path(rig, from);
             if (value == null)

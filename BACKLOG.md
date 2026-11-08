@@ -1,5 +1,16 @@
 # Backlog
 
+## Independent audit of 7 Nov work, 8 Nov 2026 (the wiring check and the board channels)
+
+Changed:
+
+- HarpDevices 0.1.1-coen-lab.7: `zapit.triggerLine` counts only while `zapit.hardwareTriggered` is true, so an honest wiring on a rig whose Zapit TTL is not cabled (GREEN-DOME-1, BLUE-OPTO-1) no longer refuses; the refusal is one line, its disagreements joined by `; `, as rig-control keeps only a workflow error's first line; two entries for one line need every target either names, where only the first's were checked. The README's `schemas\board-lines.yml` had a backspace for `\b`.
+- `workflows.txt` lists `ucl-open/coen-qc-preflight-rig`, which was on HarpDevices coen-lab.5 the day .6 went out because neither list had it.
+
+Not changed, do not raise again without new information:
+
+- `WiringCheck` compares `device` and `side` case-sensitively and reads `wiring` keys by their exact channel names, so `side: Left` or `do1:` refuses or reads as unknown: the rig schema (`Side`, the channel aliases) already rejects both before launch.
+
 ## Audit 2026-11-07, morning (/audit-rigs, set B: the seams, HarpDevices, LiveView and Shared)
 
 Changed (scripts and docs only; no package source, so no version raised):

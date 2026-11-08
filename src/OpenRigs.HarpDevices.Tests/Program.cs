@@ -285,7 +285,7 @@ namespace OpenRigs.HarpDevices.Tests
                         "      DO2: { device: RewardValve, side: right }\n" +
                         "      DO3: { device: ZapitTrigger }\n" +
                         "camera:\n  face: { serialNumber: '1' }\n  pupil: { serialNumber: '2' }\n  body: { serialNumber: '3' }\n" +
-                        "rewardValves: { left: DO1, right: DO2 }\nzapit: { triggerLine: 3 }\n";
+                        "rewardValves: { left: DO1, right: DO2 }\nzapit: { hardwareTriggered: true, triggerLine: 3 }\n";
                     var linesText = "BehaviorBoard-Main:\n" +
                         "  - { line: cameraTriggerController.trigger0, device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }\n" +
                         "  - { line: cameraTriggerController.trigger1, device: CameraTrigger }\n" +
@@ -317,7 +317,7 @@ namespace OpenRigs.HarpDevices.Tests
                     var camera = wiringOf(rigText.Replace("targets: [Camera-Face, Camera-Pupil, Camera-Body] }\n      DO1", "targets: [Camera-Face, Camera-Side] }\n      DO1"), linesText);
                     Check("a target the workflow needs and the wiring lacks refuses, and so does one rig.yml does not have",
                         camera.Problems.Any(p => p.Contains("must drive or read Camera-Pupil")) && camera.Problems.Any(p => p.Contains("names Camera-Side, which is not a device")), string.Join(" | ", camera.Problems));
-                    var missingKey = wiringOf(rigText.Replace("zapit: { triggerLine: 3 }\n", ""), linesText);
+                    var missingKey = wiringOf(rigText.Replace("zapit: { hardwareTriggered: true, triggerLine: 3 }\n", "zapit: { hardwareTriggered: true }\n"), linesText);
                     Check("a line given by a rig.yml key the rig lacks refuses", missingKey.Problems.Any(p => p.Contains("this rig.yml has no zapit.triggerLine")), string.Join(" | ", missingKey.Problems));
                     var none = wiringOf(rigText, null);
                     Check("a workflow without board-lines.yml is not checked, and says so", !none.Applies && none.Summary.StartsWith("not checked: av-dome has no"), none.Summary);
@@ -325,6 +325,20 @@ namespace OpenRigs.HarpDevices.Tests
                     Check("a board the file does not list is not checked", !otherBoard.Applies, otherBoard.Summary);
                     Check("the refusal names the board, each problem and both files", sideSwapped.Refusal("BehaviorBoard-Main").StartsWith("BehaviorBoard-Main's wiring in rig.yml does not agree") && sideSwapped.Refusal("BehaviorBoard-Main").Contains(WiringCheck.LinesFile), sideSwapped.Refusal("BehaviorBoard-Main"));
                     Check("no refusal when they agree", agree.Refusal("BehaviorBoard-Main") == null, agree.Refusal("BehaviorBoard-Main"));
+                    // Audit, 8 Nov 2026.
+                    var twoProblems = wiringOf(rigText.Replace("side: left, part", "side: right, part").Replace("DO3: { device: ZapitTrigger }", "DO3: { device: AirPuff }"), linesText);
+                    var refusal = twoProblems.Refusal("BehaviorBoard-Main");
+                    Check("the refusal is one line, every disagreement in it, as rig-control keeps only a workflow error's first line",
+                        twoProblems.Problems.Count == 2 && !refusal.Contains("\n") && twoProblems.Problems.All(refusal.Contains), refusal);
+                    var notCabled = rigText.Replace("zapit: { hardwareTriggered: true, triggerLine: 3 }", "zapit: { hardwareTriggered: false, triggerLine: 3 }").Replace("      DO3: { device: ZapitTrigger }\n", "");
+                    var zapitOff = wiringOf(notCabled, linesText);
+                    Check("zapit.triggerLine is not used while zapit.hardwareTriggered is false, so its uncabled line may be unknown",
+                        zapitOff.Problems.Count == 0 && !zapitOff.Summary.Contains("DO3"), string.Join(" | ", zapitOff.Problems) + " / " + zapitOff.Summary);
+                    var zapitUnset = wiringOf(notCabled.Replace("hardwareTriggered: false, ", ""), linesText);
+                    Check("... nor when hardwareTriggered is left out", zapitUnset.Problems.Count == 0, string.Join(" | ", zapitUnset.Problems));
+                    var twice = wiringOf(rigText, linesText + "  - { line: DO0, device: CameraTrigger, targets: [Camera-Side] }\n");
+                    Check("two entries for one line need every target either names",
+                        twice.Problems.Any(p => p.Contains("must drive or read Camera-Side")), string.Join(" | ", twice.Problems));
                 }
 
                 Console.WriteLine("The dump request:");

@@ -17,7 +17,7 @@ A Harp device is a device entry in rig.yml (`behaviorBoard: main:`, named `Behav
 
 ## The Wiring Check
 
-A Behavior board's `wiring:` in rig.yml says what is plugged into each line; a workflow's `schemasoard-lines.yml` says what it uses each line for. At Start, before the board's USB serial is checked, every line the workflow uses must be in the wiring with the same `device`, the same `side` when the workflow gives one, and every `target` it needs; otherwise the workflow stops with every disagreement listed (0.1.1-coen-lab.6 on; lib-open-rigs DECISIONS.md, 7 Nov 2026). A line the workflow does not use may be unknown. A workflow without the file, or a board the file does not list, is not checked. Each board's `<Name>_device.json` records the result as `wiring` ("checked: DO1 left RewardValve, ... agree with rig.yml's wiring", or "not checked: ..."). `part` and `note` are never compared.
+A Behavior board's `wiring:` in rig.yml says what is plugged into each line; a workflow's `schemas\board-lines.yml` says what it uses each line for. At Start, before the board's USB serial is checked, every line the workflow uses must be in the wiring with the same `device`, the same `side` when the workflow gives one, and every `target` it needs; otherwise the workflow stops with every disagreement listed (0.1.1-coen-lab.6 on; lib-open-rigs DECISIONS.md, 7 Nov 2026), on one line separated by `; ` since 0.1.1-coen-lab.7, as rig-control keeps only the first line of a workflow's error. Two entries for one line need every target either names (coen-lab.7 on). A line the workflow does not use may be unknown. A workflow without the file, or a board the file does not list, is not checked. Each board's `<Name>_device.json` records the result as `wiring` ("checked: DO1 left RewardValve, ... agree with rig.yml's wiring", or "not checked: ..."). `part` and `note` are never compared.
 
 ```yaml
 # rig.yml
@@ -28,14 +28,14 @@ behaviorBoard:
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
       DO1: { device: RewardValve, side: left }
 
-# the workflow's schemasoard-lines.yml
+# the workflow's schemas\board-lines.yml
 BehaviorBoard-Main:
   - { line: cameraTriggerController.trigger0, device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
   - { line: rewardValves.left, device: RewardValve, side: left }   # a rig.yml key holding the line
   - { line: DIPort0, device: Photodiode }
 ```
 
-A line is given as a channel (`DIPort0`, `DO1`), as `cameraTriggerController.trigger0` or `trigger1` (DO0 or DO1, only while rig.yml enables that trigger), or as a rig.yml key holding a DO line, looked for in the board's entry first and then at the top level (`rewardValves.left: DO1`, `zapit.triggerLine: 3`). Whether each device word is on the lab's list is rig-control's names check, before launch.
+A line is given as a channel (`DIPort0`, `DO1`), as `cameraTriggerController.trigger0` or `trigger1` (DO0 or DO1, only while rig.yml enables that trigger), or as a rig.yml key holding a DO line, looked for in the board's entry first and then at the top level (`rewardValves.left: DO1`, `zapit.triggerLine: 3`). `zapit.triggerLine` is used only while rig.yml's `zapit.hardwareTriggered` is true (coen-lab.7 on), so a rig whose Zapit TTL is not cabled may leave that line unknown. Whether each device word is on the lab's list is rig-control's names check, before launch.
 
 ## Settings
 

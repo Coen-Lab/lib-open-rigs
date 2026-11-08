@@ -9,3 +9,4 @@
 # Only a Bonsai project in the open-rigs layout (.bonsai\Bonsai.config and src\main.bonsai at
 # the root) is updated; any other is listed as "not Bonsai".
 ucl-open/coen-qc-calibrate-valve
+ucl-open/coen-qc-preflight-rig
