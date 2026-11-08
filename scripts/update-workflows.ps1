@@ -204,6 +204,10 @@ if ([int](Invoke-Git $repo rev-list --count '@{u}..HEAD')) { throw "lib-open-rig
 if (Invoke-Git $repo status --porcelain -- local_packages) { throw "local_packages\ here has uncommitted changes. Commit and push them first." }
 # These scripts run against every workflow, so an edit not yet pushed would too.
 if (Invoke-Git $repo status --porcelain -- scripts) { throw "scripts\ here has uncommitted changes. Commit and push them first." }
+# The package checks push-and-update-workflows.ps1 runs before its push: a lone run after a
+# plain git push shipped whatever local_packages\ held, unchecked (audit-rigs set C, run 4).
+. (Join-Path $PSScriptRoot 'lab-packages.ps1')
+Assert-LabPackagesShippable $repo
 if ([int](Invoke-Git $repo rev-list --count 'HEAD..@{u}')) {
     if (Invoke-Git $repo status --porcelain) { throw "lib-open-rigs is behind GitHub and has local changes. Commit or discard them first." }
     $null = Invoke-Git $repo merge --ff-only -q '@{u}'
@@ -245,6 +249,8 @@ if ($now -ne $sourceSha) {
     # Exit 1, not 0: the run on the newer commit happens only if somebody runs it (a plain
     # `git push` runs nothing), so this must read as not done (set B, 7 Nov 2026, S1-M1).
     "lib-open-rigs main moved to $("$now".Substring(0, [Math]::Min(7, "$now".Length))) while this run waited; nothing written or updated. Run push-and-update-workflows.ps1 (or this script) again from that commit."
+    # exit is not a throw: neither the trap nor the finally below lets the lock go (audit-rigs set C, run 4).
+    $mutex.ReleaseMutex(); $mine = $false
     exit 1
 }
 
