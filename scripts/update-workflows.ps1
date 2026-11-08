@@ -47,8 +47,9 @@ param(
 $ErrorActionPreference = 'Stop'
 # A throw (unpushed commits here, no lab share) is written to the output and exits 1, so a log
 # of the run says why it stopped (audit, 2 Nov 2026).
-# The run lock is let go here too: a throw after it is taken skipped the finally below for an
-# in-process run, and the next push waited 40 minutes for it (audit, 8 Nov 2026).
+# The run lock is let go here too: a throw after it is taken and before the try below has no
+# finally, so an in-process run kept it and the next push waited 40 minutes (audit, 8 Nov
+# 2026). A throw inside the try runs the finally first, which lets it go and clears $mine.
 trap { "Stopped: $($_.Exception.Message)"; if ($mine -and $mutex) { $mutex.ReleaseMutex() }; exit 1 }
 $repo = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $local = Join-Path $repo 'local_packages'
