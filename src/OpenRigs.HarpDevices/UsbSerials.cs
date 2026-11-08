@@ -20,18 +20,20 @@ namespace OpenRigs.HarpDevices
         /// Every serial port plugged in now, its name (COM3) to its USB serial, '' for a port with
         /// none (a motherboard COM1, a chip that makes one up). Ports that are not plugged in are
         /// left out: Windows remembers them, and only the board in the socket now matters here.
+        /// Each port's identity is read once, as rig-setup's scan reads it (S4-L5): its name from the
+        /// registry's PortName first, and plugged in when its Status is OK.
         /// </summary>
         public static Dictionary<string, string> Present()
         {
             var ports = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            using (var search = new ManagementObjectSearcher("SELECT Name, PNPDeviceID FROM Win32_PnPEntity WHERE PNPClass = 'Ports'"))
+            using (var search = new ManagementObjectSearcher("SELECT Name, PNPDeviceID, Status FROM Win32_PnPEntity WHERE PNPClass = 'Ports'"))
             using (var found = search.Get())
             {
                 foreach (ManagementBaseObject device in found)
                 {
                     var name = device["Name"] as string;
                     var id = device["PNPDeviceID"] as string;
-                    if (id == null) continue;
+                    if (id == null || !string.Equals(device["Status"] as string, "OK", StringComparison.OrdinalIgnoreCase)) continue;
                     var port = RegistryPortName(id) ?? PortOf(name);
                     if (port == null) continue;
                     ports[port] = FromIds(id, ParentId(id));

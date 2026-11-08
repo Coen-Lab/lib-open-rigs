@@ -7,17 +7,17 @@ Bonsai operators that put a workflow under an experiment controller: the workflo
 | Operator | Role |
 |----------|------|
 | `ExperimentControl` | The include to drop into a workflow. Runs `ControlServer`, publishes every event as `ControlEvents` and the Go event once as `ExperimentGo`. |
-| `ControlServer` | Reply socket (default `@tcp://127.0.0.1:5561`, local only: the rig agent relays and checks the Lab PIN). Answers `status`, `set`, `go`, `command`, `stop`. Declares the parameters a controller may change until Go and the commands it may send. |
+| `ControlServer` | Reply socket (default `@tcp://127.0.0.1:5561`, local only: the rig agent relays and checks the Lab PIN). Answers `status`, `set`, `go`, `command`, `stop`. Declares the parameters a controller may change until Go and the commands it may send. Two parameters, or two commands, with one name stop the workflow at Start, naming both (0.1.1-coen-lab.9 on; before, the second was shadowed by the first). |
 | `OnGo` | Passes only the Go event through; inside the include, before `ExperimentGo`. |
 | `ParameterValue` | The value of a declared parameter as it stood at Go, from the `ExperimentGo` event. |
 | `OnCommand` | The arguments of one declared command, each time the controller sends it. |
 | `OnParameterSet` | Each new value of one declared parameter as a controller sets it before Go, for a setting the hardware takes live (camera exposure and gain while ready). Nothing until the first set. |
 | `ParameterDefault` | Sets a declared parameter's value from the workflow (a rig setting) before Go, unless a controller has set it, so the controller shows the value the hardware starts with. |
 | `ParameterMaximum` | Sets a declared parameter's maximum at run time (an exposure that must fit the trigger period), so a `set` above it is refused with the reason rather than stopping the workflow. |
-| `ReportPhase` | Tells the controller the experiment's phase (`Ready`, `Recording`, `Finished`) on each element. Phases only move forward: a report of an earlier phase is ignored. |
+| `ReportPhase` | Tells the controller the experiment's phase (`Ready`, `Recording`, `Finished`) on each element. Phases only move forward: a report of an earlier phase is ignored. `Recording` or `Finished` before Go stops the workflow, as status would otherwise say it of an experiment nobody released (coen-lab.9 on). |
 | `ReportMetric` | Tells the controller the latest value of a named metric (the experiment folder, water delivered). |
 | `GoByName` | From `ExperimentGo`, who sent Go by name (else ID), else who launched, else empty: for provenance such as a calibration's `calibratedBy` (0.1.1-coen.5). |
-| `ExperimentSettings` | From `ExperimentGo`, the experiment's settings as JSON text for OpenRigs.Logging's `LogDataSchema` named `Settings_Experiment`, so they are `Settings\Settings_Experiment_<DateTime>.json` beside the rig's and task's: `subject_id`, `session_id`, `rig`, `workflow`, `repo`, `branch`, `commit` and `dirty` (read at Start, as OpenRigs.Manifest reads them), `launched_by`, `go_by`, `go` (UTC) and `parameters`, every declared parameter as it stood at Go (0.1.1-coen.4, 6 Nov 2026; the manifest no longer copies them). |
+| `ExperimentSettings` | From `ExperimentGo`, the experiment's settings as JSON text for OpenRigs.Logging's `LogDataSchema` named `Settings_Experiment`, so they are `Settings\Settings_Experiment_<DateTime>.json` beside the rig's and task's: `subject_id`, `session_id`, `rig`, `workflow`, `repo`, `branch`, `commit` and `dirty` (read when the node is subscribed, at the workflow's start, not at Go, as OpenRigs.Manifest reads them), `launched_by`, `go_by`, `go` (UTC) and `parameters`, every declared parameter as it stood at Go (0.1.1-coen.4, 6 Nov 2026; the manifest no longer copies them). |
 
 ## Protocol
 
@@ -25,7 +25,7 @@ One JSON object per request on a ZeroMQ REQ/REP pair, one per reply: `{"ok": tru
 
 | Request | Reply |
 |---------|-------|
-| `{"cmd": "status"}` | `phase`, `since`, `subject_id`, `session_id`, `go_requested`, `launched_by`, `go_by`, `stopped_by`, `parameters` (name, value, description), `commands` (name, description), `metrics` |
+| `{"cmd": "status"}` | `phase`, `since`, `subject_id`, `session_id`, `go_requested`, `launched_by`, `go_by`, `stopped_by`, `parameters` (name, value, description), `commands` (name, description, `taken`), `metrics`. `taken` (coen-lab.9 on) counts the times the command was taken (an `ok` reply, its event emitted), so a controller whose `command` timed out can compare it with the count before to tell whether it ran. |
 | `{"cmd": "set", "name": ..., "value": ...}` | Refused after Go, for an undeclared name, or for a value outside the parameter's limits. Since 0.1.0-local.10 each accepted set is emitted as a `Set` event after the reply (`OnParameterSet`). |
 | `{"cmd": "go", "by": ..., "launched_by": ...}` | Refused unless the phase is `Ready`; once; and since 0.1.0-local.11 while any parameter's value is outside its limits as they stand (a value set before `ParameterMaximum` lowered the limit), naming it, so a set is wanted again. Answered before the Go event is emitted, so work downstream of Go never delays the reply; the same for `command`. Work downstream of Go, a set or a command runs on the server's request thread, so a request sent while it runs waits for it. |
 | `{"cmd": "command", "name": ..., "args": ...}` | Refused unless declared and the phase is `Ready` or `Recording`. |

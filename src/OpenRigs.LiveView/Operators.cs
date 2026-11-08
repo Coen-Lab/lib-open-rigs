@@ -147,7 +147,7 @@ namespace OpenRigs.LiveView
         public string Commit { get; set; }
         /// <summary>Whether tracked files differ from the commit; null when git did not answer.</summary>
         public bool? Dirty { get; set; }
-        /// <summary>The streams sent, one per device.</summary>
+        /// <summary>The streams sent: one per device, two for a Behavior board (.encoder and .channels).</summary>
         public string[] Streamed { get; set; }
         /// <summary>Each device in rig.yml not streamed, and why.</summary>
         public string[] Skipped { get; set; }

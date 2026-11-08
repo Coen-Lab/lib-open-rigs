@@ -196,7 +196,8 @@ namespace OpenRigs.HarpDevices
             // A board that reported no WhoAmI gets its kind's map, said to be so, so the experiment is
             // not held back every night. A board of another kind would have stopped the workflow.
             var map = HarpRig.MapToWrite(whoAmI, ExpectedWhoAmI);
-            if (whoAmI.HasValue && map == null) notes.Add("No Harp package loaded in this workflow decodes WhoAmI " + whoAmI.Value + ", so its register map is not written.");
+            if (ExpectedWhoAmI == 0) notes.Add("No WhoAmI is known for this kind of device, so no register map is written, as the manifest expects none.");
+            else if (whoAmI.HasValue && map == null) notes.Add("No Harp package loaded in this workflow decodes WhoAmI " + whoAmI.Value + ", so its register map is not written.");
             else if (!whoAmI.HasValue && map != null) notes.Add("The device reported no WhoAmI, so the register map written is the one for the kind rig.yml names (WhoAmI " + ExpectedWhoAmI + ").");
             else if (!whoAmI.HasValue) notes.Add("The device reported no WhoAmI, and no Harp package loaded in this workflow decodes its kind's (" + ExpectedWhoAmI + "), so no register map is written.");
             // A wrong kind stops the workflow before Go only when the WhoAmI came at connection.

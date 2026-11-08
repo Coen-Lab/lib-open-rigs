@@ -32,7 +32,7 @@ class WiredLine(BaseSchema):
 
     device: str = Field(
         examples=["RewardValve", "CameraTrigger", "Photodiode", "ZapitTrigger"],
-        description=r"What is on the line, a word from the lab's list (wiredDevices in K:\config\device-dictionary.json).",
+        description=r"What is on the line, as the workflow's board-lines.yml names it. Nothing holds the word to a lab list yet: wiredDevices in K:\config\device-dictionary.json, checked by rig-control's names check, is planned.",
     )
     side: Optional[Side] = Field(default=None, description="The side it serves, where that matters (a reward valve).")
     targets: Optional[List[str]] = Field(

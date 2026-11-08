@@ -297,13 +297,18 @@ namespace OpenRigs.Control
         /// <summary>
         /// Moves the phase forward. A report of an earlier phase is ignored, so a reporter
         /// left on a stream that keeps running (Ready on every frame) cannot undo Recording.
+        /// Recording or Finished before Go is refused, as status would then say it of an
+        /// experiment nobody has released (S2-I1).
         /// </summary>
         /// <param name="phase">The phase reported.</param>
+        /// <exception cref="InvalidOperationException">Recording or Finished reported before Go.</exception>
         public void SetPhase(ExperimentPhase phase)
         {
             lock (gate)
             {
                 if (phase <= Phase) return;
+                if ((phase == ExperimentPhase.Recording || phase == ExperimentPhase.Finished) && !GoRequested)
+                    throw new InvalidOperationException("The workflow reported " + phase + " before Go: report Recording on the experiment folder and Finished on the end of the run, both of which come after Go (ExperimentGo).");
                 Phase = phase;
                 PhaseSince = DateTime.UtcNow;
                 if (phase == ExperimentPhase.Finished) FinishedAt = PhaseSince;
@@ -325,6 +330,10 @@ namespace OpenRigs.Control
 
         // The parameters a controller has set: the workflow's own default no longer replaces them.
         internal readonly HashSet<string> SetByController = new HashSet<string>();
+
+        // How many times each command was taken, for status: after a command whose reply was lost,
+        // a controller compares the count to tell whether it ran (S2-L2).
+        internal readonly Dictionary<string, int> Taken = new Dictionary<string, int>();
 
         /// <summary>The named declared parameter; an error naming the declared ones if there is none.</summary>
         /// <param name="name">The parameter's name.</param>
@@ -380,7 +389,7 @@ namespace OpenRigs.Control
                     ["go_by"] = Person.ToJson(GoBy),
                     ["stopped_by"] = Person.ToJson(StoppedBy),
                     ["parameters"] = new JArray(Parameters.Select(p => new JObject { ["name"] = p.Name, ["value"] = p.Value, ["description"] = p.Description })),
-                    ["commands"] = new JArray(Commands.Select(c => new JObject { ["name"] = c.Name, ["description"] = c.Description })),
+                    ["commands"] = new JArray(Commands.Select(c => new JObject { ["name"] = c.Name, ["description"] = c.Description, ["taken"] = Taken.TryGetValue(c.Name ?? "", out var n) ? n : 0 })),
                     ["metrics"] = JObject.FromObject(Metrics)
                 };
             }
@@ -431,6 +440,13 @@ namespace OpenRigs.Control
         {
             return Observable.Create<ControlEvent>(observer =>
             {
+                // The second of two with one name was shadowed by the first in set and command (S2-L2).
+                var twice = Twice("parameters", Parameters.Select(p => p.Name)) ?? Twice("commands", Commands.Select(c => c.Name));
+                if (twice != null)
+                {
+                    observer.OnError(new InvalidOperationException(twice));
+                    return Disposable.Empty;
+                }
                 var state = new ControlState(this);
                 ControlState.Current = state;
                 var cancel = new CancellationTokenSource();
@@ -611,6 +627,7 @@ namespace OpenRigs.Control
                         return Refuse("commands are taken while ready or recording (phase " + phase + ")");
                     if (!state.Commands.Any(c => c.Name == name))
                         return Refuse("no command named '" + name + "'; this workflow declares: " + Names(state.Commands.Select(c => c.Name)));
+                    state.Locked(() => state.Taken[name] = (state.Taken.TryGetValue(name, out var taken) ? taken : 0) + 1);
                     emit = new ControlEvent
                     {
                         Kind = ControlEventKind.Command,
@@ -639,6 +656,19 @@ namespace OpenRigs.Control
                 default:
                     return Refuse("unknown cmd '" + cmd + "'; one of status, set, go, command, stop");
             }
+        }
+
+        // Why two of ControlServer's parameters or commands share a name, naming both by position; null when none do.
+        static string Twice(string what, IEnumerable<string> names)
+        {
+            var list = names.Select(n => n ?? "").ToList();
+            for (var i = 0; i < list.Count; i++)
+            {
+                var j = list.IndexOf(list[i], i + 1);
+                if (j >= 0)
+                    return "ControlServer's " + what + " " + (i + 1) + " and " + (j + 1) + " are both named '" + list[i] + "', so the second could never be reached: rename or remove one.";
+            }
+            return null;
         }
 
         static string Names(IEnumerable<string> names)

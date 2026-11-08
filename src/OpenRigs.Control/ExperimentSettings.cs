@@ -16,7 +16,8 @@ namespace OpenRigs.Control
     /// (Settings\Settings_Experiment_&lt;DateTime&gt;.json): the subject and session, the rig, the
     /// workflow with its repository and commit as OpenRigs.Manifest reads them, who launched it and
     /// who sent Go, and every declared parameter as it stood at Go, ParameterDefault's included.
-    /// The repository is read once at Start, so the Go reply never waits on it.
+    /// The repository is read once, when the node is subscribed (the workflow's start), not at Go,
+    /// so the Go reply never waits on it; the settings themselves are given at each Go.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Transform)]

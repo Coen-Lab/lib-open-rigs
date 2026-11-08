@@ -270,7 +270,7 @@ namespace OpenRigs.LiveView
                         break;
                     case "rate":
                         if (TryPositive(value, out number) && number <= 1000) device.Rate = number;
-                        else Notes.Add(device.Name + ": liveView rate '" + value + "' is not a number from 0 to 1000 per second; " + device.Rate.ToString(CultureInfo.InvariantCulture) + " kept");
+                        else Notes.Add(device.Name + ": liveView rate '" + value + "' is not a number above 0 and at most 1000 per second; " + device.Rate.ToString(CultureInfo.InvariantCulture) + " kept");
                         break;
                     case "width":
                     case "height":

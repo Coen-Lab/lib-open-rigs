@@ -95,11 +95,17 @@ namespace OpenRigs.Shared
             return scalar != null ? scalar.Value : null;
         }
 
-        /// <summary>A scalar's text, trimmed; null when there is none or it is left empty (null, ~, empty or blank), as a generated rig.yml writes an unset value.</summary>
+        /// <summary>
+        /// A scalar's text, trimmed; null when there is none or it is left empty (null, Null, NULL, ~,
+        /// empty or blank), as a generated rig.yml writes an unset value and as YamlDotNet, PyYAML and
+        /// rig-setup read YAML's null (S4-L1).
+        /// </summary>
         public static string Value(YamlNode node)
         {
             var value = Scalar(node);
-            return string.IsNullOrWhiteSpace(value) || value == "null" || value == "~" ? null : value.Trim();
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            value = value.Trim();
+            return value == "null" || value == "Null" || value == "NULL" || value == "~" ? null : value;
         }
 
         static string Pascal(string name)

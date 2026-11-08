@@ -74,13 +74,15 @@ namespace OpenRigs.Shared
 
         /// <summary>
         /// The register map a record writes: the one for the WhoAmI the board reported, else, for
-        /// a board that reported none, the one for the WhoAmI its kind expects (0 for none), so
-        /// the record meets what <see cref="RegisterMapFor"/> told the manifest to expect.
+        /// a board that reported none, the one for the WhoAmI its kind expects; none for a kind
+        /// whose WhoAmI is not known (expected 0), so the record meets what
+        /// <see cref="RegisterMapFor"/> told the manifest to expect, and an unexpected
+        /// &lt;Name&gt;.yml never stands against the device's folder entry (S3-I1).
         /// </summary>
         public static RegisterMap MapToWrite(int? reported, int expected)
         {
-            if (reported.HasValue) return RegisterMaps.Find(reported.Value);
-            return expected != 0 ? RegisterMaps.Find(expected) : null;
+            if (expected == 0) return null;
+            return RegisterMaps.Find(reported ?? expected);
         }
 
         /// <summary>A setting's text, null when rig.yml has none or leaves it empty (usbSerial: null).</summary>

@@ -71,6 +71,11 @@ namespace OpenRigs.Control.Tests
             {
                 var state = ControlState.Current;
                 Check("the running server's state is ControlState.Current", state != null, "null");
+                // S2-I1: status would say Recording or Finished of an experiment nobody released.
+                var early = Catch(() => state.SetPhase(ExperimentPhase.Recording));
+                var earlyFinished = Catch(() => new ReportPhase { Phase = ExperimentPhase.Finished }.Process(Observable.Return(1)).Wait());
+                Check("Recording or Finished before Go is refused, and the phase stays", early is InvalidOperationException && earlyFinished is InvalidOperationException && earlyFinished.Message.Contains("Finished before Go") && state.Phase == ExperimentPhase.Starting,
+                    (early == null ? "Recording taken" : early.Message) + " / " + (earlyFinished == null ? "Finished taken" : earlyFinished.Message) + " / " + state.Phase);
                 Check("a whole number in range is taken", Ok(Ask(socket, new { cmd = "set", name = "RunLengthMins", value = "45" })), "refused");
                 var half = Ask(socket, new { cmd = "set", name = "RunLengthMins", value = "2.5" });
                 Check("a fraction for a whole-number parameter is refused, with the range", !Ok(half) && ((string)half["why"]).Contains("whole number from 1 to 9999"), half.ToString());
@@ -135,8 +140,12 @@ namespace OpenRigs.Control.Tests
 
                 Console.WriteLine("Commands and status:");
                 state.SetPhase(ExperimentPhase.Recording);
+                var before = (int)Ask(socket, new { cmd = "status" })["commands"][0]["taken"];
                 Check("a declared command is taken while recording", Ok(Ask(socket, new { cmd = "command", name = "reward", args = "5" })), "refused");
                 Check("an undeclared one is refused", !Ok(Ask(socket, new { cmd = "command", name = "flash" })), "taken");
+                // S2-L2: after a command whose reply was lost, the count says whether it ran.
+                var after = (int)Ask(socket, new { cmd = "status" })["commands"][0]["taken"];
+                Check("status counts each command taken, from 0", before == 0 && after == 1, before + " then " + after);
                 state.SetPhase(ExperimentPhase.Ready);
                 var culture = Thread.CurrentThread.CurrentCulture;
                 Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
@@ -194,6 +203,21 @@ namespace OpenRigs.Control.Tests
                     done.WaitOne(5000);
                 }
                 slow.Dispose();
+            }
+
+            Console.WriteLine("Two declared with one name:");
+            {
+                // S2-L2: the second was shadowed by the first in set and command.
+                foreach (var twice in new[] { "parameters", "commands" })
+                {
+                    var server = Server("tcp://127.0.0.1:5643");
+                    if (twice == "parameters") server.Parameters.Add(new Parameter { Name = "RewardUl", Value = "1" });
+                    else server.Commands.Add(new Command { Name = "reward" });
+                    Exception refused = null;
+                    using (server.Generate().Subscribe(_ => { }, e => refused = e)) { }
+                    var which = twice == "parameters" ? "parameters 2 and 4 are both named 'RewardUl'" : "commands 1 and 2 are both named 'reward'";
+                    Check("two " + twice + " with one name stop it at Start, naming both", refused is InvalidOperationException && refused.Message.Contains(which), refused == null ? "no error" : refused.Message);
+                }
             }
 
             Console.WriteLine("Two servers on one port:");

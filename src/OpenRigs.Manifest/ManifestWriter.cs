@@ -166,7 +166,7 @@ namespace OpenRigs.Manifest
             try
             {
                 manifestPath = path;
-                Write(new RunEnd(RunEnd.Running, null), null, control, null);
+                Write(new RunEnd(RunEnd.Running, null), null, control, null, false);
             }
             catch
             {
@@ -177,21 +177,21 @@ namespace OpenRigs.Manifest
             return manifestPath;
         }
 
-        /// <summary>A running write again, once the controller's stop has come: the stop's reason and who sent it are on disk even if the workflow is killed before its end. A Begin that never happened, or failed, writes nothing.</summary>
-        public void Stopping(ControlExperiment control)
+        /// <summary>The outcome so far, with run.final false, once the workflow's Finished or the controller's stop has come: the outcome, the stop's reason and who sent it are on disk even if the workflow is killed before its end. A Begin that never happened, or failed, writes nothing.</summary>
+        public void Provisional(RunEnd end, long? items, ControlExperiment control)
         {
             if (manifestPath == null) return;
-            Write(new RunEnd(RunEnd.Running, null), null, control, null);
+            Write(end, items, control, DateTime.UtcNow, false);
         }
 
-        /// <summary>The second write, with the outcome. A Begin that never happened, or failed, writes nothing.</summary>
+        /// <summary>The end-of-run write, with the outcome and run.final true. A Begin that never happened, or failed, writes nothing.</summary>
         public void Finish(RunEnd end, long? items, ControlExperiment control)
         {
             if (manifestPath == null) return;
-            Write(end, items, control, DateTime.UtcNow);
+            Write(end, items, control, DateTime.UtcNow, true);
         }
 
-        void Write(RunEnd end, long? items, ControlExperiment control, DateTime? ended)
+        void Write(RunEnd end, long? items, ControlExperiment control, DateTime? ended, bool final)
         {
             var doc = new JsonObject();
             doc.Add("version", (long)Version);
@@ -208,12 +208,14 @@ namespace OpenRigs.Manifest
             doc.Add("trial_columns", start.TrialColumns);
             var run = new JsonObject();
             run.Add("outcome", end.Outcome);
+            // Only the end-of-run write is final; absent (before Manifest 0.1.1-coen-lab.12) means final.
+            run.Add("final", final);
             run.Add("started", Iso(started));
             run.Add("ended", ended.HasValue ? Iso(ended.Value) : null);
             run.Add("seconds", ended.HasValue ? (object)Math.Round((ended.Value - started).TotalSeconds, 1) : null);
             run.Add("items", items);
             run.Add("error", end.Error);
-            // A running write carries the stop too: rig-control kills a workflow slow to stop, and that write is then the last.
+            // A running write carries the stop too (a workflow killed before the stop's own write, which then is the last).
             run.Add("stop_reason", (end.Outcome == RunEnd.Stopped || end.Outcome == RunEnd.Running) && control != null ? control.StopReason : null);
             doc.Add("run", run);
             var files = FilesSection(folder);

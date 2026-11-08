@@ -241,6 +241,25 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
+                    // S3-I1: a kind with no known WhoAmI left <Name>.yml the manifest does not expect,
+                    // which then met the <Name>/ folder entry.
+                    var messages = new Subject<HarpMessage>();
+                    var path = new Subject<string>();
+                    var written = new List<string>();
+                    var unknownKind = Recorder();
+                    unknownKind.ExpectedWhoAmI = 0;
+                    unknownKind.HasCommands = false;
+                    using (unknownKind.Process(messages, path).Subscribe(written.Add))
+                    {
+                        foreach (var m in Board(1216)) messages.OnNext(m);
+                        var experiment = Path.Combine(root, "ses-unknown-kind");
+                        path.OnNext(experiment);
+                        var json = written.Count == 1 ? File.ReadAllText(written[0]) : "";
+                        Check("a kind with no known WhoAmI writes no register map, though a loaded package decodes the board, and says so",
+                            !File.Exists(Path.Combine(experiment, "BehaviorBoard-Main", "BehaviorBoard-Main.yml")) && json.Contains("\"register_map\": null") && json.Contains("No WhoAmI is known for this kind"), written.Count + " " + json);
+                    }
+                }
+                {
                     // The wiring check's refusal stops the workflow at Start, before the board is looked at.
                     var refused = Recorder();
                     refused.WiringRefusal = "BehaviorBoard-Main's wiring in rig.yml does not agree";
@@ -346,6 +365,11 @@ namespace OpenRigs.HarpDevices.Tests
                     var twice = wiringOf(rigText, linesText + "  - { line: DO0, device: CameraTrigger, targets: [Camera-Side] }\n");
                     Check("two entries for one line need every target either names",
                         twice.Problems.Any(p => p.Contains("must drive or read Camera-Side")), string.Join(" | ", twice.Problems));
+                    // L2-L1: the wrong shape turned the check off, saying only "not checked".
+                    var mapped = wiringOf(rigText, "BehaviorBoard-Main:\n  DO1: { device: RewardValve }\n");
+                    Check("a board's entry that is a mapping, not a list, refuses", mapped.Applies && mapped.Problems.Any(p => p.Contains("must be a list of entries")) && mapped.Refusal("BehaviorBoard-Main") != null, mapped.Summary);
+                    var listTop = wiringOf(rigText, "- BehaviorBoard-Main\n");
+                    Check("... and so does a file whose top level is not a mapping", listTop.Applies && listTop.Problems.Any(p => p.Contains("list of entries")), listTop.Summary);
                 }
 
                 Console.WriteLine("The dump request:");
@@ -407,8 +431,22 @@ namespace OpenRigs.HarpDevices.Tests
                 Check("a workflow without the file is recorded as not checked, and nothing refuses",
                     unoptedBoard.WiringRefusal == null && unoptedBoard.Wiring.StartsWith("not checked:"), unoptedBoard.Wiring);
                 Check("only Behavior boards are wiring-checked", unopted.Recorded.Where(d => d.Kind != "behaviorBoard").All(d => d.Wiring == null), "another kind has a wiring result");
+                // L2-L2: a read that throws went out of Create, which never throws.
+                var linesPath = Path.Combine(repo, "schemas", "board-lines.yml");
+                using (new FileStream(linesPath, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    HarpDevicePlan locked = null;
+                    var threw = Error(() => locked = HarpDevicePlan.Create(config, published, () => repo));
+                    var lockedBoard = locked == null ? null : locked.Recorded.First(d => d.Name == "BehaviorBoard-Main");
+                    Check("a board-lines.yml that cannot be read refuses, and the plan does not throw",
+                        threw == null && lockedBoard.WiringRefusal != null && lockedBoard.WiringRefusal.Contains("could not be read"), threw ?? (lockedBoard.WiringRefusal + " | " + lockedBoard.Wiring));
+                }
                 var noFolder = HarpDevicePlan.Create(config, n => n == "PathPrefix" ? null : published(n));
                 Check("no PathPrefix records nothing, and says so", noFolder.Recorded.Count == 0 && noFolder.Notes.Any(n => n.Contains("PathPrefix")), string.Join(" | ", noFolder.Notes));
+                Check("... and stops the workflow at Start with the note's text", noFolder.StartRefusal != null && noFolder.StartRefusal.Contains(noFolder.Notes[0]), noFolder.StartRefusal);
+                Check("rig.yml's null in any case is no value (S4-L1)",
+                    new[] { "null", "Null", "NULL", "~", " " }.All(v => OpenRigs.Shared.RigDevices.Value(new YamlDotNet.RepresentationModel.YamlScalarNode(v)) == null)
+                    && OpenRigs.Shared.RigDevices.Value(new YamlDotNet.RepresentationModel.YamlScalarNode(" AB0M7PLB ")) == "AB0M7PLB", "wrong");
 
                 Console.WriteLine("In a workflow:");
                 {
@@ -434,6 +472,18 @@ namespace OpenRigs.HarpDevices.Tests
                     var inner = node.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<GroupWorkflowBuilder>().SingleOrDefault();
                     var groups = inner == null ? "" : string.Join(",", inner.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<GroupWorkflowBuilder>().Select(g => g.Name));
                     Check("... with a group for the board, made from rig.yml", groups == "BehaviorBoard-Main", groups);
+
+                    // L2-L2 (7 Nov): placed before PathPrefix it recorded nothing, saying so only in its description.
+                    WorkflowBuilder early;
+                    var earlyXml = xml.Replace("<Expression xsi:type=\"rx:BehaviorSubject\" TypeArguments=\"sys:String\"><rx:Name>PathPrefix</rx:Name></Expression>", "")
+                        .Replace("<Expression xsi:type=\"SubscribeSubject\"><Name>BehaviorBoard-Main.Identity</Name></Expression>", "");
+                    using (var reader = XmlReader.Create(new StringReader(earlyXml))) early = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+                    IObservable<System.Reactive.Unit> earlyRun = null;
+                    var earlyBuilt = Error(() => earlyRun = early.Workflow.BuildObservable());
+                    Exception earlyError = null;
+                    if (earlyRun != null) using (earlyRun.Subscribe(_ => { }, ex => earlyError = ex)) { }
+                    Check("with no PathPrefix before it, the workflow builds and stops at Start, saying so",
+                        earlyBuilt == null && earlyError != null && earlyError.Message.Contains("publishes no PathPrefix"), earlyBuilt ?? (earlyError == null ? "no error" : earlyError.Message));
 
                     var copy = new WorkflowBuilder(builder.Workflow.ToInspectableGraph().FromInspectableGraph());
                     var saved = new StringWriter();

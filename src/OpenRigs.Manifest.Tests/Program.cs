@@ -50,6 +50,8 @@ namespace OpenRigs.Manifest.Tests
             var state = (ControlState)ctor.Invoke(new object[] { new ControlServer { SubjectId = "TC002", SessionId = "003B1" } });
             Set(null, "Current", state);
             state.SetPhase(ExperimentPhase.Ready);
+            // Go taken, as ControlServer's go leaves it: Recording and Finished are refused before it.
+            Set(state, "GoRequested", true);
             Set(state, "Go", new ControlEvent
             {
                 Kind = ControlEventKind.Go, SubjectId = "TC002", SessionId = "003B1", Time = DateTime.UtcNow,
@@ -201,8 +203,8 @@ namespace OpenRigs.Manifest.Tests
                             try { running = File.ReadAllText(manifest); } catch (IOException) { continue; }
                             if (Field(running, "run.stop_reason") != "null") break;
                         }
-                        Check("a controller's stop is written while the run is still going, with who sent it", Field(running, "run.outcome") == "running" && Field(running, "run.stop_reason") == "mouse unwell"
-                            && Field(running, "control.stopped_by.id") == "JoB", Field(running, "run.outcome") + " " + Field(running, "run.stop_reason") + " " + Field(running, "control.stopped_by.id"));
+                        Check("a controller's stop is written while the run is still going, stopped and not final, with who sent it", Field(running, "run.outcome") == "stopped" && Field(running, "run.final") == "false" && Field(running, "run.stop_reason") == "mouse unwell"
+                            && Field(running, "control.stopped_by.id") == "JoB", Field(running, "run.outcome") + " " + Field(running, "run.final") + " " + Field(running, "run.stop_reason") + " " + Field(running, "control.stopped_by.id"));
                     }
                     Set(null, "Current", null);
                 }
@@ -309,9 +311,9 @@ namespace OpenRigs.Manifest.Tests
                     }
                 }
                 {
-                    // rig-control keeps an editor's Bonsai open after its port closes only while the manifest
-                    // says running (agent.py's MANIFEST_WAIT_S), so nothing but the end-of-run write ends it
-                    // (audit set A, 8 Nov 2026: an early completed write on Finished was taken back).
+                    // L1-L2 (8 Nov 2026): a workflow killed after its Finished lost its outcome. It is written
+                    // as Finished comes, not final, and rig-control keeps an editor's Bonsai open until the
+                    // end-of-run write sets run.final true.
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-fin_2026-10-30T19-57-12");
                     var path = new Subject<string>();
@@ -319,13 +321,21 @@ namespace OpenRigs.Manifest.Tests
                     var subscription = recorder.Process(path).Subscribe(_ => { }, _ => { });
                     control.SetPhase(ExperimentPhase.Recording);
                     path.OnNext(folder);
-                    control.SetPhase(ExperimentPhase.Finished);
-                    System.Threading.Thread.Sleep((int)(ManifestRecorder.StopPoll.TotalMilliseconds * 3));
                     var manifest = Path.Combine(folder, ManifestWriter.FileName);
-                    Check("a workflow's Finished leaves the manifest running until the end-of-run write", Field(File.ReadAllText(manifest), "run.outcome") == "running", Field(File.ReadAllText(manifest), "run.outcome"));
+                    var first = File.ReadAllText(manifest);
+                    Check("the first write is running and not final", Field(first, "run.outcome") == "running" && Field(first, "run.final") == "false", Field(first, "run.outcome") + " " + Field(first, "run.final"));
+                    control.SetPhase(ExperimentPhase.Finished);
+                    var provisional = "";
+                    for (var waited = System.Diagnostics.Stopwatch.StartNew(); waited.ElapsedMilliseconds < 2000; System.Threading.Thread.Sleep(50))
+                    {
+                        try { provisional = File.ReadAllText(manifest); } catch (IOException) { continue; }
+                        if (Field(provisional, "run.outcome") != "running") break;
+                    }
+                    Check("a workflow's Finished is written as it comes, completed and not final", Field(provisional, "run.outcome") == "completed" && Field(provisional, "run.final") == "false", Field(provisional, "run.outcome") + " " + Field(provisional, "run.final"));
                     subscription.Dispose();
                     Set(null, "Current", null);
-                    Check("... which says completed", Field(File.ReadAllText(manifest), "run.outcome") == "completed", Field(File.ReadAllText(manifest), "run.outcome"));
+                    var last = File.ReadAllText(manifest);
+                    Check("... and the end-of-run write is completed and final", Field(last, "run.outcome") == "completed" && Field(last, "run.final") == "true", Field(last, "run.outcome") + " " + Field(last, "run.final"));
                 }
                 {
                     // S3-L1 (Run 1): another writer's .tmp is not a file of the experiment.

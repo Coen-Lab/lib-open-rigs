@@ -38,9 +38,11 @@ namespace OpenRigs.HarpDevices
     /// Compares a Behavior board's wiring in rig.yml (what is plugged into each line) with the lines the
     /// workflow says it uses (schemas\board-lines.yml in its repository; Pip, 7 Nov 2026). Every line
     /// the workflow uses must be in the wiring with the same device, side and targets; a line it does not
-    /// use may be anything or unknown. A workflow without the file, or without the board in it, is not
-    /// checked. Whether a device word is on the lab's list (wiredDevices) is rig-control's names check,
-    /// on the rig before launch, so Start never depends on the share.
+    /// use may be anything or unknown. A workflow without the file, or a board the file does not list,
+    /// is not checked; a file that cannot be read, or a board's entry that is not a list, refuses.
+    /// Nothing yet holds a device word to a lab list: wiredDevices in the device dictionary, checked by
+    /// rig-control's names check before launch, is planned (DECISIONS.md, 7 Nov 2026), so Start never
+    /// depends on the share.
     /// </summary>
     static class WiringCheck
     {
@@ -62,26 +64,40 @@ namespace OpenRigs.HarpDevices
                 result.Summary = "not checked: " + (workflow ?? "the workflow") + " has no " + LinesFile;
                 return result;
             }
-            YamlMappingNode lines;
+            YamlNode root;
             try
             {
                 var stream = new YamlStream();
                 stream.Load(new StringReader(linesYaml));
-                lines = stream.Documents.Count > 0 ? stream.Documents[0].RootNode as YamlMappingNode : null;
+                root = stream.Documents.Count > 0 ? stream.Documents[0].RootNode : null;
             }
             catch (Exception ex)
             {
+                return Unreadable(ex);
+            }
+            // A file or a board's key there in the wrong shape refuses, rather than turning the check off (L2-L1).
+            var lines = root as YamlMappingNode;
+            if (root != null && lines == null)
+            {
                 result.Applies = true;
-                result.Problems.Add(LinesFile + " could not be read: " + ex.Message.Split('\n')[0]);
+                result.Problems.Add(LinesFile + " must map each board's name to a list of entries");
+                result.Summary = "refused: " + result.Problems[0];
                 return result;
             }
-            var entries = lines == null ? null : Child(lines, board.Name) as YamlSequenceNode;
-            if (entries == null)
+            var listed = lines == null ? null : Child(lines, board.Name);
+            if (listed == null)
             {
                 result.Summary = "not checked: " + LinesFile + " names no lines for " + board.Name;
                 return result;
             }
             result.Applies = true;
+            var entries = listed as YamlSequenceNode;
+            if (entries == null)
+            {
+                result.Problems.Add(LinesFile + "'s " + board.Name + " must be a list of entries");
+                result.Summary = "refused: " + result.Problems[0];
+                return result;
+            }
             var uses = new List<BoardLineUse>();
             foreach (var node in entries)
             {
@@ -179,6 +195,15 @@ namespace OpenRigs.HarpDevices
             var line = Channel(value) ?? (value.All(char.IsDigit) ? Channel("DO" + value) : null);
             if (line == null) why = "rig.yml's " + from + " is " + value + ", which is not a line of the board";
             return line;
+        }
+
+        /// <summary>The refusal when board-lines.yml is there and cannot be read or parsed.</summary>
+        public static WiringResult Unreadable(Exception ex)
+        {
+            var result = new WiringResult { Applies = true };
+            result.Problems.Add(LinesFile + " could not be read: " + ex.Message.Split('\n')[0]);
+            result.Summary = "refused: " + result.Problems[0];
+            return result;
         }
 
         static string Channel(string text)

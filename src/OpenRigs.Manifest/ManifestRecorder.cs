@@ -55,7 +55,7 @@ namespace OpenRigs.Manifest
                 var items = 0L;
                 var begun = false;
                 var finished = false;
-                var stopWritten = false;
+                string provisional = null;  // the outcome last written with run.final false
                 // How the run ended, kept until the folder's path arrives: the run may end before
                 // LogController has made the folder, and the manifest must still say so.
                 RunEnd pending = null;
@@ -110,22 +110,25 @@ namespace OpenRigs.Manifest
                         observer.OnCompleted();
                         return;
                     }
-                    // The controller's stop is written as soon as it comes, the run still going:
+                    // The workflow's Finished and the controller's stop are written as soon as they
+                    // come, the run still going, as completed or stopped with run.final false:
                     // rig-control kills a workflow that has not stopped by its deadline, and the
-                    // end-of-run write never comes. Still `running`: rig-control keeps an editor's
-                    // Bonsai open after its port closes only while the manifest says so.
+                    // end-of-run write never comes (L1-L2). Not final, so rig-control keeps an
+                    // editor's Bonsai open until the end-of-run write, which sets run.final true.
                     if (control != null) subscriptions.Add(Observable.Interval(StopPoll).Subscribe(_ =>
                     {
                         try
                         {
                             lock (gate)
                             {
-                                if (finished || stopWritten || control.StopReason == null) return;
-                                writer.Stopping(control);
-                                stopWritten = true;
+                                if (finished || (!control.FinishedAt.HasValue && control.StopReason == null)) return;
+                                var end = RunEnd.AtDisposal(control);
+                                if (end.Outcome == provisional) return;
+                                writer.Provisional(end, run != null ? (long?)items : null, control);
+                                provisional = end.Outcome;
                             }
                         }
-                        catch (Exception ex) { NotWritten("the controller's stop", ex); }
+                        catch (Exception ex) { NotWritten("the run's end so far", ex); }
                     }));
                 }, observer.OnError));
 

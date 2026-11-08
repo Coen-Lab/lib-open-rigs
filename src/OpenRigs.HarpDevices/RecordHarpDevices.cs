@@ -19,8 +19,8 @@ namespace OpenRigs.HarpDevices
     /// its registers and register map written into each experiment) and, when the workflow publishes
     /// &lt;Kind-Instance&gt;.Commands, a RequestRegisterDump on it. Each device's record's path is
     /// published as &lt;Kind-Instance&gt;.Identity. Only subjects built before this node can be
-    /// found, so it goes after the devices and LogController. ExperimentManifest expects the two files
-    /// with harp in its ExpectedFiles.
+    /// found, so it goes after the devices and LogController; with no PathPrefix before it, the workflow
+    /// stops at Start saying so. ExperimentManifest expects the two files with harp in its ExpectedFiles.
     /// </summary>
     [DefaultProperty(nameof(ConfigRoot))]
     [TypeDescriptionProvider(typeof(RecordHarpDevicesTypeDescriptionProvider))]
@@ -76,7 +76,12 @@ namespace OpenRigs.HarpDevices
                 Generate(plan);
                 generatedFrom = signature;
             }
-            return base.Build(arguments);
+            var built = base.Build(arguments);
+            if (plan.StartRefusal == null) return built;
+            // Built, so the editor opens the workflow on any desk; it stops when the workflow starts,
+            // as the manifest would otherwise wait every night for Harp files nobody writes (L2-L2, 7 Nov 2026).
+            return Expression.Call(typeof(Observable), nameof(Observable.Throw), built.Type.GetGenericArguments(),
+                Expression.Constant(new InvalidOperationException(plan.StartRefusal), typeof(Exception)));
         }
 
         // As StreamDevices: the inner workflow is one group, HarpDevices, swapped whole for a new

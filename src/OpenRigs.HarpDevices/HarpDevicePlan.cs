@@ -46,7 +46,11 @@ namespace OpenRigs.HarpDevices
         YamlDotNet.RepresentationModel.YamlMappingNode rig;
         List<string> deviceNames;
         string lines;
+        Exception linesUnreadable;
         string workflow;
+
+        /// <summary>Why the node records nothing and stops the workflow at Start, or null: no PathPrefix before it, which the manifest's harp files would wait for every night.</summary>
+        public string StartRefusal;
 
         // The repository of the workflow running, found as OpenRigs.Manifest and LiveView find it.
         static string WorkflowRepository()
@@ -61,6 +65,7 @@ namespace OpenRigs.HarpDevices
             if (publishedType("PathPrefix") != typeof(string))
             {
                 plan.Notes.Add("the workflow publishes no PathPrefix (OpenRigs.Logging's LogController) before this node, so there is no experiment folder to record into");
+                plan.StartRefusal = "RecordHarpDevices records nothing: " + plan.Notes[0] + ". Put it after LogController and the devices.";
                 return plan;
             }
             if (string.IsNullOrWhiteSpace(configRoot))
@@ -78,7 +83,15 @@ namespace OpenRigs.HarpDevices
             // The wiring check's inputs, read once: rig.yml's top level and the workflow's board-lines.yml.
             plan.rig = WiringCheck.ReadRig(RigDevices.PathFor(configRoot));
             plan.deviceNames = devices.Select(d => d.Name).ToList();
-            plan.lines = WiringCheck.ReadLines((repositoryRoot ?? WorkflowRepository)(), out plan.workflow);
+            // A failed read refuses the boards it would check, as a file that does not parse does (L2-L2).
+            try
+            {
+                plan.lines = WiringCheck.ReadLines((repositoryRoot ?? WorkflowRepository)(), out plan.workflow);
+            }
+            catch (Exception ex)
+            {
+                plan.linesUnreadable = ex;
+            }
             foreach (var device in devices)
             {
                 plan.Consider(device, publishedType);
@@ -106,6 +119,7 @@ namespace OpenRigs.HarpDevices
             {
                 var result = rig == null
                     ? new WiringResult { Summary = "not checked: rig.yml's top level could not be read" }
+                    : linesUnreadable != null ? WiringCheck.Unreadable(linesUnreadable)
                     : WiringCheck.Check(rig, device, deviceNames, lines, workflow);
                 wiring = result.Summary;
                 refusal = result.Refusal(device.Name);
