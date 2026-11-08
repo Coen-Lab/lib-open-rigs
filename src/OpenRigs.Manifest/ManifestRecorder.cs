@@ -56,7 +56,6 @@ namespace OpenRigs.Manifest
                 var begun = false;
                 var finished = false;
                 var stopWritten = false;
-                var completedWritten = false;
                 // How the run ended, kept until the folder's path arrives: the run may end before
                 // LogController has made the folder, and the manifest must still say so.
                 RunEnd pending = null;
@@ -111,30 +110,22 @@ namespace OpenRigs.Manifest
                         observer.OnCompleted();
                         return;
                     }
-                    // The controller's stop, and the workflow's Finished, are written as soon as they
-                    // come, the run still going: rig-control kills a workflow that has not stopped by
-                    // its deadline, and the end-of-run write never comes. Neither is the end: that
-                    // write, when it comes, still lists the folder as it is then.
+                    // The controller's stop is written as soon as it comes, the run still going:
+                    // rig-control kills a workflow that has not stopped by its deadline, and the
+                    // end-of-run write never comes. Still `running`: rig-control keeps an editor's
+                    // Bonsai open after its port closes only while the manifest says so.
                     if (control != null) subscriptions.Add(Observable.Interval(StopPoll).Subscribe(_ =>
                     {
                         try
                         {
                             lock (gate)
                             {
-                                if (finished) return;
-                                if (control.FinishedAt.HasValue)
-                                {
-                                    if (completedWritten) return;
-                                    writer.Finish(new RunEnd(RunEnd.Completed, null), run != null ? (long?)items : null, control);
-                                    completedWritten = true;
-                                    return;
-                                }
-                                if (stopWritten || control.StopReason == null) return;
+                                if (finished || stopWritten || control.StopReason == null) return;
                                 writer.Stopping(control);
                                 stopWritten = true;
                             }
                         }
-                        catch (Exception ex) { NotWritten("the controller's stop or the run's Finished", ex); }
+                        catch (Exception ex) { NotWritten("the controller's stop", ex); }
                     }));
                 }, observer.OnError));
 

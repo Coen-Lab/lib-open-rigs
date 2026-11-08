@@ -309,7 +309,9 @@ namespace OpenRigs.Manifest.Tests
                     }
                 }
                 {
-                    // L1-L2: Finished is written while the run goes on, and the end still lists the folder as it is then.
+                    // rig-control keeps an editor's Bonsai open after its port closes only while the manifest
+                    // says running (agent.py's MANIFEST_WAIT_S), so nothing but the end-of-run write ends it
+                    // (audit set A, 8 Nov 2026: an early completed write on Finished was taken back).
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-fin_2026-10-30T19-57-12");
                     var path = new Subject<string>();
@@ -318,19 +320,12 @@ namespace OpenRigs.Manifest.Tests
                     control.SetPhase(ExperimentPhase.Recording);
                     path.OnNext(folder);
                     control.SetPhase(ExperimentPhase.Finished);
+                    System.Threading.Thread.Sleep((int)(ManifestRecorder.StopPoll.TotalMilliseconds * 3));
                     var manifest = Path.Combine(folder, ManifestWriter.FileName);
-                    var text = "";
-                    for (var waited = System.Diagnostics.Stopwatch.StartNew(); waited.ElapsedMilliseconds < 2000; System.Threading.Thread.Sleep(50))
-                    {
-                        try { text = File.ReadAllText(manifest); } catch (IOException) { continue; }
-                        if (Field(text, "run.outcome") == "completed") break;
-                    }
-                    Check("a workflow's Finished is written as completed while it still runs", Field(text, "run.outcome") == "completed" && Field(text, "run.ended") != "null", Field(text, "run.outcome"));
-                    File.WriteAllText(Path.Combine(folder, "late.csv"), "x");
+                    Check("a workflow's Finished leaves the manifest running until the end-of-run write", Field(File.ReadAllText(manifest), "run.outcome") == "running", Field(File.ReadAllText(manifest), "run.outcome"));
                     subscription.Dispose();
                     Set(null, "Current", null);
-                    text = File.ReadAllText(manifest);
-                    Check("... and the end-of-run write still comes, listing a file written after Finished", Field(text, "run.outcome") == "completed" && text.Contains("\"late.csv\""), Field(text, "run.outcome"));
+                    Check("... which says completed", Field(File.ReadAllText(manifest), "run.outcome") == "completed", Field(File.ReadAllText(manifest), "run.outcome"));
                 }
                 {
                     // S3-L1 (Run 1): another writer's .tmp is not a file of the experiment.
