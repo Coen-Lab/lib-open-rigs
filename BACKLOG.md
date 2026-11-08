@@ -1,5 +1,18 @@
 # Backlog
 
+## Queued package fixes shipped, 8 Nov 2026
+
+Changed (one raise each: Control 0.1.1-coen-lab.9, Manifest 12, HarpDevices 8, LiveView 7; open-rigs' pin moves with `behaviour_box.py`):
+
+- Manifest: `run.final` (set A's L1-L2). The workflow's Finished and the controller's stop are written as they come, the run still going, as `completed` or `stopped` with `run.final: false` (every `running` write has `false` too); the end-of-run write sets `run.final: true`; absent (older manifests) means final. In FORMAT.md and the README. rig-control keeps an editor's Bonsai open while the manifest says `running` or `run.final` is false, and rig-sync treats `final: false` as `running` until stale (their own changes, the same day).
+- Control: two parameters, or two commands, with one name stop the workflow at Start, naming both by position (S2-L2); `SetPhase(Recording)` or `SetPhase(Finished)` before Go throws, so `ReportPhase` stops the workflow rather than status lying (S2-I1); each entry of `status`'s `commands` carries `taken`, the times the command was taken, counted in `Handle` (the night's S2-L2), in the README's protocol table; `ExperimentSettings`' summary says the repository is read when it is subscribed, not at Go (L1-I1).
+- HarpDevices: a `board-lines.yml` whose top level is not a mapping, or whose board's entry is not a list, refuses ("must be a list of entries") instead of turning the check off (L2-L1); a `ReadLines` that throws goes to the "could not be read" refusal, not out of `HarpDevicePlan.Create` (L2-L2); `WiringCheck`'s summary matches the README (S5-M1); `RecordHarpDevices` with no `PathPrefix` before it stops the workflow at Start with its note's text (7 Nov's L2-L2); a port is plugged in when its WMI `Status` is `OK`, as rig-setup's `present`, its name from the registry's `PortName` first (S4-L5); `HarpRig.MapToWrite` gives no register map for a kind with no known WhoAmI, so `<Name>/<Name>.yml` is never written to meet the folder entry (S3-I1). A test for each but the port reading, which needs WMI.
+- Shared: `RigDevices.Value` reads `null`, `Null`, `NULL` and `~` as empty (S4-L1), tested in HarpDevices.Tests.
+- LiveView: `LiveViewReport.Streamed`'s summary names a board's two streams (L2-I1); the rate note says "above 0 and at most 1000" (7 Nov's L2-I2).
+- open-rigs `behaviour_box.py`: the wiring `device` description says nothing holds the word to a lab list yet (S5-M1).
+
+Still open: the wiring words check (set B), rig-setup's null comment (the night's set C), and `RecordHarpDevice.cs`'s "when its port opened" wording (7 Nov morning, under Not changed), which was not in this round.
+
 ## Audit 2026-11-08, morning (/audit-rigs, set C, run 4: the seams, scripts and packaging)
 
 Changed (scripts and COEN-LAB.md only; no package source, so no version raised):
@@ -11,10 +24,6 @@ Changed (scripts and COEN-LAB.md only; no package source, so no version raised):
 Not changed, do not raise again without new information:
 
 - `update-workflows.ps1`'s clone cleanup deletes any unlisted folder under `-Work` (L3-I1): nobody passes `-Work` but the script's own re-run, and `Set-Branch` already resets listed folders there.
-
-Open, with the next change of each package:
-
-- HarpDevices or Manifest: a rig.yml device kind missing from `WhoAmIByKind` gives `ExpectedWhoAmI` 0, so the manifest does not name `<Name>/<Name>.yml`, yet `RecordHarpDevice.Write` still writes it when a loaded package decodes the board's WhoAmI, and with `auto;harp` that file then meets the `<Name>/` folder entry (S3-I1, the register-map shape of 2 Nov; no rig today: every published Harp device is in the table). Have `ExpectedPlan` always exclude `<Name>/<Name>.yml` from a Harp device's folder entry, or `MapToWrite` return null when nothing is expected; a test with an unknown kind.
 
 ## Audit 2026-11-08, early morning (/audit-rigs, set B: the seams, HarpDevices, LiveView and Shared)
 
@@ -31,9 +40,6 @@ Not changed, do not raise again without new information:
 
 Open, with the next change of each package:
 
-- HarpDevices: a `board-lines.yml` whose board key holds a mapping, or whose top level is not a mapping, turns the check off saying only "not checked" (L2-L1): refuse "must be a list of entries" where the key is there in the wrong shape. `WiringCheck.ReadLines` can throw out of `HarpDevicePlan.Create`, which promises never to throw (L2-L2): send a failed read to the "could not be read" refusal. `WiringCheck.cs:42`'s summary says the same as the README now does (S5-M1).
-- LiveView: `Operators.cs:150` says one stream per device, where a board sends `.encoder` and `.channels` (L2-I1).
-- open-rigs `src\open_rigs\rigs\behaviour_box.py:35`: the wiring `device` description, as the README (S5-M1); with the next change under `src\` (it moves every workflow's pin).
 - The wiring words check itself (S5-M1, DECISIONS.md 7 Nov): `wiredDevices` in the device dictionary, Save Names in rig-setup, and rig-control's `check-workflow-names.ps1` reading the workflow's `schemas\board-lines.yml`, before the first workflow ships one.
 
 ## Audit 2026-11-08, small hours (/audit-rigs, set A: the seams, Control and Manifest)
@@ -43,13 +49,6 @@ Changed:
 - **Manifest 0.1.1-coen-lab.11** (coen-lab.10 was built and never pushed; see L1-L2 below), every Manifest item queued for its next change in one raise: the run's error after the workflow's Finished or the controller's stop is recorded as `completed` or `stopped`, not `error` (L1-L1); `FilesSection` skips every `.tmp` and drops a file deleted while it is listed, and `stopWritten` is set only after the write succeeds (set C's S3-L1); the dead `Failed` branch and `ExperimentManifestException` are gone (7 Nov's L1-I1); `ConfigFiles` defaults from `RigDevices.DefaultConfigRoot` (7 Nov's L2-L1). Tests for each.
 - DECISIONS.md: a dated entry that coen-qc-calibrate-valve's `ValveInterleave.cs` (since 80e2fe7) orders bursts and fits nothing, so the 6 and 7 Nov "no C#" wording is out of date and the rule holds (S5-M1).
 - COEN-LAB.md: the Manifest row names the optional run input (S5-I1); the Shared row says Control compiles `WorkflowFile.cs` alone (L1-I2); Manifest 11.
-
-Open, with the next change of each package:
-
-- Manifest: a workflow rig-control kills after its Finished, past the stop deadline, loses its outcome to rig-sync's `killed` (L1-L2). Writing `completed` as Finished comes (coen-lab.10) was taken back after Phase 5: rig-control's agent keeps an editor's Bonsai open after its port closes only while the manifest says `running` (`agent.py`, `MANIFEST_WAIT_S`), so it killed the editor before the end-of-run write. Fix both sides in one round: a `run.final` flag on the end-of-run write, and rig-control waiting until it reads one (absent on older manifests, read as final).
-
-- Control: two parameters or commands with one name are taken without complaint, the second shadowing the first in `set` and `command` (S2-L2): refuse at Start, naming both. `SetPhase(Recording)` or `SetPhase(Finished)` before Go is accepted (S2-I1): refuse, as the reply's `phase` would lie. `ExperimentSettings`' summary should say it writes when it is subscribed, not at Go (L1-I1, a doc comment).
-- HarpDevices: a board's port identity is read two ways, `UsbSerials.cs`'s fallback and its status line (S4-L5): read it once, registry `PortName` first, as rig-setup does.
 
 ## Audit 2026-11-08, night (/audit-rigs, set C: the seams, scripts and packaging)
 
@@ -66,8 +65,7 @@ Not changed, do not raise again without new information:
 
 Open, with the next change of each package:
 
-- Shared: `RigDevices.Value` reads only `null` as empty, where YamlDotNet's deserializer, rig-setup and PyYAML also read `Null` and `NULL` as null, so `usbSerial: NULL` refuses Start naming the board "NULL" (S4-L1). Return null for all three, with a test, and correct rig-setup's `rig-config.ps1` comment that the readers agree.
-- Control: no count of a command taken, so after a timed-out `command` the status cannot say whether it ran (S2-L2; rig-control now says resending may repeat it). Add `commands[i].taken`, counted in `Handle`, for rig-control to compare.
+- rig-setup's `rig-config.ps1` comment that the readers agree on YAML's null (S4-L1's other half; `RigDevices.Value` reads `Null` and `NULL` since 8 Nov): a rig-setup change, not this repository's.
 
 ## Independent audit of 7 Nov work, 8 Nov 2026 (the wiring check and the board channels)
 
@@ -90,12 +88,7 @@ Changed (scripts and docs only; no package source, so no version raised):
 Not changed, do not raise again without new information:
 
 - `RecordHarpDevice.cs` keeps writing every reply into `atConnection` after Start, so a timed-out dump's fallback may be the previous experiment's registers under "when its port opened" (L2-I1): the same board, the same registers; wording, with the next HarpDevices change.
-- `LiveViewPlan.cs`'s rate note says "0 to 1000" where `TryPositive` refuses 0 (L2-I2): with the next LiveView change.
 - DECISIONS.md's stage-2 line lists `rollouts.json`, which the share has not got yet (S5-I1): decisions are append-only, and the file appears at the first rollout.
-
-Open, with the next change of each package (a raise redeploys every workflow, and GREEN-DOME-1 is mid-test):
-
-- HarpDevices: `RecordHarpDevices` placed before `PathPrefix` records nothing, saying so only in its description, while the manifest expects the Harp files, so every run is held back overnight with an alarm (L2-L2): fail at Start with the note's text.
 
 ## Audit 2026-11-07, early hours (/audit-rigs, set A: the seams, Control and Manifest)
 
