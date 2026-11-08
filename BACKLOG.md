@@ -1,5 +1,18 @@
 # Backlog
 
+## Audit 2026-11-08, small hours (/audit-rigs, set A: the seams, Control and Manifest)
+
+Changed:
+
+- **Manifest 0.1.1-coen-lab.10**, every Manifest item queued for its next change in one raise: the run's error after the workflow's Finished or the controller's stop is recorded as `completed` or `stopped`, not `error` (L1-L1); the workflow's Finished is written as it comes, `completed` with its time, so a workflow rig-control kills past its stop deadline keeps its outcome, and the end-of-run write still lists the folder (L1-L2); `FilesSection` skips every `.tmp` and drops a file deleted while it is listed, and `stopWritten` is set only after the write succeeds (set C's S3-L1); the dead `Failed` branch and `ExperimentManifestException` are gone (7 Nov's L1-I1); `ConfigFiles` defaults from `RigDevices.DefaultConfigRoot` (7 Nov's L2-L1). Tests for each.
+- DECISIONS.md: a dated entry that coen-qc-calibrate-valve's `ValveInterleave.cs` (since 80e2fe7) orders bursts and fits nothing, so the 6 and 7 Nov "no C#" wording is out of date and the rule holds (S5-M1).
+- COEN-LAB.md: the Manifest row names the optional run input (S5-I1); the Shared row says Control compiles `WorkflowFile.cs` alone (L1-I2); Manifest 10.
+
+Open, with the next change of each package:
+
+- Control: two parameters or commands with one name are taken without complaint, the second shadowing the first in `set` and `command` (S2-L2): refuse at Start, naming both. `SetPhase(Recording)` or `SetPhase(Finished)` before Go is accepted (S2-I1): refuse, as the reply's `phase` would lie. `ExperimentSettings`' summary should say it writes when it is subscribed, not at Go (L1-I1, a doc comment).
+- HarpDevices: a board's port identity is read two ways, `UsbSerials.cs`'s fallback and its status line (S4-L5): read it once, registry `PortName` first, as rig-setup does.
+
 ## Audit 2026-11-08, night (/audit-rigs, set C: the seams, scripts and packaging)
 
 Changed (scripts and docs only; no package source, so no version raised):
@@ -16,7 +29,6 @@ Not changed, do not raise again without new information:
 Open, with the next change of each package:
 
 - Shared: `RigDevices.Value` reads only `null` as empty, where YamlDotNet's deserializer, rig-setup and PyYAML also read `Null` and `NULL` as null, so `usbSerial: NULL` refuses Start naming the board "NULL" (S4-L1). Return null for all three, with a test, and correct rig-setup's `rig-config.ps1` comment that the readers agree.
-- Manifest: `FilesSection` lists another writer's `.tmp` (RecordHarpDevice's `.yml.tmp`, `_device.json.tmp`, renamed 0.7 to 5 s after Go) and throws on a file that vanishes mid-listing; a Stop in that window gives a manifest rig-sync holds as `missing` every night, or loses the stop's reason since `stopWritten` is set first (S3-L1). Skip `*.tmp`, drop a vanished file, set `stopWritten` after `writer.Stopping` succeeds, with a test.
 - Control: no count of a command taken, so after a timed-out `command` the status cannot say whether it ran (S2-L2; rig-control now says resending may repeat it). Add `commands[i].taken`, counted in `Handle`, for rig-control to compare.
 
 ## Independent audit of 7 Nov work, 8 Nov 2026 (the wiring check and the board channels)
@@ -45,7 +57,6 @@ Not changed, do not raise again without new information:
 
 Open, with the next change of each package (a raise redeploys every workflow, and GREEN-DOME-1 is mid-test):
 
-- Manifest: `ExperimentManifest.cs:136` hard-codes the ConfigRoot default that `RigDevices.DefaultConfigRoot` holds (L2-L1): build it from the shared constant, with a test.
 - HarpDevices: `RecordHarpDevices` placed before `PathPrefix` records nothing, saying so only in its description, while the manifest expects the Harp files, so every run is held back overnight with an alarm (L2-L2): fail at Start with the note's text.
 
 ## Audit 2026-11-07, early hours (/audit-rigs, set A: the seams, Control and Manifest)
@@ -61,7 +72,6 @@ Not changed, do not raise again without new information:
 
 Open, with the next change of each package:
 
-- Manifest: the `Failed` branch for a held end and `ExperimentManifestException` can no longer run since 7d22408's immediate `OnError` (L1-I1): drop both.
 - Control: `LaunchedBy` and `GoBy` are set after `GoRequested = true` outside the lock, so a status poll can see `go_requested` with no `go_by` for microseconds (L1-I2): set them inside the `Locked` block first.
 - Core README: no mention of `DescribeCalibrationCurve` (S2-L3); with the `ApplyBalancePort` removal below.
 

@@ -133,7 +133,7 @@ namespace OpenRigs.Manifest
         public string IngestScript { get; set; }
 
         /// <summary>Gets or sets ExperimentManifest's ConfigFiles.</summary>
-        public string ConfigFiles { get; set; } = @"C:\Coen-Lab-Local\RigConfigs\%COMPUTERNAME%\rig.yml";
+        public string ConfigFiles { get; set; } = RigDevices.DefaultConfigRoot + @"\%COMPUTERNAME%\rig.yml";
 
         /// <summary>Gets or sets ExperimentManifest's ExpectedFiles.</summary>
         public string ExpectedFiles { get; set; } = ExpectedPlan.Auto;

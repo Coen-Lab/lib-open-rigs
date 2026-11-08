@@ -392,12 +392,21 @@ namespace OpenRigs.Manifest
             {
                 var rel = path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? path.Substring(prefix.Length) : path;
                 rel = rel.Replace('\\', '/');
-                if (rel == FileName || rel == FileName + ".tmp") continue;
+                // Another writer's half-written file (RecordHarpDevice's .yml.tmp) is renamed within seconds: never a file of the experiment.
+                if (rel == FileName || rel.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
                 var info = new FileInfo(path);
+                long size;
+                DateTime mtime;
+                try
+                {
+                    size = info.Length;
+                    mtime = info.LastWriteTimeUtc;
+                }
+                catch (FileNotFoundException) { continue; }
                 var entry = new JsonObject();
                 entry.Add("path", rel);
-                entry.Add("size", info.Length);
-                entry.Add("mtime", Iso(info.LastWriteTimeUtc));
+                entry.Add("size", size);
+                entry.Add("mtime", Iso(mtime));
                 entry.Add("closed", IsClosed(path));
                 files.Add(entry);
             }

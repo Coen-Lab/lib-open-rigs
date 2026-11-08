@@ -287,6 +287,61 @@ namespace OpenRigs.Manifest.Tests
                     failedSubscription.Dispose();
                     subscription.Dispose();
                 }
+                {
+                    // L1-L1 (8 Nov 2026): the run's error after Finished or the controller's stop is how the workflow stopped.
+                    foreach (var finishedFirst in new[] { true, false })
+                    {
+                        var control = Controller();
+                        var folder = Path.Combine(root, "sub-TC002", "ses-err" + finishedFirst + "_2026-10-30T19-57-12");
+                        var path = new Subject<string>();
+                        var run = new Subject<int>();
+                        var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                        var subscription = recorder.Process(path, run).Subscribe(_ => { }, _ => { });
+                        control.SetPhase(ExperimentPhase.Recording);
+                        path.OnNext(folder);
+                        if (finishedFirst) control.SetPhase(ExperimentPhase.Finished); else Stop(control, "mouse unwell");
+                        run.OnError(new InvalidOperationException("the session was stopped"));
+                        subscription.Dispose();
+                        Set(null, "Current", null);
+                        var text = File.ReadAllText(Path.Combine(folder, ManifestWriter.FileName));
+                        var want = finishedFirst ? "completed" : "stopped";
+                        Check("a run's error after " + (finishedFirst ? "Finished is completed" : "the controller's stop is stopped") + ", not error", Field(text, "run.outcome") == want && Field(text, "run.error") == "null", Field(text, "run.outcome") + " " + Field(text, "run.error"));
+                    }
+                }
+                {
+                    // L1-L2: Finished is written while the run goes on, and the end still lists the folder as it is then.
+                    var control = Controller();
+                    var folder = Path.Combine(root, "sub-TC002", "ses-fin_2026-10-30T19-57-12");
+                    var path = new Subject<string>();
+                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    var subscription = recorder.Process(path).Subscribe(_ => { }, _ => { });
+                    control.SetPhase(ExperimentPhase.Recording);
+                    path.OnNext(folder);
+                    control.SetPhase(ExperimentPhase.Finished);
+                    var manifest = Path.Combine(folder, ManifestWriter.FileName);
+                    var text = "";
+                    for (var waited = System.Diagnostics.Stopwatch.StartNew(); waited.ElapsedMilliseconds < 2000; System.Threading.Thread.Sleep(50))
+                    {
+                        try { text = File.ReadAllText(manifest); } catch (IOException) { continue; }
+                        if (Field(text, "run.outcome") == "completed") break;
+                    }
+                    Check("a workflow's Finished is written as completed while it still runs", Field(text, "run.outcome") == "completed" && Field(text, "run.ended") != "null", Field(text, "run.outcome"));
+                    File.WriteAllText(Path.Combine(folder, "late.csv"), "x");
+                    subscription.Dispose();
+                    Set(null, "Current", null);
+                    text = File.ReadAllText(manifest);
+                    Check("... and the end-of-run write still comes, listing a file written after Finished", Field(text, "run.outcome") == "completed" && text.Contains("\"late.csv\""), Field(text, "run.outcome"));
+                }
+                {
+                    // S3-L1 (Run 1): another writer's .tmp is not a file of the experiment.
+                    var folder = Path.Combine(root, "tmpfiles");
+                    Directory.CreateDirectory(Path.Combine(folder, "Board"));
+                    File.WriteAllText(Path.Combine(folder, "Board", "Board.yml.tmp"), "x");
+                    File.WriteAllText(Path.Combine(folder, "Board", "Board.yml"), "x");
+                    var listed = string.Join(",", ManifestWriter.FilesSection(folder).Cast<JsonObject>().Select(f => (string)f.First(p => p.Key == "path").Value));
+                    Check("FilesSection leaves out another writer's .tmp", listed == "Board/Board.yml", listed);
+                }
+                Check("ConfigFiles defaults under the shared ConfigRoot", new ExperimentManifestSettings().ConfigFiles.StartsWith(RigDevices.DefaultConfigRoot + @"\"), new ExperimentManifestSettings().ConfigFiles);
 
                 Console.WriteLine("A write that fails:");
                 {
