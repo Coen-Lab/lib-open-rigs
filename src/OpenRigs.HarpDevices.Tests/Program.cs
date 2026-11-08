@@ -144,13 +144,20 @@ namespace OpenRigs.HarpDevices.Tests
                     var path = new Subject<string>();
                     var written = new List<string>();
                     Exception error = null;
-                    using (Recorder().Process(messages, path).Subscribe(written.Add, ex => error = ex))
+                    // A wide quiet, so a stalled test thread is not read as the dump having ended
+                    // before the negative check below; the record lands on the timer's thread.
+                    var waiting = Recorder();
+                    waiting.DumpQuiet = TimeSpan.FromMilliseconds(500);
+                    waiting.DumpTimeout = TimeSpan.FromMilliseconds(2000);
+                    using (waiting.Process(messages, path).Subscribe(p => { lock (written) written.Add(p); }, ex => error = ex))
                     {
                         foreach (var m in Board(1216)) messages.OnNext(m);  // at connection
                         var experiment = Path.Combine(root, "ses-1");
                         path.OnNext(experiment);
                         foreach (var m in Board(1216)) messages.OnNext(m);  // the dump asked for
-                        Check("waits until the dump has finished", written.Count == 0, written.Count.ToString());
+                        int early;
+                        lock (written) early = written.Count;
+                        Check("waits until the dump has finished", early == 0, early.ToString());
                         WaitFor(() => written.Count > 0 || error != null);
                         var json = File.ReadAllText(Path.Combine(experiment, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
                         Check("writes <Name>/<Name>_device.json when the dump has come", written.Count == 1 && error == null, written.Count + " " + error);

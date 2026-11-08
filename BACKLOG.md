@@ -1,5 +1,25 @@
 # Backlog
 
+## Audit 2026-11-08, early morning (/audit-rigs, set B: the seams, HarpDevices, LiveView and Shared)
+
+Changed (docs and tests only; no package source, so no version raised):
+
+- The HarpDevices README said rig-control's names check holds each wiring `device` word to the lab's list (S5-M1): nothing reads `wiring`, `board-lines.yml` or `wiredDevices`, and `K:\config\device-dictionary.json` has no `wiredDevices`. It says the check is planned and not there yet. No workflow has a `schemas\board-lines.yml` yet, so no wiring goes unchecked today.
+- The Manifest README's items 2 and 3 under When It Writes were run together by e0740ec (S3-L3).
+- `workflows.txt`'s header said its list is workflows not on rig-setup, beside coen-qc-calibrate-valve, which is (S5-L1): it says the list is besides rig-setup's and may overlap it (the duplicate stays, 6 Nov decision).
+- HarpDevices.Tests' "waits until the dump has finished" read a list the timer thread writes, with a 100 ms quiet against a stall (L2-L3): a 500 ms quiet for that block, the list read under a lock.
+
+Not changed, do not raise again without new information:
+
+- The board channel names in `WiringCheck.cs` and `behaviour_box.py`'s `BoardWiring` (L2-I2): they agree today, and drift fails loudly ("not a line of the board") on fixed hardware.
+
+Open, with the next change of each package:
+
+- HarpDevices: a `board-lines.yml` whose board key holds a mapping, or whose top level is not a mapping, turns the check off saying only "not checked" (L2-L1): refuse "must be a list of entries" where the key is there in the wrong shape. `WiringCheck.ReadLines` can throw out of `HarpDevicePlan.Create`, which promises never to throw (L2-L2): send a failed read to the "could not be read" refusal. `WiringCheck.cs:42`'s summary says the same as the README now does (S5-M1).
+- LiveView: `Operators.cs:150` says one stream per device, where a board sends `.encoder` and `.channels` (L2-I1).
+- open-rigs `src\open_rigs\rigs\behaviour_box.py:35`: the wiring `device` description, as the README (S5-M1); with the next change under `src\` (it moves every workflow's pin).
+- The wiring words check itself (S5-M1, DECISIONS.md 7 Nov): `wiredDevices` in the device dictionary, Save Names in rig-setup, and rig-control's `check-workflow-names.ps1` reading the workflow's `schemas\board-lines.yml`, before the first workflow ships one.
+
 ## Audit 2026-11-08, small hours (/audit-rigs, set A: the seams, Control and Manifest)
 
 Changed:
