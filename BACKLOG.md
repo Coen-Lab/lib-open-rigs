@@ -38,9 +38,7 @@ Not changed, do not raise again without new information:
 
 - The board channel names in `WiringCheck.cs` and `behaviour_box.py`'s `BoardWiring` (L2-I2): they agree today, and drift fails loudly ("not a line of the board") on fixed hardware.
 
-Open, with the next change of each package:
-
-- The wiring words check itself (S5-M1, DECISIONS.md 7 Nov): `wiredDevices` in the device dictionary, Save Names in rig-setup, and rig-control's `check-workflow-names.ps1` reading the workflow's `schemas\board-lines.yml`, before the first workflow ships one.
+Done since (8 Nov 2026, Pip: "Land all of it"): the wiring words check (S5-M1, DECISIONS.md 7 Nov). `wiredDevices` is in the device dictionary (RewardValve, Photodiode, CameraTrigger, AirPuff, ZapitTrigger, AudioDevice, TimestampGeneratorGen3), rig-setup's Save Names keeps it as a `Wired:` line (4b81048), and rig-control's `check-workflow-names.ps1` reads the workflow's `schemas\board-lines.yml` (55feaf1).
 
 ## Audit 2026-11-08, small hours (/audit-rigs, set A: the seams, Control and Manifest)
 

@@ -35,7 +35,7 @@ BehaviorBoard-Main:
   - { line: DIPort0, device: Photodiode }
 ```
 
-A line is given as a channel (`DIPort0`, `DO1`), as `cameraTriggerController.trigger0` or `trigger1` (DO0 or DO1, only while rig.yml enables that trigger), or as a rig.yml key holding a DO line, looked for in the board's entry first and then at the top level (`rewardValves.left: DO1`, `zapit.triggerLine: 3`). `zapit.triggerLine` is used only while rig.yml's `zapit.hardwareTriggered` is true (coen-lab.7 on), so a rig whose Zapit TTL is not cabled may leave that line unknown. Nothing yet holds a device word to a lab list: `wiredDevices` in `K:\config\device-dictionary.json`, checked by rig-control's names check, is planned (DECISIONS.md, 7 Nov 2026), and neither has it yet.
+A line is given as a channel (`DIPort0`, `DO1`), as `cameraTriggerController.trigger0` or `trigger1` (DO0 or DO1, only while rig.yml enables that trigger), or as a rig.yml key holding a DO line, looked for in the board's entry first and then at the top level (`rewardValves.left: DO1`, `zapit.triggerLine: 3`). `zapit.triggerLine` is used only while rig.yml's `zapit.hardwareTriggered` is true (coen-lab.7 on), so a rig whose Zapit TTL is not cabled may leave that line unknown. Each `device` word is one of the lab's `wiredDevices` in `K:\config\device-dictionary.json` (edited on rig-setup's Repos page, a `Wired:` line), which rig-control's names check holds a workflow's `schemas\board-lines.yml` to before launch (since 8 Nov 2026; DECISIONS.md, 7 Nov 2026).
 
 ## Settings
 
