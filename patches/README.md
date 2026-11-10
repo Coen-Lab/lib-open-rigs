@@ -2,7 +2,7 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core and Devices 0.1.1-coen-lab.4; Logging 0.1.1-coen-lab.5; Streaming and Video 0.1.1-coen-lab.3
+## OpenRigs.Core and Devices 0.1.1-coen-lab.4; Logging 0.1.1-coen-lab.6; Streaming and Video 0.1.1-coen-lab.3
 
 Raised one on 7 Nov 2026 with every lab package, no source change: `build\Common.csproj.targets` (what dependency version each nuspec names) had changed in `86daefc` with nothing flagged, and `build\` counts as each package's input since (audit-rigs set C). Logging, Streaming and Video named their dependencies at the wrong version until this build (`COEN-LAB.md`, step 1).
 
@@ -36,7 +36,7 @@ SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on PIPOFFICERI
 ```
 b36e1c342c10b054e11def50281e24273cd435b3a0a8ea5c117d754b1a214307  OpenRigs.Core.0.1.1-coen-lab.4.nupkg
 eb8d95c47b50b2591ee1e4853822cfde0663336f131f1bee54f398bb93e8a534  OpenRigs.Devices.0.1.1-coen-lab.4.nupkg
-2adf8fa4377e19df9cb6867e1ec7e87606c49967dc91747c856db19fabfcd9a3  OpenRigs.Logging.0.1.1-coen-lab.5.nupkg
+3bb63f911453a715a5aaadc7664147f25ca17e38639d9f60e3771b87757139df  OpenRigs.Logging.0.1.1-coen-lab.6.nupkg (10 Nov 2026)
 4801085e9cff076ecdd91e5824dc204f64c5490e8dc14d448948bdc1a70e2323  OpenRigs.Video.0.1.1-coen-lab.3.nupkg
 9986764daeb1a87474b7bbf45117703ef6356112a4ecaafb9f0a1f06f385eb2c  OpenRigs.Streaming.0.1.1-coen-lab.3.nupkg
 ```
