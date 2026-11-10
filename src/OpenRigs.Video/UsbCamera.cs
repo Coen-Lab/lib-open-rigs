@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reactive.Linq;
@@ -86,12 +87,21 @@ namespace OpenRigs.Video
                     if (FrameWidth > 0) capture.SetProperty(CaptureProperty.FrameWidth, FrameWidth);
                     if (FrameHeight > 0) capture.SetProperty(CaptureProperty.FrameHeight, FrameHeight);
                     lock (gate) exposureChanged = true;
+                    var since = Stopwatch.StartNew();  // since the last frame
                     while (!cancel.IsCancellationRequested)
                     {
                         Apply(capture);
                         var frame = capture.QueryFrame();
                         if (frame == null)
-                            throw new InvalidOperationException("The calibration camera stopped giving frames: was it unplugged?");
+                        {
+                            // A long exposure or its change can miss a frame (GREEN-DOME-1's USB
+                            // camera at 1 s, 10 Nov 2026): unplugged only once none comes for longer.
+                            if (since.Elapsed.TotalSeconds > NoFrameSeconds())
+                                throw new InvalidOperationException("The calibration camera stopped giving frames: was it unplugged?");
+                            Thread.Sleep(10);  // not a busy loop if it answers null at once
+                            continue;
+                        }
+                        since.Restart();
                         observer.OnNext(frame.Clone());
                     }
                 }
@@ -99,6 +109,14 @@ namespace OpenRigs.Video
         }
 
         const int DirectShowDomain = 700;  // OpenCV's CAP_DSHOW: an index in DirectShow's device order
+
+        // How long with no frame before the camera is taken as gone: 5 s, or 4 exposures if longer.
+        double NoFrameSeconds()
+        {
+            double e;
+            lock (gate) e = exposure;
+            return double.IsNaN(e) ? 5 : Math.Max(5, 4 * e / 1e6);
+        }
 
         void Apply(Capture capture)
         {
