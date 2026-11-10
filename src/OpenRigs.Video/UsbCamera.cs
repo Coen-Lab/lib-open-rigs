@@ -17,18 +17,19 @@ namespace OpenRigs.Video
     /// <summary>
     /// A USB (DirectShow) camera plugged in for a while, such as a calibration's camera on the
     /// balance (Pip, 10 Nov 2026): found as the one camera that is not the rig's own, streamed as
-    /// it comes, its exposure and gain taken live while it streams, as TriggeredSpinnaker's are.
+    /// it comes, its exposure taken live while it streams, as TriggeredSpinnaker's is. Exposure is in
+    /// microseconds, as the rig cameras' is, one setting for one meaning (Pip): DirectShow takes
+    /// only powers of two of a second, so the nearest is used. No gain: a USB camera's has no unit
+    /// common to its models, and exposure is what makes a display readable.
     /// </summary>
-    [Description("A USB (DirectShow) camera that is not the rig's own: the first whose device path carries none of rig.yml's camera serial numbers and no FLIR or Basler vendor id (or the one DevicePath names), streamed free-running. Exposure and Gain are taken live.")]
+    [Description("A USB (DirectShow) camera that is not the rig's own: the first whose device path carries none of rig.yml's camera serial numbers and no FLIR or Basler vendor id (or the one DevicePath names), streamed free-running. ExposureTime is taken live, at the nearest power of two of a second.")]
     public class UsbCamera : Source<IplImage>
     {
         // Settings a PropertyMapping writes while the camera streams, applied by the thread that
         // reads it before its next frame: OpenCV's DirectShow capture is not safe across threads.
         readonly object gate = new object();
         double exposure = double.NaN;
-        double gain = double.NaN;
         bool exposureChanged = true;
-        bool gainChanged = true;
 
         /// <summary>Initializes a new instance of the <see cref="UsbCamera"/> class.</summary>
         public UsbCamera()
@@ -54,20 +55,21 @@ namespace OpenRigs.Video
         [Description("The frame height asked for when the camera opens; the camera takes its nearest size.")]
         public int FrameHeight { get; set; }
 
-        /// <summary>Gets or sets the exposure, in the camera's DirectShow units (log2 seconds: -6 is 1/64 s); NaN leaves it automatic.</summary>
-        [Description("The exposure in DirectShow's units, log2 of seconds (-6 is 1/64 s, -8 1/256 s); NaN leaves the camera's automatic exposure. Taken live.")]
-        public double Exposure
+        /// <summary>Gets or sets the exposure, in microseconds; NaN leaves the camera's automatic exposure.</summary>
+        [Description("The exposure in microseconds, taken live at the nearest power of two of a second DirectShow allows (15625 is 1/64 s); NaN leaves the camera's automatic exposure.")]
+        public double ExposureTime
         {
             get { lock (gate) return exposure; }
             set { lock (gate) { exposure = value; exposureChanged = true; } }
         }
 
-        /// <summary>Gets or sets the gain, in the camera's own units; NaN leaves the camera's own.</summary>
-        [Description("The gain in the camera's own units; NaN leaves the camera's own. Taken live.")]
-        public double Gain
+        /// <summary>DirectShow's exposure step for an exposure in microseconds: log2 of seconds, rounded, -13 to 0.</summary>
+        /// <param name="microseconds">The exposure, in microseconds.</param>
+        /// <returns>The step, such as -6 for 15625 µs (1/64 s).</returns>
+        public static int ExposureStep(double microseconds)
         {
-            get { lock (gate) return gain; }
-            set { lock (gate) { gain = value; gainChanged = true; } }
+            var step = (int)Math.Round(Math.Log(Math.Max(microseconds, 1) / 1e6, 2));
+            return Math.Max(-13, Math.Min(0, step));
         }
 
         /// <summary>Opens the camera and streams its frames, each a copy, until unsubscribed.</summary>
@@ -83,7 +85,7 @@ namespace OpenRigs.Video
                         throw new InvalidOperationException("The calibration camera (DirectShow device " + index.ToString(CultureInfo.InvariantCulture) + ") could not be opened: is another program using it?");
                     if (FrameWidth > 0) capture.SetProperty(CaptureProperty.FrameWidth, FrameWidth);
                     if (FrameHeight > 0) capture.SetProperty(CaptureProperty.FrameHeight, FrameHeight);
-                    lock (gate) exposureChanged = gainChanged = true;
+                    lock (gate) exposureChanged = true;
                     while (!cancel.IsCancellationRequested)
                     {
                         Apply(capture);
@@ -100,18 +102,15 @@ namespace OpenRigs.Video
 
         void Apply(Capture capture)
         {
-            double e = double.NaN, g = double.NaN;
-            bool setExposure, setGain;
+            double e;
+            bool setExposure;
             lock (gate)
             {
                 setExposure = exposureChanged;
-                setGain = gainChanged;
                 e = exposure;
-                g = gain;
-                exposureChanged = gainChanged = false;
+                exposureChanged = false;
             }
-            if (setExposure && !double.IsNaN(e)) capture.SetProperty(CaptureProperty.Exposure, e);
-            if (setGain && !double.IsNaN(g)) capture.SetProperty(CaptureProperty.Gain, g);
+            if (setExposure && !double.IsNaN(e)) capture.SetProperty(CaptureProperty.Exposure, ExposureStep(e));
         }
 
         // The camera's index in DirectShow's order, which OpenCV's DirectShow capture counts in.
