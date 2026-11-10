@@ -157,9 +157,24 @@ namespace OpenRigs.LiveView
         public readonly List<string> Skipped = new List<string>();
         public readonly List<string> Notes = new List<string>();
 
+        /// <summary>
+        /// The instance name of a device a workflow brings itself, different on every rig and in
+        /// no rig.yml (Pip, 10 Nov 2026: a calibration's camera plugged in for the run): published
+        /// as &lt;Kind&gt;-Temporary.Data, such as Camera-Temporary.Data, it is streamed by its kind's
+        /// recipe with no liveView settings.
+        /// </summary>
+        public const string TemporaryInstance = "Temporary";
+
         public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType, Func<string, Type> loadedType = null)
         {
             var plan = new LiveViewPlan();
+            foreach (var recipe in DeviceRecipe.All.Where(r => !r.Harp))
+            {
+                var name = char.ToUpperInvariant(recipe.Kind[0]) + recipe.Kind.Substring(1) + "-" + TemporaryInstance;
+                if (publishedType(name + ".Data") == null) continue;  // none: nothing to say
+                plan.Consider(new RigDevice { Kind = recipe.Kind, Instance = TemporaryInstance, Name = name, Settings = new YamlMappingNode() },
+                    publishedType);
+            }
             // Looked for among the assemblies already loaded rather than referenced: LiveView
             // depends on no other lab package, and a workflow with an older Logging, or none,
             // streams what it did before.
