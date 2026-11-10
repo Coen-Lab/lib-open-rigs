@@ -167,7 +167,7 @@ namespace OpenRigs.Logging.Tests
                 .Replace("<Selector>Value</Selector>", "<Selector>Value.Image</Selector>")
                 .Replace(
                     "<io:Selector>Seconds,Value.Width,Value.Height</io:Selector>",
-                    "<io:Selector>Seconds,Value.ChunkData.FrameID,Value.ChunkData.Timestamp,Value.ChunkData.ExposureTime,Value.ChunkData.Gain</io:Selector>");
+                    "<io:Selector>Seconds,Value.ChunkData.FrameID,Value.ChunkData.Timestamp</io:Selector>");
             Assert.AreEqual(raw, Read("LogVideo.bonsai"));
         }
 

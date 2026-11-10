@@ -27,6 +27,8 @@ Logging 0.1.1-coen.2 (5 Nov 2026) adds `CsvWriter.ColumnNames`, the header's col
 
 Logging 0.1.0-bbox.6 (5 Nov 2026) fixes upstream's `LogVideo`: its two inline `FormatFileName` copies left out the chunk start, so files were `<LogName>\<LogName>.avi` and an experiment crossing the hour opened the same file twice. It now includes `OpenRigs.Logging:FormatFileName.bonsai` as `LogRawVideo` does, giving `<LogName>\<LogName>_<DateTime>.avi` and `.csv`; a test holds it equal to `LogRawVideo` apart from its frame selector and CSV columns. An upstream file, to be offered upstream: not yet reported.
 
+Logging 0.1.1-coen-lab.6 (10 Nov 2026, Pip) drops `ExposureTime` and `Gain` from `LogVideo`'s CSV, leaving `Seconds`, `FrameID` and `Timestamp`: both are fixed while recording (set only in ready mode) and recorded once in the experiment's settings, so per frame they repeated one value. A lab patch on an upstream file; upstream still writes both.
+
 Core and Devices have a `<Version>` in their `.csproj` since bbox.2, so `scripts\build-package.ps1` builds them like the rest.
 
 SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on PIPOFFICERIG, 7 Nov 2026):
