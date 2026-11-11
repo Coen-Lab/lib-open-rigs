@@ -61,6 +61,21 @@ def test_wiring_optional_and_side_checked():
             "portName": "COM3", "usbSerial": "X", "wiring": {"DO1": {"side": "left"}}}}})
 
 
+def test_stepper_wiring_by_the_driver_s_names():
+    from open_rigs.rigs.behaviour_box import HarpStepperDriver
+
+    entry = {"portName": "COM3", "usbSerial": "AQ03WRBF", "wiring": {
+        "Motor0": {"device": "BaseTransverse"},
+        "Motor1": {"device": "Radial", "side": "left"},
+        "Input0": {"device": "HomeSwitch", "note": "base transverse"}}}
+    driver = HarpStepperDriver.model_validate(entry)
+    assert driver.wiring.motor1.side.value == "left" and driver.wiring.motor2 is None
+    assert driver.model_dump(by_alias=True, exclude_none=True, mode="json")["wiring"] == entry["wiring"]
+    assert HarpStepperDriver.model_validate({"portName": "COM3"}).wiring is None
+    with pytest.raises(ValidationError):
+        HarpStepperDriver.model_validate({**entry, "wiring": {"Motor1": {"device": "Radial", "side": "middle"}}})
+
+
 def test_wiring_schema_lists_every_channel():
     schema = BehaviourBoxRig.model_json_schema(by_alias=True, mode="serialization")
     channels = list(schema["$defs"]["BoardWiring"]["properties"])

@@ -115,7 +115,7 @@ namespace OpenRigs.HarpDevices
             else if (commands.FullName != HarpRig.MessageType) Notes.Add(device.Name + ": " + device.Name + CommandsSuffix + " is " + commands.Name + ", not HarpMessage, so no register dump is asked for");
             if (whoAmI == 0) Notes.Add(device.Name + ": no WhoAmI is known for " + device.Kind + ", so the board's type is recorded, not checked");
             string wiring = null, refusal = null;
-            if (device.Kind == "behaviorBoard")
+            if (WiringCheck.Kinds.ContainsKey(device.Kind ?? ""))  // a Behavior board's or a stepper driver's (Pip, 11 Nov 2026)
             {
                 var result = rig == null
                     ? new WiringResult { Summary = "not checked: rig.yml's top level could not be read" }

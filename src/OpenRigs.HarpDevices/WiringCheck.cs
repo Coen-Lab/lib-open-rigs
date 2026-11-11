@@ -35,7 +35,8 @@ namespace OpenRigs.HarpDevices
     }
 
     /// <summary>
-    /// Compares a Behavior board's wiring in rig.yml (what is plugged into each line) with the lines the
+    /// Compares a Behavior board's or a stepper driver's wiring in rig.yml (what is plugged into each line;
+    /// a stepper driver's lines are Motor0-3 and Input0-3, Pip, 11 Nov 2026) with the lines the
     /// workflow says it uses (schemas\board-lines.yml in its repository; Pip, 7 Nov 2026). Every line
     /// the workflow uses must be in the wiring with the same device, side and targets; a line it does not
     /// use may be anything or unknown. A workflow without the file, or a board the file does not list,
@@ -55,9 +56,24 @@ namespace OpenRigs.HarpDevices
             "Led0", "Led1", "Rgb0", "Rgb1", "AnalogInput0", "AnalogInput1",
         };
 
+        /// <summary>A Harp StepperDriver's lines, as Harp.StepperDriver names them: its four motor outputs and four digital inputs (Pip, 11 Nov 2026).</summary>
+        public static readonly string[] StepperChannels =
+        {
+            "Motor0", "Motor1", "Motor2", "Motor3", "Input0", "Input1", "Input2", "Input3",
+        };
+
+        /// <summary>The device kinds whose wiring is checked, and each one's lines.</summary>
+        public static readonly Dictionary<string, string[]> Kinds = new Dictionary<string, string[]>
+        {
+            { "behaviorBoard", Channels },
+            { "stepperDriver", StepperChannels },
+        };
+
         /// <summary>The check for one board; <paramref name="linesYaml"/> null when the workflow has no board-lines.yml.</summary>
         public static WiringResult Check(YamlMappingNode rig, RigDevice board, IEnumerable<string> rigDeviceNames, string linesYaml, string workflow)
         {
+            string[] channels;
+            if (!Kinds.TryGetValue(board.Kind ?? "", out channels)) channels = Channels;
             var result = new WiringResult();
             if (linesYaml == null)
             {
@@ -110,7 +126,7 @@ namespace OpenRigs.HarpDevices
                     continue;
                 }
                 string why;
-                var line = Resolve(from, rig, board.Settings, out why);
+                var line = Resolve(from, rig, board.Settings, channels, out why);
                 if (why != null) { result.Problems.Add(why); continue; }
                 if (line == null) continue;  // a camera trigger rig.yml does not enable, or a Zapit TTL not hardware triggered: the line is not used
                 uses.Add(new BoardLineUse
@@ -167,8 +183,14 @@ namespace OpenRigs.HarpDevices
         /// </summary>
         public static string Resolve(string from, YamlMappingNode rig, YamlMappingNode board, out string why)
         {
+            return Resolve(from, rig, board, Channels, out why);
+        }
+
+        /// <summary>As <see cref="Resolve(string, YamlMappingNode, YamlMappingNode, out string)"/>, for a board whose lines are <paramref name="channels"/>.</summary>
+        public static string Resolve(string from, YamlMappingNode rig, YamlMappingNode board, string[] channels, out string why)
+        {
             why = null;
-            var channel = Channel(from);
+            var channel = Channel(from, channels);
             if (channel != null) return channel;
             if (from == "cameraTriggerController.trigger0" || from == "cameraTriggerController.trigger1")
             {
@@ -192,7 +214,7 @@ namespace OpenRigs.HarpDevices
                 why = "the workflow uses the line rig.yml gives as " + from + ", but this rig.yml has no " + from;
                 return null;
             }
-            var line = Channel(value) ?? (value.All(char.IsDigit) ? Channel("DO" + value) : null);
+            var line = Channel(value, channels) ?? (value.All(char.IsDigit) ? Channel("DO" + value, channels) : null);
             if (line == null) why = "rig.yml's " + from + " is " + value + ", which is not a line of the board";
             return line;
         }
@@ -206,9 +228,9 @@ namespace OpenRigs.HarpDevices
             return result;
         }
 
-        static string Channel(string text)
+        static string Channel(string text, string[] channels)
         {
-            return Channels.FirstOrDefault(c => string.Equals(c, (text ?? "").Trim(), StringComparison.OrdinalIgnoreCase));
+            return channels.FirstOrDefault(c => string.Equals(c, (text ?? "").Trim(), StringComparison.OrdinalIgnoreCase));
         }
 
         static string Path(YamlMappingNode root, string dotted)

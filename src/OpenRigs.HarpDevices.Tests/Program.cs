@@ -372,6 +372,37 @@ namespace OpenRigs.HarpDevices.Tests
                     Check("... and so does a file whose top level is not a mapping", listTop.Applies && listTop.Problems.Any(p => p.Contains("list of entries")), listTop.Summary);
                 }
 
+                Console.WriteLine("A stepper driver's wiring (Pip, 11 Nov 2026):");
+                {
+                    var rigText = "stepperDriver:\n  a:\n    portName: COM3\n    usbSerial: X\n    wiring:\n" +
+                        "      Motor0: { device: BaseTransverse }\n" +
+                        "      Motor1: { device: Radial, side: left }\n" +
+                        "      Motor2: { device: Radial, side: right }\n";
+                    var linesText = "StepperDriver-A:\n" +
+                        "  - { line: Motor0, device: BaseTransverse }\n" +
+                        "  - { line: Motor1, device: Radial, side: left }\n" +
+                        "  - { line: Motor2, device: Radial, side: right }\n";
+                    Func<string, string, WiringResult> wiringOf = (rigYml, lines) =>
+                    {
+                        var stream = new YamlDotNet.RepresentationModel.YamlStream();
+                        stream.Load(new StringReader(rigYml));
+                        var rigRoot = (YamlDotNet.RepresentationModel.YamlMappingNode)stream.Documents[0].RootNode;
+                        var node = (YamlDotNet.RepresentationModel.YamlMappingNode)((YamlDotNet.RepresentationModel.YamlMappingNode)rigRoot.Children[new YamlDotNet.RepresentationModel.YamlScalarNode("stepperDriver")]).Children[new YamlDotNet.RepresentationModel.YamlScalarNode("a")];
+                        var device = new OpenRigs.Shared.RigDevice { Kind = "stepperDriver", Instance = "a", Name = "StepperDriver-A", Settings = node };
+                        return WiringCheck.Check(rigRoot, device, new[] { "StepperDriver-A" }, lines, "av-dome");
+                    };
+                    var agree = wiringOf(rigText, linesText);
+                    Check("the dome's motors agree with av-dome's lines, by the driver's own names", agree.Applies && agree.Problems.Count == 0 && agree.Summary.Contains("Motor1 left Radial"), string.Join(" | ", agree.Problems) + " / " + agree.Summary);
+                    var otherSide = wiringOf(rigText.Replace("Motor1: { device: Radial, side: left }", "Motor1: { device: Radial, side: right }"), linesText);
+                    Check("a spout motor on the other side refuses", otherSide.Problems.Any(p => p.StartsWith("Motor1 is used as the left Radial")), string.Join(" | ", otherSide.Problems));
+                    var unknown = wiringOf(rigText.Replace("      Motor0: { device: BaseTransverse }\n", ""), linesText);
+                    Check("a motor the workflow drives and the wiring leaves unknown refuses", unknown.Problems.Any(p => p.StartsWith("Motor0 is used as BaseTransverse, but rig.yml's wiring does not say")), string.Join(" | ", unknown.Problems));
+                    var spare = wiringOf(rigText + "      Motor3: { device: Something }\n", linesText);
+                    Check("a spare motor may drive anything else", spare.Problems.Count == 0, string.Join(" | ", spare.Problems));
+                    var boardLine = wiringOf(rigText, "StepperDriver-A:\n  - { line: DO1, device: RewardValve }\n");
+                    Check("a Behavior board's line is not a stepper driver's", boardLine.Problems.Any(p => p.Contains("which is not a line of the board") || p.Contains("has no DO1")), string.Join(" | ", boardLine.Problems));
+                }
+
                 Console.WriteLine("The dump request:");
                 {
                     var messages = new Subject<HarpMessage>();

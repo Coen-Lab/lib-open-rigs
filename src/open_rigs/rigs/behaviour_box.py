@@ -6,6 +6,7 @@ from swc.aeon.schema import BaseSchema
 
 from open_rigs.core.rig import Rig
 from open_rigs.devices.behavior_board import BehaviorBoard as _BehaviorBoard
+from open_rigs.devices.harp import HarpStepperDriver as _HarpStepperDriver
 from open_rigs.video import SpinnakerCamera as _SpinnakerCamera
 
 
@@ -75,6 +76,30 @@ class BoardWiring(BaseSchema):
     rgb1: Optional[WiredLine] = _wired("Rgb1", "RGB LED 1")
     analog_input0: Optional[WiredLine] = _wired("AnalogInput0", "analog input 0, ADC0")
     analog_input1: Optional[WiredLine] = _wired("AnalogInput1", "analog input 1, ADC1")
+
+
+class StepperWiring(BaseSchema):
+    """What each motor output and digital input of a Harp StepperDriver is connected to, by the
+    driver's own names (Pip, 11 Nov 2026): the board stays a board, recorded as itself, and a spare
+    motor can drive anything else under its own name. A line left out is unknown, which is allowed
+    only for a line no workflow on the rig uses."""
+
+    motor0: Optional[WiredLine] = _wired("Motor0", "motor output 0")
+    motor1: Optional[WiredLine] = _wired("Motor1", "motor output 1")
+    motor2: Optional[WiredLine] = _wired("Motor2", "motor output 2")
+    motor3: Optional[WiredLine] = _wired("Motor3", "motor output 3")
+    input0: Optional[WiredLine] = _wired("Input0", "digital input 0")
+    input1: Optional[WiredLine] = _wired("Input1", "digital input 1")
+    input2: Optional[WiredLine] = _wired("Input2", "digital input 2")
+    input3: Optional[WiredLine] = _wired("Input3", "digital input 3")
+
+
+class HarpStepperDriver(_HarpStepperDriver):
+    __doc__ = _HarpStepperDriver.__doc__
+    wiring: Optional[StepperWiring] = Field(
+        default=None,
+        description="What each motor and input is connected to (Pip, 11 Nov 2026): checked at Start against the lines the workflow uses (its schemas/board-lines.yml) by OpenRigs.HarpDevices.",
+    )
 
 
 # The device entries take a liveView: block for StreamDevices, which reads rig.yml itself. They
