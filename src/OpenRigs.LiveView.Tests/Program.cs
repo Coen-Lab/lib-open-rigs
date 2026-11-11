@@ -94,6 +94,21 @@ namespace OpenRigs.LiveView.Tests
                 // L2-L2: HarpRig.NotHarp's rule, as RecordHarpDevices records and the manifest expects.
                 var idle = Plan(root, "behaviorBoard:\n  idle:\n    portName: null\n", name => name == "BehaviorBoard-Idle.Data" ? typeof(Bonsai.Harp.HarpMessage) : null);
                 Check("a board with portName: null is not streamed, though its data is HarpMessage", !idle.Streamed.Any() && idle.Skipped.Any(s => s.StartsWith("BehaviorBoard-Idle: it has no portName")), string.Join(" | ", idle.Skipped));
+                // Pip, 11 Nov 2026: the Lickety Splits and stepper drivers drawn under the board.
+                var harp = Plan(root, "licketySplit:\n  left:\n    portName: COM15\n  right:\n    portName: null\n" +
+                                      "stepperDriver:\n  a:\n    portName: COM14\n",
+                    name => name.EndsWith(".Data") ? typeof(Bonsai.Harp.HarpMessage) : null);
+                var harpStreams = string.Join(", ", harp.Streamed.SelectMany(d => d.Streams));
+                Check("a Lickety Split and a stepper driver each stream one .channels",
+                    harpStreams == "LicketySplit-Left.channels, StepperDriver-A.channels", harpStreams);
+                Check("a Lickety Split with portName: null is not streamed, as a board",
+                    harp.Skipped.Any(s => s.StartsWith("LicketySplit-Right: it has no portName")), string.Join(" | ", harp.Skipped));
+                var stepper = harp.Streamed.FirstOrDefault(d => d.Name == "StepperDriver-A");
+                Check("a stepper driver's positions are sampled at 10/s, and its summary says what it sends",
+                    stepper != null && stepper.TemplateValues()["Interval"] == "PT0.1S" && stepper.Summary.Contains("MotorStopped"),
+                    stepper == null ? "not streamed" : stepper.TemplateValues()["Interval"] + " " + stepper.Summary);
+                var notHarp = Plan(root, "licketySplit:\n  left:\n    portName: COM15\n", name => name == "LicketySplit-Left.Data" ? typeof(string) : null);
+                Check("a Lickety Split whose data is not HarpMessage is skipped", notHarp.Skipped.Any(s => s.Contains("is not HarpMessage")), string.Join(" | ", notHarp.Skipped));
                 var none = LiveViewPlan.Create(Path.Combine(root, "nowhere"), name => null);
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
 

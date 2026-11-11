@@ -23,6 +23,7 @@ namespace OpenRigs.LiveView
         public bool Harp;        // a Harp board, streamed only when HarpRig.NotHarp says it is one, as it is recorded
         public string Channels;  // a second stream, every channel of the board (BehaviorBoard-Main.channels); null for none
         public double AnalogRate; // the channels stream's analog inputs, samples per second
+        public string Sends;     // what a device's one stream carries, for its summary; null for the rate's
 
         public bool IsVideo { get { return Width > 0; } }
 
@@ -37,6 +38,18 @@ namespace OpenRigs.LiveView
             {
                 Kind = "behaviorBoard", Template = "BehaviorBoard", Stream = "encoder", Rate = 10, Harp = true,
                 Channels = "channels", AnalogRate = 100,
+            },
+            // Pip, 11 Nov 2026: the Lickety Splits and stepper drivers under the board in rig-control's
+            // board view. One stream each, named .channels and shaped as the board's, so it is drawn alike.
+            new DeviceRecipe
+            {
+                Kind = "licketySplit", Template = "LicketySplit", Stream = "channels", Rate = 1, Harp = true,
+                Sends = "its lick detectors' state (LickState) at every change, with the device's timestamp",
+            },
+            new DeviceRecipe
+            {
+                Kind = "stepperDriver", Template = "StepperDriver", Stream = "channels", Rate = 10, Harp = true,
+                Sends = "which motors are stopped (MotorStopped), its digital inputs (DigitalInputState) and motor errors (MotorRaisedError) at every change, and the motors' positions (AccumulatedSteps, when the workflow has the driver send them) sampled",
             },
         };
 
@@ -111,6 +124,8 @@ namespace OpenRigs.LiveView
             {
                 return Recipe.IsVideo
                     ? string.Format(CultureInfo.InvariantCulture, "{0}.Data, {1} frames/s at {2} x {3}, JPEG, as {4}.", Name, Rate, Width, Height, Stream)
+                    : Recipe.Sends != null
+                    ? string.Format(CultureInfo.InvariantCulture, "{0}.Data: {1}, as {2}.", Name, Recipe.Sends, Stream)
                     : ChannelsStream == null
                     ? string.Format(CultureInfo.InvariantCulture, "{0}.Data, {1}/s, as {2}.", Name, Rate, Stream)
                     : string.Format(CultureInfo.InvariantCulture, "{0}.Data, {1}/s, as {2}; and every digital input, output and DIO change, camera trigger and pulse setting, with the board's timestamp, and the analog inputs at {3}/s, as {4}.", Name, Rate, Stream, Recipe.AnalogRate, ChannelsStream);

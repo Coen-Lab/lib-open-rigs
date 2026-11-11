@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Lickety Split: its lick detectors' state at every change, with the device's timestamp, as one
+     stream shaped as a Behavior board's channels. Sent again every 2 s for a late viewer. -->
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:lick="clr-namespace:AllenNeuralDynamics.LicketySplit;assembly=AllenNeuralDynamics.LicketySplit"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>{{Subject}}</Name>
+      </Expression>
+      <Expression xsi:type="lick:Parse">
+        <harp:Register xsi:type="lick:TimestampedLickState" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>LickState</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
+        <StreamName>{{Stream}}</StreamName>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Harp stepper driver, as one stream shaped as a Behavior board's channels, each value with the
+     driver's timestamp: which motors are stopped, its digital inputs (the stage's home switches) and
+     motor errors at every change, sent again every 2 s for a late viewer; and the motors' positions,
+     sampled, when the workflow has the driver send them (AccumulatedStepsSamplingRate). -->
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:step="clr-namespace:Harp.StepperDriver;assembly=Harp.StepperDriver"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Workflow>
+    <Nodes>
+      <!-- 0 -->
+      <Expression xsi:type="SubscribeSubject">
+        <Name>{{Subject}}</Name>
+      </Expression>
+      <!-- 1-2: which motors are stopped (State) and which changed -->
+      <Expression xsi:type="step:Parse">
+        <harp:Register xsi:type="step:TimestampedMotorStopped" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>MotorStopped</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 3-4: the digital inputs, Input0-3 and which changed -->
+      <Expression xsi:type="step:Parse">
+        <harp:Register xsi:type="step:TimestampedDigitalInputState" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>DigitalInputState</lv:Register>
+          <lv:Repeat>PT2S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 5-6: a motor's driver error -->
+      <Expression xsi:type="step:Parse">
+        <harp:Register xsi:type="step:TimestampedMotorRaisedError" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>MotorRaisedError</lv:Register>
+          <lv:Repeat>PT0S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 7-9: the four motors' positions, sampled -->
+      <Expression xsi:type="step:Parse">
+        <harp:Register xsi:type="step:TimestampedAccumulatedSteps" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SampleInterval">
+          <rx:Interval>{{Interval}}</rx:Interval>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TagRegister">
+          <lv:Register>AccumulatedSteps</lv:Register>
+          <lv:Repeat>PT0S</lv:Repeat>
+        </Combinator>
+      </Expression>
+      <!-- 10-11: one stream -->
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
+        <StreamName>{{Stream}}</StreamName>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="0" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="0" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="0" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="2" To="10" Label="Source1" />
+      <Edge From="4" To="10" Label="Source2" />
+      <Edge From="6" To="10" Label="Source3" />
+      <Edge From="9" To="10" Label="Source4" />
+      <Edge From="10" To="11" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

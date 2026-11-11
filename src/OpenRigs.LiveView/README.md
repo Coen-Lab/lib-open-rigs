@@ -11,6 +11,8 @@ When the workflow is built, `StreamDevices` reads `<ConfigRoot>\<MACHINE-NAME>\r
 | `camera` | `Camera-Box.video` on the video port | 5 frames/s, 320 x 240, JPEG | the first `IplImage` in it, found by type (`Value.Image` for a frame paired with its trigger) |
 | `behaviorBoard` | `BehaviorBoard-Main.encoder` on the data port | 10/s | the raw encoder count from `AnalogData` (a `HarpMessage` stream) |
 | `behaviorBoard` | `BehaviorBoard-Main.channels` on the data port | every change; analog inputs 100/s | every channel of the board, for rig-control's Board tab (0.1.1-coen-lab.6 on) |
+| `licketySplit` | `LicketySplit-Left.channels` on the data port | every change | `LickState`, shaped as the board's channels (0.1.1-coen-lab.9 on) |
+| `stepperDriver` | `StepperDriver-A.channels` on the data port | every change; positions 10/s | `MotorStopped`, `DigitalInputState` (home switches), `MotorRaisedError`, and `AccumulatedSteps` when the workflow has the driver send them, shaped as the board's channels (0.1.1-coen-lab.9 on) |
 
 Each `channels` message is `{"Register": <name>, "Value": {"Seconds": <board time>, "Value": <value>}}`, the register named as Harp.Behavior names it and the value with the board's own timestamp, so a 1 ms pulse can be drawn at its real length:
 
@@ -20,7 +22,7 @@ Each `channels` message is `{"Register": <name>, "Value": {"Seconds": <board tim
 
 The board reports a state register only when it is read or written, at Start, before a window connects. So `DigitalInputState`, `PortDIOStateEvent`, `OutputState`, `OutputPulseEnable` and the pulse lengths are sent again every 2 s, unchanged and with their own timestamps (`TagRegister`'s `Repeat`); a viewer drops a message it already has.
 
-Devices with no recipe, or whose data the workflow does not publish, are skipped. A `behaviorBoard` is streamed only when it is a Harp device by the rule `RecordHarpDevices` records by and `ExperimentManifest` expects by (`src\Shared\HarpRig.cs`: a `portName` that is not empty or `null`, and `<Name>.Data` published as `HarpMessage`), since 0.1.0-local.12; before, a board with `portName: null` was streamed though nothing recorded it. As well as the devices it sends:
+Devices with no recipe, or whose data the workflow does not publish, are skipped. A `behaviorBoard`, `licketySplit` or `stepperDriver` is streamed only when it is a Harp device by the rule `RecordHarpDevices` records by and `ExperimentManifest` expects by (`src\Shared\HarpRig.cs`: a `portName` that is not empty or `null`, and `<Name>.Data` published as `HarpMessage`), since 0.1.0-local.12; before, a board with `portName: null` was streamed though nothing recorded it. As well as the devices it sends:
 
 - `elapsed`: seconds since the experiment folder appeared (`PathPrefix`, from OpenRigs.Logging), once a second.
 - `logs` (0.1.0-local.13 on): every row a log with `PublishRows` writes, as it is written: OpenRigs.Logging's `LogTrial` and `LogAsync` (0.1.0-bbox.5 on), wherever in the workflow they sit. Each message is one row: `Session` (the session key), `Log` (`BonsaiData_Trial`), `Row` (its number in that log, from 0, across the log's hourly files), `Header` and `Line` as written in the file. Sent only when the workflow's OpenRigs.Logging has `LoggedRows`, found among the assemblies loaded, so LiveView depends on no other lab package; with an older Logging, `liveview` says the rows are not streamed. rig-control's window shows each trial from it within a second of its end.
