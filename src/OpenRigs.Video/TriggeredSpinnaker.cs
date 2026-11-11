@@ -15,6 +15,7 @@ namespace OpenRigs.Video
         {
             ExposureTime = 1e6 / 50 - 1000;
             Binning = 1;
+            PixelFormat = PixelFormatEnums.Mono8.ToString();
         }
 
         // SpinnakerCapture opens and configures the camera on a MemberwiseClone of this node, while
@@ -62,6 +63,11 @@ namespace OpenRigs.Video
         [Description("The size of the binning area of the sensor, e.g. a binning size of 2 specifies a 2x2 binning region. Taken only when the camera opens.")]
         public int Binning { get; set; }
 
+        // A string, not PixelFormatEnums, so rig.yml's pixelFormat maps onto it; the camera refuses an
+        // unknown name when it opens.
+        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name such as Mono8 or Mono16 (rig.yml's pixelFormat). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
+        public string PixelFormat { get; set; }
+
         bool IsOpen()
         {
             return live.Camera != null && live.Camera.IsInitialized();
@@ -81,6 +87,8 @@ namespace OpenRigs.Video
         {
             try { camera.AcquisitionStop.Execute(); }
             catch { }
+            // Before binning and the region: a format change can change their limits
+            camera.PixelFormat.Value = PixelFormat;
             camera.BinningSelector.Value = BinningSelectorEnums.All.ToString();
             camera.BinningHorizontalMode.Value = BinningHorizontalModeEnums.Sum.ToString();
             camera.BinningVerticalMode.Value = BinningVerticalModeEnums.Sum.ToString();

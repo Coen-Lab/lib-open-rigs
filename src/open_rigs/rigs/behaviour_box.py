@@ -95,6 +95,10 @@ class BehaviorBoard(_BehaviorBoard):
 class SpinnakerCamera(_SpinnakerCamera):
     __doc__ = _SpinnakerCamera.__doc__
     live_view: Optional[LiveView] = Field(default=None, description="Live view settings for this camera (OpenRigs.LiveView).")
+    pixel_format: str = Field(
+        default="Mono8",
+        description="The pixel format the camera sends, a Spinnaker PixelFormat name such as Mono8 or Mono16 (Pip, 11 Nov 2026). Set each time the camera opens, so a format stored on the camera is never used; the camera refuses an unknown name at Start. Mono8 when not set.",
+    )
 
 
 # A behaviour box's hardware, the same for every workflow that runs on one, so they all read

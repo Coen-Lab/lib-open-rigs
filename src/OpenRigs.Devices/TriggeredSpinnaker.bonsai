@@ -15,6 +15,7 @@
         <Property Name="Binning" />
         <Property Name="SerialNumber" />
         <Property Name="ColorProcessing" />
+        <Property Name="PixelFormat" />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="p1:TriggeredSpinnaker">
@@ -23,6 +24,7 @@
           <p1:ExposureTime>19000</p1:ExposureTime>
           <p1:Gain>0</p1:Gain>
           <p1:Binning>1</p1:Binning>
+          <p1:PixelFormat>Mono8</p1:PixelFormat>
         </Combinator>
       </Expression>
       <Expression xsi:type="scr:ExpressionTransform">

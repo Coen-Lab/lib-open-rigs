@@ -17,6 +17,12 @@ def test_named_entries():
     assert rig.camera["box"].live_view is None
 
 
+def test_pixel_format_mono8_unless_set():
+    assert BehaviourBoxRig.model_validate(RIG).camera["box"].pixel_format == "Mono8"
+    rig = BehaviourBoxRig.model_validate({**RIG, "camera": {"box": {"serialNumber": "12345", "pixelFormat": "Mono16"}}})
+    assert rig.camera["box"].pixel_format == "Mono16"
+
+
 def test_no_version():
     assert "version" not in BehaviourBoxRig.model_fields
     assert "version" not in BehaviourBoxRig.model_validate(RIG).model_dump(by_alias=True)
