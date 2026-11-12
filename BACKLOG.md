@@ -39,6 +39,22 @@
          </Combinator>
 ```
 
+## Audit 2026-11-11 (/audit-rigs, sets A, B and C: the seams, Control, Manifest, HarpDevices, LiveView, Video, scripts)
+
+Changed (Manifest 0.1.1-coen-lab.13, Control .10, Video .8; open-rigs' pin moves with `behaviour_box.py`):
+
+- Manifest: `finished` is set only once the end-of-run write returns, the first end kept as the run's, so a write that failed (the file held by a reader) is tried again at disposal (L1-M1). Bonsai disposes the node straight after its error, so that second try comes about half a second later, not at the run's end: a reader holding `manifest.json` longer still leaves it `running` until rig-sync's stale rule. Making the node outlive its error is a design change, left. FORMAT.md's stop sentence says `running` was the stop's write only to coen-lab.11 (L1-L1).
+- Control: a socket whose bind failed is disposed, so NetMQ's cleanup returns (L1-L2), tested.
+- Video: a blank `PixelFormat` is Mono8 (L2-L1). `behaviour_box.py`'s `pixel_format` is `Mono8` only: LogVideo's FFmpeg writer takes 8-bit frames, and Mono16 failed after Go (L2-M1). The wiring `device` description names the names check (L2-L2).
+- LiveView README: `MotorStopped` comes as `{State, Changed}` (L2-H1; rig-control's reader dropped every one).
+- `patches/README.md` is a table of the lab's changes to upstream packages (UsbCamera and PixelFormat added), with no version numbers, and `Assert-LabPackagesShippable` refuses a `.nupkg` it names that `local_packages\` lacks (L3-M1); COEN-LAB.md's versions and rigIds (L3-L1, S4-L4); a package's inputs are the Shared files it compiles, not the folder (L3-L2, reversing the 8 Nov "Not changed": Video counted every Shared change too).
+
+Not changed, do not raise again without new information:
+
+- `LaunchedBy` and `GoBy` set after `GoRequested` outside the lock (open since 3 Nov): `status` is answered on the same single control thread that runs `go`, so no reply falls between them (L1-I1).
+
+Deferred to the workflow repos (read-only here): coen-behaviour-box and coen-dome-navigation map no `PixelFormat` onto their cameras, so rig.yml's `pixelFormat` is accepted and ignored there (S4-M1); av-dome has no `schemas\board-lines.yml`, so no stepper's wiring is checked (S4-L2); the LiveView templates are never deserialized in a test, as that needs the Harp packages (L2-L5). Video has no test project for `UsbCamera`'s helpers (L2-L4).
+
 ## Queued package fixes shipped, 8 Nov 2026
 
 Changed (one raise each: Control 0.1.1-coen-lab.9, Manifest 12, HarpDevices 8, LiveView 7; open-rigs' pin moves with `behaviour_box.py`):
@@ -140,7 +156,6 @@ Not changed, do not raise again without new information:
 
 Open, with the next change of each package:
 
-- Control: `LaunchedBy` and `GoBy` are set after `GoRequested = true` outside the lock, so a status poll can see `go_requested` with no `go_by` for microseconds (L1-I2): set them inside the `Locked` block first.
 - Core README: no mention of `DescribeCalibrationCurve` (S2-L3); with the `ApplyBalancePort` removal below.
 
 ## Audit 2026-11-06, evening (/audit-rigs, set C: the seams, windows, help and live view, tests, trust, scripts and packaging)
