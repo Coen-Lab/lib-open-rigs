@@ -18,7 +18,7 @@ param(
 #      experiment at Go (settings-files plan, audit M5).
 #   4. Compares every OnCommand and OnParameterSet name in src\**\*.bonsai with what the
 #      workflow's ExperimentControl declares: a stray one would listen for ever.
-# The lab's names a workflow uses are checked where it runs, not here (DECISIONS.md, stage 2):
+# The lab's names a workflow uses are checked where it runs, not here (claude-tools docs\architecture\DECISIONS.md, stage 2):
 # rig-control's scripts\check-workflow-names.ps1, by rig-setup when a rig takes a new version
 # and by rig-control's agent before each launch, against the lab's lists on the share.
 # It cannot check hardware, the visualizers themselves or the data a run writes. Exit 0 when

@@ -6,7 +6,7 @@ param(
     # rig-setup's list of the lab's repositories, every profile's, as its Repos button writes it
     # on the share. Every one that is a Bonsai project (rig-setup's rule: .bonsai\Bonsai.config
     # and src\main.bonsai) is a lab workflow here. rig-setup-rules.json's own repos are not read:
-    # none is a workflow, and its path is one machine's layout (DECISIONS.md stage 4).
+    # none is a workflow, and its path is one machine's layout (claude-tools docs\architecture\DECISIONS.md stage 4).
     # lab-package-versions.json is written beside it.
     [string]$RepoList = 'K:\config\profile-repos.json',
     # Lab workflows not (yet) on rig-setup: workflows.txt here, one GitHub <org>/<repo> a line.
@@ -19,7 +19,7 @@ param(
 # it in rig-setup: every package in local_packages\ here, at the version here, with what they
 # depend on. Run by scripts\push-and-update-workflows.ps1 after each push here, by whoever
 # pushes, from any machine with Bonsai, .NET and write access to ucl-open; nothing runs it on a
-# schedule (DECISIONS.md stage 4). A repository added with rig-setup's Repos button, or a branch
+# schedule (claude-tools docs\architecture\DECISIONS.md stage 4). A repository added with rig-setup's Repos button, or a branch
 # ticked there, gets the packages at the next run: run this script alone for that, no push needed.
 #
 # Each run first writes K:\config\lab-package-versions.json (beside -RepoList): each lab
@@ -38,7 +38,7 @@ param(
 #     the workflow has regenerate-schemas, its schema and generated classes are regenerated,
 #     and its rig template (examples\rig.py) where it has one.
 # A branch that changed is checked with its own scripts\check-workflow.ps1, if it has one, then
-# with scripts\check-workflow-builds.ps1 here (its build and layout; its names are checked on the rig, DECISIONS.md stage 2); if that passes, those files and nothing else are committed and
+# with scripts\check-workflow-builds.ps1 here (its build and layout; its names are checked on the rig, claude-tools docs\architecture\DECISIONS.md stage 2); if that passes, those files and nothing else are committed and
 # pushed to that branch, and rig-setup's 30-minute update takes main to the rigs. A failure is
 # not committed and is named in the table; the next run tries again from what GitHub has. One
 # is not pushed, as superseded, when lib-open-rigs' main has moved since this run began: the run
