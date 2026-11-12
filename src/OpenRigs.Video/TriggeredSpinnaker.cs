@@ -43,6 +43,12 @@ namespace OpenRigs.Video
             camera.BinningVerticalMode.Value = BinningVerticalModeEnums.Sum.ToString();
             camera.BinningHorizontal.Value = Binning;
             camera.BinningVertical.Value = Binning;
+            // Binning does not resize the region. A camera left cropped by a stored user set would
+            // otherwise record that crop. The offsets go first because the maximums depend on them.
+            camera.OffsetX.Value = 0;
+            camera.OffsetY.Value = 0;
+            camera.Width.Value = camera.Width.Max;
+            camera.Height.Value = camera.Height.Max;
             camera.AcquisitionFrameRateEnable.Value = false;
             camera.TriggerMode.Value = TriggerModeEnums.On.ToString();
             camera.TriggerSelector.Value = TriggerSelectorEnums.FrameStart.ToString();
