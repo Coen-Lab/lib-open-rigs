@@ -12,7 +12,7 @@ When the workflow is built, `StreamDevices` reads `<ConfigRoot>\<MACHINE-NAME>\r
 | `behaviorBoard` | `BehaviorBoard-Main.encoder` on the data port | 10/s | the raw encoder count from `AnalogData` (a `HarpMessage` stream) |
 | `behaviorBoard` | `BehaviorBoard-Main.channels` on the data port | every change; analog inputs 100/s | every channel of the board, for rig-control's Board tab (0.1.1-coen-lab.6 on) |
 | `licketySplit` | `LicketySplit-Left.channels` on the data port | every change | `LickState`, shaped as the board's channels (0.1.1-coen-lab.9 on) |
-| `stepperDriver` | `StepperDriver-A.channels` on the data port | every change; positions 10/s | `MotorStopped`, `DigitalInputState` (home switches), `MotorRaisedError`, and `AccumulatedSteps` when the workflow has the driver send them, shaped as the board's channels (0.1.1-coen-lab.9 on) |
+| `stepperDriver` | `StepperDriver-A.channels` on the data port | every change; positions 10/s | `MotorStopped` (sent as `{State, Changed}`, Harp.StepperDriver 0.4.0's `MotorStoppedPayload`, not a bitmask), `DigitalInputState` (home switches), `MotorRaisedError`, and `AccumulatedSteps` when the workflow has the driver send them, shaped as the board's channels (0.1.1-coen-lab.9 on) |
 
 Each `channels` message is `{"Register": <name>, "Value": {"Seconds": <board time>, "Value": <value>}}`, the register named as Harp.Behavior names it and the value with the board's own timestamp, so a 1 ms pulse can be drawn at its real length:
 

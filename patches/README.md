@@ -2,46 +2,28 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core and Devices 0.1.1-coen-lab.4; Logging 0.1.1-coen-lab.6; Streaming and Video 0.1.1-coen-lab.3
+## OpenRigs.Core, Devices, Logging, Streaming and Video
 
-Raised one on 7 Nov 2026 with every lab package, no source change: `build\Common.csproj.targets` (what dependency version each nuspec names) had changed in `86daefc` with nothing flagged, and `build\` counts as each package's input since (audit-rigs set C). Logging, Streaming and Video named their dependencies at the wrong version until this build (`COEN-LAB.md`, step 1).
+Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), from this repository's own `src\`: upstream branch `rig-config-resolver` at `3788bfb` (main plus the per-machine config operators `ResolveRigConfigDirectory`, `ReadRigConfig` and `ResolveRigFile`), upstream `main` merged at `f313716` (4 Nov 2026: the calibration loop, per-line pulse outputs on DO1 to DO3, camera trigger enable flags with `EnableTrigger1` off by default, and LogData CSV columns named by field, which av-dome's `tr-open-rigs` needs), and the lab's changes below, each a commit on this repository's `main`. Each package's version is its `.csproj`'s; `COEN-LAB.md` says how they are raised.
 
-Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) and the lab's own packages `0.1.0-local.N`; from 5 to 6 Nov `0.1.1-coen.N`. Every lab package is now `0.1.1-coen-lab.N` (`COEN-LAB.md`); the history below names the versions as they were.
+Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) and the lab's own packages `0.1.0-local.N`; from 5 to 6 Nov `0.1.1-coen.N`; every lab package is now `0.1.1-coen-lab.N`. The table names the versions as they were. On 7 Nov 2026 every lab package was raised one with no source change: `build\Common.csproj.targets` (what dependency version each nuspec names) had changed in `86daefc` with nothing flagged, and `build\` counts as each package's input since (audit-rigs set C).
 
-Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), from this repository's own `src\`: upstream branch `rig-config-resolver` at `3788bfb` (main plus the per-machine config operators `ResolveRigConfigDirectory`, `ReadRigConfig` and `ResolveRigFile`) and two fixes, both reported upstream, which are commits on this repository's `main`:
+| Commit | Package (version) | Change | Upstream |
+|---|---|---|---|
+| `8deeb9c` | Video | `TriggeredSpinnaker` records a cropped frame when the camera's stored region is smaller than the sensor: the region is reset to full frame after binning | ucl-open/ucl-open#66 |
+| `ee4a8a4` | Devices (`Gain` bbox.3) | Bonsai crashes when a frame waits in the Zip, because `ChunkData` is read after Spinnaker releases the image: the `TriggeredSpinnaker` include copies the chunk fields inside the camera callback (`Gain` added in `fea83fb`, without which `LogVideo` could not build against it). The `OpenRigs.Video.TriggeredSpinnaker` operator already copies `FrameID` and `Timestamp` before the Zip | ucl-open/ucl-open#67 |
+| `badd9ca` | Logging, Streaming (bbox.2) | The experiment folder is `ses-<Session>_<DateTime>`, without `date-`, as agreed on ucl-open/roadmap#37: `LogController` writes it and `StreamController`'s session key matches it. The time is still UTC | ucl-open/roadmap#37 |
+| `a92cde7`, `19e39cb` | Video (bbox.3) | A new `ExposureTime` or `Gain` goes to the open camera, and `VideoChunkData` carries both per frame | Not reported |
+| `4e79e7f` | Logging (bbox.4) | `LogTrial`, `LogAsync` and `CreateAsyncEvent`, the lab's two experiment files (`COEN-LAB.md`) | Lab-only |
+| `82bdb64` | Logging (bbox.5) | `CsvWriter`'s `AutoFlush` and `PublishRows` and the `LoggedRows` source, both on in `LogTrial` and `LogAsync`, so their rows are on disk and streamed as they are written. Off by default elsewhere (Pip, 5 Nov 2026); neither Bonsai's CsvWriter nor open-rigs has anything like them (Bonsai's `Buffered` moves writing to another thread, not to disk) | Not reported |
+| `fea83fb` | Logging (bbox.6) | Upstream's `LogVideo` left the chunk start out of its two inline `FormatFileName` copies, so files were `<LogName>\<LogName>.avi` and an experiment crossing the hour opened the same file twice. It includes `OpenRigs.Logging:FormatFileName.bonsai` as `LogRawVideo` does, giving `<LogName>\<LogName>_<DateTime>.avi` and `.csv`; a test holds it equal to `LogRawVideo` apart from its frame selector and CSV columns | Not reported |
+| `5b6baaa` | Logging (coen.2) | `CsvWriter.ColumnNames`, the header's columns for a type without writing, for the hold of `BonsaiData_Trial` to the lab's names (rig-control's `check-workflow-names.ps1` since 6 Nov 2026) | Lab-only |
+| `9ce8bc9` | Core, Devices (coen.2) | `ManualBalance` beside `SerialBalance`, built on `ManualWeighing`, `ManualReadings` and `ApplyBalancePort` (`DECISIONS.md`, 6 Nov 2026) | Lab-only (Pip: "Nothing of Tom's") |
+| `f309da2` | Logging (coen-lab.6) | `LogVideo`'s CSV drops `ExposureTime` and `Gain`, leaving `Seconds`, `FrameID` and `Timestamp`: both are fixed while recording and recorded once in the experiment's settings (Pip, 10 Nov 2026) | Lab-only |
+| `0bacc27`, `f2f8802`, `90558a7` | Video (coen-lab.4 to .6) | `UsbCamera`, a USB camera that is not the rig's own: exposure live in microseconds as `ExposureTime`, and a missing frame ends the stream only after none for 5 s or 4 exposures (Pip, 10 Nov 2026) | Lab-only |
+| `cffa26c` | Video (coen-lab.7), Devices (coen-lab.5) | `TriggeredSpinnaker` sets `PixelFormat` each time the camera opens, Mono8 when not set, and the include exposes it: a format stored on the camera was used before (BLUE-OPTO-1's were Mono16) | Not reported (`BACKLOG.md`) |
 
-| Commit | Fixes | Upstream |
-|---|---|---|
-| `8deeb9c` | `TriggeredSpinnaker` records a cropped frame when the camera's stored region is smaller than the sensor: the region is reset to full frame after binning | ucl-open/ucl-open#66 |
-| `ee4a8a4` | Bonsai crashes when a frame waits in the Zip, because `ChunkData` is read after Spinnaker releases the image: the chunk fields are copied inside the camera callback (five at first; `Gain` added in Devices 0.1.0-bbox.3, without which `LogVideo` could not build against it). This changes only the `OpenRigs.Devices` `TriggeredSpinnaker` include; the `OpenRigs.Video.TriggeredSpinnaker` operator already copies `FrameID` and `Timestamp` before the Zip | ucl-open/ucl-open#67 |
-
-Core and Devices 0.1.0-bbox.2 and Logging 0.1.0-bbox.3 (4 Nov 2026) add upstream `main` at `f313716`, merged into this repository's `main`: the calibration loop (dispense calibration, balance operators, curve builder), per-line pulse outputs on DO1 to DO3, camera trigger enable flags (`EnableTrigger1` off by default) and LogData CSV columns named by field. av-dome's `tr-open-rigs` needs them. `LogDataSchema.bonsai` is upstream's (deferred write); this fork's only change there had been an editor sample path.
-
-Logging and Streaming 0.1.0-bbox.2 (2 Nov 2026) also name the experiment folder `ses-<Session>_<DateTime>`, without `date-`, as agreed on ucl-open/roadmap#37: `LogController` writes it, and `StreamController`'s session key matches it. The time is still UTC. They have a `<Version>` in their `.csproj`, so `scripts\build-package.ps1` builds them.
-
-Video 0.1.0-bbox.3 (2 Nov 2026, a92cde7 and 19e39cb) is a lab change rather than a patch: a new `ExposureTime` or `Gain` goes to the open camera, and `VideoChunkData` carries both per frame. It has a `<Version>` in its `.csproj`, so `scripts\build-package.ps1` builds it.
-
-Logging 0.1.0-bbox.4 (4 Nov 2026, 4e79e7f) is a lab change rather than a patch: `LogTrial`, `LogAsync` and `CreateAsyncEvent`, the lab's two experiment files (`COEN-LAB.md`). 0.1.0-bbox.5 (5 Nov 2026) adds CsvWriter's `AutoFlush` and `PublishRows` and the `LoggedRows` source, both on in `LogTrial` and `LogAsync`, so their rows are on disk and streamed as they are written. Those two properties are the one part of it inside an upstream operator, `CsvWriter` (upstream's since `f313716`), and neither Bonsai's CsvWriter nor open-rigs has anything like them (Bonsai's `Buffered` moves writing to another thread, not to disk). Kept here off by default (Pip, 5 Nov 2026), to be offered upstream: not yet reported.
-
-Logging 0.1.1-coen.2 (5 Nov 2026) adds `CsvWriter.ColumnNames`, the header's columns for a type without writing, for the hold of `BonsaiData_Trial` to the lab's names (check-workflow-builds's until 6 Nov 2026, rig-control's `check-workflow-names.ps1` since).
-
-Logging 0.1.0-bbox.6 (5 Nov 2026) fixes upstream's `LogVideo`: its two inline `FormatFileName` copies left out the chunk start, so files were `<LogName>\<LogName>.avi` and an experiment crossing the hour opened the same file twice. It now includes `OpenRigs.Logging:FormatFileName.bonsai` as `LogRawVideo` does, giving `<LogName>\<LogName>_<DateTime>.avi` and `.csv`; a test holds it equal to `LogRawVideo` apart from its frame selector and CSV columns. An upstream file, to be offered upstream: not yet reported.
-
-Logging 0.1.1-coen-lab.6 (10 Nov 2026, Pip) drops `ExposureTime` and `Gain` from `LogVideo`'s CSV, leaving `Seconds`, `FrameID` and `Timestamp`: both are fixed while recording (set only in ready mode) and recorded once in the experiment's settings, so per frame they repeated one value. A lab patch on an upstream file; upstream still writes both.
-
-Core and Devices have a `<Version>` in their `.csproj` since bbox.2, so `scripts\build-package.ps1` builds them like the rest.
-
-SHA-256 of the packages as committed (built with .NET SDK 8.0.424 on PIPOFFICERIG, 7 Nov 2026):
-
-```
-b36e1c342c10b054e11def50281e24273cd435b3a0a8ea5c117d754b1a214307  OpenRigs.Core.0.1.1-coen-lab.4.nupkg
-eb8d95c47b50b2591ee1e4853822cfde0663336f131f1bee54f398bb93e8a534  OpenRigs.Devices.0.1.1-coen-lab.4.nupkg
-3bb63f911453a715a5aaadc7664147f25ca17e38639d9f60e3771b87757139df  OpenRigs.Logging.0.1.1-coen-lab.6.nupkg (10 Nov 2026)
-4801085e9cff076ecdd91e5824dc204f64c5490e8dc14d448948bdc1a70e2323  OpenRigs.Video.0.1.1-coen-lab.3.nupkg
-9986764daeb1a87474b7bbf45117703ef6356112a4ecaafb9f0a1f06f385eb2c  OpenRigs.Streaming.0.1.1-coen-lab.3.nupkg
-```
-
-`OpenRigs.Streaming` is upstream's `src/OpenRigs.Streaming` at the base commit, unchanged by either patch. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
+`OpenRigs.Streaming` is otherwise upstream's `src/OpenRigs.Streaming` at the base commit. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
 
 ## Bonsai.FFmpeg 0.2.0-uniquepipe
 
@@ -51,4 +33,4 @@ The lab's workflows record video with it rather than Bonsai.Vision's `VideoWrite
 
 ## Switching to upstream
 
-When open-rigs publishes a release containing both fixes and the config operators, or Bonsai.FFmpeg one with a unique pipe name, delete the patched package here, and in each workflow that uses it set the released version in `.bonsai\Bonsai.config` and remove its copy from `local_packages\`. `scripts\update-workflows.ps1` then leaves that package alone, since it only handles packages in this repository's `local_packages\`. Delete `bonsai-ffmpeg-unique-pipe.patch` with the FFmpeg package.
+When open-rigs publishes a release in which every row of the table above is upstream, with the config operators, or Bonsai.FFmpeg one with a unique pipe name, delete the patched package here, and in each workflow that uses it set the released version in `.bonsai\Bonsai.config` and remove its copy from `local_packages\`. `scripts\update-workflows.ps1` then leaves that package alone, since it only handles packages in this repository's `local_packages\`. Delete `bonsai-ffmpeg-unique-pipe.patch` with the FFmpeg package.

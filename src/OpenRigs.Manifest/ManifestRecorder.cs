@@ -67,9 +67,14 @@ namespace OpenRigs.Manifest
                     lock (gate)
                     {
                         if (finished) return;
-                        if (!begun) { pending = end; return; }
-                        finished = true;
+                        // The first end is the run's. Finished is set only once the write is done, so
+                        // a write that failed (the file held by a reader) is tried again at disposal,
+                        // with the same end (audit, 11 Nov 2026).
+                        end = pending ?? end;
+                        pending = end;
+                        if (!begun) return;
                         writer.Finish(end, run != null ? (long?)items : null, control);
+                        finished = true;
                     }
                 };
 
@@ -93,8 +98,8 @@ namespace OpenRigs.Manifest
                             ended = pending;
                             if (ended != null)
                             {
-                                finished = true;
                                 writer.Finish(ended, run != null ? (long?)items : null, control);
+                                finished = true;
                             }
                         }
                     }

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import Field
 from swc.aeon.schema import BaseSchema
@@ -33,7 +33,7 @@ class WiredLine(BaseSchema):
 
     device: str = Field(
         examples=["RewardValve", "CameraTrigger", "Photodiode", "ZapitTrigger"],
-        description=r"What is on the line, as the workflow's board-lines.yml names it. Nothing holds the word to a lab list yet: wiredDevices in K:\config\device-dictionary.json, checked by rig-control's names check, is planned.",
+        description=r"What is on the line, as the workflow's board-lines.yml names it: one of the lab's wiredDevices in K:\config\device-dictionary.json, checked by rig-control's names check.",
     )
     side: Optional[Side] = Field(default=None, description="The side it serves, where that matters (a reward valve).")
     targets: Optional[List[str]] = Field(
@@ -120,9 +120,10 @@ class BehaviorBoard(_BehaviorBoard):
 class SpinnakerCamera(_SpinnakerCamera):
     __doc__ = _SpinnakerCamera.__doc__
     live_view: Optional[LiveView] = Field(default=None, description="Live view settings for this camera (OpenRigs.LiveView).")
-    pixel_format: str = Field(
+    # Only formats LogVideo writes: its FFmpeg writer takes 8-bit frames alone (audit, 11 Nov 2026).
+    pixel_format: Literal["Mono8"] = Field(
         default="Mono8",
-        description="The pixel format the camera sends, a Spinnaker PixelFormat name such as Mono8 or Mono16 (Pip, 11 Nov 2026). Set each time the camera opens, so a format stored on the camera is never used; the camera refuses an unknown name at Start. Mono8 when not set.",
+        description="The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write: Mono8 (Pip, 11 Nov 2026). Set each time the camera opens, so a format stored on the camera is never used. Mono8 when not set.",
     )
 
 

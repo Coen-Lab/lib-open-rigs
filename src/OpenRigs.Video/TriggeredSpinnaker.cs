@@ -65,7 +65,7 @@ namespace OpenRigs.Video
 
         // A string, not PixelFormatEnums, so rig.yml's pixelFormat maps onto it; the camera refuses an
         // unknown name when it opens.
-        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name such as Mono8 or Mono16 (rig.yml's pixelFormat). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
+        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write, Mono8 (rig.yml's pixelFormat; blank is Mono8). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
         public string PixelFormat { get; set; }
 
         bool IsOpen()
@@ -87,8 +87,9 @@ namespace OpenRigs.Video
         {
             try { camera.AcquisitionStop.Execute(); }
             catch { }
-            // Before binning and the region: a format change can change their limits
-            camera.PixelFormat.Value = PixelFormat;
+            // Before binning and the region: a format change can change their limits. Blank means Mono8,
+            // as coen-qc-preflight-rig reads it (audit, 11 Nov 2026).
+            camera.PixelFormat.Value = string.IsNullOrWhiteSpace(PixelFormat) ? "Mono8" : PixelFormat.Trim();
             camera.BinningSelector.Value = BinningSelectorEnums.All.ToString();
             camera.BinningHorizontalMode.Value = BinningHorizontalModeEnums.Sum.ToString();
             camera.BinningVerticalMode.Value = BinningVerticalModeEnums.Sum.ToString();

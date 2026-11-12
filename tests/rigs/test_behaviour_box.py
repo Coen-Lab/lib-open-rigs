@@ -19,8 +19,11 @@ def test_named_entries():
 
 def test_pixel_format_mono8_unless_set():
     assert BehaviourBoxRig.model_validate(RIG).camera["box"].pixel_format == "Mono8"
-    rig = BehaviourBoxRig.model_validate({**RIG, "camera": {"box": {"serialNumber": "12345", "pixelFormat": "Mono16"}}})
-    assert rig.camera["box"].pixel_format == "Mono16"
+    rig = BehaviourBoxRig.model_validate({**RIG, "camera": {"box": {"serialNumber": "12345", "pixelFormat": "Mono8"}}})
+    assert rig.camera["box"].pixel_format == "Mono8"
+    # LogVideo writes 8-bit frames only (audit, 11 Nov 2026).
+    with pytest.raises(ValidationError):
+        BehaviourBoxRig.model_validate({**RIG, "camera": {"box": {"serialNumber": "12345", "pixelFormat": "Mono16"}}})
 
 
 def test_no_version():

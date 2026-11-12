@@ -470,7 +470,7 @@ namespace OpenRigs.Control
 
         static void Serve(string endpoint, ControlState state, IObserver<ControlEvent> observer, CancellationToken cancel)
         {
-            ResponseSocket socket;
+            ResponseSocket socket = null;
             try
             {
                 socket = new ResponseSocket();
@@ -480,6 +480,8 @@ namespace OpenRigs.Control
             }
             catch (Exception error)
             {
+                // A socket left open holds NetMQ's context, so its cleanup never returns (audit, 11 Nov 2026).
+                if (socket != null) socket.Dispose();
                 observer.OnError(error);
                 return;
             }

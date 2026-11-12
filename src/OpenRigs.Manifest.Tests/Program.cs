@@ -365,6 +365,41 @@ namespace OpenRigs.Manifest.Tests
                     Check("ends the node with its error rather than throwing to whoever named the folder", thrown == null && error is IOException, thrown != null ? "threw " + thrown.GetType().Name : "error " + error);
                     subscription.Dispose();
                 }
+                {
+                    // L1-M1 (audit, 11 Nov 2026): an end-of-run write that failed, the file held by a
+                    // reader without delete sharing, was never tried again: the manifest stayed running.
+                    // The node's error disposes it at once (Observable.Create), so the reader lets go
+                    // during the disposal's own attempt.
+                    var folder = Path.Combine(root, "sub-TC002", "ses-held_2026-10-30T19-57-12");
+                    var path = new Subject<string>();
+                    var run = new Subject<int>();
+                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    Exception error = null;
+                    var errored = new System.Threading.ManualResetEventSlim();
+                    var subscription = recorder.Process(path, run).Subscribe(_ => { }, e => { error = e; errored.Set(); }, () => { });
+                    path.OnNext(folder);
+                    run.OnNext(1);
+                    var manifest = Path.Combine(folder, ManifestWriter.FileName);
+                    var held = new System.Threading.ManualResetEventSlim();
+                    var reader = new System.Threading.Thread(() =>
+                    {
+                        using (new FileStream(manifest, FileMode.Open, FileAccess.Read, FileShare.Read))
+                        {
+                            held.Set();
+                            errored.Wait(5000);
+                            System.Threading.Thread.Sleep(100);
+                        }
+                    });
+                    reader.Start();
+                    held.Wait();
+                    run.OnCompleted();
+                    reader.Join();
+                    Check("an end-of-run write the reader blocks ends the node with its error", error != null, "no error");
+                    subscription.Dispose();
+                    var text = File.ReadAllText(manifest);
+                    Check("... and is written at disposal, completed, final, with its items", Field(text, "run.outcome") == "completed" && Field(text, "run.final") == "true" && Field(text, "run.items") == "1",
+                        Field(text, "run.outcome") + " " + Field(text, "run.final") + " " + Field(text, "run.items"));
+                }
 
                 Console.WriteLine("Launch and parameters:");
                 var launch = Json.Serialize(ManifestWriter.LaunchSection(new[] { "Bonsai.exe", "w.bonsai", "--property:SubjectId=A", "-p:SubjectId=B", "--property:subjectid=C", "--no-boot", "w.bonsai", "--@pipe", "x" }));

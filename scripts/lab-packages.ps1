@@ -20,12 +20,32 @@ function Test-CommentOnlyFilter([string]$Repo) {
     if ($code -ne 1 -or $comment -ne 0) { throw "The comment-only filter is wrong here (a code change read $code, want 1; a comment change read $comment, want 0): fix `$script:CommentOnly in scripts\lab-packages.ps1." }
 }
 
+# A package's inputs are the files it compiles from elsewhere, not their folder: Video compiles
+# ..\Shared\RigDevices.cs alone, and src/Shared made a change to any shared file a change to Video (audit, 11 Nov 2026).
+function Test-LabPackageInputs([string]$Repo) {
+    $video = Get-LabPackages $Repo | Where-Object { $_.Id -eq 'OpenRigs.Video' }
+    if (-not $video -or $video.Inputs -notcontains 'src/Shared/RigDevices.cs' -or $video.Inputs -contains 'src/Shared') {
+        throw "Get-LabPackages is wrong here (OpenRigs.Video's inputs are $($video.Inputs -join ', '); want src/Shared/RigDevices.cs, not src/Shared): fix it in scripts\lab-packages.ps1."
+    }
+}
+
+# patches\README.md named .nupkg files local_packages\ no longer held (Devices .4, Video .3), so
+# every package it names must be there (audit, 11 Nov 2026).
+function Assert-PatchesNamedBuilt([string]$Repo) {
+    $text = Get-Content (Join-Path $Repo 'patches\README.md') -Raw
+    $gone = @([regex]::Matches($text, '[A-Za-z][\w.]*?\.\d+\.\d+\.\d+[\w.-]*\.nupkg') | ForEach-Object { $_.Value } | Sort-Object -Unique |
+        Where-Object { -not (Test-Path (Join-Path $Repo "local_packages\$_")) })
+    if ($gone) { throw "patches\README.md names packages local_packages\ does not hold: $($gone -join ', '). Correct it." }
+}
+
 # What every way of shipping local_packages\ to the workflows checks first: push-and-update-workflows.ps1
 # before its push, and update-workflows.ps1 run on its own (a lone run after a plain git push shipped
 # whatever local_packages\ held, unchecked; audit-rigs set C, run 4).
 function Assert-LabPackagesShippable([string]$Repo) {
     $lab = Get-LabPackages $Repo
     Test-CommentOnlyFilter $Repo
+    Test-LabPackageInputs $Repo
+    Assert-PatchesNamedBuilt $Repo
 
     # What is published is local_packages\, so a package whose <Version> was raised and never built
     # would push and report every workflow up to date (round 6, 0a90299). Each package's version
@@ -87,8 +107,8 @@ function Assert-LabPackagesShippable([string]$Repo) {
 
 function Get-LabPackages([string]$Repo) {
     # Only the lab's packages carry a <Version>; open-rigs' own are versioned when packed. A
-    # package's source is its folder (not its READMEs), every folder it compiles files from
-    # (..\Shared\*.cs) and the build files every project imports: build\ (Common.csproj.targets
+    # package's source is its folder (not its READMEs), every file it compiles from elsewhere
+    # (..\Shared\*.cs, ..\Shared\RigDevices.cs) and the build files every project imports: build\ (Common.csproj.targets
     # names what dependency version each nuspec carries; 86daefc changed it and nothing was
     # flagged, audit-rigs set C) and the Directory.Build files.
     @(Get-ChildItem (Join-Path $Repo 'src') -Directory | ForEach-Object {
@@ -97,7 +117,7 @@ function Get-LabPackages([string]$Repo) {
         $xml = [xml](Get-Content $project -Raw)
         $version = $xml.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
         if (-not $version) { return }
-        $inputs = @("src/$($_.Name)", ":!src/$($_.Name)/*.md") + @($xml.Project.ItemGroup.Compile.Include | Where-Object { $_ -match '^\.\.\\([^\\]+)\\' } |
-            ForEach-Object { "src/$($Matches[1])" } | Sort-Object -Unique) + @('build', 'Directory.Build.props', 'Directory.Build.targets' | Where-Object { Test-Path (Join-Path $Repo $_) })
+        $inputs = @("src/$($_.Name)", ":!src/$($_.Name)/*.md") + @($xml.Project.ItemGroup.Compile.Include | Where-Object { $_ -match '^\.\.\\' } |
+            ForEach-Object { 'src/' + $_.Substring(3).Replace('\', '/') } | Sort-Object -Unique) + @('build', 'Directory.Build.props', 'Directory.Build.targets' | Where-Object { Test-Path (Join-Path $Repo $_) })
         [pscustomobject]@{ Id = $_.Name; Version = $version; Name = "$($_.Name) $version"; Nupkg = "local_packages/$($_.Name).$version.nupkg"; Inputs = $inputs } })
 }

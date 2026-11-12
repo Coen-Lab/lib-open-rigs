@@ -1,5 +1,44 @@
 # Backlog
 
+## Deferred: proposed upstream
+
+- `TriggeredSpinnaker` `PixelFormat` (cffa26c, Video 0.1.1-coen-lab.7 and Devices .5; blank means Mono8 since Video .8, audit 11 Nov 2026): upstream's operator never sets the format, so a camera opens in whatever format it stored (BLUE-OPTO-1's were Mono16), and LogVideo writes 8-bit frames only. To offer to ucl-open as an issue with this diff (`patches/README.md` lists it); not yet reported.
+
+```diff
+--- a/src/OpenRigs.Video/TriggeredSpinnaker.cs
++++ b/src/OpenRigs.Video/TriggeredSpinnaker.cs
+@@ -15,6 +15,7 @@ namespace OpenRigs.Video
+         {
+             ExposureTime = 1e6 / 50 - 1000;
+             Binning = 1;
++            PixelFormat = PixelFormatEnums.Mono8.ToString();
+         }
+@@ -62,6 +63,11 @@ namespace OpenRigs.Video
+         public int Binning { get; set; }
+ 
++        // A string, not PixelFormatEnums, so rig.yml's pixelFormat maps onto it; the camera refuses an
++        // unknown name when it opens.
++        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name such as Mono8 or Mono16 (rig.yml's pixelFormat). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
++        public string PixelFormat { get; set; }
++
+@@ -81,6 +87,8 @@ namespace OpenRigs.Video
+             try { camera.AcquisitionStop.Execute(); }
+             catch { }
++            // Before binning and the region: a format change can change their limits
++            camera.PixelFormat.Value = PixelFormat;
+             camera.BinningSelector.Value = BinningSelectorEnums.All.ToString();
+--- a/src/OpenRigs.Devices/TriggeredSpinnaker.bonsai
++++ b/src/OpenRigs.Devices/TriggeredSpinnaker.bonsai
+@@ -15,6 +15,7 @@
+         <Property Name="ColorProcessing" />
++        <Property Name="PixelFormat" />
+       </Expression>
+@@ -23,6 +24,7 @@
+           <p1:Binning>1</p1:Binning>
++          <p1:PixelFormat>Mono8</p1:PixelFormat>
+         </Combinator>
+```
+
 ## Queued package fixes shipped, 8 Nov 2026
 
 Changed (one raise each: Control 0.1.1-coen-lab.9, Manifest 12, HarpDevices 8, LiveView 7; open-rigs' pin moves with `behaviour_box.py`):

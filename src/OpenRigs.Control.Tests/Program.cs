@@ -232,9 +232,11 @@ namespace OpenRigs.Control.Tests
                 Check("the second ends with an error naming the port in use", second is NetMQ.AddressAlreadyInUseException, second == null ? "no error" : second.GetType().Name);
                 other.Dispose();
                 first.Dispose();
+                // L1-L2 (audit, 11 Nov 2026): the second's socket was never closed, so NetMQ's cleanup
+                // waited for it forever. Last, as it ends NetMQ for this process.
+                var cleanup = System.Threading.Tasks.Task.Run(() => NetMQConfig.Cleanup(true));
+                Check("... and closes its socket: NetMQ's cleanup returns within 5 s", cleanup.Wait(5000), "it did not");
             }
-
-            NetMQConfig.Cleanup(false);
 
             Console.WriteLine(failed == 0 ? "All checks passed." : failed + " check(s) failed.");
             return failed == 0 ? 0 : 1;

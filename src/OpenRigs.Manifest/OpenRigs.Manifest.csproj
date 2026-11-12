@@ -4,7 +4,7 @@
     <Description>OpenRigs Manifest Bonsai library. One node, ExperimentManifest, writes manifest.json into each experiment folder: the rig, the workflow's commit, how it was launched, the settings at Go, the configuration files as loaded at Start, the files it must leave (a folder for each device in rig.yml it publishes), how the run ended and every file. Nothing is wired to it.</Description>
     <PackageTags>$(PackageTags) Manifest Logging</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.12</Version>
+    <Version>0.1.1-coen-lab.13</Version>
     <!-- Every public type and member is documented: the summaries are what the Bonsai editor shows. -->
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
   </PropertyGroup>
