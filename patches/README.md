@@ -22,6 +22,7 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `f309da2` | Logging (coen-lab.6) | `LogVideo`'s CSV drops `ExposureTime` and `Gain`, leaving `Seconds`, `FrameID` and `Timestamp`: both are fixed while recording and recorded once in the experiment's settings (Pip, 10 Nov 2026) | Lab-only |
 | `0bacc27`, `f2f8802`, `90558a7` | Video (coen-lab.4 to .6) | `UsbCamera`, a USB camera that is not the rig's own: exposure live in microseconds as `ExposureTime`, and a missing frame ends the stream only after none for 5 s or 4 exposures (Pip, 10 Nov 2026) | Lab-only |
 | `cffa26c` | Video (coen-lab.7), Devices (coen-lab.5) | `TriggeredSpinnaker` sets `PixelFormat` each time the camera opens, Mono8 when not set, and the include exposes it: a format stored on the camera was used before (BLUE-OPTO-1's were Mono16) | Not reported (`BACKLOG.md`) |
+| `e137284` | Video (coen-lab.8) | A blank or null `PixelFormat` is Mono8, as coen-qc-preflight-rig reads rig.yml, not an opaque Spinnaker error | With `cffa26c` |
 
 `OpenRigs.Streaming` is otherwise upstream's `src/OpenRigs.Streaming` at the base commit. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
 
