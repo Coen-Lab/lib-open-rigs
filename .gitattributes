@@ -42,3 +42,6 @@ LICENSE text
 *.ico binary
 *.gif binary
 *.svg text
+
+# Record fixtures are compared byte for byte
+fixtures/** text eol=lf

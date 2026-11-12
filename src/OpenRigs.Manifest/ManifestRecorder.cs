@@ -225,7 +225,9 @@ namespace OpenRigs.Manifest
             if (control.FinishedAt.HasValue) return new RunEnd(Completed, null);
             // The controller's stop, which sets the reason (ControlServer's stop), not the phase alone.
             if (control.StopReason != null) return new RunEnd(Stopped, null);
-            return new RunEnd(EndedEarly, "The workflow ended before the run finished and without a stop from the controller: an error elsewhere in the workflow, or the editor's Stop button. Bonsai's output says which.");
+            return new RunEnd(EndedEarly, EndedEarlyError);
         }
+
+        internal const string EndedEarlyError = "The workflow ended before the run finished and without a stop from the controller: an error elsewhere in the workflow, or the editor's Stop button. Bonsai's output says which.";
     }
 }

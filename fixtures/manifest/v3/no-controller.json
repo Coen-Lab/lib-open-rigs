@@ -1,0 +1,95 @@
+{
+  "version": 3,
+  "created": "2026-11-12T10:45:04Z",
+  "ingest_script": null,
+  "writer": {
+    "package": "OpenRigs.Manifest",
+    "version": "0.1.1-coen-lab.14"
+  },
+  "rig": {
+    "machine": "GEEK-BBOX1",
+    "user": "Coen lab",
+    "os": "Microsoft Windows 10.0.26100"
+  },
+  "session": {
+    "subject": "test",
+    "id": "XXXXX",
+    "started": "2026-11-12T10:15:02Z",
+    "folder": "C:\\Coen-Lab-Local\\Acquired-Data\\sub-test\\ses-XXXXX_2026-11-12T10-15-02"
+  },
+  "source": {
+    "workflow": "src\\main.bonsai",
+    "repo": "https://github.com/ucl-open/coen-behaviour-box.git",
+    "root": "C:\\Github\\Coen-Lab\\coen-behaviour-box",
+    "branch": "main",
+    "commit": "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
+    "dirty": true,
+    "changed": [
+      "src/main.bonsai"
+    ],
+    "diff_sha256": "5d41402abc4b2a76b9719d911017c5925d41402abc4b2a76b9719d911017c592",
+    "bonsai": "2.9.0"
+  },
+  "launch": {
+    "arguments": [
+      "C:\\Github\\Coen-Lab\\coen-behaviour-box\\src\\main.bonsai",
+      "--start"
+    ],
+    "properties": {}
+  },
+  "control": null,
+  "config_files": [
+    {
+      "path": "C:\\Coen-Lab-Local\\RigConfigs\\GEEK-BBOX1\\rig.yml",
+      "missing": true,
+      "why": "Could not find file 'C:\\Coen-Lab-Local\\RigConfigs\\GEEK-BBOX1\\rig.yml'."
+    }
+  ],
+  "trial_columns": null,
+  "run": {
+    "outcome": "completed",
+    "final": true,
+    "started": "2026-11-12T10:15:41Z",
+    "ended": "2026-11-12T10:45:03Z",
+    "seconds": 1762,
+    "items": 88100,
+    "error": null,
+    "stop_reason": null
+  },
+  "expected": [
+    {
+      "path": "BehaviorBoard-Main/",
+      "why": "rig.yml behaviorBoard: main:, published as BehaviorBoard-Main",
+      "found": 2
+    },
+    {
+      "path": "Settings/Settings_Experiment_",
+      "why": "listed in ExpectedFiles",
+      "found": 1
+    }
+  ],
+  "notes": [
+    "Config file not found at Start: C:\\Coen-Lab-Local\\RigConfigs\\GEEK-BBOX1\\rig.yml.",
+    "No ExperimentControl running when the experiment folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it."
+  ],
+  "files": [
+    {
+      "path": "BehaviorBoard-Main/BehaviorBoard-Main_2026-11-12T10-00-00.bin",
+      "size": 1048576,
+      "mtime": "2026-11-12T10:45:02Z",
+      "closed": true
+    },
+    {
+      "path": "BehaviorBoard-Main/BehaviorBoard-Main_device.json",
+      "size": 412,
+      "mtime": "2026-11-12T10:15:03Z",
+      "closed": true
+    },
+    {
+      "path": "Settings/Settings_Experiment_2026-11-12T10-15-40.json",
+      "size": 2210,
+      "mtime": "2026-11-12T10:15:40Z",
+      "closed": true
+    }
+  ]
+}

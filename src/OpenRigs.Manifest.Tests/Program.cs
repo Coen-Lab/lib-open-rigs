@@ -152,12 +152,123 @@ namespace OpenRigs.Manifest.Tests
             File.Delete(file);
         }
 
-        static int Main()
+        static DateTime Utc(string iso)
+        {
+            return DateTime.Parse(iso, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal);
+        }
+
+        static JsonObject Object(params object[] pairs)
+        {
+            var o = new JsonObject();
+            for (var i = 0; i < pairs.Length; i += 2) o.Add((string)pairs[i], pairs[i + 1]);
+            return o;
+        }
+
+        // The records' contract (claude-tools docs\architecture\records.md): fixtures\manifest\v3\*.json are what this
+        // writer produces from these inputs, byte for byte. --write-fixtures writes them; otherwise each is compared.
+        static void Fixtures(bool write)
+        {
+            Console.WriteLine("Fixtures:");
+            var repo = AppDomain.CurrentDomain.BaseDirectory;
+            while (repo != null && !File.Exists(Path.Combine(repo, "OpenRigs.sln"))) repo = Path.GetDirectoryName(repo.TrimEnd('\\'));
+            if (repo == null) { Check("the repository holding the fixtures is found", false, "no OpenRigs.sln above " + AppDomain.CurrentDomain.BaseDirectory); return; }
+            var folder = Path.Combine(repo, "fixtures", "manifest", "v" + ManifestWriter.Version);
+            Directory.CreateDirectory(folder);
+
+            var writer = Object("package", "OpenRigs.Manifest", "version", "0.1.1-coen-lab.14");
+            var rig = Object("machine", "GEEK-BBOX1", "user", "Coen lab", "os", "Microsoft Windows 10.0.26100");
+            var workflow = @"C:\Github\Coen-Lab\coen-behaviour-box\src\main.bonsai";
+            Func<bool, JsonObject> source = dirty => Object("workflow", @"src\main.bonsai", "repo", "https://github.com/ucl-open/coen-behaviour-box.git",
+                "root", @"C:\Github\Coen-Lab\coen-behaviour-box", "branch", "main", "commit", "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
+                "dirty", dirty, "changed", dirty ? new List<object> { "src/main.bonsai" } : new List<object>(),
+                "diff_sha256", dirty ? "5d41402abc4b2a76b9719d911017c5925d41402abc4b2a76b9719d911017c592" : null, "bonsai", "2.9.0");
+            var rigYml = @"C:\Coen-Lab-Local\RigConfigs\GEEK-BBOX1\rig.yml";
+            var start = new StartSnapshot
+            {
+                Source = source(false),
+                Launch = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", workflow, "--no-editor", "--property:SubjectId=PCO1-01503", "--property:SessionId=004B1", "--property:LaunchId=rig-PCO1-01503-004B1-20261112T101500Z" }),
+                ConfigFiles = new List<object> { Object("path", rigYml, "sha256", "9b1c0f5e2d7a4c8b6e3f1a0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b") },
+            };
+            var launchId = ManifestWriter.LaunchProperty(start.Launch, ManifestWriter.LaunchIdProperty);
+            var tom = new KeyValuePair<string, string>("TomC", "Tom C");
+            var session = ManifestWriter.SessionSection(@"C:\Coen-Lab-Local\Acquired-Data\sub-PCO1-01503\ses-004B1_2026-11-12T10-15-02");
+            var plan = new ExpectedPlan();
+            plan.Entries.Add(new ExpectedEntry { Path = "BehaviorBoard-Main/", Why = "rig.yml behaviorBoard: main:, published as BehaviorBoard-Main" });
+            plan.Entries.Add(new ExpectedEntry { Path = "Settings/Settings_Experiment_", Why = "listed in ExpectedFiles" });
+            var withCamera = new ExpectedPlan();
+            withCamera.Entries.AddRange(plan.Entries);
+            withCamera.Entries.Add(new ExpectedEntry { Path = "Camera-Box/", Why = "rig.yml camera: box:, published as Camera-Box" });
+            var device = ManifestWriter.FileEntry("BehaviorBoard-Main/BehaviorBoard-Main_device.json", 412, Utc("2026-11-12T10:15:03Z"), true);
+            Func<bool, List<object>> allFiles = closed => new List<object>
+            {
+                ManifestWriter.FileEntry("BehaviorBoard-Main/BehaviorBoard-Main_2026-11-12T10-00-00.bin", 1048576, Utc("2026-11-12T10:45:02Z"), closed),
+                device,
+                ManifestWriter.FileEntry("Settings/Settings_Experiment_2026-11-12T10-15-40.json", 2210, Utc("2026-11-12T10:15:40Z"), true),
+            };
+            var go = Utc("2026-11-12T10:15:40Z");
+            var started = Utc("2026-11-12T10:15:41Z");
+            var none = new string[0];
+
+            var records = new Dictionary<string, JsonObject>();
+            var runningFiles = new List<object> { device };
+            records["running"] = ManifestWriter.Document(Utc("2026-11-12T10:15:03Z"), "coen-behaviour-box", writer, rig, session, start,
+                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", null, tom, null, null),
+                ManifestWriter.RunSection(new RunEnd(RunEnd.Running, null), false, Utc("2026-11-12T10:15:03Z"), null, null, null),
+                ManifestWriter.ExpectedSection(plan, runningFiles), none, runningFiles);
+            var files = allFiles(true);
+            records["completed"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "coen-behaviour-box", writer, rig, session, start,
+                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
+                ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
+                ManifestWriter.ExpectedSection(plan, files), none, files);
+            records["ended-early"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "coen-behaviour-box", writer, rig, session, start,
+                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
+                ManifestWriter.RunSection(new RunEnd(RunEnd.EndedEarly, RunEnd.EndedEarlyError), true, started, Utc("2026-11-12T10:20:00Z"), 12950, null),
+                ManifestWriter.ExpectedSection(withCamera, files), new[] { "Camera-Box left no file" }, files);
+            var openFiles = allFiles(false);
+            records["stopped-not-final"] = ManifestWriter.Document(Utc("2026-11-12T10:31:10Z"), "coen-behaviour-box", writer, rig, session, start,
+                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, new KeyValuePair<string, string>("", "someone at AV-DOME-CONTROL (no Lab PIN)")),
+                ManifestWriter.RunSection(new RunEnd(RunEnd.Stopped, null), false, started, Utc("2026-11-12T10:31:10Z"), null, "Stop from the window"),
+                ManifestWriter.ExpectedSection(plan, openFiles), none, openFiles);
+            var bare = new StartSnapshot
+            {
+                Source = source(true),
+                Launch = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", workflow, "--start" }),
+                ConfigFiles = new List<object> { Object("path", rigYml, "missing", true, "why", "Could not find file '" + rigYml + "'.") },
+            };
+            records["no-controller"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), null, writer, rig,
+                ManifestWriter.SessionSection(@"C:\Coen-Lab-Local\Acquired-Data\sub-test\ses-XXXXX_2026-11-12T10-15-02"), bare,
+                ManifestWriter.ControlSection(null, ManifestWriter.LaunchProperty(bare.Launch, ManifestWriter.LaunchIdProperty)),
+                ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
+                ManifestWriter.ExpectedSection(plan, files), new[] { "Config file not found at Start: " + rigYml + ".", ManifestWriter.NoControllerNote }, files);
+
+            foreach (var record in records)
+            {
+                var path = Path.Combine(folder, record.Key + ".json");
+                var bytes = new System.Text.UTF8Encoding(false).GetBytes(Json.Serialize(record.Value));
+                if (write) File.WriteAllBytes(path, bytes);
+                var onDisk = File.Exists(path) ? File.ReadAllBytes(path) : null;
+                Check("fixtures\\manifest\\v" + ManifestWriter.Version + "\\" + record.Key + ".json is what the writer produces, byte for byte", onDisk != null && onDisk.SequenceEqual(bytes),
+                    onDisk == null ? "missing (dotnet run --project src\\OpenRigs.Manifest.Tests -- --write-fixtures)" : "differs");
+            }
+            var completed = Json.Serialize(records["completed"]);
+            var topKeys = string.Join(",", records["completed"].Select(p => p.Key));
+            var fileKeys = string.Join(",", ((JsonObject)((List<object>)records["completed"].First(p => p.Key == "files").Value)[0]).Select(p => p.Key));
+            Check("version 3 has no status, completed or ingest, and a file no sha256 or expected", Field(completed, "version") == "3"
+                && topKeys == "version,created,ingest_script,writer,rig,session,source,launch,control,config_files,trial_columns,run,expected,notes,files"
+                && fileKeys == "path,size,mtime,closed", topKeys + " | " + fileKeys);
+            Check("control.launch_id is the LaunchId the controller passed", Field(completed, "control.launch_id") == "rig-PCO1-01503-004B1-20261112T101500Z", Field(completed, "control.launch_id"));
+            Check("... and null when none was passed", ManifestWriter.ControlSection(null, "a", "b", null, null, null, null).First(p => p.Key == "launch_id").Value == null, "not null");
+            Check("a blank ingest script is null, not left out", Field(Json.Serialize(records["no-controller"]), "ingest_script") == "null", "left out");
+        }
+
+        static int Main(string[] args)
         {
             var root = Path.Combine(Path.GetTempPath(), "openrigs-manifest-test-" + Guid.NewGuid().ToString("N").Substring(0, 8));
             Directory.CreateDirectory(root);
             try
             {
+                Fixtures(args.Contains("--write-fixtures"));
+
                 Console.WriteLine("How the run ended, with no run input:");
                 var finishedThenStopped = RunExperiment(root, "a", Controller(), c => { c.SetPhase(ExperimentPhase.Finished); Stop(c, "run finished"); });
                 Check("a run that finished, then was stopped by rig-control, is completed", Field(finishedThenStopped, "run.outcome") == "completed", Field(finishedThenStopped, "run.outcome"));
@@ -343,8 +454,9 @@ namespace OpenRigs.Manifest.Tests
                     Directory.CreateDirectory(Path.Combine(folder, "Board"));
                     File.WriteAllText(Path.Combine(folder, "Board", "Board.yml.tmp"), "x");
                     File.WriteAllText(Path.Combine(folder, "Board", "Board.yml"), "x");
+                    foreach (var record in ManifestWriter.RecordFiles) File.WriteAllText(Path.Combine(folder, record), "{}");
                     var listed = string.Join(",", ManifestWriter.FilesSection(folder).Cast<JsonObject>().Select(f => (string)f.First(p => p.Key == "path").Value));
-                    Check("FilesSection leaves out another writer's .tmp", listed == "Board/Board.yml", listed);
+                    Check("FilesSection leaves out another writer's .tmp and the three record files", listed == "Board/Board.yml", listed);
                 }
                 Check("ConfigFiles defaults under the shared ConfigRoot", new ExperimentManifestSettings().ConfigFiles.StartsWith(RigDevices.DefaultConfigRoot + @"\"), new ExperimentManifestSettings().ConfigFiles);
 
@@ -410,7 +522,7 @@ namespace OpenRigs.Manifest.Tests
                 var file = Path.Combine(root, "atomic.json");
                 ManifestWriter.WriteAtomically(file, "one");
                 ManifestWriter.WriteAtomically(file, "two");
-                Check("a second write replaces the first and leaves no .tmp", File.ReadAllText(file) == "two" && !File.Exists(file + ".tmp"), File.ReadAllText(file));
+                Check("a second write replaces the first and leaves no .tmp", File.ReadAllText(file) == "two" && Directory.GetFiles(root, "atomic.json.*.tmp").Length == 0, File.ReadAllText(file));
                 {
                     // A reader without delete sharing, as Python's open() is (rig-control polls manifest.json every second).
                     var opened = new System.Threading.ManualResetEventSlim();
@@ -427,7 +539,7 @@ namespace OpenRigs.Manifest.Tests
                     Exception held = null;
                     try { ManifestWriter.WriteAtomically(file, "three"); } catch (Exception e) { held = e; }
                     reader.Join();
-                    Check("a write while a reader holds the file waits for it and succeeds", held == null && File.ReadAllText(file) == "three" && !File.Exists(file + ".tmp"), held != null ? held.Message : File.ReadAllText(file));
+                    Check("a write while a reader holds the file waits for it and succeeds", held == null && File.ReadAllText(file) == "three" && Directory.GetFiles(root, "atomic.json.*.tmp").Length == 0, held != null ? held.Message : File.ReadAllText(file));
                 }
 
                 Console.WriteLine("Expected files:");

@@ -15,7 +15,7 @@ namespace OpenRigs.Manifest
     /// Writes manifest.json into each experiment folder, with nothing wired to it. At build it finds
     /// the PathPrefix subject (OpenRigs.Logging's LogController), so it goes after LogController.
     /// At Start it reads the configuration files and the launch; when PathPrefix names the folder
-    /// it writes the manifest (status partial, outcome running), and again when the run ends.
+    /// it writes the manifest (outcome running), and again when the run ends.
     /// One input may be connected, the run: its completion means completed, its error is the
     /// run's error, and its elements are counted. Without it the end is read from
     /// OpenRigs.Control's phase when ExperimentControl is in the workflow.

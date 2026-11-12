@@ -1,0 +1,110 @@
+{
+  "version": 3,
+  "created": "2026-11-12T10:45:04Z",
+  "ingest_script": "coen-behaviour-box",
+  "writer": {
+    "package": "OpenRigs.Manifest",
+    "version": "0.1.1-coen-lab.14"
+  },
+  "rig": {
+    "machine": "GEEK-BBOX1",
+    "user": "Coen lab",
+    "os": "Microsoft Windows 10.0.26100"
+  },
+  "session": {
+    "subject": "PCO1-01503",
+    "id": "004B1",
+    "started": "2026-11-12T10:15:02Z",
+    "folder": "C:\\Coen-Lab-Local\\Acquired-Data\\sub-PCO1-01503\\ses-004B1_2026-11-12T10-15-02"
+  },
+  "source": {
+    "workflow": "src\\main.bonsai",
+    "repo": "https://github.com/ucl-open/coen-behaviour-box.git",
+    "root": "C:\\Github\\Coen-Lab\\coen-behaviour-box",
+    "branch": "main",
+    "commit": "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
+    "dirty": false,
+    "changed": [],
+    "diff_sha256": null,
+    "bonsai": "2.9.0"
+  },
+  "launch": {
+    "arguments": [
+      "C:\\Github\\Coen-Lab\\coen-behaviour-box\\src\\main.bonsai",
+      "--no-editor",
+      "--property:SubjectId=PCO1-01503",
+      "--property:SessionId=004B1",
+      "--property:LaunchId=rig-PCO1-01503-004B1-20261112T101500Z"
+    ],
+    "properties": {
+      "SubjectId": "PCO1-01503",
+      "SessionId": "004B1",
+      "LaunchId": "rig-PCO1-01503-004B1-20261112T101500Z"
+    }
+  },
+  "control": {
+    "launch_id": "rig-PCO1-01503-004B1-20261112T101500Z",
+    "subject_id": "PCO1-01503",
+    "session_id": "004B1",
+    "go": "2026-11-12T10:15:40Z",
+    "launched_by": {
+      "id": "TomC",
+      "name": "Tom C"
+    },
+    "go_by": {
+      "id": "TomC",
+      "name": "Tom C"
+    },
+    "stopped_by": null
+  },
+  "config_files": [
+    {
+      "path": "C:\\Coen-Lab-Local\\RigConfigs\\GEEK-BBOX1\\rig.yml",
+      "sha256": "9b1c0f5e2d7a4c8b6e3f1a0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b"
+    }
+  ],
+  "trial_columns": null,
+  "run": {
+    "outcome": "completed",
+    "final": true,
+    "started": "2026-11-12T10:15:41Z",
+    "ended": "2026-11-12T10:45:03Z",
+    "seconds": 1762,
+    "items": 88100,
+    "error": null,
+    "stop_reason": null
+  },
+  "expected": [
+    {
+      "path": "BehaviorBoard-Main/",
+      "why": "rig.yml behaviorBoard: main:, published as BehaviorBoard-Main",
+      "found": 2
+    },
+    {
+      "path": "Settings/Settings_Experiment_",
+      "why": "listed in ExpectedFiles",
+      "found": 1
+    }
+  ],
+  "notes": [],
+  "files": [
+    {
+      "path": "BehaviorBoard-Main/BehaviorBoard-Main_2026-11-12T10-00-00.bin",
+      "size": 1048576,
+      "mtime": "2026-11-12T10:45:02Z",
+      "closed": true
+    },
+    {
+      "path": "BehaviorBoard-Main/BehaviorBoard-Main_device.json",
+      "size": 412,
+      "mtime": "2026-11-12T10:15:03Z",
+      "closed": true
+    },
+    {
+      "path": "Settings/Settings_Experiment_2026-11-12T10-15-40.json",
+      "size": 2210,
+      "mtime": "2026-11-12T10:15:40Z",
+      "closed": true
+    }
+  ]
+}

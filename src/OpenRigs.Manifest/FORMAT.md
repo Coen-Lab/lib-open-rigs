@@ -1,135 +1,35 @@
-# manifest.json, version 2
+# manifest.json, version 3
 
-One `manifest.json` in every experiment folder a rig records: what ran, from which commit, with which settings files, what the experiment had to leave, how the run ended, and every file it left. It builds on Chris Burgess's file manifest for the lab's server (11 Oct 2026), adding sections, so a reader of that format still works on it unchanged: `version`, `created`, `status`, `ingest_script` and `files` mean what they mean there.
+One `manifest.json` in every experiment folder a rig records: what was launched, from which commit, with which settings files, what the experiment had to leave, how the run went, and every file it left.
 
-This file is the format. What each tool does with it lives with the tool:
+The workflow (`ExperimentManifest`, this package) is its only writer: when the experiment folder exists, when the workflow's Finished or the controller's stop comes, and when the run ends. Nobody else ever writes it. What happens to the experiment afterwards goes in files of its own beside it, each with one writer: in the Coen Lab, `sync.json` from the overnight copy (what became of a run that never wrote `run.final`, a renamed session, the files' hashes; where it states `run` or `session`, it wins) and `ingest.json` from the server.
 
-- **The workflow** (`ExperimentManifest`, this package) writes it when the experiment folder exists and again when the run ends, with everything the rig knows. `status` is `partial`.
-- **A finishing step** checks every listed file is present and no longer being written, fills in sizes and `sha256`, and writes `status: complete`. In the Coen Lab that is rig-setup's overnight copy, which decides per experiment whether to copy, wait or raise an alarm: [rig-setup `docs/manifests.md`](https://github.com/Coen-Lab/rig-setup/blob/main/docs/manifests.md).
-- **A server** treats the experiment as finished only when `status` is `complete` and every listed file matches, then runs the registered script. In the Coen Lab that is the ingest proposal in [Coen-Lab/jacuzzi-ingest](https://github.com/Coen-Lab/jacuzzi-ingest).
+Every write is `manifest.json.<pid>.tmp`, then a rename over the old file, so no reader sees half a file. UTF-8 without a BOM, `\n` line ends; a reader decodes with `utf-8-sig`. Times are UTC, `YYYY-MM-DDTHH:MM:SSZ`. A field with no value is `null`, never absent. Paths in `files` and `expected` use `/`, relative to the experiment folder, no leading `./`, no `..`. No object has two keys differing only in case: Windows PowerShell 5.1 refuses to read one.
 
-Every writer writes `manifest.json.tmp` and renames it to `manifest.json`, so no reader sees half a file. Paths use `/`, relative to the experiment folder, no leading `./`, no `..`. No object has two keys differing only in case: Windows PowerShell 5.1 refuses to read one.
+The examples are [`fixtures/manifest/v3/`](../../fixtures/manifest/v3/): `src\OpenRigs.Manifest.Tests` builds each from fixed inputs and compares it with the file byte for byte, and readers in other repositories test themselves on them. `refuse/` holds records a reader must refuse.
 
-## Example
+## Version
 
-A manifest after the finishing step, from an experiment on GEEK-BBOX1 (`files` cut to one entry, hashes shortened):
-
-```json
-{
-  "version": 2,
-  "created": "2026-10-30T19:57:13Z",
-  "status": "complete",
-  "ingest_script": "coen-behaviour-box",
-  "writer": { "package": "OpenRigs.Manifest", "version": "0.1.1-coen-lab.12" },
-  "rig": {
-    "machine": "GEEK-BBOX1",
-    "user": "Coen lab",
-    "os": "Microsoft Windows 10.0.26100"
-  },
-  "session": {
-    "subject": "TC002",
-    "id": "003B1",
-    "started": "2026-10-30T19:57:12Z",
-    "folder": "C:\\Coen-Lab-Local\\Acquired-Data\\sub-TC002\\ses-003B1_2026-10-30T19-57-12"
-  },
-  "source": {
-    "workflow": "src\\main.bonsai",
-    "repo": "https://github.com/ucl-open/coen-behaviour-box.git",
-    "root": "C:\\Github\\Coen-Lab\\coen-behaviour-box",
-    "branch": "main",
-    "commit": "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
-    "dirty": true,
-    "changed": ["src/main.bonsai"],
-    "diff_sha256": "5d41...",
-    "bonsai": "2.9.0"
-  },
-  "launch": {
-    "arguments": ["C:\\Github\\Coen-Lab\\coen-behaviour-box\\src\\main.bonsai", "--start", "--property:SubjectId=TC002", "--property:SessionId=003B1"],
-    "properties": { "SubjectId": "TC002", "SessionId": "003B1" }
-  },
-  "control": {
-    "subject_id": "TC002",
-    "session_id": "003B1",
-    "go": "2026-10-30T19:57:11Z",
-    "launched_by": { "id": "TomC", "name": "Tom C" },
-    "go_by": { "id": "TomC", "name": "Tom C" },
-    "stopped_by": null
-  },
-  "config_files": [
-    { "path": "C:\\Coen-Lab-Local\\RigConfigs\\GEEK-BBOX1\\rig.yml", "sha256": "9b1c..." }
-  ],
-  "trial_columns": null,
-  "run": {
-    "outcome": "completed",
-    "final": true,
-    "started": "2026-10-30T19:57:13Z",
-    "ended": "2026-10-30T20:27:14Z",
-    "seconds": 1801.2,
-    "items": 90000,
-    "error": null,
-    "stop_reason": null
-  },
-  "expected": [
-    { "path": "BehaviorBoard-Main/", "why": "rig.yml behaviorBoard: main:, published as BehaviorBoard-Main", "found": 5 },
-    { "path": "Camera-Box/", "why": "rig.yml camera: box:, published as Camera-Box", "found": 2 },
-    { "path": "BehaviorBoard-Main/BehaviorBoard-Main_device.json", "why": "rig.yml behaviorBoard: main: is a Harp device (BehaviorBoard-Main.Data is HarpMessage): RecordHarpDevices' record and register map", "found": 1 },
-    { "path": "BehaviorBoard-Main/BehaviorBoard-Main.yml", "why": "rig.yml behaviorBoard: main: is a Harp device (BehaviorBoard-Main.Data is HarpMessage): RecordHarpDevices' record and register map", "found": 1 },
-    { "path": "Settings/Settings_Rig_", "why": "listed in ExpectedFiles", "found": 1 },
-    { "path": "Settings/Settings_Experiment_", "why": "listed in ExpectedFiles", "found": 1 }
-  ],
-  "notes": [],
-  "files": [
-    {
-      "path": "Camera-Box/Camera-Box_2026-10-30T19-00-00.avi",
-      "size": 412338177,
-      "mtime": "2026-10-30T20:00:00Z",
-      "sha256": "a3f1...",
-      "closed": true
-    }
-  ],
-  "completed": {
-    "by": "rig-sync",
-    "commit": "4f2a...",
-    "at": "2026-10-31T03:04:11Z",
-    "missing": [],
-    "unmet": []
-  }
-}
-```
+`version` is 3. It changes when a field a reader may rely on is removed, renamed or changes meaning; adding a field does not change it. A reader refuses a version it was not built for, and says so. Version 3 (OpenRigs.Manifest 0.1.1-coen-lab.14, 12 Nov 2026) is version 2 without `status`, `completed`, `ingest`, `files[].sha256` and `files[].expected`, which belong to the overnight copy's and the server's own files now, and with `control.launch_id` and an `ingest_script` that is `null` rather than absent.
 
 ## Fields
 
-The file manifest's own fields, unchanged:
+| Field | Meaning |
+| --- | --- |
+| `version` | 3. |
+| `created` | When this file was last written. |
+| `ingest_script` | The node's `IngestScript`: the name of the server's registry entry for this kind of data, never a path or a command; `null` when blank. |
+| `writer` | `package` and `version`, the package that wrote it, its build suffix left out. |
+| `rig` | `machine` (`COMPUTERNAME`), `user` (the Windows account) and `os`. |
+| `session` | The session as launched: `subject` and `id` from the experiment folder's name (`sub-<Subject>/ses-<Session>_<DateTime>`, which OpenRigs.Logging's `LogController` makes from the launch's `SubjectId` and `SessionId`), `started` from its `<DateTime>`, `folder` the absolute path at the write. |
+| `source` | The workflow that ran: `workflow` (the `.bonsai` file from the command line, relative to `root`), `repo` (`origin`), `root` (the git repository found walking up from the workflow's folder), `branch`, `commit`, `dirty` (whether `git status --porcelain` named a tracked file), `changed` (those files, from `root`, `[]` when clean), `diff_sha256` (sha256 of `git diff HEAD --binary` when `changed` is not empty, else `null`), `bonsai` (Bonsai.Core's version). `dirty` and `changed` are `null` when git did not answer. |
+| `launch` | Bonsai's command line: `arguments` as given (Bonsai's own relaunch arguments left out) and `properties`, each `--property:Name=Value` (or `-p:`) by name; a name given twice, in any case, is one key with the later value. |
+| `control` | The experiment controller's record (OpenRigs.Control's `ExperimentControl`), `null` when the workflow has none: `launch_id`, the id the controller passed for this launch as `--property:LaunchId` (`null` when none was); `subject_id` and `session_id` as the controller was told them; `go`, when Go was taken (`null` before); `launched_by`, `go_by`, `stopped_by`, each `{id, name}` as the controller named them (`id` empty for a name alone) or `null`. The parameters at Go are in the experiment's `Settings/Settings_Experiment_<DateTime>.json`, not here. |
+| `config_files` | Each file the node's `ConfigFiles` names, read once at Start: `{path, sha256}`, or `{path, missing: true, why}`. A folder is every file in it, each on its own; `{SubjectId}` in an entry is the launch's `SubjectId`. |
+| `trial_columns` | What the experiment's `BonsaiData_Trial` columns mean, from the node's `TrialColumns` file, read once at Start: `{path, sha256, columns}`, each column by name with `type` (`int`, `double`, `bool` or `string`) and, where they apply, `values`, `unit`, `formerly` and `description`; or `{path, missing: true, why}`. `null` when `TrialColumns` is blank. |
+| `run` | How the run went at this write. `outcome`: `running`; `completed` (the run input completed, or with no run input the controller's phase reached Finished, even if the controller then stopped the workflow); `stopped` (before that, by the controller's stop, its reason in `stop_reason`; without a controller, any stop); `ended-early` (with a controller: the workflow ended before Finished and without a stop, `error` saying so); `error` (the run input failed before Finished and the stop, `error` its message). `final`: `true` only on the end-of-run write. The workflow's Finished and the controller's stop are written as they come, with `final: false`, so a workflow killed before its end keeps its outcome; a reader acting on the end of the run treats `final: false` as `running`. `started` and `ended` (`null` while running), `seconds` between them, `items` (the run input's element count, `null` without one or while running), `error` and `stop_reason` (text or `null`). |
+| `expected` | What the experiment had to leave, whether or not it was written: `{path, why, found}`. `path` is a file, a folder ending `/` that must hold a file no other entry names, or the start of a file's path ending `_`; `found` is how many files matched it at this write. |
+| `notes` | Sentences on what the node could not find or decided, for showing. |
+| `files` | Every file in the folder at this write, `manifest.json`, `sync.json`, `ingest.json` and any `.tmp` left out: `{path, size, mtime, closed}`. `closed` is `false` while something held the file open (Bonsai's own writers until disposal, a video writer closing its file), so its size may still change. |
 
-- `version`: `1` or `2`. Version 2 (1 Nov 2026) added `launch`, `control`, `config_files`, `expected`, `notes` and the `ended-early` outcome, and dropped version 1's `rig.config_path`, `config_sha256` and `config_text`; every other version 1 field means the same. Fields added since within version 2 are optional to a reader, and `writer` says which rules a manifest followed.
-- `created`: when the manifest was last written, UTC ISO 8601.
-- `status`: `partial` from the workflow, `complete` from the finishing step. A reader acts only on `complete`.
-- `ingest_script`: optional, the name of the script the server runs for this kind of data. It names an entry in the server's registry, never a path or a command, and carries no arguments.
-- `files`: the listed files, the manifest itself excluded. `path`, `size` (bytes), `mtime` (UTC ISO 8601), `sha256` (lowercase hex; absent until the finishing step fills it in).
-
-Written by the workflow:
-
-- `writer` (since OpenRigs.Manifest 0.1.0-local.10, 2 Nov 2026): `package` and `version`, the package that wrote the manifest, so a reader can tell which of the rules below it followed. Absent from earlier manifests.
-- `rig`: `machine` (`COMPUTERNAME`), `user` and `os`.
-- `session`: `subject` and `id` from the experiment folder's name (`sub-<Subject>/ses-<Session>_<DateTime>`, and the older `ses-<Session>_date-<DateTime>`), `started` from its `<DateTime>` (UTC), `folder` the absolute path.
-- `source`: the workflow that ran. `workflow` is the `.bonsai` file from the command line when there was one; `root` is the git repository found walking up from the workflow file's folder (the working directory when Bonsai was given no file), `repo` its `origin` URL, `branch` and `commit` read from `.git`; `bonsai` the Bonsai.Core version. `dirty` is whether `git status --porcelain` named any tracked file, `null` when git did not answer. Since 0.1.0-local.10: `changed`, the tracked files it named, as paths from `root` (a rename by its new path; untracked files left out, as `dirty` leaves them), `[]` when clean and `null` when git did not answer; and `diff_sha256`, the sha256 of `git diff HEAD --binary` when `changed` is not empty, else `null`. The hash cannot rebuild the change, but two experiments with the same hash ran the same code, and one taken from a candidate diff can be checked against it.
-- `launch`: Bonsai's command line, `arguments` as given (Bonsai's own relaunch arguments left out) and `properties`, each `--property:Name=Value` (or `-p:`) by name; a name given twice, in any case, is one key with the later value.
-- `control`: the experiment controller's record (OpenRigs.Control), as the controller was told it: after rig-sync renames an `XXX` session, `session` carries the new id and `control.session_id`, `launch.properties` and the `Settings_Experiment` file keep what was typed; `subject_id`, `session_id`, `go` (UTC), and who ran it as the controller named them: `launched_by`, `go_by` and `stopped_by` (`null` for the controller's own stop after the run finished), each `{ "id", "name" }`, `id` empty when the controller gave a name alone, or `null` when it named nobody. `control` is `null` when the workflow has no experiment controller. Until OpenRigs.Manifest 0.1.1-coen.5 (6 Nov 2026) it also held `parameters`, each ExperimentControl parameter at Go; since then they are in the experiment's `Settings/Settings_Experiment_<DateTime>.json` (`Schemas/Schemas_Experiment_<DateTime>.json` until Manifest 0.1.1-coen.7, later the same day) (OpenRigs.Control's `ExperimentSettings`), with the subject, session, rig, workflow, commit and who launched and sent Go, so the settings live once, in the experiment folder.
-- `config_files`: each file the node's `ConfigFiles` names, read once at Start: `path` (absolute) and `sha256`, or `missing: true` and `why`; since 0.1.1-coen.6 (6 Nov 2026) an entry naming a folder is every file in it, each on its own, and `{SubjectId}` in an entry is the launch's `--property:SubjectId`, so a mouse's own file (its spout positions) and a rig's calibration files are hashed too (settings-files plan, audit M1). Which file ran, not what was in it: the settings themselves are the workflow's to log into the experiment, as the Open Rigs logging spec's settings JSON (section 6).
-- `trial_columns` (since OpenRigs.Manifest 0.1.1-coen.4, 6 Nov 2026): what the experiment's `BonsaiData_Trial` columns mean, from the workflow's own file (the node's `TrialColumns`, such as `schemas\trial-columns.yml`), read once at Start: `path` (absolute), `sha256` and `columns`, each column by name with `type` (`int`, `double`, `bool` or `string`) and, where they apply, `values` (the strings it may hold, or a code: meaning map), `unit`, `formerly` (names it was recorded under before, newest first) and `description`, every scalar as text. A file that could not be read, or has a column with no such type, is `missing: true` and `why`, with a note. `null` when the workflow logs no trials (`TrialColumns` blank). Absent from earlier manifests: `open_rigs.trials` then reads the workflow repository's file at `source.commit`.
-- `run`: `outcome` is `running` until the run ends, then `completed` (the run's sequence completed, or with no run sequence the experiment controller's phase reached Finished, even if the controller then stopped the workflow), `stopped` (stopped before that: with an experiment controller, only by the controller's stop, its reason in `stop_reason`), `ended-early` (with an experiment controller: the workflow ended before Finished and without a stop, from an error elsewhere or the editor's Stop; `error` carries a sentence saying so) or `error` (the run sequence failed before Finished and the controller's stop, `error` carrying the message; since 0.1.1-coen-lab.11 a failure after either is `completed` or `stopped`). From 0.1.0-local.14 to coen-lab.11 the stop was written as `running` with `stop_reason`; since coen-lab.12 it is written as below, and a `running` write carries a stop only if it came before the experiment folder's first write. Since 0.1.1-coen-lab.12, `final`: `false` on every write but the end-of-run write, which sets it `true`. The workflow's Finished and the controller's stop are written as they come, the run still going, as `completed` or `stopped` with `final: false` (and the stop's `stop_reason` and `control.stopped_by`), so a workflow rig-control kills past its stop deadline keeps its outcome; a reader that acts on the end of the run (rig-control keeping an editor's Bonsai open, rig-sync) treats `final: false` as it treats `running`. Absent (earlier manifests) means final. One more is written by rig-setup's `rig-sync.ps1`, never by this node: `killed`, when a manifest still says `running` past its `manifestStaleHours` (12) with no file of the experiment open, so the workflow died or was killed before its end-of-run write; `ended` is then rig-sync's time, `error` says so, and `notes` gains a line. `started` and `ended` UTC, `seconds` between them, `items` the number of elements the run sequence produced, `null` when none was connected and in every `running` write (so a manifest rig-sync finishes as `killed` keeps `null` whether or not a run was connected).
-- `expected`: what the experiment had to leave, whether or not it was ever written: `path` (a file; a folder ending `/` that must hold at least one file no other entry names, so a device's register map never stands in for its data; or, since 0.1.1-coen.5, the start of a file's path ending `_`, met by any file whose path starts with it, so each of the settings files `Settings/Settings_Rig_`, `Settings/Settings_Task_` and `Settings/Settings_Experiment_` is expected on its own; `Schemas/Schemas_Rig_` and the rest in experiments recorded on 6 Nov 2026 before coen.7), `why`, and `found`, how many files matched it at that write. A `path` is always relative to the experiment folder, with `/` and no leading `./` (since 0.1.0-local.12). By default one folder per device entry in rig.yml (`kind: instance:`, named `<Kind>-<Instance>`) whose subject the workflow publishes; with `harp` in `ExpectedFiles`, also each Harp device's `<Name>/<Name>_device.json` and `<Name>/<Name>.yml`. `files` lists only what existed at the run's end, so a device that wrote nothing shows only here.
-- `files[].closed`: `true` when the workflow could open the file exclusively, so its size was final; `false` when the file was still held open at that write, by Bonsai's own writers (with a run input the final write comes at the run's end, before the loggers close: `BonsaiData_Async` is open until disposal) or another process (a video writer closing its file). Advisory: rig-sync waits for every listed file to settle and measures it again before the manifest is complete.
-- `notes`: sentences on what the node could not find or decided (a config file missing, a device not expected and why, no experiment controller).
-
-Written by the finishing step:
-
-- `files[]`: `size` and `mtime` replaced and `sha256` filled in for every listed file; a file in the folder that the workflow did not list is added with `"expected": false`.
-- `completed`: `by` (the tool), `commit` (since 2 Nov 2026: the tool's own commit, `null` when it could not be read), `at`, and `missing`, the listed paths not found, which is empty on a `complete` manifest. Since 3 Nov 2026, `unmet`: the `expected` paths with no file, `[]` when every one was met. It can be non-empty on a `complete` manifest: a run whose `outcome` is not `completed` is finished without what it never wrote (rig-setup `docs/manifests.md`), so a reader wanting a full experiment checks `run.outcome` and `completed.unmet`, not `status` alone.
-- `expected[].found`: recounted by the finishing step from the copied folder, so it agrees with `completed.unmet` (the workflow's count is from its last write, which for a killed run is its first).
-
-Written by the server:
-
-- `ingest`: `state` (`queued`, `running`, `failed`, `done`), `script`, `started`, `finished`, `destination`, `error`. The server keeps its own job state as well; this is the copy that travels with the data.
-
-A reader that takes a manifest as finished checks that `version` is 1 or 2, `status` is `complete`, and each listed path exists with its `size` and, when present, its `sha256`.
+Text fields (`why`, `notes`, `error`, `stop_reason`) are for showing word for word; a reader never parses them, nor a name or a path, to decide something.

@@ -28,13 +28,21 @@ namespace OpenRigs.Manifest
     }
 
     /// <summary>
-    /// The manifest's contents and its two writes, with no Rx, so a test can drive it on a temp
-    /// folder. The format is FORMAT.md beside this file, version 2.
+    /// The manifest's contents and its writes, with no Rx, so a test can drive it on a temp
+    /// folder. The format is FORMAT.md beside this file, version 3.
     /// </summary>
     class ManifestWriter
     {
         public const string FileName = "manifest.json";
-        public const int Version = 2;
+        public const int Version = 3;
+
+        /// <summary>The experiment folder's three records, one writer each: this file, the overnight copy's and the server's. None is a file of the experiment.</summary>
+        public static readonly string[] RecordFiles = { FileName, "sync.json", "ingest.json" };
+
+        /// <summary>The launch property a controller passes its id for the launch in, recorded as control.launch_id.</summary>
+        public const string LaunchIdProperty = "LaunchId";
+
+        public const string NoControllerNote = "No ExperimentControl running when the experiment folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it.";
 
         readonly string ingestScript;
         readonly StartSnapshot start;
@@ -113,7 +121,7 @@ namespace OpenRigs.Manifest
         /// (the mouse's spout positions, calibration\LickSpoutPositions\{SubjectId}.csv, 0.1.1-coen.6).</summary>
         public const string SubjectToken = "{SubjectId}";
 
-        static string LaunchProperty(JsonObject launch, string name)
+        public static string LaunchProperty(JsonObject launch, string name)
         {
             var properties = launch.FirstOrDefault(p => p.Key == "properties").Value as JsonObject;
             var found = properties != null ? properties.FirstOrDefault(p => string.Equals(p.Key, name, StringComparison.OrdinalIgnoreCase)) : default(KeyValuePair<string, object>);
@@ -153,7 +161,7 @@ namespace OpenRigs.Manifest
             catch (Exception) { return expanded; }
         }
 
-        /// <summary>The first write, status partial and outcome running. Makes the folder if the loggers have not yet: PathPrefix names it before any of them writes and they make the same folder. Throws if the file cannot be written: nothing recorded is the thing to stop for.</summary>
+        /// <summary>The first write, outcome running. Makes the folder if the loggers have not yet: PathPrefix names it before any of them writes and they make the same folder. Throws if the file cannot be written: nothing recorded is the thing to stop for.</summary>
         public string Begin(string experimentFolder, ControlExperiment control)
         {
             if (string.IsNullOrEmpty(experimentFolder)) throw new ArgumentException("ExperimentManifest was given no experiment folder.");
@@ -162,7 +170,7 @@ namespace OpenRigs.Manifest
             var path = Path.Combine(full, FileName);
             folder = full;
             started = DateTime.UtcNow;
-            if (control == null) start.Notes.Add("No ExperimentControl running when the experiment folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it.");
+            if (control == null) start.Notes.Add(NoControllerNote);
             try
             {
                 manifestPath = path;
@@ -193,36 +201,52 @@ namespace OpenRigs.Manifest
 
         void Write(RunEnd end, long? items, ControlExperiment control, DateTime? ended, bool final)
         {
+            // A running write carries the stop too (a workflow killed before the stop's own write, which then is the last).
+            var stopReason = (end.Outcome == RunEnd.Stopped || end.Outcome == RunEnd.Running) && control != null ? control.StopReason : null;
+            var files = FilesSection(folder);
+            var doc = Document(DateTime.UtcNow, ingestScript, WriterSection(), RigSection(), SessionSection(folder), start,
+                ControlSection(control, LaunchProperty(start.Launch, LaunchIdProperty)),
+                RunSection(end, final, started, ended, items, stopReason),
+                ExpectedSection(expected, files), expected.Notes.Concat(start.Notes.Cast<string>()), files);
+            WriteAtomically(manifestPath, Json.Serialize(doc));
+        }
+
+        /// <summary>The manifest from what one write knows, reading no clock, machine or disk, so a test builds the fixtures in fixtures\manifest\v3\ from their inputs.</summary>
+        public static JsonObject Document(DateTime created, string ingestScript, JsonObject writer, JsonObject rig, JsonObject session, StartSnapshot start,
+            JsonObject control, JsonObject run, List<object> expected, IEnumerable<string> notes, List<object> files)
+        {
             var doc = new JsonObject();
             doc.Add("version", (long)Version);
-            doc.Add("created", Iso(DateTime.UtcNow));
-            doc.Add("status", "partial");
-            if (!string.IsNullOrEmpty(ingestScript)) doc.Add("ingest_script", ingestScript);
-            doc.Add("writer", WriterSection());
-            doc.Add("rig", RigSection());
-            doc.Add("session", SessionSection(folder));
+            doc.Add("created", Iso(created));
+            doc.Add("ingest_script", string.IsNullOrEmpty(ingestScript) ? null : ingestScript);
+            doc.Add("writer", writer);
+            doc.Add("rig", rig);
+            doc.Add("session", session);
             doc.Add("source", start.Source);
             doc.Add("launch", start.Launch);
-            doc.Add("control", ControlSection(control));
+            doc.Add("control", control);
             doc.Add("config_files", start.ConfigFiles);
             doc.Add("trial_columns", start.TrialColumns);
+            doc.Add("run", run);
+            doc.Add("expected", expected);
+            doc.Add("notes", notes.Cast<object>().ToList());
+            doc.Add("files", files);
+            return doc;
+        }
+
+        /// <summary>How the run went at this write. Only the end-of-run write is final.</summary>
+        public static JsonObject RunSection(RunEnd end, bool final, DateTime started, DateTime? ended, long? items, string stopReason)
+        {
             var run = new JsonObject();
             run.Add("outcome", end.Outcome);
-            // Only the end-of-run write is final; absent (before Manifest 0.1.1-coen-lab.12) means final.
             run.Add("final", final);
             run.Add("started", Iso(started));
             run.Add("ended", ended.HasValue ? Iso(ended.Value) : null);
             run.Add("seconds", ended.HasValue ? (object)Math.Round((ended.Value - started).TotalSeconds, 1) : null);
             run.Add("items", items);
             run.Add("error", end.Error);
-            // A running write carries the stop too (a workflow killed before the stop's own write, which then is the last).
-            run.Add("stop_reason", (end.Outcome == RunEnd.Stopped || end.Outcome == RunEnd.Running) && control != null ? control.StopReason : null);
-            doc.Add("run", run);
-            var files = FilesSection(folder);
-            doc.Add("expected", ExpectedSection(expected, files));
-            doc.Add("notes", expected.Notes.Concat(start.Notes.Cast<string>()).Cast<object>().ToList());
-            doc.Add("files", files);
-            WriteAtomically(manifestPath, Json.Serialize(doc));
+            run.Add("stop_reason", stopReason);
+            return run;
         }
 
         /// <summary>Each file or folder the experiment must leave, why, and how many files in the folder match it now.</summary>
@@ -241,10 +265,34 @@ namespace OpenRigs.Manifest
             return section;
         }
 
-        /// <summary>manifest.json.tmp, then the rename, so no reader sees half a file, nor a moment with no manifest (rig-sync would copy the experiment as one without). A write that fails takes its .tmp with it.</summary>
+        /// <summary>manifest.json.&lt;pid&gt;.tmp, then the rename, so no reader sees half a file, nor a moment with no manifest. UTF-8 without a BOM. A write that fails takes its .tmp with it.</summary>
         public static void WriteAtomically(string path, string text)
         {
-            AtomicFile.Write(path, text);
+            var tmp = path + "." + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture) + ".tmp";
+            try
+            {
+                File.WriteAllText(tmp, text, new UTF8Encoding(false));
+                // Windows refuses the rename while a reader holds the file without delete sharing
+                // (Python's open(); rig-control polls manifest.json every second): wait it out, about 0.5 s.
+                for (var attempt = 1; ; attempt++)
+                {
+                    try
+                    {
+                        if (File.Exists(path)) File.Replace(tmp, path, null);
+                        else File.Move(tmp, path);
+                        break;
+                    }
+                    catch (IOException) when (attempt < 10)
+                    {
+                        System.Threading.Thread.Sleep(50);
+                    }
+                }
+            }
+            catch
+            {
+                try { File.Delete(tmp); } catch (Exception) { }
+                throw;
+            }
         }
 
         /// <summary>The machine. Its rig.yml is named in config_files only (0.1.0-local.6); version 1 also copied it here.</summary>
@@ -357,21 +405,28 @@ namespace OpenRigs.Manifest
             return launch;
         }
 
-        /// <summary>The experiment controller's record: subject, session, when Go was taken, and who
+        /// <summary>The experiment controller's record: the id the controller passed for this launch (the
+        /// LaunchId property, null when none was), subject, session, when Go was taken, and who
         /// launched it, sent Go and stopped it. Null without ExperimentControl. The parameters at Go are
         /// in the experiment's Settings_Experiment file (OpenRigs.Control's ExperimentSettings, since
         /// 0.1.1-coen.5; Schemas_Experiment until coen.7), so the settings live once, in the experiment folder.</summary>
-        public static JsonObject ControlSection(ControlExperiment control)
+        public static JsonObject ControlSection(ControlExperiment control, string launchId)
         {
             if (control == null) return null;
+            return ControlSection(launchId, control.GoSubjectId, control.GoSessionId, control.GoTime, control.LaunchedBy, control.GoBy, control.StoppedBy);
+        }
+
+        public static JsonObject ControlSection(string launchId, string subjectId, string sessionId, DateTime? go,
+            KeyValuePair<string, string>? launchedBy, KeyValuePair<string, string>? goBy, KeyValuePair<string, string>? stoppedBy)
+        {
             var section = new JsonObject();
-            section.Add("subject_id", control.GoSubjectId);
-            section.Add("session_id", control.GoSessionId);
-            var go = control.GoTime;
+            section.Add("launch_id", string.IsNullOrEmpty(launchId) ? null : launchId);
+            section.Add("subject_id", subjectId);
+            section.Add("session_id", sessionId);
             section.Add("go", go.HasValue ? Iso(go.Value) : null);
-            section.Add("launched_by", PersonSection(control.LaunchedBy));
-            section.Add("go_by", PersonSection(control.GoBy));
-            section.Add("stopped_by", PersonSection(control.StoppedBy));
+            section.Add("launched_by", PersonSection(launchedBy));
+            section.Add("go_by", PersonSection(goBy));
+            section.Add("stopped_by", PersonSection(stoppedBy));
             return section;
         }
 
@@ -395,7 +450,7 @@ namespace OpenRigs.Manifest
                 var rel = path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? path.Substring(prefix.Length) : path;
                 rel = rel.Replace('\\', '/');
                 // Another writer's half-written file (RecordHarpDevice's .yml.tmp) is renamed within seconds: never a file of the experiment.
-                if (rel == FileName || rel.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
+                if (RecordFiles.Contains(rel) || rel.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
                 var info = new FileInfo(path);
                 long size;
                 DateTime mtime;
@@ -405,14 +460,19 @@ namespace OpenRigs.Manifest
                     mtime = info.LastWriteTimeUtc;
                 }
                 catch (FileNotFoundException) { continue; }
-                var entry = new JsonObject();
-                entry.Add("path", rel);
-                entry.Add("size", size);
-                entry.Add("mtime", Iso(mtime));
-                entry.Add("closed", IsClosed(path));
-                files.Add(entry);
+                files.Add(FileEntry(rel, size, mtime, IsClosed(path)));
             }
             return files;
+        }
+
+        public static JsonObject FileEntry(string path, long size, DateTime mtime, bool closed)
+        {
+            var entry = new JsonObject();
+            entry.Add("path", path);
+            entry.Add("size", size);
+            entry.Add("mtime", Iso(mtime));
+            entry.Add("closed", closed);
+            return entry;
         }
 
         /// <summary>Whether no other process holds the file: an exclusive open succeeds. A file we cannot open for another reason (an ACL) reads as closed, since that is not a write in progress.</summary>
