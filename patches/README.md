@@ -21,7 +21,7 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `9ce8bc9` | Core, Devices (coen.2) | `ManualBalance` beside `SerialBalance`, built on `ManualWeighing`, `ManualReadings` and `ApplyBalancePort` (claude-tools `DECISIONS.md`, 6 Nov 2026) | Lab-only (Pip: "Nothing of Tom's") |
 | `f309da2` | Logging (coen-lab.6) | `LogVideo`'s CSV drops `ExposureTime` and `Gain`, leaving `Seconds`, `FrameID` and `Timestamp`: both are fixed while recording and recorded once in the experiment's settings (Pip, 10 Nov 2026) | Lab-only |
 | `0bacc27`, `f2f8802`, `90558a7` | Video (coen-lab.4 to .6) | `UsbCamera`, a USB camera that is not the rig's own: exposure live in microseconds as `ExposureTime`, and a missing frame ends the stream only after none for 5 s or 4 exposures (Pip, 10 Nov 2026) | Lab-only |
-| `cffa26c` | Video (coen-lab.7), Devices (coen-lab.5) | `TriggeredSpinnaker` sets `PixelFormat` each time the camera opens, Mono8 when not set, and the include exposes it: a format stored on the camera was used before (BLUE-OPTO-1's were Mono16) | Not reported (`BACKLOG.md`) |
+| `cffa26c` | Video (coen-lab.7), Devices (coen-lab.5) | `TriggeredSpinnaker` sets `PixelFormat` each time the camera opens, Mono8 when not set, and the include exposes it: a format stored on the camera was used before (BLUE-OPTO-1's were Mono16) | Not reported (Proposed upstream, below) |
 | `e137284` | Video (coen-lab.8) | A blank or null `PixelFormat` is Mono8, as coen-qc-preflight-rig reads rig.yml, not an opaque Spinnaker error | With `cffa26c` |
 
 `OpenRigs.Streaming` is otherwise upstream's `src/OpenRigs.Streaming` at the base commit. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
@@ -35,3 +35,42 @@ The lab's workflows record video with it rather than Bonsai.Vision's `VideoWrite
 ## Switching to upstream
 
 When open-rigs publishes a release in which every row of the table above is upstream, with the config operators, or Bonsai.FFmpeg one with a unique pipe name, delete the patched package here, and in each workflow that uses it set the released version in `.bonsai\Bonsai.config` and remove its copy from `local_packages\`. app-rig-setup's `workflows\update-workflows.ps1` then leaves that package alone, since it only handles packages in this repository's `local_packages\`. Delete `bonsai-ffmpeg-unique-pipe.patch` with the FFmpeg package.
+
+## Proposed upstream
+
+- `TriggeredSpinnaker` `PixelFormat` (cffa26c, Video 0.1.1-coen-lab.7 and Devices .5; blank means Mono8 since Video .8, audit 11 Nov 2026): upstream's operator never sets the format, so a camera opens in whatever format it stored (BLUE-OPTO-1's were Mono16), and LogVideo writes 8-bit frames only. To offer to ucl-open as an issue with this diff (the table above lists it); not yet reported.
+
+```diff
+--- a/src/OpenRigs.Video/TriggeredSpinnaker.cs
++++ b/src/OpenRigs.Video/TriggeredSpinnaker.cs
+@@ -15,6 +15,7 @@ namespace OpenRigs.Video
+         {
+             ExposureTime = 1e6 / 50 - 1000;
+             Binning = 1;
++            PixelFormat = PixelFormatEnums.Mono8.ToString();
+         }
+@@ -62,6 +63,11 @@ namespace OpenRigs.Video
+         public int Binning { get; set; }
+ 
++        // A string, not PixelFormatEnums, so rig.yml's pixelFormat maps onto it; the camera refuses an
++        // unknown name when it opens.
++        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name such as Mono8 or Mono16 (rig.yml's pixelFormat). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
++        public string PixelFormat { get; set; }
++
+@@ -81,6 +87,8 @@ namespace OpenRigs.Video
+             try { camera.AcquisitionStop.Execute(); }
+             catch { }
++            // Before binning and the region: a format change can change their limits
++            camera.PixelFormat.Value = PixelFormat;
+             camera.BinningSelector.Value = BinningSelectorEnums.All.ToString();
+--- a/src/OpenRigs.Devices/TriggeredSpinnaker.bonsai
++++ b/src/OpenRigs.Devices/TriggeredSpinnaker.bonsai
+@@ -15,6 +15,7 @@
+         <Property Name="ColorProcessing" />
++        <Property Name="PixelFormat" />
+       </Expression>
+@@ -23,6 +24,7 @@
+           <p1:Binning>1</p1:Binning>
++          <p1:PixelFormat>Mono8</p1:PixelFormat>
+         </Combinator>
+```
