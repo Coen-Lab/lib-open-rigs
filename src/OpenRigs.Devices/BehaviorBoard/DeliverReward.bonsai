@@ -1,0 +1,238 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Delivers each reward, a (microlitres, RewardLine) pair: plans it (PlanReward), publishes the plan on RewardDelivered and fires its pulses through TriggerCalibratedPulse with FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, one reward after another (Concat); outputs the pulses. Loads both sides' reward lines once at start (RewardLineLeft, RewardLineRight) from rig.yml's wiring (LoadRewardLine). Writes each plan as a RewardDelivered row of BonsaiData_Async (AsyncEvents; Value the microlitres delivered, Detail starting with the side) and each calibrated line's file into the experiment as ValveCalibrationDO&lt;n&gt; (LogDataSchema). Place it after the logging that declares AsyncEvents and PathPrefix.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="RigFile" />
+        <Property Name="CalibrationDirectory" />
+        <Property Name="MissingCalibration" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:LoadRewardLine">
+          <core:RigFile>UNMAPPED</core:RigFile>
+          <core:Side>left</core:Side>
+          <core:CalibrationDirectory />
+          <core:MissingCalibration>Refuse</core:MissingCalibration>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>RewardLineLeft</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:LoadRewardLine">
+          <core:RigFile>UNMAPPED</core:RigFile>
+          <core:Side>right</core:Side>
+          <core:CalibrationDirectory />
+          <core:MissingCalibration>Refuse</core:MissingCalibration>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>RewardLineRight</Name>
+      </Expression>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:PlanReward" />
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>RewardDelivered</Name>
+      </Expression>
+      <Expression xsi:type="rx:CreateObservable">
+        <Name>FirePlan</Name>
+        <Description>Fires one plan's pulses through TriggerCalibratedPulse with FirePulses on the Harp clock (Timestamp), at the plan's width and the calibration's pulseGapMs.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Take">
+                <rx:Count>1</rx:Count>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="rx:AsyncSubject">
+              <Name>Plan</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Plan</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Timestamp</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Plan</Name>
+            </Expression>
+            <Expression xsi:type="PropertyMapping">
+              <PropertyMappings>
+                <Property Name="Line" Selector="Line" />
+                <Property Name="WidthMs" Selector="WidthMs" />
+                <Property Name="Count" Selector="Count" />
+                <Property Name="PulseGapMs" Selector="PulseGapMs" />
+              </PropertyMappings>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="core:FirePulses">
+                <core:Line>1</core:Line>
+                <core:WidthMs>1</core:WidthMs>
+                <core:Count>0</core:Count>
+                <core:PulseGapMs>0</core:PulseGapMs>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>TriggerCalibratedPulse</Name>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="5" To="6" Label="Source1" />
+            <Edge From="3" To="7" Label="Source1" />
+            <Edge From="4" To="7" Label="Source2" />
+            <Edge From="6" To="7" Label="Source3" />
+            <Edge From="7" To="8" Label="Source1" />
+            <Edge From="8" To="9" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Concat" />
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardDelivered</Name>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>new("RewardDelivered" as Event, RewardLine.Side + " DO" + Line.ToString() + " requested=" + RequestedUl.ToString() + " pulses=" + Count.ToString() + " width=" + WidthMs.ToString() + " gap=" + PulseGapMs.ToString() + " calibrated=" + RewardLine.Calibrated.ToString() + " clamped=" + Clamped.ToString() + " file=" + (RewardLine.CalibrationPath == null ? "" : RewardLine.CalibrationPath) as Detail, DeliveredUl as Value)</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orl:CreateAsyncEvent">
+          <orl:Event>RewardDelivered</orl:Event>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="Bonsai.Harp:WithLatestTimestamp.bonsai">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>AsyncEvents</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardLineLeft</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>Calibrated</Name>
+        <Description>Only a calibrated line has a file to copy.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Calibrated</Selector>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>CalibrationJson</Selector>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardLineLeft</Name>
+      </Expression>
+      <Expression xsi:type="Format">
+        <Format>ValveCalibrationDO{0}</Format>
+        <Selector>Line</Selector>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="Name" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogDataSchema.bonsai">
+        <Name>UNMAPPED</Name>
+        <Extension>json</Extension>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardLineRight</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>Calibrated</Name>
+        <Description>Only a calibrated line has a file to copy.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Calibrated</Selector>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>CalibrationJson</Selector>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardLineRight</Name>
+      </Expression>
+      <Expression xsi:type="Format">
+        <Format>ValveCalibrationDO{0}</Format>
+        <Selector>Line</Selector>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="Name" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogDataSchema.bonsai">
+        <Name>UNMAPPED</Name>
+        <Extension>json</Extension>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="0" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="6" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="20" To="21" Label="Source1" />
+      <Edge From="18" To="22" Label="Source1" />
+      <Edge From="21" To="22" Label="Source2" />
+      <Edge From="23" To="24" Label="Source1" />
+      <Edge From="24" To="25" Label="Source1" />
+      <Edge From="26" To="27" Label="Source1" />
+      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="25" To="29" Label="Source1" />
+      <Edge From="28" To="29" Label="Source2" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

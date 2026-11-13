@@ -28,6 +28,7 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Core\OpenRigs.Core.csproj" />
     <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
+    <ProjectReference Include="..\OpenRigs.Logging\OpenRigs.Logging.csproj" />
     <PackageReference Include="Harp.Hobgoblin" Version="0.1.2" />
   </ItemGroup>
 
