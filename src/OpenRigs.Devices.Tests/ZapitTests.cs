@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Devices.Zapit;
 
@@ -203,6 +204,72 @@ namespace OpenRigs.Devices.Tests
             var ex = Assert.ThrowsException<InvalidOperationException>(() =>
                 new ZapitClient { Port = 1 }.Process(Observable.Return(ZapitCommand.Stop())).Wait());
             StringAssert.Contains(ex.Message, "Could not connect to Zapit at 127.0.0.1:1");
+        }
+
+        [DataTestMethod]
+        [DataRow(true, "mouse1", true)]
+        [DataRow(false, " Test ", true)]
+        [DataRow(false, "mouse1", false)]
+        [DataRow(false, null, false)]
+        public void OnlyTheTestMouseRunsWithoutHardwareTriggering(bool hardwareTriggered, string subjectId, bool allowed)
+        {
+            if (allowed)
+            {
+                ZapitTrial.RequireHardwareTrigger(hardwareTriggered, subjectId);
+                return;
+            }
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitTrial.RequireHardwareTrigger(hardwareTriggered, subjectId));
+            StringAssert.Contains(ex.Message, "needs a hardware-triggered rig");
+        }
+
+        [TestMethod]
+        public void AnErrorReplyOrNoConditionsFileStops()
+        {
+            ZapitTrial.CheckReply(Reply(ZapitCommandType.IsStimConfigLoaded, 1));
+            ZapitTrial.CheckReply(Reply(ZapitCommandType.GetState, 0));
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() =>
+                ZapitTrial.CheckReply(Reply(ZapitCommandType.IsStimConfigLoaded, 0))).Message, "no conditions file loaded");
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() =>
+                ZapitTrial.CheckReply(Reply(ZapitCommandType.StartStimulus, 255))).Message, "answered with an error");
+        }
+
+        [TestMethod]
+        public void ReplyMarginIsThePythonModels()
+        {
+            var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "src", "open_rigs", "rigs", "dome.py"))) directory = directory.Parent;
+            Assert.IsNotNull(directory, @"No src\open_rigs\rigs\dome.py above the test output.");
+            var text = File.ReadAllText(Path.Combine(directory.FullName, "src", "open_rigs", "rigs", "dome.py"));
+            StringAssert.Contains(text, "ZAPIT_REPLY_MARGIN_SECONDS = " + ZapitTrial.ReplyMarginSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        [TestMethod]
+        public void ConnectZapitConnectsOnlyFromItsInputAndChecksEverything()
+        {
+            XNamespace xsi = "http://www.w3.org/2001/XMLSchema-instance";
+            XNamespace bonsai = "https://bonsai-rx.org/2018/workflow";
+            XDocument workflow;
+            using (var stream = typeof(ZapitClient).Assembly.GetManifestResourceStream("OpenRigs.Devices.Zapit.ConnectZapit.bonsai"))
+            {
+                workflow = XDocument.Load(stream);
+            }
+            // The client sits inside the SelectMany, so nothing connects before the input says the experiment uses Zapit.
+            var top = workflow.Root.Element(bonsai + "Workflow").Element(bonsai + "Nodes").Elements().Select(e => (string)e.Attribute(xsi + "type")).ToList();
+            CollectionAssert.AreEqual(new[] { "WorkflowInput", "rx:SelectMany", "WorkflowOutput" }, top);
+            var types = workflow.Descendants().Select(e => (string)e.Attribute(xsi + "type")).Where(t => t != null).ToList();
+            foreach (var check in new[] { "zap:ZapitClient", "zap:CheckZapitReply", "zap:CheckZapitConditionCount", "zap:RequireZapitHardwareTrigger" })
+            {
+                Assert.AreEqual(1, types.Count(t => t == check), check);
+            }
+            Assert.IsFalse(types.Contains("core:ThrowError"), "Refusals are tested C#, not ThrowError.");
+            foreach (var scope in workflow.Descendants(bonsai + "Workflow"))
+            {
+                var count = scope.Element(bonsai + "Nodes").Elements().Count();
+                foreach (var edge in scope.Element(bonsai + "Edges").Elements())
+                {
+                    Assert.IsTrue((int)edge.Attribute("From") < count && (int)edge.Attribute("To") < count, edge.ToString());
+                }
+            }
         }
     }
 }

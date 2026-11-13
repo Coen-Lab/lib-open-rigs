@@ -29,7 +29,7 @@ RIG = {
     "projectionCalibration": {"meshMapPath": "m.csv", "gammaLutPath": "g.bmp"},
     "speakerArray": {
         "device": {"deviceName": "Speakers"},
-        "speakers": {"centre": {"position": {"azimuth": 0, "elevation": 15}, "channel": 2}},
+        "speakers": {"centre": {"position": {"azimuth": 0, "elevation": 15}, "channel": 2, "filter": "calibration/speaker-centre.json"}},
         "errorSoundChannel": 2,
     },
     "lickSpoutDefaultPosition": STAGE,
@@ -125,4 +125,11 @@ def test_exactly_three_cameras(cameras):
     rig = copy.deepcopy(RIG)
     rig["camera"] = {f"c{n}": {"serialNumber": str(n)} for n in range(cameras)}
     with pytest.raises(ValidationError, match=rf"camera lists {cameras} entries; a dome has exactly 3 \(dome rig model"):
+        DomeRig.model_validate(rig)
+
+
+def test_every_speaker_needs_a_filter():
+    rig = copy.deepcopy(RIG)
+    rig["speakerArray"]["speakers"]["left"] = {"position": {"azimuth": -90, "elevation": 15}, "channel": 0}
+    with pytest.raises(ValidationError, match=r"speaker left has no filter.*calibration/speaker-left.json"):
         DomeRig.model_validate(rig)

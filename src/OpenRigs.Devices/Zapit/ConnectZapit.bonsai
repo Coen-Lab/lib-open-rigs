@@ -1,0 +1,142 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Zapit for every dome workflow, from its input on: the input is the task's Zapit conditions file path, sent once when the experiment uses Zapit. Connects to rig.yml's zapit host and port (ZapitClient), sends every ZapitCommands value and publishes every reply on ZapitReplies (both subjects declared by the workflow), and asks IsStimConfigLoaded and GetNumConditions at once. Stops the workflow on any error reply or no conditions file loaded (CheckZapitReply), a number of conditions other than the file's or a ramp-down out of range (CheckZapitConditionCount), and for a real mouse on a rig without hardware triggering (RequireZapitHardwareTrigger, from rig.yml's zapit.hardwareTriggered and SubjectId). Needs RigConfigs, SubjectId, ZapitCommands and ZapitReplies from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="rx:SelectMany">
+        <Name>ConnectZapit</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="zap:CreateZapitQuery">
+                <zap:Query>IsStimConfigLoaded</zap:Query>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="zap:CreateZapitQuery">
+                <zap:Query>GetNumConditions</zap:Query>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ZapitCommands</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Merge" />
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>RigConfigs</Name>
+            </Expression>
+            <Expression xsi:type="PropertyMapping">
+              <PropertyMappings>
+                <Property Name="Host" Selector="Zapit.Host" />
+                <Property Name="Port" Selector="Zapit.Port" />
+              </PropertyMappings>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="zap:ZapitClient">
+                <zap:Host>UNMAPPED</zap:Host>
+                <zap:Port>1488</zap:Port>
+                <zap:ReceiveTimeout>5000</zap:ReceiveTimeout>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>ZapitReplies</Name>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ZapitReplies</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="zap:CheckZapitReply" />
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ZapitReplies</Name>
+            </Expression>
+            <Expression xsi:type="rx:Condition">
+              <Name>ConditionCountReply?</Name>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="WorkflowInput">
+                    <Name>Source1</Name>
+                  </Expression>
+                  <Expression xsi:type="scr:ExpressionTransform">
+                    <scr:Expression>CommandCode == 4</scr:Expression>
+                  </Expression>
+                  <Expression xsi:type="WorkflowOutput" />
+                </Nodes>
+                <Edges>
+                  <Edge From="0" To="1" Label="Source1" />
+                  <Edge From="1" To="2" Label="Source1" />
+                </Edges>
+              </Workflow>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Take">
+                <rx:Count>1</rx:Count>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Zip" />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="zap:CheckZapitConditionCount" />
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>RigConfigs</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Zapit.HardwareTriggered</Selector>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>SubjectId</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Zip" />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="zap:RequireZapitHardwareTrigger" />
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="0" To="2" Label="Source1" />
+            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="1" To="4" Label="Source2" />
+            <Edge From="2" To="4" Label="Source3" />
+            <Edge From="5" To="6" Label="Source1" />
+            <Edge From="4" To="7" Label="Source1" />
+            <Edge From="6" To="7" Label="Source2" />
+            <Edge From="7" To="8" Label="Source1" />
+            <Edge From="8" To="9" Label="Source1" />
+            <Edge From="10" To="11" Label="Source1" />
+            <Edge From="12" To="13" Label="Source1" />
+            <Edge From="13" To="14" Label="Source1" />
+            <Edge From="14" To="15" Label="Source1" />
+            <Edge From="0" To="15" Label="Source2" />
+            <Edge From="15" To="16" Label="Source1" />
+            <Edge From="17" To="18" Label="Source1" />
+            <Edge From="18" To="20" Label="Source1" />
+            <Edge From="19" To="20" Label="Source2" />
+            <Edge From="20" To="21" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

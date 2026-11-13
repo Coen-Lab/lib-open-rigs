@@ -20,6 +20,9 @@ ZAPIT_TRIGGER = "ZapitTrigger"
 SIDES = ("left", "right")
 WHERE = "(dome rig model, open_rigs.rigs.dome)"
 CAMERAS = 3
+# How long before its trigger Zapit's armed reply must be in, in seconds (OpenRigs.Devices ZapitTrial.ReplyMarginSeconds):
+# every dome task leaves this much between arming Zapit and the trigger.
+ZAPIT_REPLY_MARGIN_SECONDS = 0.2
 
 
 class DomeBehaviorBoard(BehaviorBoard):
@@ -32,6 +35,17 @@ class DomeBehaviorBoard(BehaviorBoard):
 class DomeSpeakerArray(SpeakerArray):
     __doc__ = SpeakerArray.__doc__
     error_sound_channel: int = Field(ge=0, description="Mixer output channel the error sound plays on.")
+
+    @model_validator(mode="after")
+    def _every_speaker_filtered(self):
+        # A dome plays every speaker equalised; OpenRigs.Devices DomeSpeakers.RequireFilters refuses at Start.
+        missing = sorted(name for name, speaker in self.speakers.items() if speaker.filter is None)
+        if missing:
+            raise ValueError(
+                f"speakerArray: speaker {', '.join(missing)} has no filter, and a dome plays every speaker equalised {WHERE}. "
+                f"Give each its SpeakerFilter artefact, as in `filter: calibration/speaker-{missing[0]}.json`."
+            )
+        return self
 
 
 class ZapitServer(BaseSchema):
