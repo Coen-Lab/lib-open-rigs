@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "names": [
+    {
+      "subject": "PCO1-01503",
+      "session": "004B1",
+      "started": "2026-11-12T10:15:02Z",
+      "folder": "sub-PCO1-01503/ses-004B1_2026-11-12T10-15-02"
+    },
+    {
+      "subject": "test",
+      "session": "XXXXX",
+      "started": "2026-01-02T03:04:05Z",
+      "folder": "sub-test/ses-XXXXX_2026-01-02T03-04-05"
+    },
+    {
+      "subject": "GN019",
+      "session": "012G2",
+      "started": "2026-12-31T23:59:59Z",
+      "folder": "sub-GN019/ses-012G2_2026-12-31T23-59-59"
+    },
+    {
+      "subject": "AM006-LL",
+      "session": "001-pilot",
+      "started": "2026-11-12T00:00:00Z",
+      "folder": "sub-AM006-LL/ses-001-pilot_2026-11-12T00-00-00"
+    }
+  ],
+  "refused": [
+    {
+      "subject": "PCO1_01503",
+      "session": "004B1",
+      "why": "an underscore in the subject"
+    },
+    {
+      "subject": "PCO1-01503",
+      "session": "004_B1",
+      "why": "an underscore in the session"
+    },
+    {
+      "subject": "PCO1-01503",
+      "session": "004B1.",
+      "why": "the session ends in a dot"
+    },
+    {
+      "subject": "M[1]",
+      "session": "001B1",
+      "why": "a square bracket in the subject"
+    },
+    {
+      "subject": "",
+      "session": "001B1",
+      "why": "an empty subject"
+    }
+  ],
+  "notNames": [
+    "ses-004B1",
+    "ses-004B1_date-2026-11-12T10-15-02",
+    "ses-004B1_2026-11-12T10:15:02",
+    "sub-PCO1-01503",
+    "ses-_2026-11-12T10-15-02"
+  ]
+}

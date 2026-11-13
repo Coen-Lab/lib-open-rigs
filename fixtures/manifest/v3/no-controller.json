@@ -4,7 +4,7 @@
   "ingest_script": null,
   "writer": {
     "package": "OpenRigs.Manifest",
-    "version": "0.1.1-coen-lab.14"
+    "version": "0.1.1-coen-lab.15"
   },
   "rig": {
     "machine": "GEEK-BBOX1",

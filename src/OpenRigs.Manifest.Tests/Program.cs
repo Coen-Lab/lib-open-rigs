@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reactive.Subjects;
@@ -175,7 +176,7 @@ namespace OpenRigs.Manifest.Tests
             var folder = Path.Combine(repo, "fixtures", "manifest", "v" + ManifestWriter.Version);
             Directory.CreateDirectory(folder);
 
-            var writer = Object("package", "OpenRigs.Manifest", "version", "0.1.1-coen-lab.14");
+            var writer = Object("package", "OpenRigs.Manifest", "version", "0.1.1-coen-lab.15");
             var rig = Object("machine", "GEEK-BBOX1", "user", "Coen lab", "os", "Microsoft Windows 10.0.26100");
             var workflow = @"C:\Github\Coen-Lab\coen-behaviour-box\src\main.bonsai";
             Func<bool, JsonObject> source = dirty => Object("workflow", @"src\main.bonsai", "repo", "https://github.com/ucl-open/coen-behaviour-box.git",
@@ -259,6 +260,55 @@ namespace OpenRigs.Manifest.Tests
             Check("control.launch_id is the LaunchId the controller passed", Field(completed, "control.launch_id") == "rig-PCO1-01503-004B1-20261112T101500Z", Field(completed, "control.launch_id"));
             Check("... and null when none was passed", ManifestWriter.ControlSection(null, "a", "b", null, null, null, null).First(p => p.Key == "launch_id").Value == null, "not null");
             Check("a blank ingest script is null, not left out", Field(Json.Serialize(records["no-controller"]), "ingest_script") == "null", "left out");
+            ExperimentFolder(repo);
+        }
+
+        // The one name two languages make (claude-tools docs\architecture\records.md, Experiment folder name):
+        // fixtures\experiment-folder\v1\names.json holds this package's reader and LogController's format, as it
+        // holds rig-control's rename.
+        static void ExperimentFolder(string repo)
+        {
+            Console.WriteLine("The experiment folder's name:");
+            var path = Path.Combine(repo, "fixtures", "experiment-folder", "v1", "names.json");
+            Check(@"fixtures\experiment-folder\v1\names.json is there", File.Exists(path), path);
+            if (!File.Exists(path)) return;
+            var text = File.ReadAllText(path).Replace("\r\n", "\n");
+            // Enough for this file as it is written (two-space indent, one string per value), not a parser.
+            Func<string, string> list = key => Regex.Match(text, "\"" + key + @""": \[(.*?)\n  \]", RegexOptions.Singleline).Groups[1].Value;
+            Func<string, string, string> value = (entry, key) => Regex.Unescape(Regex.Match(entry, "\"" + key + @""": ""((?:[^""\\]|\\.)*)""").Groups[1].Value);
+            Func<string, List<string>> entries = key => Regex.Matches(list(key), @"\{[^}]*\}").Cast<Match>().Select(m => m.Value).ToList();
+            Check("it is version 1", text.Contains("\"version\": 1,"), "another version");
+
+            var logController = File.ReadAllText(Path.Combine(repo, "src", "OpenRigs.Logging", "LogController.bonsai"));
+            var format = Regex.Match(logController, @"<Format>(\{0\}[^<]*)</Format>").Groups[1].Value;
+            Check(@"LogController names the folder <root>\sub-<SubjectId>\ses-<SessionId>_<DateTime>", format == @"{0}\sub-{1}\ses-{2}_{3}", format);
+            // As OpenRigs.Core's FormatDate, which LogController gives the folder's time to.
+            Func<DateTime, string> formatDate = when => { var o = when.ToString("o").Replace(':', '-'); return o.Substring(0, o.IndexOf('.')); };
+
+            var names = entries("names");
+            Check("it has names to make and read", names.Count >= 4, names.Count.ToString());
+            foreach (var name in names)
+            {
+                var started = DateTime.Parse(value(name, "started"), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
+                var made = string.Format(CultureInfo.InvariantCulture, format, "", value(name, "subject"), value(name, "session"), formatDate(started)).TrimStart('\\').Replace('\\', '/');
+                Check(value(name, "folder") + " is what the format makes", made == value(name, "folder"), made);
+                var read = Json.Serialize(ManifestWriter.SessionSection(@"C:\Data\" + value(name, "folder").Replace('/', '\\')));
+                Check("... and reads back to its subject, session and start", Field(read, "subject") == value(name, "subject") && Field(read, "id") == value(name, "session") && Field(read, "started") == value(name, "started"), read);
+            }
+            var refused = entries("refused");
+            Check("it has IDs to refuse", refused.Count >= 5, refused.Count.ToString());
+            foreach (var entry in refused)
+            {
+                Check("refused: " + value(entry, "why"), !ManifestWriter.IdValid(value(entry, "subject")) || !ManifestWriter.IdValid(value(entry, "session")), value(entry, "subject") + " " + value(entry, "session"));
+            }
+            var notNames = Regex.Matches(list("notNames"), @"""((?:[^""\\]|\\.)*)""").Cast<Match>().Select(m => Regex.Unescape(m.Groups[1].Value)).ToList();
+            Check("it has names that are not one", notNames.Count >= 5, notNames.Count.ToString());
+            foreach (var name in notNames)
+            {
+                var folder = name.StartsWith("sub-", StringComparison.Ordinal) ? @"C:\Data\" + name : @"C:\Data\sub-PCO1-01503\" + name;
+                var read = Json.Serialize(ManifestWriter.SessionSection(folder));
+                Check(name + " is not an experiment folder's name", Field(read, "id") == "null" && Field(read, "subject") == "null" && Field(read, "started") == "null", read);
+            }
         }
 
         static int Main(string[] args)
@@ -373,7 +423,7 @@ namespace OpenRigs.Manifest.Tests
 
                 Console.WriteLine("The run input:");
                 {
-                    var folder = Path.Combine(root, "sub-TC002", "ses-f_date-2026-10-30T19-57-12");
+                    var folder = Path.Combine(root, "sub-TC002", "ses-f_2026-10-30T19-57-12");
                     var path = new Subject<string>();
                     var run = new Subject<int>();
                     var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
@@ -384,11 +434,11 @@ namespace OpenRigs.Manifest.Tests
                     path.OnNext(folder);
                     var text = File.ReadAllText(Path.Combine(folder, ManifestWriter.FileName));
                     Check("... and is written completed, with its items, when the folder appears", Field(text, "run.outcome") == "completed" && Field(text, "run.items") == "2", Field(text, "run.outcome") + " " + Field(text, "run.items"));
-                    Check("... and the older ses-<Session>_date-<DateTime> name is still read", Field(text, "session.id") == "f" && Field(text, "session.started") == "2026-10-30T19:57:12Z", Field(text, "session.id") + " " + Field(text, "session.started"));
+                    Check("... and its session is read from the folder's name", Field(text, "session.id") == "f" && Field(text, "session.started") == "2026-10-30T19:57:12Z", Field(text, "session.id") + " " + Field(text, "session.started"));
                     Check("... and the node completes", completed, "no OnCompleted");
                     // A run that fails before the folder exists: nothing to record, and the error goes
                     // on at once, so the workflow does not stand at Ready with a dead run (4 Nov 2026).
-                    var failedFolder = Path.Combine(root, "sub-TC002", "ses-f2_date-2026-10-30T19-57-12");
+                    var failedFolder = Path.Combine(root, "sub-TC002", "ses-f2_2026-10-30T19-57-12");
                     var failedPath = new Subject<string>();
                     var failedRun = new Subject<int>();
                     Exception failedWith = null;
@@ -463,7 +513,7 @@ namespace OpenRigs.Manifest.Tests
                 Console.WriteLine("A write that fails:");
                 {
                     // A file where the experiment folder should be, so Begin cannot make it.
-                    var blocked = Path.Combine(root, "sub-TC002", "ses-g_date-2026-10-30T19-57-12");
+                    var blocked = Path.Combine(root, "sub-TC002", "ses-g_2026-10-30T19-57-12");
                     Directory.CreateDirectory(Path.GetDirectoryName(blocked));
                     File.WriteAllText(blocked, "not a folder");
                     var path = new Subject<string>();
