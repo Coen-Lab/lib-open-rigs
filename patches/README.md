@@ -42,6 +42,7 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `4dfe52c` | Devices (.7) | `ZapitTrial.Command` and `ZapitLineMessage`, the per-trial Zapit command (0 mW on a laser-off trial) and trigger line write the domes share | Lab-only |
 | `9fb7af5` | Core (.6) | `DispenseProcedure.requireMonotone` deleted, as nothing read it | Lab-only |
 | `5665dd7` | Python | `DomeRig` refuses keys a dome does not use, as the generated C# does at Start; wiring refusals give the line to add | Lab-only |
+| `55afb94` | Devices (.8), Python | `Zapit.ConnectZapit`, the domes' Zapit connection and its start checks (`CheckZapitReply`, `CheckZapitConditionCount`, `RequireZapitHardwareTrigger`) once; `ZapitTrial.ReplyMarginSeconds` and `ZAPIT_REPLY_MARGIN_SECONDS`; every dome speaker needs a filter (`DomeSpeakers.RequireFilters`, `DomeSpeakerArray`) | Lab-only |
 
 `OpenRigs.Streaming` is otherwise upstream's `src/OpenRigs.Streaming` at the base commit. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
 
