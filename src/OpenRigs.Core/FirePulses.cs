@@ -134,11 +134,11 @@ namespace OpenRigs.Core
                         {
                             if (stopped) return;
                             var train = new Train { Line = Line, WidthMs = WidthMs, Count = Count, PulseGapMs = PulseGapMs };
-                            if (train.Line < 1 || train.WidthMs < 1 || train.WidthMs > ushort.MaxValue || train.Count < 0 || train.PulseGapMs < 0)
+                            if (train.Count < 0 || train.PulseGapMs < 0 || train.Count > 0 && (train.Line < 1 || train.WidthMs < 1 || train.WidthMs > ushort.MaxValue))
                             {
                                 fail(new ArgumentOutOfRangeException(null, string.Format(
                                     "FirePulses cannot fire {0} pulse(s) of {1} ms on line {2} with a {3} ms gap: " +
-                                    "the line must be 1 or more, the width 1 to 65535 ms, the count and the gap 0 or more.",
+                                    "the count and the gap must be 0 or more and, for any pulse, the line 1 or more and the width 1 to 65535 ms.",
                                     train.Count, train.WidthMs, train.Line, train.PulseGapMs)));
                                 return;
                             }

@@ -18,6 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\RigDevices.cs" Link="Shared\RigDevices.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Bonsai.Core" Version="2.9.0" />
     <PackageReference Include="Bonsai.Harp" Version="3.6.1" />
     <PackageReference Include="Bonsai.System" Version="2.9.0" />
