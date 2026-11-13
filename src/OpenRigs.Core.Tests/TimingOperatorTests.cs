@@ -73,15 +73,30 @@ namespace OpenRigs.Core.Tests
         }
 
         [TestMethod]
-        public void RefusesAClockThatGoesBackwards()
+        public void RefusesAClockThatGoesBackwardsWhileAnInputWaits()
         {
             using (var run = new Run(new HarpDelay { DueSeconds = 1 }))
             {
                 run.TickEveryMs(500, 500);
                 run.Input.OnNext("a");
                 run.TickEveryMs(10, 10);
-                StringAssert.Contains(run.Error.Message, "went backwards");
+                StringAssert.Contains(run.Error.Message, "clock jumped back from 0.5 s to 0.01 s while 1 timed event(s) were waiting");
                 Assert.AreEqual(0, run.Output.Count);
+            }
+        }
+
+        [TestMethod]
+        public void TakesAClockThatGoesBackwardsWithNothingWaitingAsTheNewTime()
+        {
+            using (var run = new Run(new HarpDelay { DueSeconds = 0.005 }))
+            {
+                run.TickEveryMs(500, 500);
+                run.TickEveryMs(10, 10);  // SynchronizeTimestamp sets the board's clock before anything waits
+                Assert.IsNull(run.Error);
+                run.Input.OnNext("a");
+                run.TickEveryMs(11, 15);
+                Assert.AreEqual(1, run.Output.Count);
+                Assert.AreEqual(0.015, run.Output[0].Seconds, 1e-9);
             }
         }
 

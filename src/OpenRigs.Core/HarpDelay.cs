@@ -3,6 +3,7 @@ using Bonsai.Harp;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
@@ -17,11 +18,13 @@ namespace OpenRigs.Core
     /// <see cref="DueSeconds"/> is read as each input arrives, so an <c>InputMapping</c> can delay
     /// each input by its own value. An input that arrives before the first tick is timed from that
     /// tick. The output completes once the input has completed and nothing is waiting. A clock that
-    /// goes backwards, or ends before the input, stops it with an error.
+    /// goes backwards while an input waits, or ends before the input, stops it with an error; one
+    /// that goes backwards with nothing waiting (Bonsai.Harp's SynchronizeTimestamp sets the board's
+    /// clock at start) is taken as the new time.
     /// </remarks>
     [Combinator]
     [DefaultProperty("DueSeconds")]
-    [Description("Delays each input by DueSeconds of Harp time (second input: the clock, in seconds) and emits it timestamped with the clock time it fell due. DueSeconds is read per input, so an InputMapping can delay each by its own value. Completes once the input has completed and nothing waits. Stops with an error if the clock goes backwards, or ends before the input.")]
+    [Description("Delays each input by DueSeconds of Harp time (second input: the clock, in seconds) and emits it timestamped with the clock time it fell due. DueSeconds is read per input, so an InputMapping can delay each by its own value. Completes once the input has completed and nothing waits. Stops with an error if the clock goes backwards while an input waits, or ends before the input; with nothing waiting it takes the new time.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class HarpDelay
     {
@@ -74,11 +77,13 @@ namespace OpenRigs.Core
                         lock (gate)
                         {
                             if (stopped) return;
-                            if (now.HasValue && seconds < now.Value)
+                            // Idle, a clock that goes backwards (SynchronizeTimestamp at start) gives the new time.
+                            if (now.HasValue && seconds < now.Value && timed.Count > 0)
                             {
-                                fail(new InvalidOperationException(string.Format(
-                                    "HarpDelay's clock went backwards, from {0} s to {1} s, so delays cannot be timed on it. " +
-                                    "Feed it a clock that only moves forward.", now.Value, seconds)));
+                                fail(new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                                    "The Harp board's clock jumped back from {0} s to {1} s while {2} timed event(s) were waiting, " +
+                                    "so they could not be timed and the workflow stopped. Something reset the board's clock mid-experiment: " +
+                                    "start the experiment again, and if it happens again, report it.", now.Value, seconds, timed.Count)));
                                 return;
                             }
                             now = seconds;

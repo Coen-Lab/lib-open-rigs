@@ -114,16 +114,50 @@ namespace OpenRigs.Core.Tests
         }
 
         [TestMethod]
-        public void RefusesAClockThatGoesBackwards()
+        public void RefusesAClockThatGoesBackwardsWithPulsesToFire()
         {
             using (var run = new Run(new FirePulses { WidthMs = 20, Count = 3, PulseGapMs = 100 }))
             {
                 run.Tick(5.0);
                 run.Input.OnNext(0);
-                run.Tick(0.001);  // a clock resynchronised under the pulses, as SynchronizeTimestamp does at its first event
+                run.Tick(0.001);  // a clock resynchronised under the pulses
                 Assert.IsInstanceOfType(run.Error, typeof(InvalidOperationException));
-                StringAssert.Contains(run.Error.Message, "went backwards");
+                StringAssert.Contains(run.Error.Message, "clock jumped back from 5 s to 0.001 s with 2 valve pulse(s) still to fire");
                 Assert.AreEqual(1, run.Pulses.Count);
+            }
+        }
+
+        [TestMethod]
+        public void TakesAClockThatGoesBackwardsWhileIdleAsTheNewTime()
+        {
+            using (var run = new Run(new FirePulses { WidthMs = 20, Count = 2, PulseGapMs = 100 }))
+            {
+                run.Tick(5.0);
+                run.Input.OnNext(0);
+                run.TickEveryMs(5.001, 5.2);
+                Assert.AreEqual(2, run.Pulses.Count);  // 5.0 and 5.12; the second closes at 5.14
+                run.Tick(1.0);  // SynchronizeTimestamp sets the board's clock while nothing waits
+                Assert.IsNull(run.Error);
+                run.Input.OnNext(0);
+                run.TickEveryMs(1.001, 1.3);
+                // The last close moved back 4.2 s with the clock, to 0.94, so the next train waits for its gap
+                CollectionAssert.AreEqual(new[] { 5.0, 5.12, 1.04, 1.16 }, run.Pulses.ConvertAll(p => Math.Round(p.Item1, 6)));
+            }
+        }
+
+        [TestMethod]
+        public void AClockThatGoesBackwardsJustAfterAPulseKeepsTheGap()
+        {
+            using (var run = new Run(new FirePulses { WidthMs = 20, Count = 1, PulseGapMs = 100 }))
+            {
+                run.Tick(5.0);
+                run.Input.OnNext(0);
+                run.Tick(5.03);
+                run.Tick(1.0);  // 10 ms after the pulse closed, by the old clock
+                run.Input.OnNext(0);
+                run.TickEveryMs(1.001, 1.2);
+                Assert.IsNull(run.Error);
+                Assert.AreEqual(1.09, Math.Round(run.Pulses[1].Item1, 6));
             }
         }
 

@@ -2,6 +2,8 @@ using Bonsai;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
+using System.Linq;
 using System.Reactive.Linq;
 
 namespace OpenRigs.Core
@@ -16,10 +18,12 @@ namespace OpenRigs.Core
     /// The properties are read when each input arrives, so an <c>InputMapping</c> can set them per
     /// train. The first pulse fires as the input arrives, or at the first clock tick if none has come yet. The output
     /// completes once the input has completed and the last pulse has closed, so a step after it
-    /// (a weighing) starts with the valve shut. A clock that goes backwards stops it with an error.
+    /// (a weighing) starts with the valve shut. A clock that goes backwards while pulses
+    /// are still to fire stops it with an error; one that goes backwards while idle (Bonsai.Harp's
+    /// SynchronizeTimestamp sets the board's clock at start) is taken as the new time.
     /// </remarks>
     [Combinator]
-    [Description("Fires Count (line, widthMs) requests for TriggerCalibratedPulse per input, timed on the Harp clock (second input, in seconds): each next pulse starts PulseGapMs after the previous one closes. Completes once the input has completed and the last pulse has closed. Stops with an error if the clock goes backwards.")]
+    [Description("Fires Count (line, widthMs) requests for TriggerCalibratedPulse per input, timed on the Harp clock (second input, in seconds): each next pulse starts PulseGapMs after the previous one closes. Completes once the input has completed and the last pulse has closed. Stops with an error if the clock goes backwards while pulses are still to fire; while idle it takes the new time.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class FirePulses
     {
@@ -109,10 +113,17 @@ namespace OpenRigs.Core
                             if (stopped) return;
                             if (now.HasValue && seconds < now.Value)
                             {
-                                fail(new InvalidOperationException(string.Format(
-                                    "FirePulses' Harp clock went backwards, from {0} s to {1} s, so pulses cannot be timed on it. " +
-                                    "Feed it a clock that only moves forward.", now.Value, seconds)));
-                                return;
+                                if (active != null || waiting.Count > 0)
+                                {
+                                    var left = (active != null ? active.Count - fired : 0) + waiting.Sum(train => train.Count);
+                                    fail(new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                                        "The Harp board's clock jumped back from {0} s to {1} s with {2} valve pulse(s) still to fire, " +
+                                        "so they could not be timed and the workflow stopped. Something reset the board's clock mid-experiment: " +
+                                        "start the experiment again, and if it happens again, report it.", now.Value, seconds, left)));
+                                    return;
+                                }
+                                // Idle: the new time is now. The last pulse's close moves with it, so the next train keeps its gap.
+                                closedAt -= now.Value - seconds;
                             }
                             now = seconds;
                             pump();
