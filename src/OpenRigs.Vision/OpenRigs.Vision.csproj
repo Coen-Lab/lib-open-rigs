@@ -4,6 +4,7 @@
     <Description>A package providing common visual stimulus functionality for all Open Rigs experiments.</Description>
     <PackageTags>$(PackageTags) Vision</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
+    <Version>0.1.1-coen-lab.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
