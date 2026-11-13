@@ -23,7 +23,7 @@
       <Expression xsi:type="p1:CreateMessage">
         <MessageType xmlns="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp">Write</MessageType>
         <Payload xsi:type="p1:CreateEncoderModePayload" xmlns="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp">
-          <p1:EncoderMode>Displacement</p1:EncoderMode>
+          <p1:EncoderMode>Position</p1:EncoderMode>
         </Payload>
       </Expression>
       <Expression xsi:type="Combinator">
