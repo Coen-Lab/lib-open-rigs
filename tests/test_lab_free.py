@@ -61,6 +61,7 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "src/OpenRigs.Manifest/README.md",
     "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj",
     "src/OpenRigs.Video/OpenRigs.Video.csproj",
+    "src/OpenRigs.Vision/OpenRigs.Vision.csproj",  # the lab's package version, as every lab package's
     "src/OpenRigs.Video/TriggeredSpinnaker.cs",
     "src/OpenRigs.Video/UsbCamera.cs",
     "src/Shared/GroupNode.cs",
