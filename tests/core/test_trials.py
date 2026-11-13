@@ -4,6 +4,7 @@ trial columns its manifest carries, or the workflow repository's file."""
 import json
 import math
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -93,3 +94,21 @@ def test_no_columns_anywhere_is_an_error(tmp_path):
     manifest(tmp_path, trial_columns={"path": "x", "missing": True, "why": "not found"})
     with pytest.raises(ValueError, match="not found"):
         trials.read(tmp_path)
+
+
+FIXTURES = Path(__file__).parents[2] / "fixtures" / "manifest" / "v3"
+
+
+@pytest.mark.parametrize("name", ["completed", "running", "no-controller"])
+def test_reads_the_writers_own_v3_manifests(tmp_path, name):
+    write(tmp_path, "manifest.json", (FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
+    with pytest.raises(ValueError, match="no trial columns"):
+        trials.columns(tmp_path)
+
+
+@pytest.mark.parametrize("name", ["no-version", "unknown-version", "unreadable"])
+def test_refuses_a_manifest_of_no_known_version(tmp_path, name):
+    write(tmp_path, "manifest.json", (FIXTURES / "refuse" / f"{name}.json").read_text(encoding="utf-8"))
+    with pytest.raises(ValueError) as raised:
+        trials.columns(tmp_path, repo=tmp_path)
+    assert "no trial columns" not in str(raised.value)

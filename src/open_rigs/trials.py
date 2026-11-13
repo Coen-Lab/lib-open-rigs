@@ -27,6 +27,8 @@ from ruamel.yaml import YAML
 
 LOG = "BonsaiData_Trial"
 MANIFEST = "manifest.json"
+# Every version keeps `trial_columns` and `source.commit` as they were; any other is refused (records.md, rule 3).
+MANIFEST_VERSIONS = (1, 2, 3)
 REPO_FILE = "schemas/trial-columns.yml"
 
 
@@ -49,6 +51,8 @@ def columns(experiment: Union[str, Path], repo: Union[str, Path, None] = None) -
     neither the experiment's manifest nor `repo` has them."""
     manifest_path = Path(experiment) / MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig")) if manifest_path.is_file() else {}
+    if manifest and manifest.get("version") not in MANIFEST_VERSIONS:
+        raise ValueError(f"{manifest_path}: manifest version {manifest.get('version')!r} is not one this reads ({', '.join(map(str, MANIFEST_VERSIONS))})")
     section = manifest.get("trial_columns") or {}
     if "columns" in section:
         return section["columns"]
