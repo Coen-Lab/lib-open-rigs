@@ -126,7 +126,7 @@ namespace OpenRigs.Core.Calibration
                     : string.Format("Weigh Now: {0}, after {1} pulses of {2} {3}.", bursts[index].Name, bursts[index].Count, bursts[index].Size, unit);
                 Action land = () =>
                 {
-                    // PulseBurst completes one period after its last pulse, so the drop has landed
+                    // FirePulses completes once its last pulse has closed, so the drop has landed
                     // before the weighing starts; a little after that, the person is asked.
                     var burst = bursts[index];
                     var wait = TimeSpan.FromMilliseconds(burst.Count > 0 ? burst.Size + burst.Gap + 250 : 250);

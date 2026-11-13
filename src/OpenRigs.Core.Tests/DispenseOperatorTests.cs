@@ -22,38 +22,6 @@ namespace OpenRigs.Core.Tests
         }
 
         [TestMethod]
-        public void PulseBurst_FiresRepeatsRequestsOnTheChannel()
-        {
-            var requests = new PulseBurst { Channel = 2 }.Process(Observable.Return(Sample(20, repeats: 3))).ToList().Timeout(TimeSpan.FromSeconds(5)).Wait();
-            Assert.AreEqual(3, requests.Count);
-            Assert.IsTrue(requests.All(r => r.Item1 == 2 && r.Item2 == 20));
-        }
-
-        [TestMethod]
-        public void PulseBurst_CompletesAfterTheLastPulseHasLanded()
-        {
-            var started = DateTime.UtcNow;
-            PulseBurst.Burst(1, 20, 3, 30).ToList().Timeout(TimeSpan.FromSeconds(5)).Wait();
-            // Three pulses at t = 0, 50, 100 ms, then one more period before completion.
-            Assert.IsTrue((DateTime.UtcNow - started).TotalMilliseconds >= 140, "completed too early");
-        }
-
-        [TestMethod]
-        public void PulseBurst_PrimesAtTheLargestSampleUnlessToldOtherwise()
-        {
-            var procedure = new DispenseProcedure { Samples = new List<DispenseSample> { Sample(20), Sample(60), Sample(40) }, PrimingPulses = 2 };
-            var priming = new PulseBurst().Process(Observable.Return(procedure)).ToList().Timeout(TimeSpan.FromSeconds(5)).Wait();
-            Assert.AreEqual(2, priming.Count);
-            Assert.IsTrue(priming.All(r => r.Item2 == 60));
-
-            procedure.PrimingSize = 30;
-            Assert.IsTrue(new PulseBurst().Process(Observable.Return(procedure)).ToList().Wait().All(r => r.Item2 == 30));
-
-            procedure.PrimingPulses = 0;
-            Assert.AreEqual(0, new PulseBurst().Process(Observable.Return(procedure)).ToList().Wait().Count);
-        }
-
-        [TestMethod]
         public void WeighStable_WeighsAfterTheStepCompletesAndTheBalanceSettles()
         {
             var step = Observable.Timer(TimeSpan.FromMilliseconds(50)).Select(_ => "burst");
@@ -100,8 +68,8 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void TheOperatorsComposeIntoTheProcedure()
         {
-            // The same scenario the include wires: priming, baseline, three samples, against a simulated
-            // balance that gains 0.05 ul per ms of pulse plus 0.1 ul per pulse and reports every 5 ms.
+            // Priming, baseline and three samples, fired by FirePulses on a stand-in clock against a
+            // simulated balance that gains 0.05 ul per ms of pulse plus 0.1 ul per pulse and reports every 5 ms.
             var procedure = new DispenseProcedure
             {
                 Samples = new List<DispenseSample> { Sample(20), Sample(40), Sample(60) },
@@ -110,19 +78,19 @@ namespace OpenRigs.Core.Tests
             var requests = new Subject<Tuple<int, int>>();
             var grams = new double[1];
             var readings = new BehaviorSubject<WeightMeasurement>(new WeightMeasurement(0, 0, 1));
-            var burst = new PulseBurst();
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var clock = Observable.Interval(TimeSpan.FromMilliseconds(1)).Select(_ => stopwatch.Elapsed.TotalSeconds).Publish().RefCount();
             var weigh = new WeighStable { SettleWindow = 2, TimeoutSeconds = 2 };
 
-            Func<IObservable<Tuple<int, int>>, IObservable<double>> fireThenWeigh = pulses =>
-                weigh.Process(pulses.Do(requests.OnNext), readings);
+            Func<int, int, int, IObservable<double>> fireThenWeigh = (width, count, gap) => Observable.Defer(() =>
+                weigh.Process(new FirePulses { WidthMs = width, Count = count, PulseGapMs = gap }
+                    .Process(Observable.Return(0), clock).Do(requests.OnNext), readings));
 
             using (requests.Subscribe(request => grams[0] += (0.1 + 0.05 * request.Item2) / 1000.0))
             using (Observable.Interval(TimeSpan.FromMilliseconds(5)).Select(i => new WeightMeasurement(i, (float)grams[0], 1f)).Subscribe(readings))
             {
-                var weights = fireThenWeigh(burst.Process(Observable.Return(procedure)))
-                    .Concat(procedure.Samples.ToObservable().Select(sample => Observable.Defer(() => fireThenWeigh(burst.Process(Observable.Return(sample))))).Concat());
-                // The include does the arithmetic with stock nodes: Skip(1) zipped with the weights gives the gain,
-                // an ExpressionTransform divides by repeats and density.
+                var weights = fireThenWeigh(60, procedure.PrimingPulses, 2)
+                    .Concat(procedure.Samples.Select(sample => fireThenWeigh(sample.Size, sample.Repeats, sample.PulseGapMs)).Concat());
                 var gains = weights.Publish(shared => shared.Skip(1).Zip(shared, (current, previous) => current - previous));
                 var points = gains.Zip(procedure.Samples.ToObservable(), (gain, sample) => Tuple.Create((double)sample.Size, gain / sample.Repeats / procedure.DensityGPerMl * 1000.0))
                     .ToList().Timeout(TimeSpan.FromSeconds(20)).Wait();

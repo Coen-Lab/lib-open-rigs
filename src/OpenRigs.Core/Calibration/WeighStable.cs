@@ -12,14 +12,14 @@ namespace OpenRigs.Core
     /// in grams, or fails after <see cref="TimeoutSeconds"/>.
     /// </summary>
     /// <remarks>
-    /// The first input is the step to wait for, typically a <c>PulseBurst</c>, whose elements
+    /// The first input is the step to wait for, typically a <c>FirePulses</c>, whose elements
     /// are ignored. Only its completion matters, and an empty burst still weighs. The second
     /// input is the balance readings, such as the <c>BalanceReading</c> subject. Readings that
     /// arrived before the burst completed are not counted.
     /// </remarks>
     [Combinator]
     [DefaultProperty("SettleWindow")]
-    [Description("Weighs once the first input completes: waits for SettleWindow consecutive stable readings on the second input (the balance) and emits the last one's weight, in grams, or fails after TimeoutSeconds. Put it after a PulseBurst to weigh what the burst delivered. An empty burst still weighs, which gives the baseline.")]
+    [Description("Weighs once the first input completes: waits for SettleWindow consecutive stable readings on the second input (the balance) and emits the last one's weight, in grams, or fails after TimeoutSeconds. Put it after a FirePulses to weigh what the burst delivered. An empty burst still weighs, which gives the baseline.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class WeighStable
     {
