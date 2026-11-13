@@ -3,10 +3,11 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Delivers each reward, a (microlitres, RewardLine) pair: plans it (PlanReward), publishes the plan on RewardDelivered and fires its pulses through TriggerCalibratedPulse with FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, one reward after another (Concat); outputs the pulses. Loads both sides' reward lines once at start (RewardLineLeft, RewardLineRight) from rig.yml's wiring (LoadRewardLine). Writes each plan as a RewardDelivered row of BonsaiData_Async (AsyncEvents; Value the microlitres delivered, Detail starting with the side) and each calibrated line's file into the experiment as ValveCalibrationDO&lt;n&gt; (LogDataSchema). Place it after the logging that declares AsyncEvents and PathPrefix.</Description>
+  <Description>Delivers each reward, a (side, microlitres) pair with the side as rig.yml's wiring names it (left, right): plans it (PlanReward), publishes the plan on RewardDelivered and fires its pulses through TriggerCalibratedPulse with FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, one reward after another (Concat); outputs the pulses. Loads both sides' reward lines once at start (RewardLineLeft, RewardLineRight) from rig.yml's wiring (LoadRewardLine). Writes each plan as a RewardDelivered row of BonsaiData_Async (AsyncEvents; Value the microlitres delivered, Detail starting with the side) and each calibrated line's file into the experiment as ValveCalibrationDO&lt;n&gt; (LogDataSchema). Place it after the logging that declares AsyncEvents and PathPrefix.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -38,6 +39,21 @@
       </Expression>
       <Expression xsi:type="WorkflowInput">
         <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardLineLeft</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardLineRight</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:RewardForSide" />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="core:PlanReward" />
@@ -212,27 +228,32 @@
       <Edge From="1" To="2" Label="Source1" />
       <Edge From="0" To="3" Label="Source1" />
       <Edge From="3" To="4" Label="Source1" />
-      <Edge From="5" To="6" Label="Source1" />
-      <Edge From="6" To="7" Label="Source1" />
       <Edge From="6" To="8" Label="Source1" />
-      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="7" To="8" Label="Source2" />
+      <Edge From="5" To="9" Label="Source1" />
+      <Edge From="8" To="9" Label="Source2" />
       <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
       <Edge From="11" To="12" Label="Source1" />
-      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="11" To="13" Label="Source1" />
       <Edge From="13" To="14" Label="Source1" />
       <Edge From="14" To="15" Label="Source1" />
       <Edge From="16" To="17" Label="Source1" />
       <Edge From="17" To="18" Label="Source1" />
+      <Edge From="18" To="19" Label="Source1" />
       <Edge From="19" To="20" Label="Source1" />
-      <Edge From="20" To="21" Label="Source1" />
-      <Edge From="18" To="22" Label="Source1" />
-      <Edge From="21" To="22" Label="Source2" />
-      <Edge From="23" To="24" Label="Source1" />
+      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="22" To="23" Label="Source1" />
       <Edge From="24" To="25" Label="Source1" />
-      <Edge From="26" To="27" Label="Source1" />
-      <Edge From="27" To="28" Label="Source1" />
-      <Edge From="25" To="29" Label="Source1" />
-      <Edge From="28" To="29" Label="Source2" />
+      <Edge From="25" To="26" Label="Source1" />
+      <Edge From="23" To="27" Label="Source1" />
+      <Edge From="26" To="27" Label="Source2" />
+      <Edge From="28" To="29" Label="Source1" />
+      <Edge From="29" To="30" Label="Source1" />
+      <Edge From="31" To="32" Label="Source1" />
+      <Edge From="32" To="33" Label="Source1" />
+      <Edge From="30" To="34" Label="Source1" />
+      <Edge From="33" To="34" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

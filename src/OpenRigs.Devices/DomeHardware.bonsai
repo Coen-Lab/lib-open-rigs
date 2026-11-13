@@ -1,0 +1,410 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A dome's hardware from rig.yml, for every dome workflow. Takes each device's entry by name from RigConfigs (BehaviorBoard-Main, TimestampGeneratorGen3-Main, StepperDriver-A and -B, LicketySplit-Left and -Right, each an AsyncSubject of that name) and opens it behind its &lt;Name&gt;.Data and &lt;Name&gt;.Commands subjects. Publishes RigFile (rig.yml's path), HarpClockSet (the first Timestamp within 2 s of UTC), ZapitTriggerLine (the board line wiring gives ZapitTrigger: never pulsed, cleared when the workflow stops), WheelDistanceCm, LickStateLeft and LickStateRight; the board takes TriggerCalibratedPulse and TriggerPulse. Includes HarpLickSpoutStage, with this mouse's positions file calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml. Needs RigConfigs, RigConfigDirectory and SubjectId from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>BehaviorBoard</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>BehaviorBoard-Main</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>TimestampGeneratorGen3</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>TimestampGeneratorGen3-Main</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>TimestampGeneratorGen3-Main</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>StepperDriver</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>StepperDriver-A</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>StepperDriver-A</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>StepperDriver</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>StepperDriver-B</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>StepperDriver-B</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>LicketySplit</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>LicketySplit-Left</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>LicketySplit-Left</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>LicketySplit</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>LicketySplit-Right</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>LicketySplit-Right</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigDirectory</Name>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>it + "\\rig.yml"</scr:Expression>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TimestampGeneratorGen3-Main</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+          <Property Name="TimerFrequency" Selector="Settings.TimerFrequency" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:TimestampGeneratorGen3.bonsai">
+        <CommandsSubjectName>TimestampGeneratorCommands</CommandsSubjectName>
+        <PortName>UNMAPPED</PortName>
+        <DumpRegisters>true</DumpRegisters>
+        <Heartbeat>Enabled</Heartbeat>
+        <EventsSubjectName>ClockSynchronizerEvents</EventsSubjectName>
+        <TimerFrequency>Timer1000Hz</TimerFrequency>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ClockSynchronizerEvents</Name>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>TimestampGeneratorGen3-Main.Data</Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>TimestampGeneratorGen3-Main.Commands</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TimestampGeneratorGen3-Main.Commands</Name>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>TimestampGeneratorCommands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:HarpClockSet">
+          <dev:ToleranceSeconds>2</dev:ToleranceSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>HarpClockSet</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="RigFile" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:WiredOutput">
+          <dev:RigFile>UNMAPPED</dev:RigFile>
+          <dev:Board>BehaviorBoard-Main</dev:Board>
+          <dev:Device>ZapitTrigger</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>ZapitTriggerLine</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai">
+        <CommandsSubjectName>BehaviorBoard-Main.Commands</CommandsSubjectName>
+        <PortName>UNMAPPED</PortName>
+        <DumpRegisters>true</DumpRegisters>
+        <Heartbeat>Enabled</Heartbeat>
+        <EventsSubjectName>BehaviorBoard-Main.Data</EventsSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ZapitTriggerLine</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="Outputs" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ClearOutputsOnStop">
+          <dev:PortName>UNMAPPED</dev:PortName>
+          <dev:Outputs>DO3</dev:Outputs>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="CountsPerRev" Selector="Settings.RunningWheel.CountsPerRev" />
+          <Property Name="WheelDiameterMm" Selector="Settings.RunningWheel.WheelDiameterMm" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.RunningWheel.bonsai">
+        <CommandsSubjectName>BehaviorBoard-Main.Commands</CommandsSubjectName>
+        <EventsSubjectName>BehaviorBoard-Main.Data</EventsSubjectName>
+        <CountsPerRev>4096</CountsPerRev>
+        <WheelDiameterMm>0</WheelDiameterMm>
+        <WheelDistanceSubjectName>WheelDistanceCm</WheelDistanceSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Settings.PulseController.OutputPulseEnable</Selector>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ZapitTriggerLine</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:WithoutPulseLine" />
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="OutputPulseEnable" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.PulseController.bonsai">
+        <BehaviorCommandsSubjectName>BehaviorBoard-Main.Commands</BehaviorCommandsSubjectName>
+        <OutputPulseEnable>DO1 DO2</OutputPulseEnable>
+        <PulseDO1>1</PulseDO1>
+        <PulseDO2>1</PulseDO2>
+        <PulseDO3>1</PulseDO3>
+        <BehaviorEventsSubjectName>BehaviorBoard-Main.Data</BehaviorEventsSubjectName>
+        <TriggerPulseSubjectName>TriggerPulse</TriggerPulseSubjectName>
+        <TriggerCalibratedPulseSubjectName>TriggerCalibratedPulse</TriggerCalibratedPulseSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="EnableTrigger0" Selector="Settings.CameraTriggerController.Trigger0Enabled" />
+          <Property Name="EnableTrigger1" Selector="Settings.CameraTriggerController.Trigger1Enabled" />
+          <Property Name="Trigger0Frequency" Selector="Settings.CameraTriggerController.Trigger0Frequency" />
+          <Property Name="Trigger1Frequency" Selector="Settings.CameraTriggerController.Trigger1Frequency" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.CameraTriggerController.bonsai">
+        <EnableTrigger0>true</EnableTrigger0>
+        <EnableTrigger1>false</EnableTrigger1>
+        <Trigger0Frequency>50</Trigger0Frequency>
+        <Trigger1Frequency>50</Trigger1Frequency>
+        <BehaviorCommandsSubjectName>BehaviorBoard-Main.Commands</BehaviorCommandsSubjectName>
+        <BehaviorEventsSubjectName>BehaviorBoard-Main.Data</BehaviorEventsSubjectName>
+        <Camera0TriggerEventsSubjectName>Camera0TriggerEvents</Camera0TriggerEventsSubjectName>
+        <Camera1TriggerEventsSubjectName>Camera1TriggerEvents</Camera1TriggerEventsSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LicketySplit-Left</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+          <Property Name="Channel0TriggerThreshold" Selector="Settings.Channel0TriggerThreshold" />
+          <Property Name="Channel0UntriggerThreshold" Selector="Settings.Channel0UntriggerThreshold" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LicketySplit.bonsai">
+        <CommandsSubjectName>LicketySplit-Left.Commands</CommandsSubjectName>
+        <PortName>UNMAPPED</PortName>
+        <DumpRegisters>true</DumpRegisters>
+        <Heartbeat>Enabled</Heartbeat>
+        <EventsSubjectName>LicketySplit-Left.Data</EventsSubjectName>
+        <Channel0TriggerThreshold>0</Channel0TriggerThreshold>
+        <Channel0UntriggerThreshold>0</Channel0UntriggerThreshold>
+        <LickStateSubjectName>LickStateLeft</LickStateSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LicketySplit-Right</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+          <Property Name="Channel0TriggerThreshold" Selector="Settings.Channel0TriggerThreshold" />
+          <Property Name="Channel0UntriggerThreshold" Selector="Settings.Channel0UntriggerThreshold" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LicketySplit.bonsai">
+        <CommandsSubjectName>LicketySplit-Right.Commands</CommandsSubjectName>
+        <PortName>UNMAPPED</PortName>
+        <DumpRegisters>true</DumpRegisters>
+        <Heartbeat>Enabled</Heartbeat>
+        <EventsSubjectName>LicketySplit-Right.Data</EventsSubjectName>
+        <Channel0TriggerThreshold>0</Channel0TriggerThreshold>
+        <Channel0UntriggerThreshold>0</Channel0UntriggerThreshold>
+        <LickStateSubjectName>LickStateRight</LickStateSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigDirectory</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>SubjectId</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>it.Item1 + "\\calibration\\LickSpoutPositions\\" + it.Item2 + ".csv"</scr:Expression>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PositionsFile" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="RigFile" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="StepSize" DisplayName="SpoutStepSize" Description="Motor steps each spout nudge moves, read at each nudge." />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:HarpLickSpoutStage.bonsai">
+        <RigFile>UNMAPPED</RigFile>
+        <PositionsFile>UNMAPPED</PositionsFile>
+        <StepSize>150</StepSize>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
+      <Edge From="18" To="19" Label="Source1" />
+      <Edge From="20" To="21" Label="Source1" />
+      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="22" To="23" Label="Source1" />
+      <Edge From="24" To="25" Label="Source1" />
+      <Edge From="25" To="26" Label="Source1" />
+      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="28" To="29" Label="Source1" />
+      <Edge From="30" To="31" Label="Source1" />
+      <Edge From="33" To="34" Label="Source1" />
+      <Edge From="35" To="36" Label="Source1" />
+      <Edge From="36" To="37" Label="Source1" />
+      <Edge From="39" To="40" Label="Source1" />
+      <Edge From="38" To="41" Label="Source1" />
+      <Edge From="40" To="41" Label="Source2" />
+      <Edge From="41" To="42" Label="Source1" />
+      <Edge From="43" To="44" Label="Source1" />
+      <Edge From="44" To="45" Label="Source1" />
+      <Edge From="46" To="47" Label="Source1" />
+      <Edge From="48" To="49" Label="Source1" />
+      <Edge From="45" To="50" Label="Source1" />
+      <Edge From="47" To="50" Label="Source2" />
+      <Edge From="49" To="50" Label="Source3" />
+      <Edge From="51" To="52" Label="Source1" />
+      <Edge From="52" To="53" Label="Source1" />
+      <Edge From="54" To="55" Label="Source1" />
+      <Edge From="55" To="57" Label="Source1" />
+      <Edge From="56" To="57" Label="Source2" />
+      <Edge From="57" To="58" Label="Source1" />
+      <Edge From="58" To="59" Label="Source1" />
+      <Edge From="59" To="60" Label="Source1" />
+      <Edge From="61" To="62" Label="Source1" />
+      <Edge From="62" To="63" Label="Source1" />
+      <Edge From="64" To="65" Label="Source1" />
+      <Edge From="65" To="66" Label="Source1" />
+      <Edge From="67" To="68" Label="Source1" />
+      <Edge From="68" To="69" Label="Source1" />
+      <Edge From="70" To="72" Label="Source1" />
+      <Edge From="71" To="72" Label="Source2" />
+      <Edge From="72" To="73" Label="Source1" />
+      <Edge From="73" To="74" Label="Source1" />
+      <Edge From="75" To="76" Label="Source1" />
+      <Edge From="74" To="78" Label="Source1" />
+      <Edge From="76" To="78" Label="Source2" />
+      <Edge From="77" To="78" Label="Source3" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
