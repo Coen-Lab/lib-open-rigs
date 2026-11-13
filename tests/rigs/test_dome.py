@@ -55,6 +55,31 @@ def test_old_keys_gone():
     assert not keys & {"rewardValves", "interPulseInterval", "version"}
 
 
+@pytest.mark.parametrize(
+    "edit, keys",
+    [
+        (lambda rig: rig.update(rewardValves={"left": 1}, interPulseInterval=0.1), "interPulseInterval, rewardValves"),
+        (lambda rig: rig["zapit"].update(triggerLine="DO3"), "zapit.triggerLine"),
+        (lambda rig: rig["behaviorBoard"]["main"]["wiring"]["DO1"].update(valve="left"),
+         "behaviorBoard.main.wiring.DO1.valve"),
+        (lambda rig: rig["camera"]["face"].update(exposure=1), "camera.face.exposure"),
+    ],
+)
+def test_unknown_keys_refused(edit, keys):
+    # The generated C# refuses a key its classes lack, so a rig.yml still holding one stops at Start.
+    rig = copy.deepcopy(RIG)
+    edit(rig)
+    with pytest.raises(ValidationError, match=f"rig.yml has {keys}, which a dome does not use") as refused:
+        DomeRig.model_validate(rig)
+    assert "(dome rig model, open_rigs.rigs.dome)" in str(refused.value)
+
+
+def test_people_only_wiring_keys_kept():
+    rig = copy.deepcopy(RIG)
+    rig["behaviorBoard"]["main"]["wiring"]["DO3"] = {"device": "ZapitTrigger", "note": "also the masking light", "part": "BNC"}
+    DomeRig.model_validate(rig)
+
+
 def test_wiring_required():
     rig = copy.deepcopy(RIG)
     del rig["behaviorBoard"]["main"]["wiring"]
@@ -63,25 +88,29 @@ def test_wiring_required():
 
 
 @pytest.mark.parametrize(
-    "wiring, message",
+    "wiring, message, example",
     [
-        ({"DO1": {"device": "RewardValve", "side": "left"}, "DO3": {"device": "ZapitTrigger"}}, "one right RewardValve, has 0"),
+        ({"DO1": {"device": "RewardValve", "side": "left"}, "DO3": {"device": "ZapitTrigger"}}, "one right RewardValve, has 0",
+         "`DO2: { device: RewardValve, side: right }`"),
         ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "side": "left"},
-          "DO3": {"device": "ZapitTrigger"}}, "one left RewardValve, has 2"),
+          "DO3": {"device": "ZapitTrigger"}}, "one left RewardValve, has 2", "`DO1: { device: RewardValve, side: left }`"),
         ({"DO1": {"device": "RewardValve"}, "DO2": {"device": "RewardValve", "side": "right"},
-          "DO3": {"device": "ZapitTrigger"}}, "DO1 has no side"),
+          "DO3": {"device": "ZapitTrigger"}}, "DO1 has no side", "`DO1: { device: RewardValve, side: left }`"),
         ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "side": "right"}},
-         "one ZapitTrigger, has 0"),
+         "one ZapitTrigger, has 0", "`DO3: { device: ZapitTrigger }`"),
         ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "side": "right"},
-          "DO3": {"device": "ZapitTrigger"}, "DO0": {"device": "ZapitTrigger"}}, "one ZapitTrigger, has 2"),
+          "DO3": {"device": "ZapitTrigger"}, "DO0": {"device": "ZapitTrigger"}}, "one ZapitTrigger, has 2",
+         "`DO3: { device: ZapitTrigger }`"),
         ({"DO1": {"device": "RewardValve", "side": "left"}, "DO3": {"device": "RewardValve", "side": "right"},
-          "DO2": {"device": "ZapitTrigger"}}, "RewardValve DO3 needs a CalibratedPulse"),
+          "DO2": {"device": "ZapitTrigger"}}, "RewardValve DO3 needs a CalibratedPulse",
+         "`DO3: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO3.json }`"),
     ],
 )
-def test_wiring_refused(wiring, message):
+def test_wiring_refused(wiring, message, example):
     with pytest.raises(ValidationError, match=message) as refused:
         DomeRig.model_validate(rig_with(**wiring))
     assert "(dome rig model, open_rigs.rigs.dome)" in str(refused.value)
+    assert example in str(refused.value)
 
 
 def test_error_sound_channel_required():
