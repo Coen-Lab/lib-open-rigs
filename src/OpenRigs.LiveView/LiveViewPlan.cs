@@ -39,7 +39,7 @@ namespace OpenRigs.LiveView
                 Kind = "behaviorBoard", Template = "BehaviorBoard", Stream = "encoder", Rate = 10, Harp = true,
                 Channels = "channels", AnalogRate = 100,
             },
-            // Pip, 11 Nov 2026: the Lickety Splits and stepper drivers under the board in rig-control's
+            // Pip, 11 Nov 2026: the Lickety Splits and stepper drivers under the board in app-rig-control's
             // board view. One stream each, named .channels and shaped as the board's, so it is drawn alike.
             new DeviceRecipe
             {

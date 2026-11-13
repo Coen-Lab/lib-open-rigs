@@ -153,7 +153,7 @@ namespace OpenRigs.Video
         }
 
         // The vendor ids of cameras that belong to rigs and are never a calibration camera: FLIR
-        // (Spinnaker) and Basler (BLUE-OPTO's Zapit camera, which no rig.yml lists), as rig-control's
+        // (Spinnaker) and Basler (BLUE-OPTO's Zapit camera, which no rig.yml lists), as app-rig-control's
         // still_camera.py has them.
         static readonly string[] RigVendors = { "vid_1e10", "vid_2676" };
 

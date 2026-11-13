@@ -117,8 +117,8 @@ namespace OpenRigs.Manifest
                     }
                     // The workflow's Finished and the controller's stop are written as soon as they
                     // come, the run still going, as completed or stopped with run.final false:
-                    // rig-control kills a workflow that has not stopped by its deadline, and the
-                    // end-of-run write never comes (L1-L2). Not final, so rig-control keeps an
+                    // app-rig-control kills a workflow that has not stopped by its deadline, and the
+                    // end-of-run write never comes (L1-L2). Not final, so app-rig-control keeps an
                     // editor's Bonsai open until the end-of-run write, which sets run.final true.
                     if (control != null) subscriptions.Add(Observable.Interval(StopPoll).Subscribe(_ =>
                     {
@@ -215,7 +215,7 @@ namespace OpenRigs.Manifest
         /// <summary>
         /// The end when the workflow stops with the run unfinished. With a controller: completed
         /// if the workflow reported Finished (even if the controller stopped it after, as
-        /// rig-control does after every run), stopped if the controller stopped it before, otherwise
+        /// app-rig-control does after every run), stopped if the controller stopped it before, otherwise
         /// the run ended early from something this node cannot see (an error elsewhere, the
         /// editor's Stop button). Without one, stopped: the editor's Stop is how such a run ends.
         /// </summary>

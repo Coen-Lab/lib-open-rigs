@@ -156,7 +156,7 @@ namespace OpenRigs.LiveView.Tests
                 Check("a workflow named only after the bootstrapper's --no-boot is not the one launched", relaunched == null, relaunched);
                 // RecordHarpDevices' default; a StreamDevices left unset streamed nothing (set C, S4-L2).
                 var settings = new StreamDevicesSettings();
-                Check("ConfigRoot defaults to the folder rig-setup keeps each rig.yml under", settings.ConfigRoot == @"C:\Coen-Lab-Local\RigConfigs", settings.ConfigRoot);
+                Check("ConfigRoot defaults to the folder app-rig-setup keeps each rig.yml under", settings.ConfigRoot == @"C:\Coen-Lab-Local\RigConfigs", settings.ConfigRoot);
             }
             finally
             {

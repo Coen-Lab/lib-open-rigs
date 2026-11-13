@@ -265,7 +265,7 @@ namespace OpenRigs.Manifest.Tests
 
         // The one name two languages make (claude-tools docs\architecture\records.md, Experiment folder name):
         // fixtures\experiment-folder\v1\names.json holds this package's reader and LogController's format, as it
-        // holds rig-control's rename.
+        // holds app-rig-control's rename.
         static void ExperimentFolder(string repo)
         {
             Console.WriteLine("The experiment folder's name:");
@@ -321,7 +321,7 @@ namespace OpenRigs.Manifest.Tests
 
                 Console.WriteLine("How the run ended, with no run input:");
                 var finishedThenStopped = RunExperiment(root, "a", Controller(), c => { c.SetPhase(ExperimentPhase.Finished); Stop(c, "run finished"); });
-                Check("a run that finished, then was stopped by rig-control, is completed", Field(finishedThenStopped, "run.outcome") == "completed", Field(finishedThenStopped, "run.outcome"));
+                Check("a run that finished, then was stopped by app-rig-control, is completed", Field(finishedThenStopped, "run.outcome") == "completed", Field(finishedThenStopped, "run.outcome"));
                 Check("... in a folder named ses-<Session>_<DateTime>, its session read from the name", Field(finishedThenStopped, "session.id") == "a" && Field(finishedThenStopped, "session.subject") == "TC002" && Field(finishedThenStopped, "session.started") == "2026-10-30T19:57:12Z", Field(finishedThenStopped, "session.id") + " " + Field(finishedThenStopped, "session.started"));
                 Check("... with no stop reason", Field(finishedThenStopped, "run.stop_reason") == "null", Field(finishedThenStopped, "run.stop_reason"));
                 var finished = RunExperiment(root, "b", Controller(), c => c.SetPhase(ExperimentPhase.Finished));
@@ -346,7 +346,7 @@ namespace OpenRigs.Manifest.Tests
                 Check("control names who launched the experiment and who sent Go", Field(named, "control.launched_by.id") == "PipC" && Field(named, "control.launched_by.name") == "Pip Coen" && Field(named, "control.go_by.id") == "JoB", named);
                 Check("... and who stopped it", Field(named, "control.stopped_by.name") == "Jo Bloggs" && Field(named, "control.stopped_by.id") == "", Field(named, "control.stopped_by.name"));
                 {
-                    // S3-L3: rig-control kills a workflow slow to stop, so the running write is the last.
+                    // S3-L3: app-rig-control kills a workflow slow to stop, so the running write is the last.
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-slow_2026-10-30T19-57-12");
                     var path = new Subject<string>();
@@ -404,7 +404,7 @@ namespace OpenRigs.Manifest.Tests
                     && ExpectedPlan.Matches(schemas[1], inSchemas, schemas) == 0, "the rig's file met the task's entry, or not its own");
                 Check("... and does not keep that file from meeting its folder", ExpectedPlan.Matches(schemas[2], inSchemas, schemas) == 1, "the folder was not met");
                 // 0.1.0-local.10: the writer and its version, and what a dirty checkout changed.
-                // The version the build stamped: open-rigs' build sets it (rig-setup's workflows\build-package.ps1
+                // The version the build stamped: open-rigs' build sets it (app-rig-setup's workflows\build-package.ps1
                 // passes the .csproj's <Version>; a plain build is 42.42.42-dev0).
                 var built = ((AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(typeof(ManifestWriter).Assembly, typeof(AssemblyInformationalVersionAttribute))).InformationalVersion.Split('+')[0];
                 Check("writer names the package and its version as built", Field(finished, "writer.package") == "OpenRigs.Manifest" && Field(finished, "writer.version") == built, Field(finished, "writer.version") + " vs " + built);
@@ -473,7 +473,7 @@ namespace OpenRigs.Manifest.Tests
                 }
                 {
                     // L1-L2 (8 Nov 2026): a workflow killed after its Finished lost its outcome. It is written
-                    // as Finished comes, not final, and rig-control keeps an editor's Bonsai open until the
+                    // as Finished comes, not final, and app-rig-control keeps an editor's Bonsai open until the
                     // end-of-run write sets run.final true.
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-fin_2026-10-30T19-57-12");
@@ -574,7 +574,7 @@ namespace OpenRigs.Manifest.Tests
                 ManifestWriter.WriteAtomically(file, "two");
                 Check("a second write replaces the first and leaves no .tmp", File.ReadAllText(file) == "two" && Directory.GetFiles(root, "atomic.json.*.tmp").Length == 0, File.ReadAllText(file));
                 {
-                    // A reader without delete sharing, as Python's open() is (rig-control polls manifest.json every second).
+                    // A reader without delete sharing, as Python's open() is (app-rig-control polls manifest.json every second).
                     var opened = new System.Threading.ManualResetEventSlim();
                     var reader = new System.Threading.Thread(() =>
                     {

@@ -11,7 +11,7 @@ namespace OpenRigs.HarpDevices
     /// <summary>
     /// Which board is on which serial port, by the USB serial number its chip was made with: an
     /// FTDI chip's (Harp boards, AB0M7PLB) or a Pico's flash id (E664C856C3913E37). Read the way
-    /// rig-setup's machine record reads it (engine\machine.ps1, Get-UsbSerialFromIds), so the
+    /// app-rig-setup's machine record reads it (engine\machine.ps1, Get-UsbSerialFromIds), so the
     /// serial this checks is the one the rig's nightly scan lists.
     /// </summary>
     static class UsbSerials
@@ -20,7 +20,7 @@ namespace OpenRigs.HarpDevices
         /// Every serial port plugged in now, its name (COM3) to its USB serial, '' for a port with
         /// none (a motherboard COM1, a chip that makes one up). Ports that are not plugged in are
         /// left out: Windows remembers them, and only the board in the socket now matters here.
-        /// Each port's identity is read once, as rig-setup's scan reads it (S4-L5): its name from the
+        /// Each port's identity is read once, as app-rig-setup's scan reads it (S4-L5): its name from the
         /// registry's PortName first, and plugged in when its Status is OK.
         /// </summary>
         public static Dictionary<string, string> Present()
@@ -43,7 +43,7 @@ namespace OpenRigs.HarpDevices
         }
 
         /// <summary>
-        /// The port's name as its driver registered it (Device Parameters\PortName), as rig-setup
+        /// The port's name as its driver registered it (Device Parameters\PortName), as app-rig-setup
         /// reads it; null when there is none, and then the display name's is used.
         /// </summary>
         static string RegistryPortName(string instanceId)

@@ -38,7 +38,7 @@ namespace OpenRigs.Logging
         /// <remarks>
         /// The Bonsai CsvWriter writes through a StreamWriter that flushes only when its 4 KB buffer
         /// fills or the file closes. An experiment's trial log, a few rows a minute, then reached disk
-        /// tens of trials late, and a Bonsai ended by force lost its unflushed tail (rig-control,
+        /// tens of trials late, and a Bonsai ended by force lost its unflushed tail (app-rig-control,
         /// 1 Nov 2026: 411 rows against 503 frames). A flush per row costs a write per row, so it
         /// is for slow logs only (LogTrial and LogAsync turn it on), never a Harp log at 1 kHz.
         /// </remarks>

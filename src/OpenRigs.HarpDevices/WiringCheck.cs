@@ -27,7 +27,7 @@ namespace OpenRigs.HarpDevices
         public string Refusal(string board)
         {
             if (Problems.Count == 0) return null;
-            // One line: rig-control keeps only the first line of a workflow's error (audit, 8 Nov 2026).
+            // One line: app-rig-control keeps only the first line of a workflow's error (audit, 8 Nov 2026).
             return board + "'s wiring in rig.yml does not agree with the lines this workflow uses (" + WiringCheck.LinesFile + "), so it does not start: " +
                 string.Join("; ", Problems) +
                 ". Fix whichever is wrong: rig.yml's wiring says what is plugged in on this rig, the workflow's file what it drives or reads on each line.";
@@ -42,7 +42,7 @@ namespace OpenRigs.HarpDevices
     /// use may be anything or unknown. A workflow without the file, or a board the file does not list,
     /// is not checked; a file that cannot be read, or a board's entry that is not a list, refuses.
     /// Nothing yet holds a device word to a lab list: wiredDevices in the device dictionary, checked by
-    /// rig-control's names check before launch, is planned (DECISIONS.md, 7 Nov 2026), so Start never
+    /// app-rig-control's names check before launch, is planned (DECISIONS.md, 7 Nov 2026), so Start never
     /// depends on the share.
     /// </summary>
     static class WiringCheck

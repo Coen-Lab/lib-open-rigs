@@ -33,7 +33,7 @@ class WiredLine(BaseSchema):
 
     device: str = Field(
         examples=["RewardValve", "CameraTrigger", "Photodiode", "ZapitTrigger"],
-        description=r"What is on the line, as the workflow's board-lines.yml names it: one of the lab's wiredDevices in K:\config\device-dictionary.json, checked by rig-control's names check.",
+        description=r"What is on the line, as the workflow's board-lines.yml names it: one of the lab's wiredDevices in K:\config\device-dictionary.json, checked by app-rig-control's names check.",
     )
     side: Optional[Side] = Field(default=None, description="The side it serves, where that matters (a reward valve).")
     targets: Optional[List[str]] = Field(
@@ -137,7 +137,7 @@ class SpinnakerCamera(_SpinnakerCamera):
 # No version (Pip, 3 Nov 2026): a rig's rig.yml is written once at deploy and is then the rig's,
 # so a version in it went stale at every change while nothing read it. Whether a workflow takes
 # the file is told by its keys instead: the workflow refuses any key its classes lack, and
-# rig-setup's rig.yml row names each one a clone on the rig would refuse.
+# app-rig-setup's rig.yml row names each one a clone on the rig would refuse.
 class BehaviourBoxRig(Rig):
     behavior_board: Dict[str, BehaviorBoard] = Field(
         description="Harp Behavior boards by name, such as main (BehaviorBoard-Main): serial port, camera trigger on Trigger0 and running wheel on encoder port 2."

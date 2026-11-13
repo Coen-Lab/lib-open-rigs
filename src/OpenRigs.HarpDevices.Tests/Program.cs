@@ -104,7 +104,7 @@ namespace OpenRigs.HarpDevices.Tests
             Directory.CreateDirectory(root);
             try
             {
-                Console.WriteLine("USB serials, as rig-setup's scan reads them:");
+                Console.WriteLine("USB serials, as app-rig-setup's scan reads them:");
                 Check("an FTDI chip's is its parent's id's last part", UsbSerials.FromIds(@"FTDIBUS\VID_0403+PID_6001+AB0M7PLBA\0000", @"USB\VID_0403&PID_6001\AB0M7PLB") == "AB0M7PLB", "wrong");
                 Check("a Pico's, a composite device's interface, is its parent's", UsbSerials.FromIds(@"USB\VID_2E8A&PID_000A&MI_00\6&2B157701&0&0000", @"USB\VID_2E8A&PID_000A\E664C856C3913E37") == "E664C856C3913E37", "wrong");
                 Check("a plain USB device's is its own", UsbSerials.FromIds(@"USB\VID_1234&PID_0001\SER123", @"USB\ROOT_HUB30\4&1&0&0") == "SER123", "wrong");
@@ -354,7 +354,7 @@ namespace OpenRigs.HarpDevices.Tests
                     // Audit, 8 Nov 2026.
                     var twoProblems = wiringOf(rigText.Replace("side: left, part", "side: right, part").Replace("DO3: { device: ZapitTrigger }", "DO3: { device: AirPuff }"), linesText);
                     var refusal = twoProblems.Refusal("BehaviorBoard-Main");
-                    Check("the refusal is one line, every disagreement in it, as rig-control keeps only a workflow error's first line",
+                    Check("the refusal is one line, every disagreement in it, as app-rig-control keeps only a workflow error's first line",
                         twoProblems.Problems.Count == 2 && !refusal.Contains("\n") && twoProblems.Problems.All(refusal.Contains), refusal);
                     var notCabled = rigText.Replace("zapit: { hardwareTriggered: true, triggerLine: 3 }", "zapit: { hardwareTriggered: false, triggerLine: 3 }").Replace("      DO3: { device: ZapitTrigger }\n", "");
                     var zapitOff = wiringOf(notCabled, linesText);

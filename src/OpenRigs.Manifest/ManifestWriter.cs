@@ -273,7 +273,7 @@ namespace OpenRigs.Manifest
             {
                 File.WriteAllText(tmp, text, new UTF8Encoding(false));
                 // Windows refuses the rename while a reader holds the file without delete sharing
-                // (Python's open(); rig-control polls manifest.json every second): wait it out, about 0.5 s.
+                // (Python's open(); app-rig-control polls manifest.json every second): wait it out, about 0.5 s.
                 for (var attempt = 1; ; attempt++)
                 {
                     try

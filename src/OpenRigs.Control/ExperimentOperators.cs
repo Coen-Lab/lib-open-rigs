@@ -152,7 +152,7 @@ namespace OpenRigs.Control
     }
 
     /// <summary>
-    /// Who pressed Go, as the controller vouched for them (rig-control: from the Lab PIN or the
+    /// Who pressed Go, as the controller vouched for them (app-rig-control: from the Lab PIN or the
     /// launch's control token), else who launched the experiment, else empty: a name for
     /// provenance, such as a calibration's calibratedBy.
     /// </summary>

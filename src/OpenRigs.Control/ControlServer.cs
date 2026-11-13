@@ -107,7 +107,7 @@ namespace OpenRigs.Control
 
     /// <summary>
     /// A person a controller names on a request: who launched the experiment, sent Go or stopped it.
-    /// The controller vouches for them (rig-control checks a PIN first); the workflow only records.
+    /// The controller vouches for them (app-rig-control checks a PIN first); the workflow only records.
     /// </summary>
     public class Person
     {
@@ -269,7 +269,7 @@ namespace OpenRigs.Control
         public Person StoppedBy { get; internal set; }
 
         /// <summary>When the workflow reported Finished; null if it never did. Kept because the
-        /// phase moves on to Stopping when the controller stops a finished experiment, as rig-control
+        /// phase moves on to Stopping when the controller stops a finished experiment, as app-rig-control
         /// does after every run, and a run that finished is still one that finished.</summary>
         public DateTime? FinishedAt { get; private set; }
 
