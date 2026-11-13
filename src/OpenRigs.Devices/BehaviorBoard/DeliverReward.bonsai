@@ -7,13 +7,14 @@
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Delivers each reward, a (side, microlitres) pair with the side as rig.yml's wiring names it (left, right): plans it (PlanReward), publishes the plan on RewardDelivered and fires its pulses through TriggerCalibratedPulse with FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, one reward after another (Concat); outputs the pulses. Loads both sides' reward lines once at start (RewardLineLeft, RewardLineRight) from rig.yml's wiring (LoadRewardLine). Writes each plan as a RewardDelivered row of BonsaiData_Async (AsyncEvents; Value the microlitres delivered, Detail starting with the side) and each calibrated line's file into the experiment as ValveCalibrationDO&lt;n&gt; (LogDataSchema). Place it after the logging that declares AsyncEvents and PathPrefix.</Description>
+  <Description>Delivers each reward, a (side, microlitres) pair with the side as rig.yml's wiring names it (left, right): plans it (PlanReward), publishes the plan on RewardDelivered and fires its pulses through TriggerCalibratedPulse with one FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, so a reward that comes while one fires starts pulseGapMs after its last pulse closes; outputs the pulses. Loads both sides' reward lines once at start (RewardLineLeft, RewardLineRight) from rig.yml's wiring (LoadRewardLine); a reward above MaxRewardUl (20 ul by default) stops the workflow. Writes each plan as a RewardDelivered row of BonsaiData_Async (AsyncEvents; Value the microlitres delivered, Detail starting with the side) and each calibrated line's file into the experiment as ValveCalibrationDO&lt;n&gt; (LogDataSchema). Place it after the logging that declares AsyncEvents and PathPrefix.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="RigFile" />
         <Property Name="CalibrationDirectory" />
         <Property Name="MissingCalibration" />
+        <Property Name="MaxRewardUl" />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="core:LoadRewardLine">
@@ -21,6 +22,7 @@
           <core:Side>left</core:Side>
           <core:CalibrationDirectory />
           <core:MissingCalibration>Refuse</core:MissingCalibration>
+          <core:MaxRewardUl>20</core:MaxRewardUl>
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
@@ -32,6 +34,7 @@
           <core:Side>right</core:Side>
           <core:CalibrationDirectory />
           <core:MissingCalibration>Refuse</core:MissingCalibration>
+          <core:MaxRewardUl>20</core:MaxRewardUl>
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
@@ -61,66 +64,27 @@
       <Expression xsi:type="rx:BehaviorSubject">
         <Name>RewardDelivered</Name>
       </Expression>
-      <Expression xsi:type="rx:CreateObservable">
-        <Name>FirePlan</Name>
-        <Description>Fires one plan's pulses through TriggerCalibratedPulse with FirePulses on the Harp clock (Timestamp), at the plan's width and the calibration's pulseGapMs.</Description>
-        <Workflow>
-          <Nodes>
-            <Expression xsi:type="WorkflowInput">
-              <Name>Source1</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:Take">
-                <rx:Count>1</rx:Count>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="rx:AsyncSubject">
-              <Name>Plan</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>Plan</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>Timestamp</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>Plan</Name>
-            </Expression>
-            <Expression xsi:type="PropertyMapping">
-              <PropertyMappings>
-                <Property Name="Line" Selector="Line" />
-                <Property Name="WidthMs" Selector="WidthMs" />
-                <Property Name="Count" Selector="Count" />
-                <Property Name="PulseGapMs" Selector="PulseGapMs" />
-              </PropertyMappings>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="core:FirePulses">
-                <core:Line>1</core:Line>
-                <core:WidthMs>1</core:WidthMs>
-                <core:Count>0</core:Count>
-                <core:PulseGapMs>0</core:PulseGapMs>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>TriggerCalibratedPulse</Name>
-            </Expression>
-            <Expression xsi:type="WorkflowOutput" />
-          </Nodes>
-          <Edges>
-            <Edge From="0" To="1" Label="Source1" />
-            <Edge From="1" To="2" Label="Source1" />
-            <Edge From="5" To="6" Label="Source1" />
-            <Edge From="3" To="7" Label="Source1" />
-            <Edge From="4" To="7" Label="Source2" />
-            <Edge From="6" To="7" Label="Source3" />
-            <Edge From="7" To="8" Label="Source1" />
-            <Edge From="8" To="9" Label="Source1" />
-          </Edges>
-        </Workflow>
+      <Expression xsi:type="InputMapping">
+        <PropertyMappings>
+          <Property Name="Line" Selector="Line" />
+          <Property Name="WidthMs" Selector="WidthMs" />
+          <Property Name="Count" Selector="Count" />
+          <Property Name="PulseGapMs" Selector="PulseGapMs" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Timestamp</Name>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:Concat" />
+        <Combinator xsi:type="core:FirePulses">
+          <core:Line>1</core:Line>
+          <core:WidthMs>1</core:WidthMs>
+          <core:Count>0</core:Count>
+          <core:PulseGapMs>0</core:PulseGapMs>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>TriggerCalibratedPulse</Name>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
       <Expression xsi:type="SubscribeSubject">
@@ -236,24 +200,26 @@
       <Edge From="10" To="11" Label="Source1" />
       <Edge From="11" To="12" Label="Source1" />
       <Edge From="11" To="13" Label="Source1" />
-      <Edge From="13" To="14" Label="Source1" />
-      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="13" To="15" Label="Source1" />
+      <Edge From="14" To="15" Label="Source2" />
+      <Edge From="15" To="16" Label="Source1" />
       <Edge From="16" To="17" Label="Source1" />
-      <Edge From="17" To="18" Label="Source1" />
       <Edge From="18" To="19" Label="Source1" />
       <Edge From="19" To="20" Label="Source1" />
+      <Edge From="20" To="21" Label="Source1" />
       <Edge From="21" To="22" Label="Source1" />
-      <Edge From="22" To="23" Label="Source1" />
+      <Edge From="23" To="24" Label="Source1" />
       <Edge From="24" To="25" Label="Source1" />
-      <Edge From="25" To="26" Label="Source1" />
-      <Edge From="23" To="27" Label="Source1" />
-      <Edge From="26" To="27" Label="Source2" />
-      <Edge From="28" To="29" Label="Source1" />
-      <Edge From="29" To="30" Label="Source1" />
+      <Edge From="26" To="27" Label="Source1" />
+      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="25" To="29" Label="Source1" />
+      <Edge From="28" To="29" Label="Source2" />
+      <Edge From="30" To="31" Label="Source1" />
       <Edge From="31" To="32" Label="Source1" />
-      <Edge From="32" To="33" Label="Source1" />
-      <Edge From="30" To="34" Label="Source1" />
-      <Edge From="33" To="34" Label="Source2" />
+      <Edge From="33" To="34" Label="Source1" />
+      <Edge From="34" To="35" Label="Source1" />
+      <Edge From="32" To="36" Label="Source1" />
+      <Edge From="35" To="36" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

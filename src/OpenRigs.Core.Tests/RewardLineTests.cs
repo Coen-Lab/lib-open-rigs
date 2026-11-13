@@ -61,7 +61,7 @@ namespace OpenRigs.Core.Tests
 
         RewardLine Load(string rig, string calibration, string side = "left", MissingCalibration missing = MissingCalibration.Refuse)
         {
-            return LoadRewardLine.Load(Write(rig, calibration), side, "", Machine, missing);
+            return LoadRewardLine.Load(Write(rig, calibration), side, "", Machine, missing, LoadRewardLine.DefaultMaxRewardUl);
         }
 
         string Refusal(string rig, string calibration, string side = "left")
@@ -192,6 +192,73 @@ namespace OpenRigs.Core.Tests
             var none = PlanReward.Plan(uncalibrated, 2.0);
             Assert.AreEqual(0, none.Count);
             Assert.AreEqual(0.0, none.DeliveredUl);
+        }
+
+        [TestMethod]
+        public void RewardsQueuedInOneFirePulsesKeepTheGapBetweenThem()
+        {
+            // As DeliverReward wires it: each plan sets FirePulses' properties (its InputMapping) as it goes in.
+            var fire = new FirePulses();
+            var plans = new System.Reactive.Subjects.Subject<RewardPlan>();
+            var clock = new System.Reactive.Subjects.Subject<double>();
+            var mapped = System.Reactive.Linq.Observable.Do(plans, plan =>
+            {
+                fire.Line = plan.Line;
+                fire.WidthMs = plan.WidthMs;
+                fire.Count = plan.Count;
+                fire.PulseGapMs = plan.PulseGapMs;
+            });
+            double now = 0;
+            var onsets = new System.Collections.Generic.List<double>();
+            using (fire.Process(mapped, clock).Subscribe(pulse => onsets.Add(now)))
+            {
+                clock.OnNext(0);
+                plans.OnNext(PlanReward.Plan(Calibrated(), 2.0));  // one pulse of 38 ms
+                plans.OnNext(PlanReward.Plan(Calibrated(), 6.0));  // two of 56 ms, at the fixture's 100 ms gap
+                for (var ms = 1; ms <= 1000; ms++) clock.OnNext(now = ms / 1000.0);
+            }
+            CollectionAssert.AreEqual(new[] { 0.0, 0.138, 0.294 }, onsets.ConvertAll(t => Math.Round(t, 6)));
+        }
+
+        [TestMethod]
+        public void RefusesARewardAboveTheMaximum()
+        {
+            var line = Calibrated();
+            Assert.AreEqual(20, line.MaxRewardUl);
+            Assert.AreEqual(7, PlanReward.Plan(line, 20).Count);  // the maximum itself is planned
+            foreach (var ul in new[] { 30.0, 1e12, double.PositiveInfinity })
+            {
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(line, ul));
+                StringAssert.Contains(ex.Message, "more than the 20 ul one reward may give");
+            }
+            File.Delete(Path.Combine(folder, "calibration", "valve-DO1.json"));
+            var uncalibrated = Load(Rig, null, missing: MissingCalibration.DeliverNothing);
+            Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(uncalibrated, 30));
+        }
+
+        [TestMethod]
+        public void RefusesAMaximumThatAllowsNothing()
+        {
+            foreach (var max in new[] { 0.0, -1.0, double.NaN, double.PositiveInfinity })
+            {
+                var ex = Assert.ThrowsException<ArgumentOutOfRangeException>(() =>
+                    LoadRewardLine.Load(Write(Rig, Fixture), "left", "", Machine, MissingCalibration.Refuse, max));
+                StringAssert.Contains(ex.Message, "MaxRewardUl");
+            }
+        }
+
+        [TestMethod]
+        public void RefusesACountThatWouldOverflow()
+        {
+            // 1e-5 ul a pulse at most: 20 ul would be 2 million pulses
+            var line = Load(Rig, Edit(Fixture, f =>
+            {
+                f["linearFit"]["slope"] = 1e-7;
+                f["linearFit"]["intercept"] = 0.0;
+                f["linearFit"]["maxX"] = 60;
+            }));
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(line, 20));
+            StringAssert.Contains(ex.Message, "more than 65535");
         }
 
         [TestMethod]

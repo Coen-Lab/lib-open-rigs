@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Xml.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Core;
 
@@ -23,5 +25,35 @@ namespace OpenRigs.Devices.Tests
             var ex = Assert.ThrowsException<ArgumentException>(() => RewardForSide.Pick("centre", Left, Right));
             StringAssert.Contains(ex.Message, "side 'centre': the reward lines are left and right");
         }
+
+        // One FirePulses queues each reward a gap after the last (RewardLineTests); one per reward did not.
+        [TestMethod]
+        public void DeliverRewardFiresEveryRewardThroughOneFirePulses()
+        {
+            XNamespace xsi = "http://www.w3.org/2001/XMLSchema-instance";
+            XDocument workflow;
+            using (var stream = typeof(RewardForSide).Assembly.GetManifestResourceStream("OpenRigs.Devices.BehaviorBoard.DeliverReward.bonsai"))
+            {
+                workflow = XDocument.Load(stream);
+            }
+            var types = workflow.Descendants().Select(e => (string)e.Attribute(xsi + "type")).Where(t => t != null).ToList();
+            Assert.AreEqual(1, types.Count(t => t == "core:FirePulses"));
+            Assert.IsFalse(types.Contains("rx:CreateObservable") || types.Contains("rx:Concat"));
+
+            var nodes = workflow.Root.Element(Bonsai + "Workflow").Element(Bonsai + "Nodes").Elements().ToList();
+            var edges = workflow.Root.Element(Bonsai + "Workflow").Element(Bonsai + "Edges").Elements()
+                .Select(e => new { From = (int)e.Attribute("From"), To = (int)e.Attribute("To"), Label = (string)e.Attribute("Label") }).ToList();
+            Func<int, string> type = index => (string)nodes[index].Attribute(xsi + "type") == "Combinator"
+                ? (string)nodes[index].Elements().First().Attribute(xsi + "type")
+                : (string)nodes[index].Attribute(xsi + "type");
+            var fire = nodes.FindIndex(n => type(nodes.IndexOf(n)) == "core:FirePulses");
+            var input = edges.Single(e => e.To == fire && e.Label == "Source1").From;
+            Assert.AreEqual("InputMapping", type(input));
+            CollectionAssert.AreEquivalent(new[] { "Line", "WidthMs", "Count", "PulseGapMs" },
+                nodes[input].Descendants(Bonsai + "Property").Select(p => (string)p.Attribute("Name")).ToArray());
+            Assert.AreEqual("core:PlanReward", type(edges.Single(e => e.To == input).From));
+        }
+
+        static readonly XNamespace Bonsai = "https://bonsai-rx.org/2018/workflow";
     }
 }
