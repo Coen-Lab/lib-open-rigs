@@ -30,6 +30,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{DEE5DD87
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Core.Tests", "src\OpenRigs.Core.Tests\OpenRigs.Core.Tests.csproj", "{EDE58EBC-D6EB-4671-8464-13581A61A687}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{B2E5F084-2FFD-4476-8510-764F7006418F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Devices.Tests", "src\OpenRigs.Devices.Tests\OpenRigs.Devices.Tests.csproj", "{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -72,11 +76,18 @@ Global
 		{EDE58EBC-D6EB-4671-8464-13581A61A687}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EDE58EBC-D6EB-4671-8464-13581A61A687}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EDE58EBC-D6EB-4671-8464-13581A61A687}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {6BCBC17F-9E00-4ABC-9CEE-ABB0337E929D}
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9} = {B2E5F084-2FFD-4476-8510-764F7006418F}
 	EndGlobalSection
 EndGlobal
