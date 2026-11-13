@@ -6,7 +6,6 @@ from swc.aeon.schema import BaseSchema
 from open_rigs.devices.harp import HarpBehavior
 from open_rigs.core.artefacts import ArtefactPath
 from open_rigs.core.base import DiscriminatorTypeMixin, UShort, bind_typename
-from open_rigs.core.calibration import CalibrationModel
 
 
 class DigitalOutputs(RootModel[str]):
@@ -50,23 +49,14 @@ class FixedPulse(DiscriminatorTypeMixin, BaseSchema):
 
 
 class CalibratedPulse(DiscriminatorTypeMixin, BaseSchema):
-    """A pulsed output whose width comes from a calibration curve at run time, such as a reward valve."""
+    """A pulsed output whose width comes from a calibration curve's linear fit at run time, such as a reward valve."""
 
     artefact: ArtefactPath = Field(
         examples=["calibration/valve-DO1.json"],
         description=(
             "Relative path of the CalibrationCurve that converts the requested quantity to a pulse width: "
-            "a file written by the platform's DispenseCalibration procedure into this machine's calibration folder."
+            "a file in this machine's calibration folder holding the measured points and their linear fit."
         ),
-    )
-    fit: CalibrationModel = Field(
-        default=CalibrationModel.LINEAR_FIT,
-        description="How the rig fits the artefact's points at startup. LinearFit suits repeated weighings.",
-    )
-    max_age_days: int = Field(
-        default=90,
-        ge=0,
-        description="Warn at startup when the artefact is older than this many days. 0 disables the check.",
     )
 
 

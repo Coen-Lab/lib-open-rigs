@@ -94,19 +94,6 @@
       "title": "CalibrationCurve",
       "type": "object"
     },
-    "CalibrationModel": {
-      "description": "How a calibration curve is derived from its points; the `OpenRigs.Core.CalibrationModel` operators' enum.",
-      "enum": [
-        "LinearFit",
-        "PolynomialFit",
-        "Linear",
-        "CubicSpline",
-        "Step"
-      ],
-      "title": "CalibrationModel",
-      "type": "string",
-      "x-sgen-typename": "OpenRigs.Core.CalibrationModel"
-    },
     "CalibrationPoint": {
       "description": "One measured pair of a calibration curve.",
       "properties": {
@@ -129,7 +116,7 @@
       "type": "object"
     },
     "DispenseCalibration": {
-      "description": "What an experiment repository commits as `config/<dispenser>-calibration.yml`.\n\n`OpenRigs.Core:DispenseCalibration.bonsai` deserialises it with the Core `DeserializeFromYaml`\nand runs the procedure; the balance port is set on the workflow at run time.",
+      "description": "What an experiment repository commits as `config/<dispenser>-calibration.yml`.\n\nA calibration workflow deserialises it with the Core `DeserializeFromYaml` and runs the\nprocedure; the balance port is set on the workflow at run time.",
       "properties": {
         "procedure": {
           "$ref": "#/$defs/DispenseProcedure",
@@ -164,7 +151,7 @@
       "type": "object"
     },
     "DispenseProcedure": {
-      "description": "Settings of the dispense calibration: fire known sizes, weigh the gain, write a CalibrationCurve.\n\nRun by `OpenRigs.Core:DispenseCalibration.bonsai`. Subjects are declared to wire in a rig's own hardware",
+      "description": "Settings of the dispense calibration: fire known sizes, weigh the gain, write a CalibrationCurve.\n\nRun by a calibration workflow; the fit is done afterwards in Python and written into the CalibrationCurve.",
       "properties": {
         "samples": {
           "description": "Sizes to measure, each fired and weighed in turn.",
@@ -230,22 +217,9 @@
           "title": "WeighTimeoutS",
           "type": "number"
         },
-        "fit": {
-          "$ref": "#/$defs/CalibrationModel",
-          "default": "LinearFit",
-          "description": "Model fitted to the points for the acceptance report; the artefact stores the points, not the fit.",
-          "title": "Fit"
-        },
-        "fitOrder": {
-          "default": 2,
-          "description": "Polynomial order; used by PolynomialFit only.",
-          "minimum": 1,
-          "title": "FitOrder",
-          "type": "integer"
-        },
         "requireMonotone": {
           "default": true,
-          "description": "Refuse to write a curve that is not monotone in either direction, since a rig inverts it to look a volume up.",
+          "description": "Refuse to write a curve that is not monotone, since a rig inverts it to look a volume up.",
           "title": "RequireMonotone",
           "type": "boolean"
         }
@@ -274,12 +248,12 @@
           "title": "Repeats",
           "type": "integer"
         },
-        "interPulseIntervalMs": {
+        "pulseGapMs": {
           "default": 500,
-          "description": "Gap between consecutive pulses, in milliseconds; long enough for the valve to seat.",
+          "description": "Off-to-on time between consecutive pulses, in milliseconds; long enough for the valve to seat.",
           "maximum": 65535,
           "minimum": 0,
-          "title": "InterPulseIntervalMs",
+          "title": "PulseGapMs",
           "type": "integer"
         }
       },

@@ -21,7 +21,6 @@ from open_rigs.core.artefacts import ArtefactPath, rig_artefacts
 from open_rigs.core.calibration import (
     Calibration,
     CalibrationSchema,
-    CalibrationModel,
     CalibrationPoint,
     CalibrationCurve,
     DispenseSample,
@@ -52,7 +51,6 @@ __all__ = [
     "rig_artefacts",
     "Calibration",
     "CalibrationSchema",
-    "CalibrationModel",
     "CalibrationPoint",
     "CalibrationCurve",
     "DispenseSample",

@@ -401,14 +401,13 @@ namespace OpenRigs.Core.Calibration
     /// <summary>
     /// What an experiment repository commits as `config/<dispenser>-calibration.yml`.
     ///
-    ///`OpenRigs.Core:DispenseCalibration.bonsai` deserialises it with the Core `DeserializeFromYaml`
-    ///and runs the procedure; the balance port is set on the workflow at run time.
+    ///A calibration workflow deserialises it with the Core `DeserializeFromYaml` and runs the
+    ///procedure; the balance port is set on the workflow at run time.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("What an experiment repository commits as `config/<dispenser>-calibration.yml`.\n\n`" +
-        "OpenRigs.Core:DispenseCalibration.bonsai` deserialises it with the Core `Deserial" +
-        "izeFromYaml`\nand runs the procedure; the balance port is set on the workflow at " +
-        "run time.")]
+    [System.ComponentModel.DescriptionAttribute("What an experiment repository commits as `config/<dispenser>-calibration.yml`.\n\nA" +
+        " calibration workflow deserialises it with the Core `DeserializeFromYaml` and ru" +
+        "ns the\nprocedure; the balance port is set on the workflow at run time.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class DispenseCalibration
@@ -503,12 +502,12 @@ namespace OpenRigs.Core.Calibration
     /// <summary>
     /// Settings of the dispense calibration: fire known sizes, weigh the gain, write a CalibrationCurve.
     ///
-    ///Run by `OpenRigs.Core:DispenseCalibration.bonsai`. Subjects are declared to wire in a rig's own hardware
+    ///Run by a calibration workflow; the fit is done afterwards in Python and written into the CalibrationCurve.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
     [System.ComponentModel.DescriptionAttribute("Settings of the dispense calibration: fire known sizes, weigh the gain, write a C" +
-        "alibrationCurve.\n\nRun by `OpenRigs.Core:DispenseCalibration.bonsai`. Subjects are" +
-        " declared to wire in a rig\'s own hardware")]
+        "alibrationCurve.\n\nRun by a calibration workflow; the fit is done afterwards in P" +
+        "ython and written into the CalibrationCurve.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class DispenseProcedure
@@ -530,10 +529,6 @@ namespace OpenRigs.Core.Calibration
     
         private double _weighTimeoutS;
     
-        private OpenRigs.Core.CalibrationModel _fit;
-    
-        private int _fitOrder;
-    
         private bool _requireMonotone;
     
         public DispenseProcedure()
@@ -545,8 +540,6 @@ namespace OpenRigs.Core.Calibration
             _densityGPerMl = 1D;
             _settleWindow = 10;
             _weighTimeoutS = 60D;
-            _fit = OpenRigs.Core.CalibrationModel.LinearFit;
-            _fitOrder = 2;
             _requireMonotone = true;
         }
     
@@ -560,8 +553,6 @@ namespace OpenRigs.Core.Calibration
             _densityGPerMl = other._densityGPerMl;
             _settleWindow = other._settleWindow;
             _weighTimeoutS = other._weighTimeoutS;
-            _fit = other._fit;
-            _fitOrder = other._fitOrder;
             _requireMonotone = other._requireMonotone;
         }
     
@@ -711,49 +702,12 @@ namespace OpenRigs.Core.Calibration
         }
     
         /// <summary>
-        /// Model fitted to the points for the acceptance report; the artefact stores the points, not the fit.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("fit")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="fit")]
-        [System.ComponentModel.DescriptionAttribute("Model fitted to the points for the acceptance report; the artefact stores the poi" +
-            "nts, not the fit.")]
-        public OpenRigs.Core.CalibrationModel Fit
-        {
-            get
-            {
-                return _fit;
-            }
-            set
-            {
-                _fit = value;
-            }
-        }
-    
-        /// <summary>
-        /// Polynomial order; used by PolynomialFit only.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("fitOrder")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="fitOrder")]
-        [System.ComponentModel.DescriptionAttribute("Polynomial order; used by PolynomialFit only.")]
-        public int FitOrder
-        {
-            get
-            {
-                return _fitOrder;
-            }
-            set
-            {
-                _fitOrder = value;
-            }
-        }
-    
-        /// <summary>
-        /// Refuse to write a curve that is not monotone in either direction, since a rig inverts it to look a volume up.
+        /// Refuse to write a curve that is not monotone, since a rig inverts it to look a volume up.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("requireMonotone")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="requireMonotone")]
-        [System.ComponentModel.DescriptionAttribute("Refuse to write a curve that is not monotone in either direction, since a rig inv" +
-            "erts it to look a volume up.")]
+        [System.ComponentModel.DescriptionAttribute("Refuse to write a curve that is not monotone, since a rig inverts it to look a vo" +
+            "lume up.")]
         public bool RequireMonotone
         {
             get
@@ -786,8 +740,6 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("DensityGPerMl = " + _densityGPerMl + ", ");
             stringBuilder.Append("SettleWindow = " + _settleWindow + ", ");
             stringBuilder.Append("WeighTimeoutS = " + _weighTimeoutS + ", ");
-            stringBuilder.Append("Fit = " + _fit + ", ");
-            stringBuilder.Append("FitOrder = " + _fitOrder + ", ");
             stringBuilder.Append("RequireMonotone = " + _requireMonotone);
             return true;
         }
@@ -823,19 +775,19 @@ namespace OpenRigs.Core.Calibration
     
         private int _repeats;
     
-        private int _interPulseIntervalMs;
+        private int _pulseGapMs;
     
         public DispenseSample()
         {
             _repeats = 10;
-            _interPulseIntervalMs = 500;
+            _pulseGapMs = 500;
         }
     
         protected DispenseSample(DispenseSample other)
         {
             _size = other._size;
             _repeats = other._repeats;
-            _interPulseIntervalMs = other._interPulseIntervalMs;
+            _pulseGapMs = other._pulseGapMs;
         }
     
         /// <summary>
@@ -876,21 +828,21 @@ namespace OpenRigs.Core.Calibration
         }
     
         /// <summary>
-        /// Gap between consecutive pulses, in milliseconds; long enough for the valve to seat.
+        /// Off-to-on time between consecutive pulses, in milliseconds; long enough for the valve to seat.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("interPulseIntervalMs")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="interPulseIntervalMs")]
-        [System.ComponentModel.DescriptionAttribute("Gap between consecutive pulses, in milliseconds; long enough for the valve to sea" +
-            "t.")]
-        public int InterPulseIntervalMs
+        [Newtonsoft.Json.JsonPropertyAttribute("pulseGapMs")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="pulseGapMs")]
+        [System.ComponentModel.DescriptionAttribute("Off-to-on time between consecutive pulses, in milliseconds; long enough for the v" +
+            "alve to seat.")]
+        public int PulseGapMs
         {
             get
             {
-                return _interPulseIntervalMs;
+                return _pulseGapMs;
             }
             set
             {
-                _interPulseIntervalMs = value;
+                _pulseGapMs = value;
             }
         }
     
@@ -908,7 +860,7 @@ namespace OpenRigs.Core.Calibration
         {
             stringBuilder.Append("Size = " + _size + ", ");
             stringBuilder.Append("Repeats = " + _repeats + ", ");
-            stringBuilder.Append("InterPulseIntervalMs = " + _interPulseIntervalMs);
+            stringBuilder.Append("PulseGapMs = " + _pulseGapMs);
             return true;
         }
     
@@ -1155,9 +1107,9 @@ namespace OpenRigs.Core.Calibration
     ///Extends `SerialDevice` with the balance's protocol.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("A serial balance read by the platform\'s dispense calibration through `OpenRigs.Dev" +
-        "ices:SerialBalance.bonsai`.\n\nExtends `SerialDevice` with the balance\'s protocol." +
-        "")]
+    [System.ComponentModel.DescriptionAttribute("A serial balance read by the platform\'s dispense calibration through `OpenRigs.De" +
+        "vices:SerialBalance.bonsai`.\n\nExtends `SerialDevice` with the balance\'s protocol" +
+        ".")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class SerialBalance

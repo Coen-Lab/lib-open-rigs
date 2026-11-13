@@ -7,7 +7,6 @@ rig schema that references it binds to that type instead of generating a copy.
 """
 
 from datetime import datetime
-from enum import StrEnum
 from typing import List
 
 from pydantic import Field
@@ -34,23 +33,6 @@ class CalibrationSchema(BaseSchema):
     def __get_pydantic_json_schema__(cls, core_schema, handler) -> JsonSchemaValue:
         json_schema = super().__get_pydantic_json_schema__(core_schema, handler)
         bind_typename(handler.resolve_ref_schema(json_schema), f"{CSHARP_NAMESPACE}.{cls.__name__}")
-        return json_schema
-
-
-class CalibrationModel(StrEnum):
-    """How a calibration curve is derived from its points; the `OpenRigs.Core.CalibrationModel` operators' enum."""
-
-    LINEAR_FIT = "LinearFit"
-    POLYNOMIAL_FIT = "PolynomialFit"
-    LINEAR = "Linear"
-    CUBIC_SPLINE = "CubicSpline"
-    STEP = "Step"
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, core_schema, handler) -> JsonSchemaValue:
-        """Binds to the hand-written enum in OpenRigs.Core, which FitCalibrationCurve and LookupCalibration take."""
-        json_schema = handler(core_schema)
-        bind_typename(handler.resolve_ref_schema(json_schema), "OpenRigs.Core.CalibrationModel")
         return json_schema
 
 
@@ -100,15 +82,15 @@ class DispenseSample(CalibrationSchema):
         gt=0, description="The size to fire, in the procedure's x unit: milliseconds for a valve, steps for a pump."
     )
     repeats: int = Field(default=10, ge=1, description="Pulses fired at this size before the gain is weighed.")
-    inter_pulse_interval_ms: data_types.UShort = Field(
-        default=500, description="Gap between consecutive pulses, in milliseconds; long enough for the valve to seat."
+    pulse_gap_ms: data_types.UShort = Field(
+        default=500, description="Off-to-on time between consecutive pulses, in milliseconds; long enough for the valve to seat."
     )
 
 
 class DispenseProcedure(CalibrationSchema):
     """Settings of the dispense calibration: fire known sizes, weigh the gain, write a CalibrationCurve.
 
-    Run by `OpenRigs.Core:DispenseCalibration.bonsai`. Subjects are declared to wire in a rig's own hardware
+    Run by a calibration workflow; the fit is done afterwards in Python and written into the CalibrationCurve.
     """
 
     samples: List[DispenseSample] = Field(min_length=2, description="Sizes to measure, each fired and weighed in turn.")
@@ -129,12 +111,7 @@ class DispenseProcedure(CalibrationSchema):
     weigh_timeout_s: data_types.Double = Field(
         default=60.0, gt=0, description="Fail if the balance has not settled within this time, in seconds."
     )
-    fit: CalibrationModel = Field(
-        default=CalibrationModel.LINEAR_FIT,
-        description="Model fitted to the points for the acceptance report; the artefact stores the points, not the fit.",
-    )
-    fit_order: int = Field(default=2, ge=1, description="Polynomial order; used by PolynomialFit only.")
     require_monotone: bool = Field(
         default=True,
-        description="Refuse to write a curve that is not monotone in either direction, since a rig inverts it to look a volume up.",
+        description="Refuse to write a curve that is not monotone, since a rig inverts it to look a volume up.",
     )

@@ -98,7 +98,7 @@ namespace OpenRigs.Core.Calibration
             public string Name;
             public int Count;
             public int Size;
-            public int Interval;
+            public int Gap;
         }
 
         /// <summary>Asks for and takes each weight of the runs the settings start.</summary>
@@ -129,7 +129,7 @@ namespace OpenRigs.Core.Calibration
                     // PulseBurst completes one period after its last pulse, so the drop has landed
                     // before the weighing starts; a little after that, the person is asked.
                     var burst = bursts[index];
-                    var wait = TimeSpan.FromMilliseconds(burst.Count > 0 ? burst.Size + burst.Interval + 250 : 250);
+                    var wait = TimeSpan.FromMilliseconds(burst.Count > 0 ? burst.Size + burst.Gap + 250 : 250);
                     timer.Disposable = Observable.Timer(wait).Subscribe(_ =>
                     {
                         lock (gate)
@@ -148,14 +148,14 @@ namespace OpenRigs.Core.Calibration
                     {
                         var p = settings.Procedure;
                         unit = p.XUnit ?? "";
-                        int interval = p.Samples.Max(s => s.InterPulseIntervalMs);
+                        int gap = p.Samples.Max(s => s.PulseGapMs);
                         bursts = new List<Burst>();
                         bursts.Add(new Burst
                         {
                             Name = "priming",
                             Count = p.PrimingPulses,
                             Size = p.PrimingSize ?? p.Samples.Max(s => s.Size),
-                            Interval = interval
+                            Gap = gap
                         });
                         for (int i = 0; i < p.Samples.Count; i++)
                         {
@@ -164,7 +164,7 @@ namespace OpenRigs.Core.Calibration
                                 Name = string.Format("sample {0} of {1}", i + 1, p.Samples.Count),
                                 Count = p.Samples[i].Repeats,
                                 Size = p.Samples[i].Size,
-                                Interval = p.Samples[i].InterPulseIntervalMs
+                                Gap = p.Samples[i].PulseGapMs
                             });
                         }
 

@@ -20,8 +20,8 @@ namespace OpenRigs.Core.Tests
                 {
                     Samples = new List<DispenseSample>
                     {
-                        new DispenseSample { Size = 10, Repeats = 2, InterPulseIntervalMs = 1 },
-                        new DispenseSample { Size = 20, Repeats = 2, InterPulseIntervalMs = 1 }
+                        new DispenseSample { Size = 10, Repeats = 2, PulseGapMs = 1 },
+                        new DispenseSample { Size = 20, Repeats = 2, PulseGapMs = 1 }
                     },
                     PrimingPulses = priming,
                     XUnit = "ms",

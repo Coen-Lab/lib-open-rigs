@@ -11,7 +11,7 @@
         <Name>Source1</Name>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="RequestSubjectName" Description="The (channel, size) pulse requests the procedure fires, such as the PulseController's TriggerCalibratedPulse; the same subject DispenseCalibration's RequestSubjectName names." Category="Subjects" />
+        <Property Name="Name" DisplayName="RequestSubjectName" Description="The (channel, size) pulse requests the procedure fires, such as the PulseController's TriggerCalibratedPulse; the same subject the calibration workflow fires its pulses on." Category="Subjects" />
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>TriggerCalibratedPulse</Name>

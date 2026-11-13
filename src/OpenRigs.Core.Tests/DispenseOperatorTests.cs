@@ -13,7 +13,7 @@ namespace OpenRigs.Core.Tests
     {
         static DispenseSample Sample(int size, int repeats = 4, int intervalMs = 2)
         {
-            return new DispenseSample { Size = size, Repeats = repeats, InterPulseIntervalMs = intervalMs };
+            return new DispenseSample { Size = size, Repeats = repeats, PulseGapMs = intervalMs };
         }
 
         static IObservable<WeightMeasurement> Readings(double grams, bool stable = true, int periodMs = 5)

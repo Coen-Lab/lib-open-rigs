@@ -21,7 +21,7 @@ namespace OpenRigs.Core
     /// </remarks>
     [Combinator]
     [DefaultProperty("Channel")]
-    [Description("Fires a burst of (channel, size) pulse requests for each DispenseSample: repeats requests, one every size plus interPulseIntervalMs, then completes once the last pulse has landed. Send the output to the subject that fires one pulse, such as the PulseController's TriggerCalibratedPulse. Fed the DispenseProcedure instead, it fires the priming burst.")]
+    [Description("Fires a burst of (channel, size) pulse requests for each DispenseSample: repeats requests, one every size plus pulseGapMs, then completes once the last pulse has landed. Send the output to the subject that fires one pulse, such as the PulseController's TriggerCalibratedPulse. Fed the DispenseProcedure instead, it fires the priming burst.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PulseBurst
     {
@@ -36,7 +36,7 @@ namespace OpenRigs.Core
         /// </summary>
         public IObservable<Tuple<int, int>> Process(IObservable<DispenseSample> source)
         {
-            return source.SelectMany(sample => Burst(Channel, sample.Size, sample.Repeats, sample.InterPulseIntervalMs));
+            return source.SelectMany(sample => Burst(Channel, sample.Size, sample.Repeats, sample.PulseGapMs));
         }
 
         /// <summary>
@@ -51,7 +51,7 @@ namespace OpenRigs.Core
                     throw new InvalidOperationException("The dispense procedure has no samples to take the priming size from.");
                 }
                 int size = procedure.PrimingSize ?? procedure.Samples.Max(sample => sample.Size);
-                int interval = procedure.Samples.Max(sample => sample.InterPulseIntervalMs);
+                int interval = procedure.Samples.Max(sample => sample.PulseGapMs);
                 return Burst(Channel, size, procedure.PrimingPulses, interval);
             });
         }
