@@ -18,6 +18,7 @@ from open_rigs.rigs.behaviour_box import BehaviorBoard, BoardWiring, HarpStepper
 REWARD_VALVE = "RewardValve"
 ZAPIT_TRIGGER = "ZapitTrigger"
 SIDES = ("left", "right")
+WHERE = "(dome rig model, open_rigs.rigs.dome)"
 
 
 class DomeBehaviorBoard(BehaviorBoard):
@@ -75,20 +76,22 @@ class DomeRig(Rig):
             valves = {alias: line for alias, line in lines.items() if line.device == REWARD_VALVE}
             unsided = sorted(alias for alias, line in valves.items() if line.side is None)
             if unsided:
-                raise ValueError(f"behaviorBoard {name}: RewardValve on {', '.join(unsided)} has no side")
+                raise ValueError(f"behaviorBoard {name}: RewardValve on {', '.join(unsided)} has no side in wiring {WHERE}")
             sides = Counter(line.side.value for line in valves.values() if line.side is not None)
             for side in SIDES:
                 if sides[side] != 1:
-                    raise ValueError(f"behaviorBoard {name}: wiring needs exactly one {side} RewardValve, has {sides[side]}")
+                    raise ValueError(
+                        f"behaviorBoard {name}: wiring needs exactly one {side} RewardValve, has {sides[side]} {WHERE}"
+                    )
             zapit = sum(line.device == ZAPIT_TRIGGER for line in lines.values())
             if zapit != 1:
-                raise ValueError(f"behaviorBoard {name}: wiring needs exactly one ZapitTrigger, has {zapit}")
+                raise ValueError(f"behaviorBoard {name}: wiring needs exactly one ZapitTrigger, has {zapit} {WHERE}")
             outputs = board.pulse_controller.outputs if board.pulse_controller else None
             for alias in sorted(valves):
                 output = getattr(outputs, alias.lower(), None) if outputs else None
                 if output is None or not isinstance(output.root, CalibratedPulse):
                     raise ValueError(
-                        f"behaviorBoard {name}: RewardValve {alias} needs a CalibratedPulse in pulseController.outputs"
+                        f"behaviorBoard {name}: RewardValve {alias} needs a CalibratedPulse in pulseController.outputs {WHERE}"
                     )
         return self
 

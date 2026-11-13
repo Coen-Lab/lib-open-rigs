@@ -79,8 +79,9 @@ def test_wiring_required():
     ],
 )
 def test_wiring_refused(wiring, message):
-    with pytest.raises(ValidationError, match=message):
+    with pytest.raises(ValidationError, match=message) as refused:
         DomeRig.model_validate(rig_with(**wiring))
+    assert "(dome rig model, open_rigs.rigs.dome)" in str(refused.value)
 
 
 def test_error_sound_channel_required():
