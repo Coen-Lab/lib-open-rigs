@@ -1,0 +1,133 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders"
+                 xmlns:res="clr-namespace:Bonsai.Resources;assembly=Bonsai.System"
+                 xmlns:vis="clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The dome's projection: a BonVision window on DisplayDevice, an orthographic view of azimuth -135 to 135 and elevation -22.5 to 82.5 degrees, mesh mapping and gamma correction from the input (rig.yml's projectionCalibration: meshMapPath, gammaLutPath). Stimuli draw on the DrawStimuli subject. Disposed on the render thread (DisposeOnRenderThread), so stopping from another thread cannot crash Bonsai.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="FileName" Selector="MeshMapPath" />
+          <Property Name="GammaLut" Selector="GammaLutPath" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="DisplayDevice" Description="The display the projector is on." />
+        <Property Name="WindowState" Description="Fullscreen for the projector; Normal to test on a desk." />
+        <Property Name="Width" Description="The window width, in pixels: the display mode set at start when full screen." />
+        <Property Name="Height" Description="The window height, in pixels: the display mode set at start when full screen." />
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>DomeWindow</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="DisplayDevice" />
+              <Property Name="WindowState" />
+              <Property Name="Width" />
+              <Property Name="Height" />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="gl:CreateWindow">
+                <gl:Width>1920</gl:Width>
+                <gl:Height>1080</gl:Height>
+                <gl:VSync>On</gl:VSync>
+                <gl:SwapSync>false</gl:SwapSync>
+                <gl:ClearColor>Gray</gl:ClearColor>
+                <gl:ClearMask>DepthBufferBit ColorBufferBit</gl:ClearMask>
+                <gl:CursorVisible>false</gl:CursorVisible>
+                <gl:Location xsi:nil="true" />
+                <gl:WindowBorder>Fixed</gl:WindowBorder>
+                <gl:WindowState>Fullscreen</gl:WindowState>
+                <gl:DisplayDevice>First</gl:DisplayDevice>
+                <gl:TargetRenderFrequency>60</gl:TargetRenderFrequency>
+                <gl:TargetUpdateFrequency>60</gl:TargetUpdateFrequency>
+                <gl:RenderState />
+                <gl:GraphicsMode>
+                  <gl:ColorFormat>
+                    <gl:Red>8</gl:Red>
+                    <gl:Green>8</gl:Green>
+                    <gl:Blue>8</gl:Blue>
+                    <gl:Alpha>8</gl:Alpha>
+                  </gl:ColorFormat>
+                  <gl:Depth>16</gl:Depth>
+                  <gl:Stencil>0</gl:Stencil>
+                  <gl:Samples>0</gl:Samples>
+                  <gl:AccumulatorFormat>
+                    <gl:Red>0</gl:Red>
+                    <gl:Green>0</gl:Green>
+                    <gl:Blue>0</gl:Blue>
+                    <gl:Alpha>0</gl:Alpha>
+                  </gl:AccumulatorFormat>
+                  <gl:Buffers>2</gl:Buffers>
+                  <gl:Stereo>false</gl:Stereo>
+                </gl:GraphicsMode>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.BonVisionResources.bonsai" />
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="res:LoadResources" />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="gl:RenderFrame" />
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.OrthographicView.bonsai">
+              <Left>-135</Left>
+              <Right>135</Right>
+              <Bottom>-22.5</Bottom>
+              <Top>82.5</Top>
+            </Expression>
+            <Expression xsi:type="rx:BehaviorSubject">
+              <Name>DrawStimuli</Name>
+            </Expression>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="FileName" />
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.MeshMapping.bonsai">
+              <ClearColor>Gray</ClearColor>
+              <FileName>UNMAPPED</FileName>
+            </Expression>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="GammaLut" />
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.GammaCorrection.bonsai">
+              <ClearColor>Gray</ClearColor>
+              <GammaLut>UNMAPPED</GammaLut>
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="2" To="3" Label="Source1" />
+            <Edge From="4" To="5" Label="Source1" />
+            <Edge From="5" To="6" Label="Source1" />
+            <Edge From="6" To="8" Label="Source1" />
+            <Edge From="7" To="8" Label="Source2" />
+            <Edge From="8" To="10" Label="Source1" />
+            <Edge From="9" To="10" Label="Source2" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vis:DisposeOnRenderThread">
+          <vis:TimeoutSeconds>2</vis:TimeoutSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="3" Label="Source1" />
+      <Edge From="2" To="3" Label="Source2" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
