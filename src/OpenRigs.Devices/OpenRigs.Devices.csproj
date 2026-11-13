@@ -15,12 +15,14 @@
     <PackageReference Include="Bonsai.Arduino"   Version="2.9.0" />
     <PackageReference Include="Bonsai.Core"      Version="2.9.0" />
     <PackageReference Include="Harp.Behavior" Version="0.2.0" />
+    <PackageReference Include="Harp.StepperDriver" Version="0.4.0" />
     <PackageReference Include="Harp.TimestampGeneratorGen3" Version="0.1.1" />
     <PackageReference Include="AllenNeuralDynamics.LicketySplit" Version="0.2.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Core\OpenRigs.Core.csproj" />
+    <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
     <PackageReference Include="Harp.Hobgoblin" Version="0.1.2" />
   </ItemGroup>
 

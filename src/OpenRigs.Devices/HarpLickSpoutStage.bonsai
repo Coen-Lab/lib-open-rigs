@@ -1,0 +1,564 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:step="clr-namespace:Harp.StepperDriver;assembly=Harp.StepperDriver"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The two-driver lick spout stage: opens StepperDriver-A and StepperDriver-B (rig.yml entries, subscribed by those names) behind their .Data and .Commands subjects, sets them up, homes all five motors (LickSpoutStage.Homed once done, then the spouts go in), and moves the stage for the controller's spout commands and for LickSpoutCommand values sent to LickSpoutStage.Commands. Each target is published on LickSpoutStage.Target. The mouse's in positions come from PositionsFile, else rig.yml's lickSpoutDefaultPosition (RigFile). The workflow declares the commands: SpoutsHome, SpoutsIn, SpoutsOut, SaveSpoutPositions, LeftUp, LeftDown, RightUp, RightDown, LeftFront, LeftBack, RightFront, RightBack, BaseLeft, BaseRight.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>StepperDriver-A.Commands</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.Commands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="step:Device">
+          <harp:OperationMode>Active</harp:OperationMode>
+          <harp:OperationLed>On</harp:OperationLed>
+          <harp:DumpRegisters>true</harp:DumpRegisters>
+          <harp:VisualIndicators>On</harp:VisualIndicators>
+          <harp:Heartbeat>Enabled</harp:Heartbeat>
+          <harp:IgnoreErrors>false</harp:IgnoreErrors>
+          <harp:PortName>UNMAPPED</harp:PortName>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>StepperDriver-A.Data</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>20</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeLast">
+          <rx:Count>1</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:SetUpLickSpoutDriver">
+          <dev:Driver>A</dev:Driver>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-A.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Last" />
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>StepperDriver-A.SetUp</Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>StepperDriver-B.Commands</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-B.Commands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-B</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="step:Device">
+          <harp:OperationMode>Active</harp:OperationMode>
+          <harp:OperationLed>On</harp:OperationLed>
+          <harp:DumpRegisters>true</harp:DumpRegisters>
+          <harp:VisualIndicators>On</harp:VisualIndicators>
+          <harp:Heartbeat>Enabled</harp:Heartbeat>
+          <harp:IgnoreErrors>false</harp:IgnoreErrors>
+          <harp:PortName>UNMAPPED</harp:PortName>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>StepperDriver-B.Data</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-B.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>20</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeLast">
+          <rx:Count>1</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:SetUpLickSpoutDriver">
+          <dev:Driver>B</dev:Driver>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-B.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Last" />
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>StepperDriver-B.SetUp</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.Data</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.SetUp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:HomeLickSpoutMotor">
+          <dev:Driver>A</dev:Driver>
+          <dev:Motor>0</dev:Motor>
+          <dev:TimeoutSeconds>60</dev:TimeoutSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-A.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Last" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.Data</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.SetUp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:HomeLickSpoutMotor">
+          <dev:Driver>A</dev:Driver>
+          <dev:Motor>1</dev:Motor>
+          <dev:TimeoutSeconds>60</dev:TimeoutSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-A.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Last" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.Data</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.SetUp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:HomeLickSpoutMotor">
+          <dev:Driver>A</dev:Driver>
+          <dev:Motor>2</dev:Motor>
+          <dev:TimeoutSeconds>60</dev:TimeoutSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-A.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Last" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-B.Data</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-B.SetUp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:HomeLickSpoutMotor">
+          <dev:Driver>B</dev:Driver>
+          <dev:Motor>0</dev:Motor>
+          <dev:TimeoutSeconds>60</dev:TimeoutSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-B.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Last" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-B.Data</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-B.SetUp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:HomeLickSpoutMotor">
+          <dev:Driver>B</dev:Driver>
+          <dev:Motor>1</dev:Motor>
+          <dev:TimeoutSeconds>60</dev:TimeoutSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-B.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Last" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Delay">
+          <rx:DueTime>PT2S</rx:DueTime>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="BooleanProperty">
+          <Value>true</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>LickSpoutStage.Homed</Name>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="dev:LickSpoutCommand">
+        <rx:Name>LickSpoutStage.Commands</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>SpoutsHome</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>SpoutsHome</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>SpoutsIn</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>SpoutsIn</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>SpoutsOut</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>SpoutsOut</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>SaveSpoutPositions</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>SaveSpoutPositions</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>LeftUp</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>LeftUp</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>LeftDown</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>LeftDown</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>RightUp</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>RightUp</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>RightDown</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>RightDown</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>LeftFront</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>LeftFront</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>LeftBack</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>LeftBack</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>RightFront</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>RightFront</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>RightBack</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>RightBack</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>BaseLeft</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>BaseLeft</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>BaseRight</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>BaseRight</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LickSpoutStage.Commands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LickSpoutStage.Homed</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ToLickSpoutCommand">
+          <dev:Command>SpoutsIn</dev:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LickSpoutStage.Homed</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="RigFile" />
+        <Property Name="PositionsFile" />
+        <Property Name="StepSize" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:LickSpoutStage">
+          <dev:RigFile>UNMAPPED</dev:RigFile>
+          <dev:PositionsFile>UNMAPPED</dev:PositionsFile>
+          <dev:StepSize>150</dev:StepSize>
+          <dev:RetractSteps>1500</dev:RetractSteps>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>LickSpoutStage.Target</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LickSpoutStage.Target</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:MoveLickSpoutDriver">
+          <dev:Driver>A</dev:Driver>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-A.Commands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LickSpoutStage.Target</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:MoveLickSpoutDriver">
+          <dev:Driver>B</dev:Driver>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StepperDriver-B.Commands</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="1" To="4" Label="Source1" />
+      <Edge From="3" To="4" Label="Source2" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="14" To="17" Label="Source1" />
+      <Edge From="16" To="17" Label="Source2" />
+      <Edge From="17" To="18" Label="Source1" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="20" To="21" Label="Source1" />
+      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="22" To="23" Label="Source1" />
+      <Edge From="23" To="24" Label="Source1" />
+      <Edge From="24" To="25" Label="Source1" />
+      <Edge From="26" To="28" Label="Source1" />
+      <Edge From="27" To="28" Label="Source2" />
+      <Edge From="28" To="29" Label="Source1" />
+      <Edge From="29" To="30" Label="Source1" />
+      <Edge From="30" To="31" Label="Source1" />
+      <Edge From="32" To="34" Label="Source1" />
+      <Edge From="33" To="34" Label="Source2" />
+      <Edge From="34" To="35" Label="Source1" />
+      <Edge From="35" To="36" Label="Source1" />
+      <Edge From="36" To="37" Label="Source1" />
+      <Edge From="38" To="40" Label="Source1" />
+      <Edge From="39" To="40" Label="Source2" />
+      <Edge From="40" To="41" Label="Source1" />
+      <Edge From="41" To="42" Label="Source1" />
+      <Edge From="42" To="43" Label="Source1" />
+      <Edge From="44" To="46" Label="Source1" />
+      <Edge From="45" To="46" Label="Source2" />
+      <Edge From="46" To="47" Label="Source1" />
+      <Edge From="47" To="48" Label="Source1" />
+      <Edge From="48" To="49" Label="Source1" />
+      <Edge From="50" To="52" Label="Source1" />
+      <Edge From="51" To="52" Label="Source2" />
+      <Edge From="52" To="53" Label="Source1" />
+      <Edge From="53" To="54" Label="Source1" />
+      <Edge From="54" To="55" Label="Source1" />
+      <Edge From="31" To="56" Label="Source1" />
+      <Edge From="37" To="56" Label="Source2" />
+      <Edge From="43" To="56" Label="Source3" />
+      <Edge From="49" To="56" Label="Source4" />
+      <Edge From="55" To="56" Label="Source5" />
+      <Edge From="56" To="57" Label="Source1" />
+      <Edge From="57" To="58" Label="Source1" />
+      <Edge From="58" To="59" Label="Source1" />
+      <Edge From="61" To="62" Label="Source1" />
+      <Edge From="62" To="63" Label="Source1" />
+      <Edge From="61" To="64" Label="Source1" />
+      <Edge From="64" To="65" Label="Source1" />
+      <Edge From="61" To="66" Label="Source1" />
+      <Edge From="66" To="67" Label="Source1" />
+      <Edge From="61" To="68" Label="Source1" />
+      <Edge From="68" To="69" Label="Source1" />
+      <Edge From="61" To="70" Label="Source1" />
+      <Edge From="70" To="71" Label="Source1" />
+      <Edge From="61" To="72" Label="Source1" />
+      <Edge From="72" To="73" Label="Source1" />
+      <Edge From="61" To="74" Label="Source1" />
+      <Edge From="74" To="75" Label="Source1" />
+      <Edge From="61" To="76" Label="Source1" />
+      <Edge From="76" To="77" Label="Source1" />
+      <Edge From="61" To="78" Label="Source1" />
+      <Edge From="78" To="79" Label="Source1" />
+      <Edge From="61" To="80" Label="Source1" />
+      <Edge From="80" To="81" Label="Source1" />
+      <Edge From="61" To="82" Label="Source1" />
+      <Edge From="82" To="83" Label="Source1" />
+      <Edge From="61" To="84" Label="Source1" />
+      <Edge From="84" To="85" Label="Source1" />
+      <Edge From="61" To="86" Label="Source1" />
+      <Edge From="86" To="87" Label="Source1" />
+      <Edge From="61" To="88" Label="Source1" />
+      <Edge From="88" To="89" Label="Source1" />
+      <Edge From="91" To="92" Label="Source1" />
+      <Edge From="63" To="93" Label="Source1" />
+      <Edge From="65" To="93" Label="Source2" />
+      <Edge From="67" To="93" Label="Source3" />
+      <Edge From="69" To="93" Label="Source4" />
+      <Edge From="71" To="93" Label="Source5" />
+      <Edge From="73" To="93" Label="Source6" />
+      <Edge From="75" To="93" Label="Source7" />
+      <Edge From="77" To="93" Label="Source8" />
+      <Edge From="79" To="93" Label="Source9" />
+      <Edge From="81" To="93" Label="Source10" />
+      <Edge From="83" To="93" Label="Source11" />
+      <Edge From="85" To="93" Label="Source12" />
+      <Edge From="87" To="93" Label="Source13" />
+      <Edge From="89" To="93" Label="Source14" />
+      <Edge From="90" To="93" Label="Source15" />
+      <Edge From="92" To="93" Label="Source16" />
+      <Edge From="93" To="95" Label="Source1" />
+      <Edge From="94" To="95" Label="Source2" />
+      <Edge From="95" To="97" Label="Source1" />
+      <Edge From="96" To="97" Label="Source2" />
+      <Edge From="97" To="98" Label="Source1" />
+      <Edge From="99" To="100" Label="Source1" />
+      <Edge From="100" To="101" Label="Source1" />
+      <Edge From="102" To="103" Label="Source1" />
+      <Edge From="103" To="104" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
