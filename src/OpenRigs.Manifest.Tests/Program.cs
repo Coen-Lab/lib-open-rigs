@@ -404,7 +404,7 @@ namespace OpenRigs.Manifest.Tests
                     && ExpectedPlan.Matches(schemas[1], inSchemas, schemas) == 0, "the rig's file met the task's entry, or not its own");
                 Check("... and does not keep that file from meeting its folder", ExpectedPlan.Matches(schemas[2], inSchemas, schemas) == 1, "the folder was not met");
                 // 0.1.0-local.10: the writer and its version, and what a dirty checkout changed.
-                // The version the build stamped: open-rigs' build sets it (scripts\build-package.ps1
+                // The version the build stamped: open-rigs' build sets it (rig-setup's workflows\build-package.ps1
                 // passes the .csproj's <Version>; a plain build is 42.42.42-dev0).
                 var built = ((AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(typeof(ManifestWriter).Assembly, typeof(AssemblyInformationalVersionAttribute))).InformationalVersion.Split('+')[0];
                 Check("writer names the package and its version as built", Field(finished, "writer.package") == "OpenRigs.Manifest" && Field(finished, "writer.version") == built, Field(finished, "writer.version") + " vs " + built);

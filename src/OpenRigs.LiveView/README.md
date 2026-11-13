@@ -66,4 +66,4 @@ Data on TCP `DataPort` (5556), video on `VideoPort` (5558), on every interface, 
 
 ## Tested
 
-`dotnet run --project src\OpenRigs.LiveView.Tests` decides the plan from rig.yml files in a temporary folder, with stand-ins for the device data types: what is streamed and skipped and why, the `liveView:` settings, the session key, and the workflow's path. Exit 0 when every check passes. The inner workflow it builds is checked by building a workflow that uses it (`scripts\check-workflow-builds.ps1`, or the workflow's own check).
+`dotnet run --project src\OpenRigs.LiveView.Tests` decides the plan from rig.yml files in a temporary folder, with stand-ins for the device data types: what is streamed and skipped and why, the `liveView:` settings, the session key, and the workflow's path. Exit 0 when every check passes. The inner workflow it builds is checked by building a workflow that uses it (rig-setup's `workflows\check-workflow-builds.ps1`, or the workflow's own check).
