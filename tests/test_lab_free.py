@@ -1,7 +1,8 @@
 """lib-open-rigs holds nothing lab-only: no lab app, path or person in its files.
 
-The files listed below already named the lab when the rule began (v8); cleaning them is separate
-work and each leaves the list as it is cleaned. Every other tracked text file is checked.
+The files listed below already named the lab when the rule began (v8), each with the number of its
+lines that do; cleaning them is separate work, and each count falls, and the file leaves the list, as it
+is cleaned. A listed file may not gain a line. Every other tracked text file names the lab on none.
 """
 
 import re
@@ -19,56 +20,56 @@ LAB_ONLY = re.compile(
 )
 
 NAMED_THE_LAB_BEFORE_THE_RULE = {
-    "README.md",
-    "build/Common.csproj.targets",
-    "docs/bonsai-operators/OpenRigs.Logging/log-async.md",
-    "docs/bonsai-operators/OpenRigs.Logging/log-trial.md",
-    "fixtures/manifest/v3/completed.json",
-    "fixtures/manifest/v3/ended-early.json",
-    "fixtures/manifest/v3/no-controller.json",
-    "fixtures/manifest/v3/refuse/no-version.json",
-    "fixtures/manifest/v3/refuse/unknown-version.json",
-    "fixtures/manifest/v3/refuse/version-2.json",
-    "fixtures/manifest/v3/running.json",
-    "fixtures/manifest/v3/stopped-not-final.json",
-    "patches/README.md",
-    "src/OpenRigs.Control.Tests/Program.cs",
-    "src/OpenRigs.Control/ControlServer.cs",
-    "src/OpenRigs.Control/ExperimentOperators.cs",
-    "src/OpenRigs.Control/OpenRigs.Control.csproj",
-    "src/OpenRigs.Control/README.md",
-    "src/OpenRigs.Core/OpenRigs.Core.csproj",
-    "src/OpenRigs.Devices/OpenRigs.Devices.csproj",
-    "src/OpenRigs.HarpDevices.Tests/Program.cs",
-    "src/OpenRigs.HarpDevices/HarpDevicePlan.cs",
-    "src/OpenRigs.HarpDevices/OpenRigs.HarpDevices.csproj",
-    "src/OpenRigs.HarpDevices/README.md",
-    "src/OpenRigs.HarpDevices/UsbSerials.cs",
-    "src/OpenRigs.HarpDevices/WiringCheck.cs",
-    "src/OpenRigs.LiveView.Tests/Program.cs",
-    "src/OpenRigs.LiveView/LiveViewPlan.cs",
-    "src/OpenRigs.LiveView/OpenRigs.LiveView.csproj",
-    "src/OpenRigs.LiveView/README.md",
-    "src/OpenRigs.LiveView/Templates/StreamController.xml",
-    "src/OpenRigs.Logging/CsvWriter.cs",
-    "src/OpenRigs.Logging/OpenRigs.Logging.csproj",
-    "src/OpenRigs.Manifest.Tests/Program.cs",
-    "src/OpenRigs.Manifest/ExpectedFiles.cs",
-    "src/OpenRigs.Manifest/FORMAT.md",
-    "src/OpenRigs.Manifest/ManifestRecorder.cs",
-    "src/OpenRigs.Manifest/ManifestWriter.cs",
-    "src/OpenRigs.Manifest/OpenRigs.Manifest.csproj",
-    "src/OpenRigs.Manifest/README.md",
-    "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj",
-    "src/OpenRigs.Video/OpenRigs.Video.csproj",
-    "src/OpenRigs.Vision/OpenRigs.Vision.csproj",  # the lab's package version, as every lab package's
-    "src/OpenRigs.Video/TriggeredSpinnaker.cs",
-    "src/OpenRigs.Video/UsbCamera.cs",
-    "src/Shared/GroupNode.cs",
-    "src/Shared/Json.cs",
-    "src/Shared/RigDevices.cs",
-    "src/open_rigs/rigs/behaviour_box.py",
-    "src/open_rigs/trials.py",
+    "README.md": 1,
+    "build/Common.csproj.targets": 2,
+    "docs/bonsai-operators/OpenRigs.Logging/log-async.md": 1,
+    "docs/bonsai-operators/OpenRigs.Logging/log-trial.md": 3,
+    "fixtures/manifest/v3/completed.json": 10,
+    "fixtures/manifest/v3/ended-early.json": 10,
+    "fixtures/manifest/v3/no-controller.json": 9,
+    "fixtures/manifest/v3/refuse/no-version.json": 10,
+    "fixtures/manifest/v3/refuse/unknown-version.json": 10,
+    "fixtures/manifest/v3/refuse/version-2.json": 10,
+    "fixtures/manifest/v3/running.json": 9,
+    "fixtures/manifest/v3/stopped-not-final.json": 10,
+    "patches/README.md": 14,
+    "src/OpenRigs.Control.Tests/Program.cs": 3,
+    "src/OpenRigs.Control/ControlServer.cs": 3,
+    "src/OpenRigs.Control/ExperimentOperators.cs": 1,
+    "src/OpenRigs.Control/OpenRigs.Control.csproj": 1,
+    "src/OpenRigs.Control/README.md": 8,
+    "src/OpenRigs.Core/OpenRigs.Core.csproj": 1,
+    "src/OpenRigs.Devices/OpenRigs.Devices.csproj": 1,
+    "src/OpenRigs.HarpDevices.Tests/Program.cs": 4,
+    "src/OpenRigs.HarpDevices/HarpDevicePlan.cs": 1,
+    "src/OpenRigs.HarpDevices/OpenRigs.HarpDevices.csproj": 1,
+    "src/OpenRigs.HarpDevices/README.md": 8,
+    "src/OpenRigs.HarpDevices/UsbSerials.cs": 3,
+    "src/OpenRigs.HarpDevices/WiringCheck.cs": 5,
+    "src/OpenRigs.LiveView.Tests/Program.cs": 3,
+    "src/OpenRigs.LiveView/LiveViewPlan.cs": 2,
+    "src/OpenRigs.LiveView/OpenRigs.LiveView.csproj": 1,
+    "src/OpenRigs.LiveView/README.md": 7,
+    "src/OpenRigs.LiveView/Templates/StreamController.xml": 1,
+    "src/OpenRigs.Logging/CsvWriter.cs": 1,
+    "src/OpenRigs.Logging/OpenRigs.Logging.csproj": 1,
+    "src/OpenRigs.Manifest.Tests/Program.cs": 26,
+    "src/OpenRigs.Manifest/ExpectedFiles.cs": 1,
+    "src/OpenRigs.Manifest/FORMAT.md": 3,
+    "src/OpenRigs.Manifest/ManifestRecorder.cs": 3,
+    "src/OpenRigs.Manifest/ManifestWriter.cs": 4,
+    "src/OpenRigs.Manifest/OpenRigs.Manifest.csproj": 1,
+    "src/OpenRigs.Manifest/README.md": 10,
+    "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj": 1,
+    "src/OpenRigs.Video/OpenRigs.Video.csproj": 1,
+    "src/OpenRigs.Video/TriggeredSpinnaker.cs": 1,
+    "src/OpenRigs.Video/UsbCamera.cs": 3,
+    "src/OpenRigs.Vision/OpenRigs.Vision.csproj": 1,  # the lab's package version, as every lab package's
+    "src/Shared/GroupNode.cs": 1,
+    "src/Shared/Json.cs": 1,
+    "src/Shared/RigDevices.cs": 3,
+    "src/open_rigs/rigs/behaviour_box.py": 7,
+    "src/open_rigs/trials.py": 1,
 }
 
 
@@ -76,17 +77,20 @@ def lab_text(text: str) -> list[str]:
     return [f"{number}: {match.group(0)}" for number, line in enumerate(text.splitlines(), 1) if (match := LAB_ONLY.search(line))]
 
 
-def test_no_other_file_names_the_lab():
+def test_no_file_names_the_lab_on_more_lines_than_listed():
     names = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
     found = []
     for name in names:
-        if name in NAMED_THE_LAB_BEFORE_THE_RULE or name == THIS_FILE or not (ROOT / name).is_file():
+        if name == THIS_FILE or not (ROOT / name).is_file():
             continue
         data = (ROOT / name).read_bytes()
         if b"\0" in data:
             continue  # binary
-        found += [f"{name}:{hit}" for hit in lab_text(data.decode("utf-8", errors="replace"))]
-    assert not found, "lab-only text in lib-open-rigs:\n" + "\n".join(found)
+        hits = lab_text(data.decode("utf-8", errors="replace"))
+        allowed = NAMED_THE_LAB_BEFORE_THE_RULE.get(name, 0)
+        if len(hits) != allowed:
+            found.append(f"{name}: {len(hits)} lab line(s), {allowed} listed:\n  " + "\n  ".join(hits))
+    assert not found, "lab-only text in lib-open-rigs (a lower count is cleaning: lower the listed number):\n" + "\n".join(found)
 
 
 def test_listed_files_are_still_there():
