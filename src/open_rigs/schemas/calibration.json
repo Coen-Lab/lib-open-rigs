@@ -15,7 +15,7 @@
           "type": "string"
         },
         "machineName": {
-          "description": "Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.",
+          "description": "Name of the machine the calibration was measured on. LoadRewardLine refuses a valve calibration from any other machine.",
           "title": "MachineName",
           "type": "string"
         },
@@ -229,12 +229,6 @@
           "exclusiveMinimum": 0,
           "title": "WeighTimeoutS",
           "type": "number"
-        },
-        "requireMonotone": {
-          "default": true,
-          "description": "Refuse to write a curve that is not monotone, since a rig inverts it to look a volume up.",
-          "title": "RequireMonotone",
-          "type": "boolean"
         }
       },
       "required": [
@@ -329,7 +323,7 @@
           "type": "string"
         },
         "machineName": {
-          "description": "Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.",
+          "description": "Name of the machine the calibration was measured on. LoadRewardLine refuses a valve calibration from any other machine.",
           "title": "MachineName",
           "type": "string"
         },
@@ -479,7 +473,7 @@
           "type": "string"
         },
         "machineName": {
-          "description": "Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.",
+          "description": "Name of the machine the calibration was measured on. LoadRewardLine refuses a valve calibration from any other machine.",
           "title": "MachineName",
           "type": "string"
         },

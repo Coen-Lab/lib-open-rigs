@@ -59,7 +59,6 @@ def test_dispense_procedure_defaults():
     procedure = DispenseProcedure(samples=[DispenseSample(size=20), DispenseSample(size=60)])
     assert procedure.priming_size is None  # the procedure primes at the largest sample size
     assert procedure.priming_pulses == 5
-    assert procedure.require_monotone
 
 
 def test_balance_port_is_a_placeholder_until_run_time():

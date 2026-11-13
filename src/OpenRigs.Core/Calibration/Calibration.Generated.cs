@@ -127,12 +127,12 @@ namespace OpenRigs.Core.Calibration
         }
     
         /// <summary>
-        /// Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.
+        /// Name of the machine the calibration was measured on. LoadRewardLine refuses a valve calibration from any other machine.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("machineName", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="machineName")]
-        [System.ComponentModel.DescriptionAttribute("Name of the machine the calibration was measured on. A rig warns when it is not t" +
-            "he machine it runs on.")]
+        [System.ComponentModel.DescriptionAttribute("Name of the machine the calibration was measured on. LoadRewardLine refuses a val" +
+            "ve calibration from any other machine.")]
         public string MachineName
         {
             get
@@ -576,8 +576,6 @@ namespace OpenRigs.Core.Calibration
     
         private double _weighTimeoutS;
     
-        private bool _requireMonotone;
-    
         public DispenseProcedure()
         {
             _samples = new System.Collections.Generic.List<DispenseSample>();
@@ -587,7 +585,6 @@ namespace OpenRigs.Core.Calibration
             _densityGPerMl = 1D;
             _settleWindow = 10;
             _weighTimeoutS = 60D;
-            _requireMonotone = true;
         }
     
         protected DispenseProcedure(DispenseProcedure other)
@@ -600,7 +597,6 @@ namespace OpenRigs.Core.Calibration
             _densityGPerMl = other._densityGPerMl;
             _settleWindow = other._settleWindow;
             _weighTimeoutS = other._weighTimeoutS;
-            _requireMonotone = other._requireMonotone;
         }
     
         /// <summary>
@@ -748,25 +744,6 @@ namespace OpenRigs.Core.Calibration
             }
         }
     
-        /// <summary>
-        /// Refuse to write a curve that is not monotone, since a rig inverts it to look a volume up.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("requireMonotone")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="requireMonotone")]
-        [System.ComponentModel.DescriptionAttribute("Refuse to write a curve that is not monotone, since a rig inverts it to look a vo" +
-            "lume up.")]
-        public bool RequireMonotone
-        {
-            get
-            {
-                return _requireMonotone;
-            }
-            set
-            {
-                _requireMonotone = value;
-            }
-        }
-    
         public System.IObservable<DispenseProcedure> Generate()
         {
             return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new DispenseProcedure(this)));
@@ -786,8 +763,7 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("PrimingSize = " + _primingSize + ", ");
             stringBuilder.Append("DensityGPerMl = " + _densityGPerMl + ", ");
             stringBuilder.Append("SettleWindow = " + _settleWindow + ", ");
-            stringBuilder.Append("WeighTimeoutS = " + _weighTimeoutS + ", ");
-            stringBuilder.Append("RequireMonotone = " + _requireMonotone);
+            stringBuilder.Append("WeighTimeoutS = " + _weighTimeoutS);
             return true;
         }
     
@@ -1162,12 +1138,12 @@ namespace OpenRigs.Core.Calibration
         }
     
         /// <summary>
-        /// Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.
+        /// Name of the machine the calibration was measured on. LoadRewardLine refuses a valve calibration from any other machine.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("machineName", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="machineName")]
-        [System.ComponentModel.DescriptionAttribute("Name of the machine the calibration was measured on. A rig warns when it is not t" +
-            "he machine it runs on.")]
+        [System.ComponentModel.DescriptionAttribute("Name of the machine the calibration was measured on. LoadRewardLine refuses a val" +
+            "ve calibration from any other machine.")]
         public string MachineName
         {
             get
@@ -1734,12 +1710,12 @@ namespace OpenRigs.Core.Calibration
         }
     
         /// <summary>
-        /// Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.
+        /// Name of the machine the calibration was measured on. LoadRewardLine refuses a valve calibration from any other machine.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("machineName", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="machineName")]
-        [System.ComponentModel.DescriptionAttribute("Name of the machine the calibration was measured on. A rig warns when it is not t" +
-            "he machine it runs on.")]
+        [System.ComponentModel.DescriptionAttribute("Name of the machine the calibration was measured on. LoadRewardLine refuses a val" +
+            "ve calibration from any other machine.")]
         public string MachineName
         {
             get

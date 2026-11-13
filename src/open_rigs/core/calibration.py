@@ -42,7 +42,7 @@ class Calibration(CalibrationSchema):
     calibrated_at: datetime = Field(description="When the calibration was measured, in UTC.")
     calibrated_by: str = Field(description="Who ran the calibration.")
     machine_name: str = Field(
-        description="Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on."
+        description="Name of the machine the calibration was measured on. LoadRewardLine refuses a valve calibration from any other machine."
     )
     notes: str = Field(default="", description="Free-text notes about the calibration.")
 
@@ -135,8 +135,4 @@ class DispenseProcedure(CalibrationSchema):
     )
     weigh_timeout_s: data_types.Double = Field(
         default=60.0, gt=0, description="Fail if the balance has not settled within this time, in seconds."
-    )
-    require_monotone: bool = Field(
-        default=True,
-        description="Refuse to write a curve that is not monotone, since a rig inverts it to look a volume up.",
     )
