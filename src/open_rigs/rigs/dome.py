@@ -19,6 +19,7 @@ REWARD_VALVE = "RewardValve"
 ZAPIT_TRIGGER = "ZapitTrigger"
 SIDES = ("left", "right")
 WHERE = "(dome rig model, open_rigs.rigs.dome)"
+CAMERAS = 3
 
 
 class DomeBehaviorBoard(BehaviorBoard):
@@ -60,7 +61,9 @@ class DomeRig(Rig):
     lickety_split: Dict[str, LicketySplit] = Field(
         description="Lick detectors by name: left (LicketySplit-Left) and right (LicketySplit-Right)."
     )
-    camera: Dict[str, SpinnakerCamera] = Field(description="Triggered Spinnaker cameras by name, such as face (Camera-Face).")
+    camera: Dict[str, SpinnakerCamera] = Field(
+        description="Triggered Spinnaker cameras by name, exactly three: face, pupil and body (Camera-Face, Camera-Pupil, Camera-Body)."
+    )
     projection_calibration: ProjectionCalibration = Field(description="Mesh-map and gamma-LUT file paths for the dome projection.")
     speaker_array: DomeSpeakerArray = Field(description="Dome speaker array and audio output device.")
     lick_spout_default_position: StepperPositions = Field(
@@ -70,6 +73,8 @@ class DomeRig(Rig):
 
     @model_validator(mode="after")
     def _wired_lines(self):
+        if len(self.camera) != CAMERAS:
+            raise ValueError(f"camera lists {len(self.camera)} entries; a dome has exactly {CAMERAS} {WHERE}")
         for name, board in self.behavior_board.items():
             lines = {alias: getattr(board.wiring, field) for field, alias in _ALIASES.items()}
             lines = {alias: line for alias, line in lines.items() if line is not None}

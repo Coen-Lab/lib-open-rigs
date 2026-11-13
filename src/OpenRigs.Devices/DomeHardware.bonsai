@@ -6,8 +6,9 @@
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A dome's hardware from rig.yml, for every dome workflow. Takes each device's entry by name from RigConfigs (BehaviorBoard-Main, TimestampGeneratorGen3-Main, StepperDriver-A and -B, LicketySplit-Left and -Right, each an AsyncSubject of that name) and opens it behind its &lt;Name&gt;.Data and &lt;Name&gt;.Commands subjects. Publishes RigFile (rig.yml's path), HarpClockSet (the first Timestamp within 2 s of UTC), ZapitTriggerLine (the board line wiring gives ZapitTrigger: never pulsed, cleared when the workflow stops), WheelDistanceCm, LickStateLeft and LickStateRight; the board takes TriggerCalibratedPulse and TriggerPulse. Includes HarpLickSpoutStage, with this mouse's positions file calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml. Needs RigConfigs, RigConfigDirectory and SubjectId from the workflow.</Description>
+  <Description>A dome's hardware from rig.yml, for every dome workflow. Takes each device's entry by name from RigConfigs (BehaviorBoard-Main, TimestampGeneratorGen3-Main, StepperDriver-A and -B, LicketySplit-Left and -Right, Camera-Face, -Pupil and -Body, each an AsyncSubject of that name; rig.yml must list exactly three cameras) and opens it behind its &lt;Name&gt;.Data and &lt;Name&gt;.Commands subjects. Publishes RigFile (rig.yml's path), HarpClockSet (the first Timestamp within 2 s of UTC), ZapitTriggerLine (the board line wiring gives ZapitTrigger: never pulsed, cleared when the workflow stops), WheelDistanceCm, LickStateLeft and LickStateRight; the board takes TriggerCalibratedPulse and TriggerPulse. Each camera runs on the board's trigger 0, publishes Camera-&lt;Name&gt;.Data and stops the workflow at start if its exposure does not fit the trigger period (ExposureFitsTrigger); its video is logged by the workflow. Includes HarpLickSpoutStage, with this mouse's positions file calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml. Needs RigConfigs, RigConfigDirectory and SubjectId from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -93,6 +94,55 @@
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
         <Name>LicketySplit-Right</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Camera</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:RequireEntries">
+          <dev:Kind>camera</dev:Kind>
+          <dev:Count>3</dev:Count>
+          <dev:Rule>dome rig model, open_rigs.rigs.dome</dev:Rule>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>CameraEntries</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>CameraEntries</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>Camera-Face</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>Camera-Face</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>CameraEntries</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>Camera-Pupil</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>Camera-Pupil</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>CameraEntries</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>Camera-Body</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>Camera-Body</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>RigConfigDirectory</Name>
@@ -272,6 +322,108 @@
         <Camera1TriggerEventsSubjectName>Camera1TriggerEvents</Camera1TriggerEventsSubjectName>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
+        <Name>Camera-Face</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vid:ExposureFitsTrigger">
+          <vid:TriggerOutput>0</vid:TriggerOutput>
+          <vid:MarginMicroseconds>1000</vid:MarginMicroseconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="SerialNumber" Selector="Settings.SerialNumber" />
+          <Property Name="ExposureTime" Selector="Settings.ExposureTime" />
+          <Property Name="Gain" Selector="Settings.Gain" />
+          <Property Name="Binning" Selector="Settings.Binning" />
+          <Property Name="PixelFormat" Selector="Settings.PixelFormat" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:TriggeredSpinnaker.bonsai">
+        <ExposureTime>19000</ExposureTime>
+        <Gain>0</Gain>
+        <Binning>1</Binning>
+        <SerialNumber>UNMAPPED</SerialNumber>
+        <ColorProcessing>Default</ColorProcessing>
+        <PixelFormat>Mono8</PixelFormat>
+        <CameraTriggerEventsSubjectName>Camera0TriggerEvents</CameraTriggerEventsSubjectName>
+        <FrameEventsSubjectName>Camera-Face.Data</FrameEventsSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Camera-Pupil</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vid:ExposureFitsTrigger">
+          <vid:TriggerOutput>0</vid:TriggerOutput>
+          <vid:MarginMicroseconds>1000</vid:MarginMicroseconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="SerialNumber" Selector="Settings.SerialNumber" />
+          <Property Name="ExposureTime" Selector="Settings.ExposureTime" />
+          <Property Name="Gain" Selector="Settings.Gain" />
+          <Property Name="Binning" Selector="Settings.Binning" />
+          <Property Name="PixelFormat" Selector="Settings.PixelFormat" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:TriggeredSpinnaker.bonsai">
+        <ExposureTime>19000</ExposureTime>
+        <Gain>0</Gain>
+        <Binning>1</Binning>
+        <SerialNumber>UNMAPPED</SerialNumber>
+        <ColorProcessing>Default</ColorProcessing>
+        <PixelFormat>Mono8</PixelFormat>
+        <CameraTriggerEventsSubjectName>Camera0TriggerEvents</CameraTriggerEventsSubjectName>
+        <FrameEventsSubjectName>Camera-Pupil.Data</FrameEventsSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Camera-Body</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vid:ExposureFitsTrigger">
+          <vid:TriggerOutput>0</vid:TriggerOutput>
+          <vid:MarginMicroseconds>1000</vid:MarginMicroseconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="SerialNumber" Selector="Settings.SerialNumber" />
+          <Property Name="ExposureTime" Selector="Settings.ExposureTime" />
+          <Property Name="Gain" Selector="Settings.Gain" />
+          <Property Name="Binning" Selector="Settings.Binning" />
+          <Property Name="PixelFormat" Selector="Settings.PixelFormat" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:TriggeredSpinnaker.bonsai">
+        <ExposureTime>19000</ExposureTime>
+        <Gain>0</Gain>
+        <Binning>1</Binning>
+        <SerialNumber>UNMAPPED</SerialNumber>
+        <ColorProcessing>Default</ColorProcessing>
+        <PixelFormat>Mono8</PixelFormat>
+        <CameraTriggerEventsSubjectName>Camera0TriggerEvents</CameraTriggerEventsSubjectName>
+        <FrameEventsSubjectName>Camera-Body.Data</FrameEventsSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
         <Name>LicketySplit-Left</Name>
       </Expression>
       <Expression xsi:type="PropertyMapping">
@@ -366,45 +518,69 @@
       <Edge From="22" To="23" Label="Source1" />
       <Edge From="24" To="25" Label="Source1" />
       <Edge From="25" To="26" Label="Source1" />
-      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="26" To="27" Label="Source1" />
       <Edge From="28" To="29" Label="Source1" />
-      <Edge From="30" To="31" Label="Source1" />
-      <Edge From="33" To="34" Label="Source1" />
+      <Edge From="29" To="30" Label="Source1" />
+      <Edge From="31" To="32" Label="Source1" />
+      <Edge From="32" To="33" Label="Source1" />
+      <Edge From="34" To="35" Label="Source1" />
       <Edge From="35" To="36" Label="Source1" />
-      <Edge From="36" To="37" Label="Source1" />
-      <Edge From="39" To="40" Label="Source1" />
-      <Edge From="38" To="41" Label="Source1" />
-      <Edge From="40" To="41" Label="Source2" />
+      <Edge From="37" To="38" Label="Source1" />
+      <Edge From="38" To="39" Label="Source1" />
+      <Edge From="40" To="41" Label="Source1" />
       <Edge From="41" To="42" Label="Source1" />
       <Edge From="43" To="44" Label="Source1" />
-      <Edge From="44" To="45" Label="Source1" />
       <Edge From="46" To="47" Label="Source1" />
       <Edge From="48" To="49" Label="Source1" />
-      <Edge From="45" To="50" Label="Source1" />
-      <Edge From="47" To="50" Label="Source2" />
-      <Edge From="49" To="50" Label="Source3" />
-      <Edge From="51" To="52" Label="Source1" />
+      <Edge From="49" To="50" Label="Source1" />
       <Edge From="52" To="53" Label="Source1" />
+      <Edge From="51" To="54" Label="Source1" />
+      <Edge From="53" To="54" Label="Source2" />
       <Edge From="54" To="55" Label="Source1" />
-      <Edge From="55" To="57" Label="Source1" />
-      <Edge From="56" To="57" Label="Source2" />
+      <Edge From="56" To="57" Label="Source1" />
       <Edge From="57" To="58" Label="Source1" />
-      <Edge From="58" To="59" Label="Source1" />
       <Edge From="59" To="60" Label="Source1" />
       <Edge From="61" To="62" Label="Source1" />
-      <Edge From="62" To="63" Label="Source1" />
+      <Edge From="58" To="63" Label="Source1" />
+      <Edge From="60" To="63" Label="Source2" />
+      <Edge From="62" To="63" Label="Source3" />
       <Edge From="64" To="65" Label="Source1" />
       <Edge From="65" To="66" Label="Source1" />
       <Edge From="67" To="68" Label="Source1" />
-      <Edge From="68" To="69" Label="Source1" />
-      <Edge From="70" To="72" Label="Source1" />
-      <Edge From="71" To="72" Label="Source2" />
+      <Edge From="68" To="70" Label="Source1" />
+      <Edge From="69" To="70" Label="Source2" />
+      <Edge From="70" To="71" Label="Source1" />
+      <Edge From="71" To="72" Label="Source1" />
       <Edge From="72" To="73" Label="Source1" />
-      <Edge From="73" To="74" Label="Source1" />
+      <Edge From="74" To="75" Label="Source1" />
       <Edge From="75" To="76" Label="Source1" />
-      <Edge From="74" To="78" Label="Source1" />
-      <Edge From="76" To="78" Label="Source2" />
-      <Edge From="77" To="78" Label="Source3" />
+      <Edge From="77" To="79" Label="Source1" />
+      <Edge From="78" To="79" Label="Source2" />
+      <Edge From="79" To="80" Label="Source1" />
+      <Edge From="80" To="81" Label="Source1" />
+      <Edge From="81" To="82" Label="Source1" />
+      <Edge From="83" To="85" Label="Source1" />
+      <Edge From="84" To="85" Label="Source2" />
+      <Edge From="85" To="86" Label="Source1" />
+      <Edge From="86" To="87" Label="Source1" />
+      <Edge From="87" To="88" Label="Source1" />
+      <Edge From="89" To="91" Label="Source1" />
+      <Edge From="90" To="91" Label="Source2" />
+      <Edge From="91" To="92" Label="Source1" />
+      <Edge From="92" To="93" Label="Source1" />
+      <Edge From="93" To="94" Label="Source1" />
+      <Edge From="95" To="96" Label="Source1" />
+      <Edge From="96" To="97" Label="Source1" />
+      <Edge From="98" To="99" Label="Source1" />
+      <Edge From="99" To="100" Label="Source1" />
+      <Edge From="101" To="103" Label="Source1" />
+      <Edge From="102" To="103" Label="Source2" />
+      <Edge From="103" To="104" Label="Source1" />
+      <Edge From="104" To="105" Label="Source1" />
+      <Edge From="106" To="107" Label="Source1" />
+      <Edge From="105" To="109" Label="Source1" />
+      <Edge From="107" To="109" Label="Source2" />
+      <Edge From="108" To="109" Label="Source3" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

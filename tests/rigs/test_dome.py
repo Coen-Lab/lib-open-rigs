@@ -25,7 +25,7 @@ RIG = {
     "timestampGeneratorGen3": {"main": HARP},
     "stepperDriver": {"a": HARP, "b": HARP},
     "licketySplit": {"left": HARP, "right": HARP},
-    "camera": {"face": {"serialNumber": "1"}},
+    "camera": {"face": {"serialNumber": "1"}, "pupil": {"serialNumber": "2"}, "body": {"serialNumber": "3"}},
     "projectionCalibration": {"meshMapPath": "m.csv", "gammaLutPath": "g.bmp"},
     "speakerArray": {
         "device": {"deviceName": "Speakers"},
@@ -88,4 +88,12 @@ def test_error_sound_channel_required():
     rig = copy.deepcopy(RIG)
     del rig["speakerArray"]["errorSoundChannel"]
     with pytest.raises(ValidationError, match="errorSoundChannel"):
+        DomeRig.model_validate(rig)
+
+
+@pytest.mark.parametrize("cameras", [1, 4])
+def test_exactly_three_cameras(cameras):
+    rig = copy.deepcopy(RIG)
+    rig["camera"] = {f"c{n}": {"serialNumber": str(n)} for n in range(cameras)}
+    with pytest.raises(ValidationError, match=rf"camera lists {cameras} entries; a dome has exactly 3 \(dome rig model"):
         DomeRig.model_validate(rig)
