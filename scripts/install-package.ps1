@@ -13,7 +13,7 @@ param(
 #     as text so line endings, BOM and the order of everything else stay as they are;
 #   - every .csproj in the environment that references the package: its Version updated, so the
 #     workflow's own C# compiles against the same package Bonsai loads.
-# Git is left to the caller. Used by build-package.ps1 -Install and update-workflows.ps1.
+# Git is left to the caller. Used by build-package.ps1 -Install and rig-setup's update-workflows.ps1.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $Nupkg = (Resolve-Path $Nupkg).Path

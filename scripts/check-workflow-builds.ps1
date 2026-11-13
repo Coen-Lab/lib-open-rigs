@@ -5,7 +5,7 @@ param(
     # Internal: the step this script runs in a fresh process of its own (assemblies stay loaded).
     [ValidateSet('', 'Build')][string]$Step = ''
 )
-# The check update-workflows.ps1 runs on a workflow that has no scripts\check-workflow.ps1 of
+# The check rig-setup's update-workflows.ps1 runs on a workflow that has no scripts\check-workflow.ps1 of
 # its own, without the rig and without opening Bonsai:
 #   1. Compiles src\Extensions, if the workflow has one, under C# 5, the language Bonsai
 #      compiles it with.

@@ -1,5 +1,5 @@
 # The lab's packages and what each is built from, for build-package.ps1 and
-# push-and-update-workflows.ps1 (one list, so the two never disagree). Dot-source it.
+# rig-setup's push-and-update-workflows.ps1 (one list, so the two never disagree). Dot-source it.
 
 # A change whose lines are all comments or blank changes no package, so it neither blocks a push
 # nor needs a version (86daefc, comment-only edits to Manifest, blocked every push until the
@@ -38,8 +38,8 @@ function Assert-PatchesNamedBuilt([string]$Repo) {
     if ($gone) { throw "patches\README.md names packages local_packages\ does not hold: $($gone -join ', '). Correct it." }
 }
 
-# What every way of shipping local_packages\ to the workflows checks first: push-and-update-workflows.ps1
-# before its push, and update-workflows.ps1 run on its own (a lone run after a plain git push shipped
+# What every way of shipping local_packages\ to the workflows checks first: rig-setup's push-and-update-workflows.ps1
+# before its push, and rig-setup's update-workflows.ps1 run on its own (a lone run after a plain git push shipped
 # whatever local_packages\ held, unchecked; audit-rigs set C, run 4).
 function Assert-LabPackagesShippable([string]$Repo) {
     $lab = Get-LabPackages $Repo
@@ -99,7 +99,7 @@ function Assert-LabPackagesShippable([string]$Repo) {
             if ($LASTEXITCODE -ne 0) { "$($_.Name) (built on $($commit.Substring(0, 7)), but its source differs from what it was committed onto)" }
         } })
     if ($misbuilt) { throw "Built on other source: $($misbuilt -join ', '). Raise <Version>, rebuild and commit local_packages\ first." }
-    # update-workflows.ps1 would stop at the second.
+    # rig-setup's update-workflows.ps1 would stop at the second.
     $twice = @(Get-ChildItem (Join-Path $Repo 'local_packages') -Filter '*.nupkg' |
         Group-Object { $_.Name -replace '\.\d+\.\d+\.\d+.*$', '' } | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
     if ($twice) { throw "Two versions in local_packages\ of: $($twice -join ', '). Keep one (build-package.ps1 removes the old)." }

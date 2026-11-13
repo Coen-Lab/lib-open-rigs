@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory)][string]$Package,
     # A Bonsai environment root (a folder with .bonsai\Bonsai.config and local_packages\) to
     # install the package into for the first time. Workflows that already have the package get
-    # the new version from scripts\update-workflows.ps1.
+    # the new version from rig-setup's update-workflows.ps1.
     [string]$Install = ''
 )
 # Builds one package into local_packages\, replacing the version there before, so the folder
