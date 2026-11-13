@@ -15,6 +15,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import jsonschema
 import yaml
@@ -42,7 +43,7 @@ def schema_for(config: Path, schemas: Path) -> tuple[Path | None, str]:
     return (pick[0] if len(pick) == 1 else None), ""
 
 
-def closed(node):
+def closed(node: Any) -> Any:
     """The schema with every object that lists its properties closed to others, as the generated
     DeserializeFromYaml is: it refuses an unknown key, which the schema (pydantic's) lets through."""
     if isinstance(node, dict):
