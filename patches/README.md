@@ -2,7 +2,7 @@
 
 `local_packages\` also carries builds of packages with fixes the lab needs that are not released yet. Each has a version of its own, distinct from any upstream one, so a restore never confuses the two.
 
-## OpenRigs.Core, Devices, Logging, Streaming and Video
+## OpenRigs.Core, Devices, Logging, Streaming, Video and Vision
 
 Built because open-rigs has not published a release yet (ucl-open/ucl-open#12), from this repository's own `src\`: upstream branch `rig-config-resolver` at `3788bfb` (main plus the per-machine config operators `ResolveRigConfigDirectory`, `ReadRigConfig` and `ResolveRigFile`), upstream `main` merged at `f313716` (4 Nov 2026: the calibration loop, per-line pulse outputs on DO1 to DO3, camera trigger enable flags with `EnableTrigger1` off by default, and LogData CSV columns named by field, which av-dome's `tr-open-rigs` needs), and the lab's changes below, each a commit on this repository's `main`. Each package's version is its `.csproj`'s; claude-tools `docs/architecture/COEN-LAB.md` says how they are raised.
 
@@ -23,6 +23,27 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `0bacc27`, `f2f8802`, `90558a7` | Video (coen-lab.4 to .6) | `UsbCamera`, a USB camera that is not the rig's own: exposure live in microseconds as `ExposureTime`, and a missing frame ends the stream only after none for 5 s or 4 exposures (Pip, 10 Nov 2026) | Lab-only |
 | `cffa26c` | Video (coen-lab.7), Devices (coen-lab.5) | `TriggeredSpinnaker` sets `PixelFormat` each time the camera opens, Mono8 when not set, and the include exposes it: a format stored on the camera was used before (BLUE-OPTO-1's were Mono16) | Not reported (Proposed upstream, below) |
 | `e137284` | Video (coen-lab.8) | A blank or null `PixelFormat` is Mono8, as coen-qc-preflight-rig reads rig.yml, not an opaque Spinnaker error | With `cffa26c` |
+| `fcef3f6` | Core (.5) | The Bonsai calibration fitting stack is deleted, with its MathNet dependency: a curve's fit is made in Python when it is written. The pulse gap is named `pulseGapMs` | Lab-only |
+| `423ecb5` | Core (.5) | `CalibrationCurve` carries `pulseGapMs` and its `linearFit`, which a rig plans rewards with | Lab-only |
+| `1e18f65` | Core (.5) | `FirePulses` replaces `PulseBurst`: pulse trains timed on the Harp clock, each pulse `PulseGapMs` after the previous one closes | Lab-only |
+| `a8c6b58` | Core (.5) | `LoadRewardLine` (one side's reward line from rig.yml's wiring and its valve calibration, read once at start) and `PlanReward` (a reward as equal pulses inside the calibrated range) | Lab-only |
+| `21e53b0` | Core (.5) | `HarpDelay` (a delay on the Harp clock), `StartupWatchdog` and `ThrowError` | Lab-only |
+| `1fd1e35` | Core (.5) | `RigDevice` and `NamedDevice`, a rig.yml device by kind and name | Lab-only |
+| `a66a434`, `fa4c431` | Python | `open_rigs.rigs.dome` `DomeRig`, the one rig model of every dome workflow: wiring required and checked, refusals naming the rule's home | Lab-only |
+| `cce137c` | Devices (.6) | Zapit: the TCP client, its commands and replies, and the conditions file's checks | Lab-only |
+| `4afd389` | Devices (.6) | `HarpLickSpoutStage`: setup, homing, moves and per-mouse positions in tested C# | Lab-only |
+| `17eac88`, `0a55cab` | Devices (.6) | `DeliverReward`: each (side, microlitres) reward planned and fired as calibrated pulses on the Harp clock, logged as water delivered | Lab-only |
+| `0a55cab`, `888a82b` | Devices (.6) | `DomeHardware` (the dome's boards, stage and three cameras) and `DomeHarpLogs` | Lab-only |
+| `0ca2c36` | Devices (.6) | `BehaviorBoard.RunningWheel` reads the encoder in Position mode, so it gives distance | Lab-only |
+| `0aea718`, `cd12107`, `ad76b13` | Vision (.1) | `DomeDisplay` and `DisposeOnRenderThread`; Vision is built as a lab package for the first time | Lab-only |
+| `5891c48` | Video (.9) | `ExposureFitsTrigger`, with `OpenRigs.Video.Tests` | Lab-only |
+| `62f827c` | Core (not built) | `FirePulses` and `HarpDelay` refuse a clock that steps back only while pulses or delays are pending; idle, they take the new time (SynchronizeTimestamp sets the board's clock at start) | Lab-only |
+| `5a76011` | Core, Devices (not built) | `DeliverReward` fires every reward through one `FirePulses`, so a queued reward starts `pulseGapMs` after the last; `LoadRewardLine`'s `MaxRewardUl` (20 by default) and `PlanReward` refuse a larger reward or one over 65535 pulses | Lab-only |
+| `4dfe52c` | Devices (not built) | `ZapitTrial.Command` and `ZapitLineMessage`, the per-trial Zapit command (0 mW on a laser-off trial) and trigger line write the domes share | Lab-only |
+| `9fb7af5` | Core (not built) | `DispenseProcedure.requireMonotone` deleted, as nothing read it | Lab-only |
+| `5665dd7` | Python | `DomeRig` refuses keys a dome does not use, as the generated C# does at Start; wiring refusals give the line to add | Lab-only |
+
+The rows marked "not built" are on `main` with no package version raised: the next build raises Core and Devices.
 
 `OpenRigs.Streaming` is otherwise upstream's `src/OpenRigs.Streaming` at the base commit. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
 
