@@ -36,6 +36,39 @@ namespace OpenRigs.Devices.Tests
         }
 
         [TestMethod]
+        public void ATrialsCommandSendsItsPowerOnlyWithTheLaserOn()
+        {
+            var on = ZapitTrial.Command(7, 3, true, 4.5, true, 1.5);
+            Assert.AreEqual("StartStimulus(condition=3, laserOn=True, hardwareTriggered=True, duration=1.5, power=4.5, delay=0)", on.ToString());
+            Assert.AreEqual(true, on.Logging);
+            var off = ZapitTrial.Command(8, 2, false, 4.5, false, 0);
+            Assert.AreEqual("StartStimulus(condition=2, laserOn=False, hardwareTriggered=False, duration=0, power=0, delay=0)", off.ToString());
+            Assert.AreEqual(0f, BitConverter.ToSingle(off.ToBytes(), 8));
+            Assert.AreEqual(64, off.ToBytes()[1] & 64);  // the power is sent, not left to the conditions file
+        }
+
+        [DataTestMethod]
+        [DataRow(0, 1.0, "Trial 5 has Zapit condition 0")]
+        [DataRow(255, 1.0, "Trial 5 has Zapit condition 255")]
+        [DataRow(1, -1.0, "Trial 5's Zapit stimulus lasts -1 s")]
+        public void ATrialsCommandRefusesWhatZapitCannotPlay(int condition, double duration, string message)
+        {
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitTrial.Command(5, condition, true, 1, false, duration));
+            StringAssert.Contains(ex.Message, message);
+        }
+
+        [TestMethod]
+        public void LineMessagesSetAndClearTheLine()
+        {
+            var set = ZapitTrial.LineMessage(Harp.Behavior.DigitalOutputs.DO3, true);
+            Assert.AreEqual(Harp.Behavior.OutputSet.Address, set.Address);
+            Assert.AreEqual(Harp.Behavior.DigitalOutputs.DO3, Harp.Behavior.OutputSet.GetPayload(set));
+            var clear = new ZapitLineMessage().Process(Observable.Return(Harp.Behavior.DigitalOutputs.DO3)).Wait();
+            Assert.AreEqual(Harp.Behavior.OutputClear.Address, clear.Address);
+            Assert.AreEqual(Bonsai.Harp.MessageType.Write, clear.MessageType);
+        }
+
+        [TestMethod]
         public void StartStimulusSetsKeysValuesAndFloats()
         {
             var bytes = new ZapitCommand
