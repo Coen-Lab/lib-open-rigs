@@ -1,7 +1,7 @@
 {
   "$defs": {
     "CalibrationCurve": {
-      "description": "A calibration measured as pairs, such as valve opening time against delivered volume.\n\nWritten by the platform's DispenseCalibration procedure (valves, pumps) and read by a rig\nwhose configuration points a CalibratedPulse at it; the rig fits the points at startup.",
+      "description": "A calibration measured as pairs, such as valve opening time against volume per pulse, with its linear fit.\n\nThe fit is made in Python when the curve is written; a rig whose configuration points a\nCalibratedPulse at the file reads `linear_fit` and `pulse_gap_ms`, never the points.",
       "properties": {
         "calibratedAt": {
           "description": "When the calibration was measured, in UTC.",
@@ -58,13 +58,24 @@
           "type": "string"
         },
         "points": {
-          "description": "Measured pairs; the fit is done at load, not stored.",
+          "description": "Measured pairs, kept as the record of what was weighed.",
           "items": {
             "$ref": "#/$defs/CalibrationPoint"
           },
           "minItems": 2,
           "title": "Points",
           "type": "array"
+        },
+        "pulseGapMs": {
+          "description": "Off-to-on time between the pulses of each sample, in milliseconds; a rig fires at the same gap.",
+          "maximum": 65535,
+          "minimum": 0,
+          "title": "PulseGapMs",
+          "type": "integer"
+        },
+        "linearFit": {
+          "$ref": "#/$defs/LinearFit",
+          "description": "The line fitted to the points, which a rig plans with."
         },
         "payloadPath": {
           "anyOf": [
@@ -89,7 +100,9 @@
         "xUnit",
         "yName",
         "yUnit",
-        "points"
+        "points",
+        "pulseGapMs",
+        "linearFit"
       ],
       "title": "CalibrationCurve",
       "type": "object"
@@ -261,6 +274,44 @@
         "size"
       ],
       "title": "DispenseSample",
+      "type": "object"
+    },
+    "LinearFit": {
+      "description": "A straight line fitted to a curve's points: y = slope * x + intercept, valid from `min_x` to `max_x`.\n\nFor a valve, x is the pulse width in ms and y the volume per pulse in ul; a rig plans pulses only\ninside the range.",
+      "properties": {
+        "slope": {
+          "description": "y per unit of x, such as ul per ms of pulse width.",
+          "exclusiveMinimum": 0,
+          "title": "Slope",
+          "type": "number"
+        },
+        "intercept": {
+          "description": "y at x = 0, in the unit of y.",
+          "title": "Intercept",
+          "type": "number"
+        },
+        "minX": {
+          "description": "Smallest x the fit is valid for, such as the shortest pulse width measured.",
+          "maximum": 65535,
+          "minimum": 0,
+          "title": "MinX",
+          "type": "integer"
+        },
+        "maxX": {
+          "description": "Largest x the fit is valid for, such as the longest pulse width measured.",
+          "maximum": 65535,
+          "minimum": 0,
+          "title": "MaxX",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "slope",
+        "intercept",
+        "minX",
+        "maxX"
+      ],
+      "title": "LinearFit",
       "type": "object"
     },
     "MeshMap": {

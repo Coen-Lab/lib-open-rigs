@@ -23,6 +23,7 @@ from open_rigs.core.calibration import (
     CalibrationSchema,
     CalibrationPoint,
     CalibrationCurve,
+    LinearFit,
     DispenseSample,
     DispenseProcedure,
 )
@@ -53,6 +54,7 @@ __all__ = [
     "CalibrationSchema",
     "CalibrationPoint",
     "CalibrationCurve",
+    "LinearFit",
     "DispenseSample",
     "DispenseProcedure",
     "ExperimentSession",

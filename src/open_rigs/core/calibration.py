@@ -9,7 +9,7 @@ rig schema that references it binds to that type instead of generating a copy.
 from datetime import datetime
 from typing import List
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic.json_schema import JsonSchemaValue
 from swc.aeon.schema import BaseSchema
 
@@ -54,11 +54,32 @@ class CalibrationPoint(CalibrationSchema):
     y: data_types.Double = Field(description="The measured value, in the unit of the y axis.")
 
 
-class CalibrationCurve(Calibration):
-    """A calibration measured as pairs, such as valve opening time against delivered volume.
+class LinearFit(CalibrationSchema):
+    """A straight line fitted to a curve's points: y = slope * x + intercept, valid from `min_x` to `max_x`.
 
-    Written by the platform's DispenseCalibration procedure (valves, pumps) and read by a rig
-    whose configuration points a CalibratedPulse at it; the rig fits the points at startup.
+    For a valve, x is the pulse width in ms and y the volume per pulse in ul; a rig plans pulses only
+    inside the range.
+    """
+
+    slope: data_types.Double = Field(gt=0, description="y per unit of x, such as ul per ms of pulse width.")
+    intercept: data_types.Double = Field(description="y at x = 0, in the unit of y.")
+    min_x: data_types.UShort = Field(ge=1, description="Smallest x the fit is valid for, such as the shortest pulse width measured.")
+    max_x: data_types.UShort = Field(ge=1, description="Largest x the fit is valid for, such as the longest pulse width measured.")
+
+    @model_validator(mode="after")
+    def _range_gives_volume(self) -> "LinearFit":
+        if self.max_x < self.min_x:
+            raise ValueError(f"maxX {self.max_x} is below minX {self.min_x}")
+        if self.slope * self.min_x + self.intercept <= 0:
+            raise ValueError(f"the fit gives no volume at minX {self.min_x}")
+        return self
+
+
+class CalibrationCurve(Calibration):
+    """A calibration measured as pairs, such as valve opening time against volume per pulse, with its linear fit.
+
+    The fit is made in Python when the curve is written; a rig whose configuration points a
+    CalibratedPulse at the file reads `linear_fit` and `pulse_gap_ms`, never the points.
     """
 
     x_name: str = Field(examples=["pulse_width"], description="Name of the quantity the rig controls.")
@@ -66,8 +87,12 @@ class CalibrationCurve(Calibration):
     y_name: str = Field(examples=["volume"], description="Name of the measured quantity.")
     y_unit: str = Field(examples=["ul"], description="Unit of the y values.")
     points: List[CalibrationPoint] = Field(
-        min_length=2, description="Measured pairs; the fit is done at load, not stored."
+        min_length=2, description="Measured pairs, kept as the record of what was weighed."
     )
+    pulse_gap_ms: data_types.UShort = Field(
+        description="Off-to-on time between the pulses of each sample, in milliseconds; a rig fires at the same gap."
+    )
+    linear_fit: LinearFit = Field(description="The line fitted to the points, which a rig plans with.")
     payload_path: ArtefactPath | None = Field(
         default=None,
         description="Relative path of a file a consumer still needs alongside the points, such as a gamma LUT bitmap.",

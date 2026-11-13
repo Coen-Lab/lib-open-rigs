@@ -8,9 +8,11 @@
   "yName": "volume",
   "yUnit": "ul",
   "points": [
-    { "x": 20, "y": 1.1 },
-    { "x": 40, "y": 2.3 },
-    { "x": 60, "y": 3.4 }
+    { "x": 20, "y": 1.0 },
+    { "x": 40, "y": 2.1 },
+    { "x": 60, "y": 3.2 }
   ],
-  "payloadPath": null
+  "payloadPath": null,
+  "pulseGapMs": 100,
+  "linearFit": { "slope": 0.055, "intercept": -0.1, "minX": 20, "maxX": 60 }
 }

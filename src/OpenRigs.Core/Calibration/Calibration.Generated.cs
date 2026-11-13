@@ -10,16 +10,16 @@ namespace OpenRigs.Core.Calibration
     #pragma warning disable // Disable all warnings
 
     /// <summary>
-    /// A calibration measured as pairs, such as valve opening time against delivered volume.
+    /// A calibration measured as pairs, such as valve opening time against volume per pulse, with its linear fit.
     ///
-    ///Written by the platform's DispenseCalibration procedure (valves, pumps) and read by a rig
-    ///whose configuration points a CalibratedPulse at it; the rig fits the points at startup.
+    ///The fit is made in Python when the curve is written; a rig whose configuration points a
+    ///CalibratedPulse at the file reads `linear_fit` and `pulse_gap_ms`, never the points.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute(@"A calibration measured as pairs, such as valve opening time against delivered volume.
+    [System.ComponentModel.DescriptionAttribute(@"A calibration measured as pairs, such as valve opening time against volume per pulse, with its linear fit.
 
-    Written by the platform's DispenseCalibration procedure (valves, pumps) and read by a rig
-    whose configuration points a CalibratedPulse at it; the rig fits the points at startup.")]
+    The fit is made in Python when the curve is written; a rig whose configuration points a
+    CalibratedPulse at the file reads `linear_fit` and `pulse_gap_ms`, never the points.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class CalibrationCurve
@@ -43,12 +43,17 @@ namespace OpenRigs.Core.Calibration
     
         private System.Collections.Generic.List<CalibrationPoint> _points;
     
+        private int _pulseGapMs;
+    
+        private LinearFit _linearFit;
+    
         private string _payloadPath;
     
         public CalibrationCurve()
         {
             _notes = "";
             _points = new System.Collections.Generic.List<CalibrationPoint>();
+            _linearFit = new LinearFit();
         }
     
         protected CalibrationCurve(CalibrationCurve other)
@@ -62,6 +67,8 @@ namespace OpenRigs.Core.Calibration
             _yName = other._yName;
             _yUnit = other._yUnit;
             _points = other._points;
+            _pulseGapMs = other._pulseGapMs;
+            _linearFit = other._linearFit;
             _payloadPath = other._payloadPath;
         }
     
@@ -229,12 +236,12 @@ namespace OpenRigs.Core.Calibration
         }
     
         /// <summary>
-        /// Measured pairs; the fit is done at load, not stored.
+        /// Measured pairs, kept as the record of what was weighed.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("points", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="points")]
-        [System.ComponentModel.DescriptionAttribute("Measured pairs; the fit is done at load, not stored.")]
+        [System.ComponentModel.DescriptionAttribute("Measured pairs, kept as the record of what was weighed.")]
         public System.Collections.Generic.List<CalibrationPoint> Points
         {
             get
@@ -244,6 +251,44 @@ namespace OpenRigs.Core.Calibration
             set
             {
                 _points = value;
+            }
+        }
+    
+        /// <summary>
+        /// Off-to-on time between the pulses of each sample, in milliseconds; a rig fires at the same gap.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("pulseGapMs", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="pulseGapMs")]
+        [System.ComponentModel.DescriptionAttribute("Off-to-on time between the pulses of each sample, in milliseconds; a rig fires at" +
+            " the same gap.")]
+        public int PulseGapMs
+        {
+            get
+            {
+                return _pulseGapMs;
+            }
+            set
+            {
+                _pulseGapMs = value;
+            }
+        }
+    
+        /// <summary>
+        /// The line fitted to the points, which a rig plans with.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("linearFit", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="linearFit")]
+        [System.ComponentModel.DescriptionAttribute("The line fitted to the points, which a rig plans with.")]
+        public LinearFit LinearFit
+        {
+            get
+            {
+                return _linearFit;
+            }
+            set
+            {
+                _linearFit = value;
             }
         }
     
@@ -287,6 +332,8 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("YName = " + _yName + ", ");
             stringBuilder.Append("YUnit = " + _yUnit + ", ");
             stringBuilder.Append("Points = " + _points + ", ");
+            stringBuilder.Append("PulseGapMs = " + _pulseGapMs + ", ");
+            stringBuilder.Append("LinearFit = " + _linearFit + ", ");
             stringBuilder.Append("PayloadPath = " + _payloadPath);
             return true;
         }
@@ -861,6 +908,147 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("Size = " + _size + ", ");
             stringBuilder.Append("Repeats = " + _repeats + ", ");
             stringBuilder.Append("PulseGapMs = " + _pulseGapMs);
+            return true;
+        }
+    
+        public override string ToString()
+        {
+            System.Text.StringBuilder stringBuilder = new System.Text.StringBuilder();
+            stringBuilder.Append(GetType().Name);
+            stringBuilder.Append(" { ");
+            if (PrintMembers(stringBuilder))
+            {
+                stringBuilder.Append(" ");
+            }
+            stringBuilder.Append("}");
+            return stringBuilder.ToString();
+        }
+    }
+
+
+    /// <summary>
+    /// A straight line fitted to a curve's points: y = slope * x + intercept, valid from `min_x` to `max_x`.
+    ///
+    ///For a valve, x is the pulse width in ms and y the volume per pulse in ul; a rig plans pulses only
+    ///inside the range.
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
+    [System.ComponentModel.DescriptionAttribute("A straight line fitted to a curve\'s points: y = slope * x + intercept, valid from" +
+        " `min_x` to `max_x`.\n\nFor a valve, x is the pulse width in ms and y the volume p" +
+        "er pulse in ul; a rig plans pulses only\ninside the range.")]
+    [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
+    [Bonsai.CombinatorAttribute(MethodName="Generate")]
+    public partial class LinearFit
+    {
+    
+        private double _slope;
+    
+        private double _intercept;
+    
+        private int _minX;
+    
+        private int _maxX;
+    
+        public LinearFit()
+        {
+        }
+    
+        protected LinearFit(LinearFit other)
+        {
+            _slope = other._slope;
+            _intercept = other._intercept;
+            _minX = other._minX;
+            _maxX = other._maxX;
+        }
+    
+        /// <summary>
+        /// y per unit of x, such as ul per ms of pulse width.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("slope", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="slope")]
+        [System.ComponentModel.DescriptionAttribute("y per unit of x, such as ul per ms of pulse width.")]
+        public double Slope
+        {
+            get
+            {
+                return _slope;
+            }
+            set
+            {
+                _slope = value;
+            }
+        }
+    
+        /// <summary>
+        /// y at x = 0, in the unit of y.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("intercept", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="intercept")]
+        [System.ComponentModel.DescriptionAttribute("y at x = 0, in the unit of y.")]
+        public double Intercept
+        {
+            get
+            {
+                return _intercept;
+            }
+            set
+            {
+                _intercept = value;
+            }
+        }
+    
+        /// <summary>
+        /// Smallest x the fit is valid for, such as the shortest pulse width measured.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("minX", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="minX")]
+        [System.ComponentModel.DescriptionAttribute("Smallest x the fit is valid for, such as the shortest pulse width measured.")]
+        public int MinX
+        {
+            get
+            {
+                return _minX;
+            }
+            set
+            {
+                _minX = value;
+            }
+        }
+    
+        /// <summary>
+        /// Largest x the fit is valid for, such as the longest pulse width measured.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("maxX", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="maxX")]
+        [System.ComponentModel.DescriptionAttribute("Largest x the fit is valid for, such as the longest pulse width measured.")]
+        public int MaxX
+        {
+            get
+            {
+                return _maxX;
+            }
+            set
+            {
+                _maxX = value;
+            }
+        }
+    
+        public System.IObservable<LinearFit> Generate()
+        {
+            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new LinearFit(this)));
+        }
+    
+        public System.IObservable<LinearFit> Generate<TSource>(System.IObservable<TSource> source)
+        {
+            return System.Reactive.Linq.Observable.Select(source, _ => new LinearFit(this));
+        }
+    
+        protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
+        {
+            stringBuilder.Append("Slope = " + _slope + ", ");
+            stringBuilder.Append("Intercept = " + _intercept + ", ");
+            stringBuilder.Append("MinX = " + _minX + ", ");
+            stringBuilder.Append("MaxX = " + _maxX);
             return true;
         }
     
@@ -1742,6 +1930,11 @@ namespace OpenRigs.Core.Calibration
             return Process<DispenseSample>(source);
         }
 
+        public System.IObservable<string> Process(System.IObservable<LinearFit> source)
+        {
+            return Process<LinearFit>(source);
+        }
+
         public System.IObservable<string> Process(System.IObservable<MeshMap> source)
         {
             return Process<MeshMap>(source);
@@ -1776,6 +1969,7 @@ namespace OpenRigs.Core.Calibration
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DispenseCalibration>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DispenseProcedure>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DispenseSample>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LinearFit>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<MeshMap>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SerialBalance>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpeakerFilter>))]
@@ -1854,6 +2048,11 @@ namespace OpenRigs.Core.Calibration
             return Process<DispenseSample>(source);
         }
 
+        public System.IObservable<string> Process(System.IObservable<LinearFit> source)
+        {
+            return Process<LinearFit>(source);
+        }
+
         public System.IObservable<string> Process(System.IObservable<MeshMap> source)
         {
             return Process<MeshMap>(source);
@@ -1888,6 +2087,7 @@ namespace OpenRigs.Core.Calibration
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DispenseCalibration>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DispenseProcedure>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DispenseSample>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LinearFit>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<MeshMap>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SerialBalance>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpeakerFilter>))]

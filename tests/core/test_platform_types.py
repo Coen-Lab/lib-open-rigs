@@ -38,7 +38,7 @@ def test_platform_generator_emits_definitions_instead_of_bindings():
     for model in PLATFORM_TYPES:
         assert "x-sgen-typename" not in defs[model.__name__], model.__name__
     # Nested platform types are generated in the same run, so they are untagged too.
-    for name in ("CalibrationPoint", "DispenseSample", "DispenseProcedure", "SerialBalance"):
+    for name in ("CalibrationPoint", "LinearFit", "DispenseSample", "DispenseProcedure", "SerialBalance"):
         assert "x-sgen-typename" not in defs[name], name
 
 
