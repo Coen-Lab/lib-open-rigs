@@ -54,6 +54,23 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual("core:PlanReward", type(edges.Single(e => e.To == input).From));
         }
 
-        static readonly XNamespace Bonsai = "https://bonsai-rx.org/2018/workflow";
+        // One cap on a reward: LoadRewardLine's default, DeliverReward's two lines and the Python dome model's MAX_REWARD_UL.
+        [TestMethod]
+        public void MaxRewardIsThePythonModels()
+        {
+            XNamespace core = "clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core";
+            XDocument workflow;
+            using (var stream = typeof(RewardForSide).Assembly.GetManifestResourceStream("OpenRigs.Devices.BehaviorBoard.DeliverReward.bonsai"))
+            {
+                workflow = XDocument.Load(stream);
+            }
+            var caps = workflow.Descendants(core + "MaxRewardUl").Select(e => (double)e).ToList();
+            Assert.AreEqual(2, caps.Count);
+            Assert.IsTrue(caps.All(c => c == LoadRewardLine.DefaultMaxRewardUl), string.Join(", ", caps));
+            StringAssert.Matches(ZapitTests.DomePy(), new System.Text.RegularExpressions.Regex(
+                @"(?m)^MAX_REWARD_UL = " + LoadRewardLine.DefaultMaxRewardUl.ToString(System.Globalization.CultureInfo.InvariantCulture) + @"\r?$"));
+        }
+
+        static readonly XNamespace Bonsai ="https://bonsai-rx.org/2018/workflow";
     }
 }

@@ -23,6 +23,10 @@ CAMERAS = 3
 # How long before its trigger Zapit's armed reply must be in, in seconds (OpenRigs.Devices ZapitTrial.ReplyMarginSeconds):
 # every dome task leaves this much between arming Zapit and the trigger.
 ZAPIT_REPLY_MARGIN_SECONDS = 0.2
+# The longest Zapit ramp-down a dome task may ask for, in seconds (OpenRigs.Devices ZapitConditions.MaximumRampDownMs).
+ZAPIT_MAX_RAMP_DOWN_SECONDS = 0.5
+# The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, DeliverReward's MaxRewardUl).
+MAX_REWARD_UL = 20
 
 
 class DomeBehaviorBoard(BehaviorBoard):

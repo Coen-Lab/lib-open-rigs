@@ -236,11 +236,22 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ReplyMarginIsThePythonModels()
         {
+            StringAssert.Contains(DomePy(), "ZAPIT_REPLY_MARGIN_SECONDS = " + ZapitTrial.ReplyMarginSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        [TestMethod]
+        public void MaximumRampDownIsThePythonModels()
+        {
+            StringAssert.Contains(DomePy(), "ZAPIT_MAX_RAMP_DOWN_SECONDS = " + (ZapitConditions.MaximumRampDownMs / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>The text of the dome rig model, src\open_rigs\rigs\dome.py, found above the test output.</summary>
+        internal static string DomePy()
+        {
             var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
             while (directory != null && !File.Exists(Path.Combine(directory.FullName, "src", "open_rigs", "rigs", "dome.py"))) directory = directory.Parent;
             Assert.IsNotNull(directory, @"No src\open_rigs\rigs\dome.py above the test output.");
-            var text = File.ReadAllText(Path.Combine(directory.FullName, "src", "open_rigs", "rigs", "dome.py"));
-            StringAssert.Contains(text, "ZAPIT_REPLY_MARGIN_SECONDS = " + ZapitTrial.ReplyMarginSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return File.ReadAllText(Path.Combine(directory.FullName, "src", "open_rigs", "rigs", "dome.py"));
         }
 
         [TestMethod]
