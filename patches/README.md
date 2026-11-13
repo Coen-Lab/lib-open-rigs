@@ -37,13 +37,11 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `0ca2c36` | Devices (.6) | `BehaviorBoard.RunningWheel` reads the encoder in Position mode, so it gives distance | Lab-only |
 | `0aea718`, `cd12107`, `ad76b13` | Vision (.1) | `DomeDisplay` and `DisposeOnRenderThread`; Vision is built as a lab package for the first time | Lab-only |
 | `5891c48` | Video (.9) | `ExposureFitsTrigger`, with `OpenRigs.Video.Tests` | Lab-only |
-| `62f827c` | Core (not built) | `FirePulses` and `HarpDelay` refuse a clock that steps back only while pulses or delays are pending; idle, they take the new time (SynchronizeTimestamp sets the board's clock at start) | Lab-only |
-| `5a76011` | Core, Devices (not built) | `DeliverReward` fires every reward through one `FirePulses`, so a queued reward starts `pulseGapMs` after the last; `LoadRewardLine`'s `MaxRewardUl` (20 by default) and `PlanReward` refuse a larger reward or one over 65535 pulses | Lab-only |
-| `4dfe52c` | Devices (not built) | `ZapitTrial.Command` and `ZapitLineMessage`, the per-trial Zapit command (0 mW on a laser-off trial) and trigger line write the domes share | Lab-only |
-| `9fb7af5` | Core (not built) | `DispenseProcedure.requireMonotone` deleted, as nothing read it | Lab-only |
+| `62f827c` | Core (.6) | `FirePulses` and `HarpDelay` refuse a clock that steps back only while pulses or delays are pending; idle, they take the new time (SynchronizeTimestamp sets the board's clock at start) | Lab-only |
+| `5a76011` | Core (.6), Devices (.7) | `DeliverReward` fires every reward through one `FirePulses`, so a queued reward starts `pulseGapMs` after the last; `LoadRewardLine`'s `MaxRewardUl` (20 by default) and `PlanReward` refuse a larger reward or one over 65535 pulses | Lab-only |
+| `4dfe52c` | Devices (.7) | `ZapitTrial.Command` and `ZapitLineMessage`, the per-trial Zapit command (0 mW on a laser-off trial) and trigger line write the domes share | Lab-only |
+| `9fb7af5` | Core (.6) | `DispenseProcedure.requireMonotone` deleted, as nothing read it | Lab-only |
 | `5665dd7` | Python | `DomeRig` refuses keys a dome does not use, as the generated C# does at Start; wiring refusals give the line to add | Lab-only |
-
-The rows marked "not built" are on `main` with no package version raised: the next build raises Core and Devices.
 
 `OpenRigs.Streaming` is otherwise upstream's `src/OpenRigs.Streaming` at the base commit. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
 
