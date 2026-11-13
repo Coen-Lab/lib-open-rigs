@@ -34,6 +34,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{B2E5F084-2FF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Devices.Tests", "src\OpenRigs.Devices.Tests\OpenRigs.Devices.Tests.csproj", "{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Video.Tests", "src\OpenRigs.Video.Tests\OpenRigs.Video.Tests.csproj", "{04209567-13E2-40F9-85D3-5CEA867D1315}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -80,6 +82,10 @@ Global
 		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04209567-13E2-40F9-85D3-5CEA867D1315}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04209567-13E2-40F9-85D3-5CEA867D1315}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04209567-13E2-40F9-85D3-5CEA867D1315}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04209567-13E2-40F9-85D3-5CEA867D1315}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -89,5 +95,6 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6BE59606-3C6C-483C-9C01-C4EE83DD70B9} = {B2E5F084-2FFD-4476-8510-764F7006418F}
+		{04209567-13E2-40F9-85D3-5CEA867D1315} = {B2E5F084-2FFD-4476-8510-764F7006418F}
 	EndGlobalSection
 EndGlobal
