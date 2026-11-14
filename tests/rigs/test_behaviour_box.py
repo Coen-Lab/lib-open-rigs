@@ -84,3 +84,13 @@ def test_wiring_schema_lists_every_channel():
     channels = list(schema["$defs"]["BoardWiring"]["properties"])
     assert channels[:4] == ["DIPort0", "DIPort1", "DIPort2", "DI3"] and len(channels) == 23
     assert {"DO0", "DO3", "AnalogInput1", "Rgb1"} <= set(channels)
+
+
+def test_video_encoder_libx264_and_path_unless_set():
+    assert BehaviourBoxRig.model_validate(RIG).video_encoder is None
+    rig = BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_qsv", "ffmpegPath": "D:\ffmpeg\ffmpeg.exe"}})
+    assert (rig.video_encoder.codec, rig.video_encoder.ffmpeg_path) == ("h264_qsv", "D:\ffmpeg\ffmpeg.exe")
+    assert BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {}}).video_encoder.codec == "libx264"
+    # OpenRigs.Video's FfmpegVideoWriter knows these three alone.
+    with pytest.raises(ValidationError):
+        BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": "hevc_nvenc"}})

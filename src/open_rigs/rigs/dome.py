@@ -5,7 +5,7 @@ added for one is there for all. Device kinds are groups of named entries, as the
 behaviorBoard: main: is BehaviorBoard-Main.
 """
 from collections import Counter
-from typing import Any, Dict, Iterator
+from typing import Any, Dict, Iterator, Optional
 
 from pydantic import Field, ModelWrapValidatorHandler, model_validator
 from swc.aeon.schema import BaseSchema
@@ -13,7 +13,7 @@ from swc.aeon.schema import BaseSchema
 from open_rigs.components import ProjectionCalibration, SpeakerArray
 from open_rigs.core.rig import Rig
 from open_rigs.devices import CalibratedPulse, HarpTimestampGeneratorGen3, LicketySplit, StepperPositions
-from open_rigs.rigs.behaviour_box import BehaviorBoard, BoardWiring, HarpStepperDriver, SpinnakerCamera
+from open_rigs.rigs.behaviour_box import BehaviorBoard, BoardWiring, HarpStepperDriver, SpinnakerCamera, VideoEncoder
 
 REWARD_VALVE = "RewardValve"
 ZAPIT_TRIGGER = "ZapitTrigger"
@@ -88,6 +88,7 @@ class DomeRig(Rig):
         description="The stage's in position, in steps, for a mouse with no positions file of its own."
     )
     zapit: ZapitServer = Field(description="Zapit optogenetics server endpoint; contacted only when the task enables optogenetics.")
+    video_encoder: Optional[VideoEncoder] = Field(default=None, description="How the cameras' video is encoded; left out: libx264 and the ffmpeg.exe on PATH.")
 
     @model_validator(mode="wrap")
     @classmethod

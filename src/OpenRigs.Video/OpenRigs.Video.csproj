@@ -4,7 +4,7 @@
     <Description>OpenRigs Logging Bonsai library.</Description>
     <PackageTags>$(PackageTags) Logging</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.9</Version>
+    <Version>0.1.1-coen-lab.11</Version>
   </PropertyGroup>
 
 
@@ -21,6 +21,10 @@
   <!-- rig.yml's cameras, read as OpenRigs.LiveView reads its devices: UsbCamera never takes the rig's own. -->
   <ItemGroup>
     <Compile Include="..\Shared\RigDevices.cs" Link="Shared\RigDevices.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenRigs.Video.Tests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -26,6 +26,10 @@ spouts were offered where the task records bothSpouts; the response rate is the 
 A file without a column the checks read (harpTime, outcomeTime and the rest of the shared block) is one problem,
 not checked further; without a Settings_Task file the checks that need the task are one problem. `summarise-experiment
 <experiment folder> ...` prints each summary and each failed check, exiting 1 when one fails.
+
+With videos (`summarise-experiment --videos`), each camera video is also checked against its CSV, its frames counted
+from the file (open_rigs.rigs.video_frames): minutes for a long session, so it is asked for, not done by default. A killed
+run's last second of frames with no CSV row is printed as a NOTE, not a problem (see video_frames).
 """
 
 from __future__ import annotations
@@ -39,6 +43,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from open_rigs.rigs import video_frames
 
 # (name, type, unit or None, description or None: None where each task describes it)
 SHARED_COLUMNS: List[Tuple[str, str, Optional[str], Optional[str]]] = [
@@ -130,6 +136,8 @@ class Summary:
     requested_ul: float = 0.0  # the task's rewards: rewardSizeUl of each rewarded trial
     delivered_ul: float = 0.0  # every RewardDelivered row's Value (manual rewards included)
     problems: List[str] = field(default_factory=list)
+    videos: List[str] = field(default_factory=list)  # each camera video's frames and CSV rows, when checked
+    notes: List[str] = field(default_factory=list)  # accepted, not problems: a killed run's video frames with no CSV row
 
 
 def _rows(folder: Path, pattern: str) -> List[Dict[str, str]]:
@@ -182,9 +190,19 @@ def _task(folder: Path) -> Optional[_Task]:
     return None
 
 
-def summarise(folder: Path) -> Summary:
-    """One experiment's summary and failed checks, from its files alone."""
+def summarise(folder: Path, videos: bool = False) -> Summary:
+    """One experiment's summary and failed checks, from its files alone; with videos, each camera video against its CSV."""
     folder = Path(folder)
+    s = _summarise(folder)
+    if videos:
+        checks = video_frames.check_videos(folder)
+        s.videos = [video_frames.describe(check).strip() for check in checks]
+        s.problems += [p for check in checks for p in check.problems]
+        s.notes += [n for check in checks for n in check.notes]
+    return s
+
+
+def _summarise(folder: Path) -> Summary:
     trials = _rows(folder, "BonsaiData/BonsaiData_Trial*.csv")
     events = _rows(folder, "BonsaiData/BonsaiData_Async*.csv")
     try:
@@ -268,6 +286,8 @@ def describe(s: Summary) -> str:
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",
              f"  outcome to next stimulus: {spread(s.interval_seconds)}",
              f"  water: {s.requested_ul:g} ul asked by the task, {s.delivered_ul:g} ul delivered (RewardDelivered)"]
+    lines += [f"  video {v}" for v in s.videos]
+    lines += [f"  NOTE {n}" for n in s.notes]
     lines += [f"  PROBLEM {p}" for p in s.problems]
     return "\n".join(lines)
 
@@ -275,10 +295,11 @@ def describe(s: Summary) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="One dome experiment summarised from its files, with its consistency checks.")
     parser.add_argument("folders", nargs="+", type=Path, help="experiment folders (ses-...)")
+    parser.add_argument("--videos", action="store_true", help="also count each camera video's frames against its CSV (minutes)")
     args = parser.parse_args()
     failed = False
     for folder in args.folders:
-        s = summarise(folder)
+        s = summarise(folder, args.videos)
         print(describe(s))
         failed |= bool(s.problems)
     sys.exit(1 if failed else 0)

@@ -148,3 +148,10 @@ def test_every_speaker_needs_a_filter():
     rig["speakerArray"]["speakers"]["left"] = {"position": {"azimuth": -90, "elevation": 15}, "channel": 0}
     with pytest.raises(ValidationError, match=r"speaker left has no filter.*calibration/speaker-left.json"):
         DomeRig.model_validate(rig)
+
+
+def test_video_encoder_optional():
+    assert DomeRig.model_validate(RIG).video_encoder is None
+    assert DomeRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc"}}).video_encoder.codec == "h264_nvenc"
+    with pytest.raises(ValidationError, match="ffmpeg"):
+        DomeRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc", "ffmpeg": "x"}})

@@ -175,3 +175,16 @@ def test_performance_is_rig_controls(tmp_path):
         t["bothSpouts"] = both
     s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["bothSpouts"]))
     assert (s.correct, round(s.performance, 4), s.responded) == (2, round(1 / 3, 4), 0.8)  # trial 3, one spout, left out
+
+
+def test_videos_are_checked_when_asked(tmp_path):
+    trials = _chain(2)
+    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])
+    (folder / "Camera-Pupil").mkdir()
+    (folder / "Camera-Pupil" / "Camera-Pupil_2026-11-14T01-00-00.avi").write_bytes(b"RIFF" + (4).to_bytes(4, "little") + b"AVI ")
+    (folder / "Camera-Pupil" / "Camera-Pupil_2026-11-14T01-00-00.csv").write_text("harpTime,frameId\n1000,0\n")
+    assert summarise(folder).problems == []
+    s = summarise(folder, videos=True)
+    assert s.videos == ["Camera-Pupil/Camera-Pupil_2026-11-14T01-00-00.avi: 0 frames, CSV 1 rows"]
+    assert s.problems == ["Camera-Pupil/Camera-Pupil_2026-11-14T01-00-00.avi: holds 0 frames, but Camera-Pupil_2026-11-14T01-00-00.csv lists 1 "
+                          "(1 missing from the video)"]

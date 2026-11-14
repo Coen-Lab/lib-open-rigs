@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 regenerate-calibration = "open_rigs._generators.calibration:main"
+check-videos = "open_rigs.rigs.video_frames:main"
 
 [dependency-groups]
 dev = [

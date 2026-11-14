@@ -125,6 +125,20 @@ class SpinnakerCamera(_SpinnakerCamera):
     )
 
 
+class VideoEncoder(BaseSchema):
+    """How this machine encodes its cameras' video: OpenRigs.Video's FfmpegVideoWriter (OpenRigs.Logging's LogVideoFfmpeg)
+    reads it at Start. The encoder is the machine's, so it is one setting for every camera."""
+
+    codec: Literal["libx264", "h264_nvenc", "h264_qsv"] = Field(
+        default="libx264",
+        description="The FFmpeg H.264 encoder: h264_nvenc on an NVIDIA GPU, h264_qsv on Intel Quick Sync, libx264 (software, the default) on any machine with the cores for it.",
+    )
+    ffmpeg_path: Optional[str] = Field(
+        default=None,
+        description="The full path of ffmpeg.exe. Left out: the first ffmpeg.exe on PATH. The workflow stops at Start when neither is there.",
+    )
+
+
 # A behaviour box's hardware, the same for every workflow that runs on one, so they all read
 # one rig.yml. Each kind of device is a group of named entries, so rig.yml binds a name to its
 # hardware (port, serial number) and each workflow asks for the names it drives: an entry it
@@ -143,3 +157,4 @@ class BehaviourBoxRig(Rig):
     camera: Dict[str, SpinnakerCamera] = Field(
         description="Triggered Spinnaker cameras by name, such as box (Camera-Box), whose frame rate is the board's trigger0_frequency."
     )
+    video_encoder: Optional[VideoEncoder] = Field(default=None, description="How the cameras' video is encoded; left out: libx264 and the ffmpeg.exe on PATH.")
