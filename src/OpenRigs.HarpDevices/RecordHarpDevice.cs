@@ -48,14 +48,6 @@ namespace OpenRigs.HarpDevices
         [Description("The board's USB serial as rig.yml gives it (usbSerial). The board on PortName must have it, or the workflow stops at Start.")]
         public string UsbSerial { get; set; }
 
-        /// <summary>Gets or sets what the wiring check found, for the record.</summary>
-        [Description("What the wiring check found (rig.yml's wiring against the workflow's schemas\\board-lines.yml), written into the record; empty for a device it does not cover.")]
-        public string Wiring { get; set; }
-
-        /// <summary>Gets or sets every disagreement between rig.yml's wiring and the lines the workflow uses; the workflow stops at Start when set.</summary>
-        [Description("Every disagreement between rig.yml's wiring and the lines the workflow uses. When set, the workflow stops at Start with it.")]
-        public string WiringRefusal { get; set; }
-
         /// <summary>Gets or sets the WhoAmI the device must report, or 0 to record it unchecked.</summary>
         [Description("The WhoAmI a device of this kind reports. Another stops the workflow; 0 records it unchecked.")]
         public int ExpectedWhoAmI { get; set; }
@@ -84,7 +76,6 @@ namespace OpenRigs.HarpDevices
                 string usbSerial;
                 try
                 {
-                    if (!string.IsNullOrEmpty(WiringRefusal)) throw new InvalidOperationException(WiringRefusal);
                     usbSerial = CheckBoard(PresentPorts());
                 }
                 catch (Exception ex)
@@ -212,7 +203,6 @@ namespace OpenRigs.HarpDevices
             record.Add("rig_entry", Entry);
             record.Add("port", PortName);
             record.Add("usb_serial", usbSerial);
-            record.Add("wiring", string.IsNullOrEmpty(Wiring) ? null : Wiring);
             record.Add("who_am_i", Number(whoAmI));
             record.Add("expected_who_am_i", ExpectedWhoAmI != 0 ? (object)ExpectedWhoAmI : null);
             record.Add("device_name", DeviceNameOf(registers));

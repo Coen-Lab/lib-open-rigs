@@ -254,4 +254,66 @@ namespace OpenRigs.Logging.Tests
             Assert.AreEqual("Data", LoggedRows.LogName(@"C:\s\Data\Data.csv"));
         }
     }
+
+    /// <summary>
+    /// LogTrial's and LogAsync's AutoFlush and PublishRows reach the CsvWriter only through two
+    /// ExternalizedMappings in LogData (audit L1-L1, 14 Nov 2026): a run reads the CSV after it has
+    /// closed, so a dropped mapping would pass every other test while each row waited in the buffer.
+    /// </summary>
+    [TestClass]
+    public class LogTrialAsyncMappingTests
+    {
+        static readonly System.Xml.Linq.XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
+        static readonly string[] Settings = { "AutoFlush", "PublishRows" };
+
+        static System.Xml.Linq.XDocument Embedded(string name)
+        {
+            using var stream = typeof(LoggedRows).Assembly.GetManifestResourceStream($"OpenRigs.Logging.{name}");
+            Assert.IsNotNull(stream, $"Missing embedded resource '{name}'.");
+            return System.Xml.Linq.XDocument.Load(stream);
+        }
+
+        // Each Expression of a Workflow element's Nodes, by index, and its Edges as (from, to).
+        static (List<System.Xml.Linq.XElement> Nodes, List<(int From, int To)> Edges) Graph(System.Xml.Linq.XElement workflow)
+        {
+            var ns = workflow.Name.Namespace;
+            var nodes = workflow.Element(ns + "Nodes").Elements(ns + "Expression").ToList();
+            var edges = workflow.Element(ns + "Edges").Elements(ns + "Edge")
+                .Select(e => ((int)e.Attribute("From"), (int)e.Attribute("To"))).ToList();
+            return (nodes, edges);
+        }
+
+        static string Type(System.Xml.Linq.XElement node) => (string)node.Attribute(Xsi + "type");
+
+        // The ExternalizedMapping naming both settings is wired into the node the predicate picks.
+        static void AssertMappedInto(System.Xml.Linq.XElement workflow, Func<System.Xml.Linq.XElement, bool> target, string where)
+        {
+            var (nodes, edges) = Graph(workflow);
+            var mapping = nodes.FindIndex(n => Type(n) == "ExternalizedMapping" &&
+                Settings.All(s => n.Elements().Any(p => p.Name.LocalName == "Property" && (string)p.Attribute("Name") == s)));
+            Assert.IsTrue(mapping >= 0, $"{where}: no ExternalizedMapping names AutoFlush and PublishRows.");
+            var into = edges.Where(e => e.From == mapping).Select(e => nodes[e.To]).ToList();
+            Assert.IsTrue(into.Any(target), $"{where}: the mapping of AutoFlush and PublishRows is wired into {string.Join(", ", into.Select(Type))}.");
+        }
+
+        [DataTestMethod]
+        [DataRow("LogTrial.bonsai")]
+        [DataRow("LogAsync.bonsai")]
+        public void AutoFlushAndPublishRows_AreOnInTheInclude(string file)
+        {
+            var include = Embedded(file).Descendants().Single(e => Type(e) == "IncludeWorkflow" && (string)e.Attribute("Path") == "OpenRigs.Logging:LogData.bonsai");
+            foreach (var setting in Settings)
+                Assert.AreEqual("true", (string)include.Elements().SingleOrDefault(e => e.Name.LocalName == setting), $"{file}'s {setting}.");
+        }
+
+        [TestMethod]
+        public void LogData_MapsAutoFlushAndPublishRows_OntoItsCsvWriter()
+        {
+            var outer = Embedded("LogData.bonsai").Root.Elements().Single(e => e.Name.LocalName == "Workflow");
+            var create = outer.Descendants().First(e => Type(e) == "rx:CreateObservable");
+            AssertMappedInto(outer, n => n == create, "LogData");
+            var inner = create.Elements().Single(e => e.Name.LocalName == "Workflow");
+            AssertMappedInto(inner, n => Type(n) == "orl:CsvWriter", "LogData's CreateObservable");
+        }
+    }
 }

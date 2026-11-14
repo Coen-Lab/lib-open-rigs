@@ -4,7 +4,7 @@
     <Description>OpenRigs LiveView Bonsai library. One node, StreamDevices, streams every device in the machine's rig.yml that the workflow publishes, at fixed rates per device kind that rig.yml can override, over OpenRigs.Streaming's ports.</Description>
     <PackageTags>$(PackageTags) Streaming LiveView</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.9</Version>
+    <Version>0.1.1-coen-lab.10</Version>
     <!-- Every public type and member is documented: the summaries are what the Bonsai editor shows. -->
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
   </PropertyGroup>

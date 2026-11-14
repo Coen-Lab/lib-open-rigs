@@ -260,14 +260,6 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
-                    // The wiring check's refusal stops the workflow at Start, before the board is looked at.
-                    var refused = Recorder();
-                    refused.WiringRefusal = "BehaviorBoard-Main's wiring in rig.yml does not agree";
-                    Exception error = null;
-                    using (refused.Process(new Subject<HarpMessage>(), new Subject<string>()).Subscribe(_ => { }, ex => error = ex))
-                        Check("a wiring refusal stops the workflow at Start with its message", error != null && error.Message == refused.WiringRefusal, error == null ? "no error" : error.Message);
-                }
-                {
                     // L2-L3: an error on the board's messages before any experiment was dropped.
                     var messages = new Subject<HarpMessage>();
                     Exception error = null;
@@ -300,109 +292,6 @@ namespace OpenRigs.HarpDevices.Tests
                     Check("the wrong board stops it at Start", error != null && error.Message.Contains("AQ03WRBO"), error == null ? "no error" : error.Message);
                 }
 
-                Console.WriteLine("Wiring against the workflow's lines:");
-                {
-                    var rigText = "behaviorBoard:\n  main:\n    portName: COM6\n    usbSerial: X\n" +
-                        "    cameraTriggerController: { trigger0Enabled: true, trigger0Frequency: 50, trigger1Enabled: false, trigger1Frequency: 50 }\n" +
-                        "    wiring:\n" +
-                        "      DIPort0: { device: Photodiode, note: sync square }\n" +
-                        "      DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }\n" +
-                        "      DO1: { device: RewardValve, side: left, part: '?' }\n" +
-                        "      DO2: { device: RewardValve, side: right }\n" +
-                        "      DO3: { device: ZapitTrigger }\n" +
-                        "camera:\n  face: { serialNumber: '1' }\n  pupil: { serialNumber: '2' }\n  body: { serialNumber: '3' }\n" +
-                        "rewardValves: { left: DO1, right: DO2 }\nzapit: { hardwareTriggered: true, triggerLine: 3 }\n";
-                    var linesText = "BehaviorBoard-Main:\n" +
-                        "  - { line: cameraTriggerController.trigger0, device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }\n" +
-                        "  - { line: cameraTriggerController.trigger1, device: CameraTrigger }\n" +
-                        "  - { line: rewardValves.left, device: RewardValve, side: left }\n" +
-                        "  - { line: rewardValves.right, device: RewardValve, side: right }\n" +
-                        "  - { line: zapit.triggerLine, device: ZapitTrigger }\n" +
-                        "  - { line: DIPort0, device: Photodiode }\n";
-                    Func<string, string, WiringResult> wiringOf = (rigYml, lines) =>
-                    {
-                        var stream = new YamlDotNet.RepresentationModel.YamlStream();
-                        stream.Load(new StringReader(rigYml));
-                        var rigRoot = (YamlDotNet.RepresentationModel.YamlMappingNode)stream.Documents[0].RootNode;
-                        var boardNode = (YamlDotNet.RepresentationModel.YamlMappingNode)((YamlDotNet.RepresentationModel.YamlMappingNode)rigRoot.Children[new YamlDotNet.RepresentationModel.YamlScalarNode("behaviorBoard")]).Children[new YamlDotNet.RepresentationModel.YamlScalarNode("main")];
-                        var device = new OpenRigs.Shared.RigDevice { Kind = "behaviorBoard", Instance = "main", Name = "BehaviorBoard-Main", Settings = boardNode };
-                        return WiringCheck.Check(rigRoot, device, new[] { "BehaviorBoard-Main", "Camera-Face", "Camera-Pupil", "Camera-Body" }, lines, "av-dome");
-                    };
-                    var agree = wiringOf(rigText, linesText);
-                    Check("the dome's wiring agrees with av-dome's lines", agree.Applies && agree.Problems.Count == 0, string.Join(" | ", agree.Problems));
-                    Check("... resolving rewardValves.left to DO1, zapit.triggerLine to DO3 and the enabled trigger to DO0, not the disabled one",
-                        agree.Summary.Contains("DO1 left RewardValve") && agree.Summary.Contains("DO3 ZapitTrigger") && agree.Summary.Contains("DO0 CameraTrigger") && !agree.Summary.Contains("DO1 CameraTrigger"), agree.Summary);
-                    var sideSwapped = wiringOf(rigText.Replace("side: left, part", "side: right, part"), linesText);
-                    Check("a valve on the other side refuses", sideSwapped.Problems.Any(p => p.StartsWith("DO1 (rewardValves.left) is used as the left RewardValve")), string.Join(" | ", sideSwapped.Problems));
-                    var unknown = wiringOf(rigText.Replace("      DIPort0: { device: Photodiode, note: sync square }\n", ""), linesText);
-                    Check("a line the workflow uses and the wiring leaves unknown refuses", unknown.Problems.Any(p => p.StartsWith("DIPort0 is used as Photodiode, but rig.yml's wiring does not say")), string.Join(" | ", unknown.Problems));
-                    var unused = wiringOf(rigText + "", linesText.Replace("  - { line: DIPort0, device: Photodiode }\n", ""));
-                    Check("a line the workflow does not use may be anything", unused.Problems.Count == 0, string.Join(" | ", unused.Problems));
-                    var other = wiringOf(rigText.Replace("DO3: { device: ZapitTrigger }", "DO3: { device: AirPuff }"), linesText);
-                    Check("another device on a used line refuses, naming both", other.Problems.Any(p => p.Contains("ZapitTrigger") && p.Contains("AirPuff")), string.Join(" | ", other.Problems));
-                    var camera = wiringOf(rigText.Replace("targets: [Camera-Face, Camera-Pupil, Camera-Body] }\n      DO1", "targets: [Camera-Face, Camera-Side] }\n      DO1"), linesText);
-                    Check("a target the workflow needs and the wiring lacks refuses, and so does one rig.yml does not have",
-                        camera.Problems.Any(p => p.Contains("must drive or read Camera-Pupil")) && camera.Problems.Any(p => p.Contains("names Camera-Side, which is not a device")), string.Join(" | ", camera.Problems));
-                    var missingKey = wiringOf(rigText.Replace("zapit: { hardwareTriggered: true, triggerLine: 3 }\n", "zapit: { hardwareTriggered: true }\n"), linesText);
-                    Check("a line given by a rig.yml key the rig lacks refuses", missingKey.Problems.Any(p => p.Contains("this rig.yml has no zapit.triggerLine")), string.Join(" | ", missingKey.Problems));
-                    var none = wiringOf(rigText, null);
-                    Check("a workflow without board-lines.yml is not checked, and says so", !none.Applies && none.Summary.StartsWith("not checked: av-dome has no"), none.Summary);
-                    var otherBoard = wiringOf(rigText, "BehaviorBoard-Second:\n  - { line: DO1, device: RewardValve }\n");
-                    Check("a board the file does not list is not checked", !otherBoard.Applies, otherBoard.Summary);
-                    Check("the refusal names the board, each problem and both files", sideSwapped.Refusal("BehaviorBoard-Main").StartsWith("BehaviorBoard-Main's wiring in rig.yml does not agree") && sideSwapped.Refusal("BehaviorBoard-Main").Contains(WiringCheck.LinesFile), sideSwapped.Refusal("BehaviorBoard-Main"));
-                    Check("no refusal when they agree", agree.Refusal("BehaviorBoard-Main") == null, agree.Refusal("BehaviorBoard-Main"));
-                    // Audit, 8 Nov 2026.
-                    var twoProblems = wiringOf(rigText.Replace("side: left, part", "side: right, part").Replace("DO3: { device: ZapitTrigger }", "DO3: { device: AirPuff }"), linesText);
-                    var refusal = twoProblems.Refusal("BehaviorBoard-Main");
-                    Check("the refusal is one line, every disagreement in it, as app-rig-control keeps only a workflow error's first line",
-                        twoProblems.Problems.Count == 2 && !refusal.Contains("\n") && twoProblems.Problems.All(refusal.Contains), refusal);
-                    var notCabled = rigText.Replace("zapit: { hardwareTriggered: true, triggerLine: 3 }", "zapit: { hardwareTriggered: false, triggerLine: 3 }").Replace("      DO3: { device: ZapitTrigger }\n", "");
-                    var zapitOff = wiringOf(notCabled, linesText);
-                    Check("zapit.triggerLine is not used while zapit.hardwareTriggered is false, so its uncabled line may be unknown",
-                        zapitOff.Problems.Count == 0 && !zapitOff.Summary.Contains("DO3"), string.Join(" | ", zapitOff.Problems) + " / " + zapitOff.Summary);
-                    var zapitUnset = wiringOf(notCabled.Replace("hardwareTriggered: false, ", ""), linesText);
-                    Check("... nor when hardwareTriggered is left out", zapitUnset.Problems.Count == 0, string.Join(" | ", zapitUnset.Problems));
-                    var twice = wiringOf(rigText, linesText + "  - { line: DO0, device: CameraTrigger, targets: [Camera-Side] }\n");
-                    Check("two entries for one line need every target either names",
-                        twice.Problems.Any(p => p.Contains("must drive or read Camera-Side")), string.Join(" | ", twice.Problems));
-                    // L2-L1: the wrong shape turned the check off, saying only "not checked".
-                    var mapped = wiringOf(rigText, "BehaviorBoard-Main:\n  DO1: { device: RewardValve }\n");
-                    Check("a board's entry that is a mapping, not a list, refuses", mapped.Applies && mapped.Problems.Any(p => p.Contains("must be a list of entries")) && mapped.Refusal("BehaviorBoard-Main") != null, mapped.Summary);
-                    var listTop = wiringOf(rigText, "- BehaviorBoard-Main\n");
-                    Check("... and so does a file whose top level is not a mapping", listTop.Applies && listTop.Problems.Any(p => p.Contains("list of entries")), listTop.Summary);
-                }
-
-                Console.WriteLine("A stepper driver's wiring (Pip, 11 Nov 2026):");
-                {
-                    var rigText = "stepperDriver:\n  a:\n    portName: COM3\n    usbSerial: X\n    wiring:\n" +
-                        "      Motor0: { device: BaseTransverse }\n" +
-                        "      Motor1: { device: Radial, side: left }\n" +
-                        "      Motor2: { device: Radial, side: right }\n";
-                    var linesText = "StepperDriver-A:\n" +
-                        "  - { line: Motor0, device: BaseTransverse }\n" +
-                        "  - { line: Motor1, device: Radial, side: left }\n" +
-                        "  - { line: Motor2, device: Radial, side: right }\n";
-                    Func<string, string, WiringResult> wiringOf = (rigYml, lines) =>
-                    {
-                        var stream = new YamlDotNet.RepresentationModel.YamlStream();
-                        stream.Load(new StringReader(rigYml));
-                        var rigRoot = (YamlDotNet.RepresentationModel.YamlMappingNode)stream.Documents[0].RootNode;
-                        var node = (YamlDotNet.RepresentationModel.YamlMappingNode)((YamlDotNet.RepresentationModel.YamlMappingNode)rigRoot.Children[new YamlDotNet.RepresentationModel.YamlScalarNode("stepperDriver")]).Children[new YamlDotNet.RepresentationModel.YamlScalarNode("a")];
-                        var device = new OpenRigs.Shared.RigDevice { Kind = "stepperDriver", Instance = "a", Name = "StepperDriver-A", Settings = node };
-                        return WiringCheck.Check(rigRoot, device, new[] { "StepperDriver-A" }, lines, "av-dome");
-                    };
-                    var agree = wiringOf(rigText, linesText);
-                    Check("the dome's motors agree with av-dome's lines, by the driver's own names", agree.Applies && agree.Problems.Count == 0 && agree.Summary.Contains("Motor1 left Radial"), string.Join(" | ", agree.Problems) + " / " + agree.Summary);
-                    var otherSide = wiringOf(rigText.Replace("Motor1: { device: Radial, side: left }", "Motor1: { device: Radial, side: right }"), linesText);
-                    Check("a spout motor on the other side refuses", otherSide.Problems.Any(p => p.StartsWith("Motor1 is used as the left Radial")), string.Join(" | ", otherSide.Problems));
-                    var unknown = wiringOf(rigText.Replace("      Motor0: { device: BaseTransverse }\n", ""), linesText);
-                    Check("a motor the workflow drives and the wiring leaves unknown refuses", unknown.Problems.Any(p => p.StartsWith("Motor0 is used as BaseTransverse, but rig.yml's wiring does not say")), string.Join(" | ", unknown.Problems));
-                    var spare = wiringOf(rigText + "      Motor3: { device: Something }\n", linesText);
-                    Check("a spare motor may drive anything else", spare.Problems.Count == 0, string.Join(" | ", spare.Problems));
-                    var boardLine = wiringOf(rigText, "StepperDriver-A:\n  - { line: DO1, device: RewardValve }\n");
-                    Check("a Behavior board's line is not a stepper driver's", boardLine.Problems.Any(p => p.Contains("which is not a line of the board") || p.Contains("has no DO1")), string.Join(" | ", boardLine.Problems));
-                }
-
                 Console.WriteLine("The dump request:");
                 {
                     var messages = new Subject<HarpMessage>();
@@ -428,14 +317,31 @@ namespace OpenRigs.HarpDevices.Tests
                     "behaviorBoard:\n  main:\n    portName: COM3\n    usbSerial: AB0M7PLB\n  spare:\n    portName: COM9\n  idle:\n    portName: null\n" +
                     "licketySplit:\n  left:\n    portName: COM4\n    usbSerial: E664C856C3913E37\n" +
                     "soundCard:\n  main:\n    portName: COM6\n" +
-                    "camera:\n  box:\n    serialNumber: '1'\nrootPath: C:\\data\n");
+                    "stepperDriver:\n  a:\n    portName: COM8\n    usbSerial: X\n    wiring:\n      Motor1: { device: Radial, side: left }\n" +
+                    "camera:\n  box:\n    serialNumber: '1'\n" +
+                    "speakerArray:\n  device: { bootDelay: 3 }\n  syncChannel: 7\n  unusedChannels: null\nrootPath: C:\\data\n");
                 Func<string, Type> published = n =>
                     n == "PathPrefix" ? typeof(string)
-                    : n == "BehaviorBoard-Main.Data" || n == "BehaviorBoard-Main.Commands" || n == "LicketySplit-Left.Data" || n == "SoundCard-Main.Data" || n == "BehaviorBoard-Idle.Data" ? typeof(HarpMessage)
+                    : n == "BehaviorBoard-Main.Data" || n == "BehaviorBoard-Main.Commands" || n == "LicketySplit-Left.Data" || n == "SoundCard-Main.Data" || n == "BehaviorBoard-Idle.Data" || n == "StepperDriver-A.Data" ? typeof(HarpMessage)
                     : n == "Camera-Box.Data" ? typeof(object) : null;
                 var plan = HarpDevicePlan.Create(config, published);
                 var main = plan.Recorded.FirstOrDefault(d => d.Name == "BehaviorBoard-Main");
-                Check("records each serial device the workflow publishes as HarpMessage", string.Join(",", plan.Recorded.Select(d => d.Name)) == "BehaviorBoard-Main,LicketySplit-Left,SoundCard-Main", string.Join(",", plan.Recorded.Select(d => d.Name)));
+                Check("records each serial device the workflow publishes as HarpMessage", string.Join(",", plan.Recorded.Select(d => d.Name)) == "BehaviorBoard-Main,LicketySplit-Left,SoundCard-Main,StepperDriver-A", string.Join(",", plan.Recorded.Select(d => d.Name)));
+                // L2-L2: the fixture has a stepper driver, with wiring, so a kind beside the Behavior board is planned from it.
+                var stepper = plan.Recorded.FirstOrDefault(d => d.Name == "StepperDriver-A");
+                Check("a stepper driver is checked against WhoAmI 1130, its wiring nothing to the plan", stepper != null && stepper.ExpectedWhoAmI == 1130 && stepper.PortName == "COM8" && stepper.ToString() == "StepperDriver-A|stepperDriver|COM8|X|1130|False", stepper == null ? "none" : stepper.ToString());
+                Check("settings with a sub-mapping and a value (speakerArray) are not an empty entry, and nothing refuses", plan.StartRefusal == null && !plan.Notes.Any(n => n.Contains("has no settings")), plan.StartRefusal + " | " + string.Join(" | ", plan.Notes));
+                // L2-L1: one empty instance hid its whole kind, without a word.
+                var emptyConfig = Path.Combine(root, "config-empty");
+                Directory.CreateDirectory(Path.Combine(emptyConfig, Environment.MachineName));
+                File.WriteAllText(Path.Combine(emptyConfig, Environment.MachineName, "rig.yml"),
+                    "behaviorBoard:\n  main:\n    portName: COM3\n    usbSerial: AB0M7PLB\n  spare:\n" +
+                    "licketySplit:\n  left:\n    portName: COM4\n    usbSerial: E664C856C3913E37\n");
+                var emptyPlan = HarpDevicePlan.Create(emptyConfig, published);
+                Check("an empty entry beside a board stops the workflow at Start, naming it and its kind",
+                    emptyPlan.StartRefusal != null && emptyPlan.StartRefusal.Contains("the rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none is checked")
+                    && emptyPlan.Notes.Any(n => n.StartsWith("the rig.yml entry behaviorBoard: spare:")) && emptyPlan.Recorded.Select(d => d.Name).SequenceEqual(new[] { "LicketySplit-Left" }),
+                    emptyPlan.StartRefusal + " | " + string.Join(",", emptyPlan.Recorded.Select(d => d.Name)));
                 Check("... with rig.yml's port and USB serial, its kind's WhoAmI, and its commands", main != null && main.PortName == "COM3" && main.UsbSerial == "AB0M7PLB" && main.ExpectedWhoAmI == 1216 && main.HasCommands, main == null ? "none" : main.ToString());
                 var left = plan.Recorded.FirstOrDefault(d => d.Name == "LicketySplit-Left");
                 Check("a Lickety Split is checked against WhoAmI 1400", left != null && left.ExpectedWhoAmI == 1400 && !plan.Notes.Any(n => n.Contains("licketySplit")), left == null ? "none" : left.ToString());
@@ -448,30 +354,6 @@ namespace OpenRigs.HarpDevices.Tests
                 var wrongCommands = HarpDevicePlan.Create(config, n => n == "BehaviorBoard-Main.Commands" ? typeof(string) : published(n));
                 Check("Commands of another type asks for no dump, and is noted", !wrongCommands.Recorded.First(d => d.Name == "BehaviorBoard-Main").HasCommands
                     && wrongCommands.Notes.Any(n => n.Contains("BehaviorBoard-Main.Commands is String, not HarpMessage")), string.Join(" | ", wrongCommands.Notes));
-                var repo = Path.Combine(root, "workflow-repo");
-                Directory.CreateDirectory(Path.Combine(repo, "schemas"));
-                File.WriteAllText(Path.Combine(repo, "schemas", "board-lines.yml"), "BehaviorBoard-Main:\n  - { line: DO1, device: RewardValve, side: left }\n");
-                var wired = HarpDevicePlan.Create(config, published, () => repo);
-                var wiredBoard = wired.Recorded.First(d => d.Name == "BehaviorBoard-Main");
-                Check("the plan reads the workflow's board-lines.yml and refuses a board whose rig.yml has no wiring for a line it uses",
-                    wiredBoard.WiringRefusal != null && wiredBoard.WiringRefusal.Contains("DO1 is used as left RewardValve") && wired.Notes.Any(n => n.StartsWith("BehaviorBoard-Main: refused")),
-                    wiredBoard.WiringRefusal + " | " + string.Join(" | ", wired.Notes));
-                Check("... the refusal reaches the board's node, and the plan changes so the inner workflow is remade", wired.Signature() != plan.Signature(), "same signature");
-                var unopted = HarpDevicePlan.Create(config, published, () => Path.Combine(root, "no-such-repo"));
-                var unoptedBoard = unopted.Recorded.First(d => d.Name == "BehaviorBoard-Main");
-                Check("a workflow without the file is recorded as not checked, and nothing refuses",
-                    unoptedBoard.WiringRefusal == null && unoptedBoard.Wiring.StartsWith("not checked:"), unoptedBoard.Wiring);
-                Check("only Behavior boards are wiring-checked", unopted.Recorded.Where(d => d.Kind != "behaviorBoard").All(d => d.Wiring == null), "another kind has a wiring result");
-                // L2-L2: a read that throws went out of Create, which never throws.
-                var linesPath = Path.Combine(repo, "schemas", "board-lines.yml");
-                using (new FileStream(linesPath, FileMode.Open, FileAccess.Read, FileShare.None))
-                {
-                    HarpDevicePlan locked = null;
-                    var threw = Error(() => locked = HarpDevicePlan.Create(config, published, () => repo));
-                    var lockedBoard = locked == null ? null : locked.Recorded.First(d => d.Name == "BehaviorBoard-Main");
-                    Check("a board-lines.yml that cannot be read refuses, and the plan does not throw",
-                        threw == null && lockedBoard.WiringRefusal != null && lockedBoard.WiringRefusal.Contains("could not be read"), threw ?? (lockedBoard.WiringRefusal + " | " + lockedBoard.Wiring));
-                }
                 var noFolder = HarpDevicePlan.Create(config, n => n == "PathPrefix" ? null : published(n));
                 Check("no PathPrefix records nothing, and says so", noFolder.Recorded.Count == 0 && noFolder.Notes.Any(n => n.Contains("PathPrefix")), string.Join(" | ", noFolder.Notes));
                 Check("... and stops the workflow at Start with the note's text", noFolder.StartRefusal != null && noFolder.StartRefusal.Contains(noFolder.Notes[0]), noFolder.StartRefusal);

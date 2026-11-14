@@ -109,6 +109,12 @@ namespace OpenRigs.LiveView.Tests
                     stepper == null ? "not streamed" : stepper.TemplateValues()["Interval"] + " " + stepper.Summary);
                 var notHarp = Plan(root, "licketySplit:\n  left:\n    portName: COM15\n", name => name == "LicketySplit-Left.Data" ? typeof(string) : null);
                 Check("a Lickety Split whose data is not HarpMessage is skipped", notHarp.Skipped.Any(s => s.Contains("is not HarpMessage")), string.Join(" | ", notHarp.Skipped));
+                // L2-L1: one empty instance hid its whole kind, without a word.
+                var empty = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  box:\n    serialNumber: '1'\n",
+                    name => name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage) : name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                Check("an empty entry beside a board is noted, naming it, and its kind is not streamed",
+                    empty.Notes.Any(n => n == "the rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none is streamed")
+                    && string.Join(", ", empty.Streamed.Select(d => d.Name)) == "Camera-Box", string.Join(" | ", empty.Notes));
                 var none = LiveViewPlan.Create(Path.Combine(root, "nowhere"), name => null);
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
 

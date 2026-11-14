@@ -134,8 +134,6 @@ namespace OpenRigs.HarpDevices
                     UsbSerial = device.UsbSerial,
                     ExpectedWhoAmI = device.ExpectedWhoAmI,
                     HasCommands = device.HasCommands,
-                    Wiring = device.Wiring,
-                    WiringRefusal = device.WiringRefusal,
                 },
             });
             var identity = graph.Add(new Bonsai.Reactive.PublishSubject { Name = device.Name + HarpDevicePlan.IdentitySuffix });

@@ -27,13 +27,12 @@ class Side(str, Enum):
 
 
 class WiredLine(BaseSchema):
-    """What is plugged into one line of the board. A workflow's schemas/board-lines.yml says what it
-    uses each line for, and OpenRigs.HarpDevices compares the two at Start: device, side and targets
-    must agree on every line the workflow uses, or the workflow stops. part and note are for people."""
+    """What is plugged into one line of the board. Nothing compares it with a workflow at Start; a
+    dome's reward and Zapit lines are read from it. part and note are for people."""
 
     device: str = Field(
         examples=["RewardValve", "CameraTrigger", "Photodiode", "ZapitTrigger"],
-        description=r"What is on the line, as the workflow's board-lines.yml names it: one of the lab's wiredDevices in K:\config\device-dictionary.json, checked by app-rig-control's names check.",
+        description=r"What is on the line: one of the lab's wiredDevices in K:\config\device-dictionary.json. Nothing checks it against that list.",
     )
     side: Optional[Side] = Field(default=None, description="The side it serves, where that matters (a reward valve).")
     targets: Optional[List[str]] = Field(
@@ -51,7 +50,7 @@ def _wired(channel: str, what: str) -> Optional[WiredLine]:
 
 class BoardWiring(BaseSchema):
     """What is plugged into each line of a Harp Behavior board, by the board's own channel names. A
-    line left out is unknown, which is allowed only for a line no workflow on the rig uses."""
+    line left out is unknown."""
 
     di_port0: Optional[WiredLine] = _wired("DIPort0", "digital input, port 0")
     di_port1: Optional[WiredLine] = _wired("DIPort1", "digital input, port 1")
@@ -81,8 +80,7 @@ class BoardWiring(BaseSchema):
 class StepperWiring(BaseSchema):
     """What each motor output and digital input of a Harp StepperDriver is connected to, by the
     driver's own names (Pip, 11 Nov 2026): the board stays a board, recorded as itself, and a spare
-    motor can drive anything else under its own name. A line left out is unknown, which is allowed
-    only for a line no workflow on the rig uses."""
+    motor can drive anything else under its own name. A line left out is unknown."""
 
     motor0: Optional[WiredLine] = _wired("Motor0", "motor output 0")
     motor1: Optional[WiredLine] = _wired("Motor1", "motor output 1")
@@ -98,7 +96,7 @@ class HarpStepperDriver(_HarpStepperDriver):
     __doc__ = _HarpStepperDriver.__doc__
     wiring: Optional[StepperWiring] = Field(
         default=None,
-        description="What each motor and input is connected to (Pip, 11 Nov 2026): checked at Start against the lines the workflow uses (its schemas/board-lines.yml) by OpenRigs.HarpDevices.",
+        description="What each motor and input is connected to (Pip, 11 Nov 2026). Not checked at Start.",
     )
 
 
@@ -113,7 +111,7 @@ class BehaviorBoard(_BehaviorBoard):
     live_view: Optional[LiveView] = Field(default=None, description="Live view settings for this board (OpenRigs.LiveView).")
     wiring: Optional[BoardWiring] = Field(
         default=None,
-        description="What is plugged into each line (Pip, 7 Nov 2026): checked at Start against the lines the workflow uses (its schemas/board-lines.yml) by OpenRigs.HarpDevices.",
+        description="What is plugged into each line (Pip, 7 Nov 2026). Not checked at Start against the workflow.",
     )
 
 

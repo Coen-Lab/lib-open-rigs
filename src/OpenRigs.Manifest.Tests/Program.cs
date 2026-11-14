@@ -628,6 +628,15 @@ namespace OpenRigs.Manifest.Tests
                 // Round 5: rig.yml's devices are read by src\Shared\RigDevices.cs, as the live view reads them.
                 var none = ExpectedPlan.Create("auto", Path.Combine(root, "absent", "rig.yml"), n => typeof(object));
                 Check("no rig.yml expects nothing, and says so", none.Entries.Count == 0 && none.Notes.Any(n => n.StartsWith("No rig.yml at") && n.EndsWith("so no device's files are expected.")), string.Join(" | ", none.Notes));
+                // L2-L1: one empty instance hid its whole kind, without a word.
+                var emptyYml = Path.Combine(root, "empty-rig.yml");
+                File.WriteAllText(emptyYml, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  box:\n    serialNumber: '1'\n" +
+                    "speakerArray:\n  device: { bootDelay: 3 }\n  syncChannel: 7\n");
+                var empty = ExpectedPlan.Create("auto", emptyYml, n => typeof(object));
+                Check("an empty entry beside a board is noted, naming it, and settings with a value (speakerArray) are not",
+                    empty.Notes.Count(n => n.Contains("has no settings")) == 1
+                    && empty.Notes.Contains("The rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none of its files is expected.")
+                    && string.Join(", ", empty.Entries.Select(e => e.Path)) == "Camera-Box/", string.Join(" | ", empty.Notes));
 
                 Console.WriteLine("ConfigRoot:");
                 var other = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", "--property:ConfigRoot=D:\\Test\\config" });

@@ -83,6 +83,9 @@ namespace OpenRigs.Manifest
                 Notes.Add(char.ToUpperInvariant(problem[0]) + problem.Substring(1) + " when the workflow was built, so no device's files are expected.");
                 return;
             }
+            // An empty entry hides its whole kind from RigDevices.Read (audit L2-L1).
+            foreach (var empty in EmptyRigEntries.Find(rigConfig))
+                Notes.Add(char.ToUpperInvariant(empty[0]) + empty.Substring(1) + " and none of its files is expected.");
             foreach (var device in devices)
             {
                 var name = device.Name;
