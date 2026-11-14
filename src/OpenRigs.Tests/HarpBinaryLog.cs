@@ -6,7 +6,7 @@ using Bonsai.Harp;
 namespace OpenRigs.Tests
 {
     /// <summary>
-    /// Reads raw Harp binary logs of the kind written by MatrixWriter.
+    /// Reads raw Harp binary logs of the kind written by LogHarpDevice.
     /// </summary>
     public static class HarpBinaryLog
     {

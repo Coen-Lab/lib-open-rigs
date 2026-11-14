@@ -18,6 +18,8 @@ The operator has two parallel outputs:
 
 File paths are assembled from the `PathPrefix` subject (published by [LogController](log-controller.md)) and the `LogName` externalized property.
 
+Each file is written by `BinaryLogWriter`, on its own thread, as Bonsai's `MatrixWriter` did, so a slow disk never holds up the device. Unlike `MatrixWriter`'s, that thread keeps Bonsai open until the file is closed: headless Bonsai (`--no-editor`) exits as soon as the workflow ends, and with `MatrixWriter` a log could lose its last messages, or never be created.
+
 ### Externalized properties
 
 | Property | Default | Description |
