@@ -48,8 +48,8 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `7028e65` | None | The lab's packages Control, HarpDevices, LiveView and Manifest are in `OpenRigs.sln` (not their `.Tests` console programs, which `records.yml` runs), so OpenRigs.yml's restore covers them and its documentation job builds them; MathNet.Numerics 4.15.0 is back in `.bonsai\Bonsai.config` (`fcef3f6`); no package raised | Lab-only |
 | `1aeae37` | Vision (.2) | `DisposeOnRenderThread` writes the shader window source's error to the console, where it was dropped | Lab-only |
 | `3203626` | Core (.7) | `HarpDelay` sends outside its lock, one thread at a time: sending under it deadlocked a dome when an input from another thread ended the delay (BLUE-OPTO-2, 14 Nov 2026) | Lab-only |
-| `5ead3b3` | Logging (.7) | `CsvWriter` names a Harp-timestamped record's first column `harpTime`, not `Seconds`, so a file says which clock its times are on; `LogVideo` and `LogRawVideo` write through it, so camera CSVs match (`harpTime`, `ChunkData.FrameID`, `ChunkData.Timestamp`) and `specs/logging.md` section 4 says a reader takes either name (Pip, 14 Nov 2026) | Lab-only |
-| `54e3f83` | Core (.8) | `QuietWait`, the dome tasks' quiet waits before Go, once for coen-dome-decision-making and coen-dome-navigation | Lab-only |
+| `5ead3b3` | Logging (.7) | `CsvWriter` names a Harp-timestamped record's first column `harpTime`, not `Seconds`, so a file says which clock its times are on; `LogVideo` and `LogRawVideo` write through it, so camera CSVs match (`harpTime`, `ChunkData.FrameID`, `ChunkData.Timestamp`) and `specs/logging.md` section 4 says a reader takes either name (14 Nov 2026) | Lab-only |
+| `54e3f83` | Core (.8) | `QuietWait`, the dome tasks' quiet waits before Go, one class for every dome task | Lab-only |
 
 OpenRigs.yml's publish job also pushes each green build's packages, versioned `0.0.0-ciN`, to Coen-Lab's GitHub Packages feed. No workflow installs from that feed: workflows install the `-coen-lab.N` builds in this repository's `local_packages\`, which app-rig-setup's `workflows\update-workflows.ps1` copies into each one.
 

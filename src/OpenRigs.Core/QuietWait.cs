@@ -7,7 +7,7 @@ namespace OpenRigs.Core
     /// A trial's quiet waits on the Harp clock, counted from the interval's start: Go needs every spout released for
     /// lickSeconds (a held contact blocks Go), and the wheel's distance (forward and back added) within wheelCm over
     /// the last wheelSeconds; Go is the first moment at or after earliest at which both hold. With both off, Go is
-    /// earliest. Shared by coen-dome-decision-making and coen-dome-navigation, so both tasks wait alike.
+    /// earliest. One class for every dome task, so all of them wait alike.
     /// </summary>
     public class QuietWait
     {
