@@ -23,7 +23,7 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `0bacc27`, `f2f8802`, `90558a7` | Video (coen-lab.4 to .6) | `UsbCamera`, a USB camera that is not the rig's own: exposure live in microseconds as `ExposureTime`, and a missing frame ends the stream only after none for 5 s or 4 exposures (Pip, 10 Nov 2026) | Lab-only |
 | `cffa26c` | Video (coen-lab.7), Devices (coen-lab.5) | `TriggeredSpinnaker` sets `PixelFormat` each time the camera opens, Mono8 when not set, and the include exposes it: a format stored on the camera was used before (BLUE-OPTO-1's were Mono16) | Not reported (Proposed upstream, below) |
 | `e137284` | Video (coen-lab.8) | A blank or null `PixelFormat` is Mono8, as coen-qc-preflight-rig reads rig.yml, not an opaque Spinnaker error | With `cffa26c` |
-| `fcef3f6` | Core (.5) | The Bonsai calibration fitting stack is deleted, with its MathNet dependency: a curve's fit is made in Python when it is written. The pulse gap is named `pulseGapMs` | Lab-only |
+| `fcef3f6` | Core (.5) | The Bonsai calibration fitting stack is deleted, with Core's MathNet dependency: a curve's fit is made in Python when it is written. The pulse gap is named `pulseGapMs`. It also took MathNet.Numerics out of `.bonsai\Bonsai.config`, which Bonsai.Numerics (a dependency of BonVision and of `RandomInterval.bonsai`) still needs, so `.bonsai` could not be set up and OpenRigs.yml's image job failed until `7028e65` put it back | Lab-only |
 | `423ecb5` | Core (.5) | `CalibrationCurve` carries `pulseGapMs` and its `linearFit`, which a rig plans rewards with | Lab-only |
 | `1e18f65` | Core (.5) | `FirePulses` replaces `PulseBurst`: pulse trains timed on the Harp clock, each pulse `PulseGapMs` after the previous one closes | Lab-only |
 | `a8c6b58` | Core (.5) | `LoadRewardLine` (one side's reward line from rig.yml's wiring and its valve calibration, read once at start) and `PlanReward` (a reward as equal pulses inside the calibrated range) | Lab-only |
@@ -45,6 +45,10 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `55afb94` | Devices (.8), Python | `Zapit.ConnectZapit`, the domes' Zapit connection and its start checks (`CheckZapitReply`, `CheckZapitConditionCount`, `RequireZapitHardwareTrigger`) once; `ZapitTrial.ReplyMarginSeconds` and `ZAPIT_REPLY_MARGIN_SECONDS`; every dome speaker needs a filter (`DomeSpeakers.RequireFilters`, `DomeSpeakerArray`) | Lab-only |
 | `7cc06df` | Python | `open_rigs.rigs.dome`'s `MAX_REWARD_UL` (20) and `ZAPIT_MAX_RAMP_DOWN_SECONDS` (0.5), held by C# tests to `LoadRewardLine.DefaultMaxRewardUl`, `DeliverReward`'s two `MaxRewardUl` and `ZapitConditions.MaximumRampDownMs`; no package raised | Lab-only |
 | `954353d` | Python | `DomeRig` refuses a board whose ZapitTrigger line is in `outputPulseEnable`: the line, and the masking light on it, is held from the trigger until the workflow clears it, never a board-timed pulse (14 Nov 2026). `DomeHardware`'s `WithoutPulseLine` already dropped it at run time; no package raised | Lab-only |
+| `7028e65` | None | The lab's packages Control, HarpDevices, LiveView and Manifest are in `OpenRigs.sln` (not their `.Tests` console programs, which `records.yml` runs), so OpenRigs.yml's restore covers them and its documentation job builds them; MathNet.Numerics 4.15.0 is back in `.bonsai\Bonsai.config` (`fcef3f6`); no package raised | Lab-only |
+| `1aeae37` | Vision (.2) | `DisposeOnRenderThread` writes the shader window source's error to the console, where it was dropped | Lab-only |
+
+OpenRigs.yml's publish job also pushes each green build's packages, versioned `0.0.0-ciN`, to Coen-Lab's GitHub Packages feed. No workflow installs from that feed: workflows install the `-coen-lab.N` builds in this repository's `local_packages\`, which app-rig-setup's `workflows\update-workflows.ps1` copies into each one.
 
 `OpenRigs.Streaming` is otherwise upstream's `src/OpenRigs.Streaming` at the base commit. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
 
@@ -60,39 +64,54 @@ When open-rigs publishes a release in which every row of the table above is upst
 
 ## Proposed upstream
 
-- `TriggeredSpinnaker` `PixelFormat` (cffa26c, Video 0.1.1-coen-lab.7 and Devices .5; blank means Mono8 since Video .8, audit 11 Nov 2026): upstream's operator never sets the format, so a camera opens in whatever format it stored (BLUE-OPTO-1's were Mono16), and LogVideo writes 8-bit frames only. To offer to ucl-open as an issue with this diff (the table above lists it); not yet reported.
+- `TriggeredSpinnaker` `PixelFormat` (cffa26c, Video 0.1.1-coen-lab.7 and Devices .5; blank means Mono8 since Video .8, audit 11 Nov 2026): upstream's operator never sets the format, so a camera opens in whatever format it stored (BLUE-OPTO-1's were Mono16), and LogVideo writes 8-bit frames only. To offer to ucl-open as an issue with this diff (the table above lists it), made from the code against upstream `main` at `f313716` (regenerated 14 Nov 2026); not yet reported.
 
 ```diff
 --- a/src/OpenRigs.Video/TriggeredSpinnaker.cs
 +++ b/src/OpenRigs.Video/TriggeredSpinnaker.cs
-@@ -15,6 +15,7 @@ namespace OpenRigs.Video
+@@ -15,6 +15,7 @@
          {
              ExposureTime = 1e6 / 50 - 1000;
              Binning = 1;
 +            PixelFormat = PixelFormatEnums.Mono8.ToString();
          }
-@@ -62,6 +63,11 @@ namespace OpenRigs.Video
+ 
+         [Description("The duration of each individual exposure, in microseconds. In general, this should be 1 / frameRate - 1 millisecond to prepare for next trigger.")]
+@@ -26,10 +27,18 @@
+         [Description("The size of the binning area of the sensor, e.g. a binning size of 2 specifies a 2x2 binning region.")]
          public int Binning { get; set; }
  
 +        // A string, not PixelFormatEnums, so rig.yml's pixelFormat maps onto it; the camera refuses an
 +        // unknown name when it opens.
-+        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name such as Mono8 or Mono16 (rig.yml's pixelFormat). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
++        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write, Mono8 (rig.yml's pixelFormat; blank is Mono8). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
 +        public string PixelFormat { get; set; }
 +
-@@ -81,6 +87,8 @@ namespace OpenRigs.Video
+         protected override void Configure(IManagedCamera camera)
+         {
              try { camera.AcquisitionStop.Execute(); }
              catch { }
-+            // Before binning and the region: a format change can change their limits
-+            camera.PixelFormat.Value = PixelFormat;
++            // Before binning and the region: a format change can change their limits. Blank means Mono8,
++            // as coen-qc-preflight-rig reads it (audit, 11 Nov 2026).
++            camera.PixelFormat.Value = string.IsNullOrWhiteSpace(PixelFormat) ? "Mono8" : PixelFormat.Trim();
              camera.BinningSelector.Value = BinningSelectorEnums.All.ToString();
+             camera.BinningHorizontalMode.Value = BinningHorizontalModeEnums.Sum.ToString();
+             camera.BinningVerticalMode.Value = BinningVerticalModeEnums.Sum.ToString();
 --- a/src/OpenRigs.Devices/TriggeredSpinnaker.bonsai
 +++ b/src/OpenRigs.Devices/TriggeredSpinnaker.bonsai
-@@ -15,6 +15,7 @@
+@@ -14,6 +14,7 @@
+         <Property Name="Binning" />
+         <Property Name="SerialNumber" />
          <Property Name="ColorProcessing" />
 +        <Property Name="PixelFormat" />
        </Expression>
-@@ -23,6 +24,7 @@
+       <Expression xsi:type="Combinator">
+         <Combinator xsi:type="p1:TriggeredSpinnaker">
+@@ -22,6 +23,7 @@
+           <p1:ExposureTime>19000</p1:ExposureTime>
+           <p1:Gain>0</p1:Gain>
            <p1:Binning>1</p1:Binning>
 +          <p1:PixelFormat>Mono8</p1:PixelFormat>
          </Combinator>
+       </Expression>
+       <Expression xsi:type="ExternalizedMapping">
 ```
