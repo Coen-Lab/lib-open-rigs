@@ -36,6 +36,7 @@ The model refuses a `rig.yml` unless each board's wiring has exactly one `Reward
 | `DeliverReward` | `OpenRigs.Devices:BehaviorBoard.DeliverReward.bonsai` | input `(side, microlitres)`; properties `RigFile`, `CalibrationDirectory`, `MissingCalibration`; subject `Timestamp` | `RewardLineLeft`, `RewardLineRight` (`LoadRewardLine`), one plan per reward on `RewardDelivered`, its pulses on `TriggerCalibratedPulse` one reward after another; a `RewardDelivered` row on `AsyncEvents` (Value the microlitres delivered, Detail starting with the side) and each calibrated line's file as `ValveCalibrationDO<n>`. Place it after `AsyncEvents` and `PathPrefix` are declared |
 | `DomeDisplay` | `OpenRigs.Vision:DomeDisplay.bonsai` | input `projectionCalibration`; properties `DisplayDevice`, `WindowState`, `Width`, `Height` | the BonVision window, mesh mapping and gamma correction; stimuli draw on `DrawStimuli`; disposed on the render thread |
 | `BehaviorBoard.RunningWheel` | `OpenRigs.Devices:BehaviorBoard.RunningWheel.bonsai` | the board's subjects, `CountsPerRev`, `WheelDiameterMm` | the distance run, in cm, with the encoder in Position mode |
+| `Zapit.ConnectZapit` | `OpenRigs.Devices:Zapit.ConnectZapit.bonsai` | input the task's Zapit conditions file path, sent once when the experiment uses Zapit; subjects `ZapitCommands`, `ZapitReplies` (declared by the workflow), `RigConfigs`, `SubjectId` | the TCP link to `rig.yml`'s `zapit` host and port: every `ZapitCommands` value sent, every reply on `ZapitReplies`. Stops the workflow on an error reply, no conditions file loaded, a conditions count other than the file's, or a real mouse on a rig without hardware triggering |
 
 ## Operators
 
@@ -47,9 +48,24 @@ The model refuses a `rig.yml` unless each board's wiring has exactly one `Reward
 | `RequireEntries` | Devices | refuses one kind's rig.yml entries unless there are exactly `Count`, naming where the rule is set |
 | `RewardForSide` | Devices | pairs a reward with its side's `RewardLine` for `PlanReward` |
 | `ZapitClient`, `ZapitCommand`, `ZapitReply`, `CreateZapitQuery`, `CheckZapitConditionCount`, `ZapitConditions`, `ZapitConditionsSnapshot` | Devices (`OpenRigs.Devices.Zapit`) | the Zapit TCP protocol; the conditions file's numbering and ramp-down checks; its copy for the experiment |
+| `ZapitTrial` (`Command`, `CheckArmed`, `CheckReply`, `RequireHardwareTrigger`, `LineMessage`, `ReplyMarginSeconds`), `CheckZapitReply`, `RequireZapitHardwareTrigger`, `ZapitLineMessage` | Devices (`OpenRigs.Devices.Zapit`) | one trial's StartStimulus; the check that Zapit's reply armed that trial's condition with the laser as asked (`CheckArmed`, the same message in every dome task); the stops on an error reply or no conditions file, and on a real mouse without hardware triggering; the ZapitTrigger line's set and clear; the 0.2 s a task allows for Zapit's reply |
+| `LoadSpeakers`, `SpeakerBuffer`, `ErrorSoundBuffer`, `CheckWaveRate` | Audio | see [Sound](#sound) |
 | `ExposureFitsTrigger` | Video | refuses a camera exposure longer than its trigger period allows |
 | `DisposeOnRenderThread` | Vision | disposes the display on the GL thread |
+| `QuietWait` | Core | a trial's quiet waits before Go: both spouts released for `lickQuietSeconds` (a held contact holds Go), the wheel within `wheelQuietCm`, forward and back added, over the last `wheelQuietSeconds`; one class for every dome task |
 | `LoadRewardLine`, `PlanReward`, `FirePulses`, `HarpDelay`, `RigDevice`, `StartupWatchdog`, `ThrowError` | Core | see [Calibration](calibration.md) |
+
+## Sound
+
+The speakers and every sound a task plays go through `OpenRigs.Audio` ([Speakers and Sounds](../bonsai-operators/OpenRigs.Audio/speakers.md)): `LoadSpeakers` reads `rig.yml`'s `speakerArray` from `RigFile` once, checking every speaker's filter, into an `AsyncSubject` `Speakers`; `SpeakerBuffer` lays a sound (or a table of sounds) out on chosen speakers, equalised for each (a stimulus) or not (a background noise); `ErrorSoundBuffer` gives the lab's one error sound on `errorSoundChannel` alone at the task's `punishment.sound.gain`, so a task file names no error sound file. Build each buffer once at load, waiting for the task file where it sets a gain, and keep the mixer's start at least 3 s after Start (`rig.yml`'s `device.bootDelay` may lengthen it, never shorten it).
+
+## The trial log
+
+Every dome task's `schemas\trial-columns.yml` starts with the same 16 columns, in this order, with the same types, units and descriptions: `harpTime, trialNumber, trialType, outcome, itiStartTime, itiSeconds, quietWaitSeconds, trialStartTime, stimulusOnsetTime, outcomeTime, rewardSizeUl, punishSound, punishTimeoutSeconds, laserCondition, laserPowerMw, laserTriggerTime` (`trialType`, `outcome`, `rewardSizeUl` and `punishSound` described by each task). The block is `open_rigs.rigs.dome_trials.SHARED_COLUMNS`; each task's `tests\test_trial_columns.py` holds its file to it with `shared_block_problems`, so change it there and regenerate every task's file. A task's own columns follow.
+
+Keep a task's outcome logic (what counts as the response, and the reward, error sound and spouts that follow) in one C# operator that runs on every tick, the way a corridor task's state machine runs on every position update. Nodes that run only at an outcome pay .NET's first-run compile at trial 1's: in a two-spout task whose choice, row and consequence are a chain of nodes, trial 1's reward came 8 to 20 ms after its outcome and every later one within 2 ms (measured 14 Nov 2026; neither writing the row on its own thread nor compiling the task's C# at Start changed it, and only an earlier outcome through the same nodes did). `summarise-experiment` reports a reward more than 2 ms late.
+
+`uv run summarise-experiment <experiment folder>` (`open_rigs.rigs.dome_trials.summarise`) reads one experiment from its files alone and checks the rows against each other and the task file: trial numbers and outcomes, each Go, stimulus and laser trigger within 2 ms of where the task puts it, each interval starting at the last outcome plus its timeout, the error sound with each timeout, and a `RewardDelivered` row for each rewarded trial. Its performance is Correct / (Correct + Incorrect) over the trials both spouts were offered, as Rig Control shows it.
 
 ## Video logging
 

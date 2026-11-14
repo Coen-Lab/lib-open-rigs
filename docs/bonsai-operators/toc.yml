@@ -1,3 +1,7 @@
+- name: OpenRigs.Audio
+  items:
+  - name: Speakers and Sounds
+    href: OpenRigs.Audio/speakers.md
 - name: OpenRigs.Core
   items:
   - name: Rig Configuration
@@ -43,6 +47,8 @@
     href: OpenRigs.Logging/log-harp-device.md
   - name: Log Video
     href: OpenRigs.Logging/log-video.md
+  - name: Log Video (FFmpeg)
+    href: OpenRigs.Logging/log-video-ffmpeg.md
 - name: OpenRigs.Streaming
   items:
   - name: Overview
