@@ -148,6 +148,17 @@ class DomeRig(Rig):
                         f"behaviorBoard {name}: RewardValve {alias} needs a CalibratedPulse in pulseController.outputs {WHERE}. "
                         f"Add it, as in `{alias}: {{ discriminatorType: CalibratedPulse, artefact: calibration/valve-{alias}.json }}`."
                     )
+            # A pulse-enabled line ends itself after its PulseDOx width; the Zapit line (and any masking light on it)
+            # is held from the trigger until the workflow clears it.
+            zapit_line = next(alias for alias, line in lines.items() if line.device == ZAPIT_TRIGGER)
+            pulsed = board.pulse_controller.output_pulse_enable.root.replace(",", " ").split() if board.pulse_controller else []
+            if zapit_line in pulsed:
+                kept = ", ".join(line for line in pulsed if line != zapit_line) or "None"
+                raise ValueError(
+                    f"behaviorBoard {name}: ZapitTrigger {zapit_line} is in pulseController.outputPulseEnable, so the board "
+                    f"would end it after PulseDO{zapit_line[-1]} instead of holding it until the workflow clears it {WHERE}. "
+                    f'Take {zapit_line} out, as in `outputPulseEnable: "{kept}"`.'
+                )
         return self
 
 

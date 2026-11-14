@@ -17,7 +17,7 @@ The Behavior Board (`who_am_i = 1216`) is a Harp board commonly used as an I/O h
 
 Sub-modules:
 
-- `PulseController`: `output_pulse_enable` (the `DO1`/`DO2`/`DO3` lines enabled) and `outputs`, one entry per line saying what drives its pulse width: a `FixedPulse` with `pulse_width_ms` set in the rig configuration, or a `CalibratedPulse` naming the calibration curve that converts a requested quantity, such as a reward volume, to a width at run time. All three lines are listed; an unused line is a `FixedPulse` of width 0.
+- `PulseController`: `output_pulse_enable` (the `DO1`/`DO2`/`DO3` lines enabled) and `outputs`, one entry per line saying what drives its pulse width: a `FixedPulse` with `pulse_width_ms` set in the rig configuration, or a `CalibratedPulse` naming the calibration curve that converts a requested quantity, such as a reward volume, to a width at run time. All three lines are listed; an unused line is a `FixedPulse` of width 0. A line left out of `output_pulse_enable` stays high once set until it is cleared, as a dome's Zapit trigger line must (`open_rigs.rigs.dome` refuses it pulse-enabled).
 - `CameraTriggerController`: `trigger0_frequency` and `trigger1_frequency` (Hz) for `CameraOutput0` and `CameraOutput1`.
 - `RunningWheel`: `counts_per_rev` and `wheel_diameter_mm`.
 

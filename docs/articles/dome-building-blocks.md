@@ -12,7 +12,7 @@ behaviorBoard:
     portName: COM3
     usbSerial: AB0M7PLB
     pulseController:
-      outputPulseEnable: "DO1, DO2, DO3"
+      outputPulseEnable: "DO1, DO2"
       outputs:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
@@ -24,7 +24,7 @@ behaviorBoard:
       DO3: { device: ZapitTrigger, note: also the masking light }
 ```
 
-The model refuses a `rig.yml` unless each board's wiring has exactly one `RewardValve` per side, each with its `side`, each on a line whose output is a `CalibratedPulse`, and exactly one `ZapitTrigger`; every refusal ends "(dome rig model, open_rigs.rigs.dome)". It also refuses a `camera` list of other than three entries (`face`, `pupil`, `body`). Other required keys: `speakerArray.errorSoundChannel` (beside `device.bootDelay`, `syncChannel` and `syncGain`), `lickSpoutDefaultPosition` (the in position of a mouse with no positions file) and `zapit` (`host`, `port`, `hardwareTriggered`).
+The model refuses a `rig.yml` unless each board's wiring has exactly one `RewardValve` per side, each with its `side`, each on a line whose output is a `CalibratedPulse`, and exactly one `ZapitTrigger`, on a line not in `outputPulseEnable` (a pulse-enabled line ends itself after its `PulseDOx` width, and the Zapit line, with the masking light on it, is held from the trigger until the workflow clears it; its `outputs` entry stays, a `FixedPulse` of width 0); every refusal ends "(dome rig model, open_rigs.rigs.dome)". It also refuses a `camera` list of other than three entries (`face`, `pupil`, `body`). Other required keys: `speakerArray.errorSoundChannel` (beside `device.bootDelay`, `syncChannel` and `syncGain`), `lickSpoutDefaultPosition` (the in position of a mouse with no positions file) and `zapit` (`host`, `port`, `hardwareTriggered`).
 
 ## Blocks
 

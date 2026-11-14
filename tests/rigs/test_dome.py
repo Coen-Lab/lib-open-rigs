@@ -11,7 +11,7 @@ RIG = {
     "rootPath": "C:\\Data",
     "behaviorBoard": {"main": {
         **HARP,
-        "pulseController": {"outputs": {
+        "pulseController": {"outputPulseEnable": "DO1, DO2", "outputs": {
             "DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DO1.json"},
             "DO2": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DO2.json"},
             "DO3": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0},
@@ -111,6 +111,21 @@ def test_wiring_refused(wiring, message, example):
         DomeRig.model_validate(rig_with(**wiring))
     assert "(dome rig model, open_rigs.rigs.dome)" in str(refused.value)
     assert example in str(refused.value)
+
+
+@pytest.mark.parametrize("pulsed, kept", [("DO1, DO2, DO3", "DO1, DO2"), (None, "DO1, DO2"), ("DO3", "None")])
+def test_zapit_line_not_pulsed(pulsed, kept):
+    # A pulse-enabled line ends itself after its PulseDOx width; the Zapit line is held until the workflow clears it.
+    rig = copy.deepcopy(RIG)
+    controller = rig["behaviorBoard"]["main"]["pulseController"]
+    if pulsed is None:
+        del controller["outputPulseEnable"]  # the default pulse-enables DO1 to DO3
+    else:
+        controller["outputPulseEnable"] = pulsed
+    with pytest.raises(ValidationError, match="ZapitTrigger DO3 is in pulseController.outputPulseEnable") as refused:
+        DomeRig.model_validate(rig)
+    assert "(dome rig model, open_rigs.rigs.dome)" in str(refused.value)
+    assert f'`outputPulseEnable: "{kept}"`' in str(refused.value)
 
 
 def test_error_sound_channel_required():
