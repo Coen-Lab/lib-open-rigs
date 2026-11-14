@@ -11,8 +11,8 @@ namespace OpenRigs.Devices.Zapit
     public static class ZapitTrial
     {
         /// <summary>
-        /// How long before its trigger Zapit's armed reply must be in, in seconds (open_rigs.rigs.dome
-        /// ZAPIT_REPLY_MARGIN_SECONDS): every dome task leaves this much between arming and the trigger.
+        /// How long before its trigger Zapit's armed reply must be in, in seconds (open_rigs.components.zapit
+        /// ZAPIT_REPLY_MARGIN_SECONDS): every task using Zapit leaves this much between arming and the trigger.
         /// </summary>
         public const double ReplyMarginSeconds = 0.2;
 

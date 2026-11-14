@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Logs each of a dome's Harp devices (BehaviorBoard-Main, TimestampGeneratorGen3-Main, StepperDriver-A, StepperDriver-B, LicketySplit-Left, LicketySplit-Right) with LogHarpDevice, LogName its name, from its &lt;Name&gt;.Data once the experiment folder exists (PathPrefix) and the Harp clock is set (HarpClockSet, from DomeHardware), so no file is dated 1904. Place it in the workflow's logging, after PathPrefix is declared: an include subscribing PathPrefix ahead of its definition builds the definition early.</Description>
+  <Description>Logs each of the Harp devices RigHardware opens (BehaviorBoard-Main, TimestampGeneratorGen3-Main, StepperDriver-A, StepperDriver-B, LicketySplit-Left, LicketySplit-Right) with LogHarpDevice, LogName its name, from its &lt;Name&gt;.Data once the experiment folder exists (PathPrefix) and the Harp clock is set (HarpClockSet, from RigHardware), so no file is dated 1904. Place it in the workflow's logging, after PathPrefix is declared: an include subscribing PathPrefix ahead of its definition builds the definition early.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">

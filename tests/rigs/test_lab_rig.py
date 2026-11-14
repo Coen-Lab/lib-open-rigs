@@ -3,7 +3,7 @@ import copy
 import pytest
 from pydantic import ValidationError
 
-from open_rigs.rigs.dome import DomeRig
+from open_rigs.rigs.lab_rig import LabRig
 
 HARP = {"portName": "COM1", "usbSerial": "X"}
 STAGE = {"baseTransverse": 0, "leftRadial": 0, "rightRadial": 0, "leftElevation": 0, "rightElevation": 0}
@@ -44,14 +44,14 @@ def rig_with(**wiring):
 
 
 def test_template_validates():
-    rig = DomeRig.model_validate(RIG)
+    rig = LabRig.model_validate(RIG)
     assert rig.speaker_array.error_sound_channel == 2
-    assert "triggerLine" not in DomeRig.model_json_schema(by_alias=True)["$defs"]["ZapitServer"]["properties"]
+    assert "triggerLine" not in LabRig.model_json_schema(by_alias=True)["$defs"]["ZapitServer"]["properties"]
 
 
 def test_old_keys_gone():
     # The generated C# refuses a key its classes lack, so a rig.yml still holding these stops at Start.
-    keys = set(DomeRig.model_json_schema(by_alias=True)["properties"])
+    keys = set(LabRig.model_json_schema(by_alias=True)["properties"])
     assert not keys & {"rewardValves", "interPulseInterval", "version"}
 
 
@@ -69,37 +69,56 @@ def test_unknown_keys_refused(edit, keys):
     # The generated C# refuses a key its classes lack, so a rig.yml still holding one stops at Start.
     rig = copy.deepcopy(RIG)
     edit(rig)
-    with pytest.raises(ValidationError, match=f"rig.yml has {keys}, which a dome does not use") as refused:
-        DomeRig.model_validate(rig)
-    assert "(dome rig model, open_rigs.rigs.dome)" in str(refused.value)
+    with pytest.raises(ValidationError, match=f"rig.yml has {keys}, which no lab workflow uses") as refused:
+        LabRig.model_validate(rig)
+    assert "(lab rig model, open_rigs.rigs.lab_rig)" in str(refused.value)
 
 
 def test_people_only_wiring_keys_kept():
     rig = copy.deepcopy(RIG)
     rig["behaviorBoard"]["main"]["wiring"]["DO3"] = {"device": "ZapitTrigger", "note": "also the masking light", "part": "BNC"}
-    DomeRig.model_validate(rig)
+    LabRig.model_validate(rig)
 
 
-def test_wiring_required():
+def test_every_part_optional():
+    # Each workflow takes the parts it drives: a rig.yml with none of them, or a box's two, is a rig.
+    rig = LabRig.model_validate({"rootPath": "C:/Data"})
+    assert (rig.behavior_board, rig.camera, rig.speaker_array, rig.zapit, rig.projection_calibration) == ({}, {}, None, None, None)
+    box = LabRig.model_validate({"rootPath": "C:/Data","behaviorBoard": {"main": HARP}, "camera": {"overhead": {"serialNumber": "1"}}})
+    assert box.behavior_board["main"].wiring is None and list(box.camera) == ["overhead"]
+
+
+def test_one_valve_is_enough():
     rig = copy.deepcopy(RIG)
-    del rig["behaviorBoard"]["main"]["wiring"]
-    with pytest.raises(ValidationError, match="wiring"):
-        DomeRig.model_validate(rig)
+    del rig["zapit"]
+    rig["behaviorBoard"]["main"]["wiring"] = {"DO1": {"device": "RewardValve", "side": "left"}}
+    LabRig.model_validate(rig)
+
+
+def test_zapit_needs_its_trigger_line():
+    rig = copy.deepcopy(RIG)
+    rig["behaviorBoard"]["main"]["wiring"] = {"DO1": {"device": "RewardValve", "side": "left"}}
+    with pytest.raises(ValidationError, match="rig.yml has zapit, so a board's wiring needs its ZapitTrigger line") as refused:
+        LabRig.model_validate(rig)
+    assert "`DO3: { device: ZapitTrigger }`" in str(refused.value)
+
+
+def test_one_zapit_trigger_per_rig():
+    rig = copy.deepcopy(RIG)
+    rig["behaviorBoard"]["second"] = copy.deepcopy(rig["behaviorBoard"]["main"])
+    with pytest.raises(ValidationError, match="behaviorBoard main and second each wire a ZapitTrigger"):
+        LabRig.model_validate(rig)
 
 
 @pytest.mark.parametrize(
     "wiring, message, example",
     [
-        ({"DO1": {"device": "RewardValve", "side": "left"}, "DO3": {"device": "ZapitTrigger"}}, "one right RewardValve, has 0",
-         "`DO2: { device: RewardValve, side: right }`"),
         ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "side": "left"},
-          "DO3": {"device": "ZapitTrigger"}}, "one left RewardValve, has 2", "`DO1: { device: RewardValve, side: left }`"),
+          "DO3": {"device": "ZapitTrigger"}}, "has 2 left RewardValves", "`DO1: { device: RewardValve, side: left }`"),
         ({"DO1": {"device": "RewardValve"}, "DO2": {"device": "RewardValve", "side": "right"},
           "DO3": {"device": "ZapitTrigger"}}, "DO1 has no side", "`DO1: { device: RewardValve, side: left }`"),
-        ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "side": "right"}},
-         "one ZapitTrigger, has 0", "`DO3: { device: ZapitTrigger }`"),
         ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "side": "right"},
-          "DO3": {"device": "ZapitTrigger"}, "DO0": {"device": "ZapitTrigger"}}, "one ZapitTrigger, has 2",
+          "DO3": {"device": "ZapitTrigger"}, "DO0": {"device": "ZapitTrigger"}}, "has 2 ZapitTriggers",
          "`DO3: { device: ZapitTrigger }`"),
         ({"DO1": {"device": "RewardValve", "side": "left"}, "DO3": {"device": "RewardValve", "side": "right"},
           "DO2": {"device": "ZapitTrigger"}}, "RewardValve DO3 needs a CalibratedPulse",
@@ -108,8 +127,8 @@ def test_wiring_required():
 )
 def test_wiring_refused(wiring, message, example):
     with pytest.raises(ValidationError, match=message) as refused:
-        DomeRig.model_validate(rig_with(**wiring))
-    assert "(dome rig model, open_rigs.rigs.dome)" in str(refused.value)
+        LabRig.model_validate(rig_with(**wiring))
+    assert "(lab rig model, open_rigs.rigs.lab_rig)" in str(refused.value)
     assert example in str(refused.value)
 
 
@@ -123,8 +142,8 @@ def test_zapit_line_not_pulsed(pulsed, kept):
     else:
         controller["outputPulseEnable"] = pulsed
     with pytest.raises(ValidationError, match="ZapitTrigger DO3 is in pulseController.outputPulseEnable") as refused:
-        DomeRig.model_validate(rig)
-    assert "(dome rig model, open_rigs.rigs.dome)" in str(refused.value)
+        LabRig.model_validate(rig)
+    assert "(lab rig model, open_rigs.rigs.lab_rig)" in str(refused.value)
     assert f'`outputPulseEnable: "{kept}"`' in str(refused.value)
 
 
@@ -132,26 +151,18 @@ def test_error_sound_channel_required():
     rig = copy.deepcopy(RIG)
     del rig["speakerArray"]["errorSoundChannel"]
     with pytest.raises(ValidationError, match="errorSoundChannel"):
-        DomeRig.model_validate(rig)
-
-
-@pytest.mark.parametrize("cameras", [1, 4])
-def test_exactly_three_cameras(cameras):
-    rig = copy.deepcopy(RIG)
-    rig["camera"] = {f"c{n}": {"serialNumber": str(n)} for n in range(cameras)}
-    with pytest.raises(ValidationError, match=rf"camera lists {cameras} entries; a dome has exactly 3 \(dome rig model"):
-        DomeRig.model_validate(rig)
+        LabRig.model_validate(rig)
 
 
 def test_every_speaker_needs_a_filter():
     rig = copy.deepcopy(RIG)
     rig["speakerArray"]["speakers"]["left"] = {"position": {"azimuth": -90, "elevation": 15}, "channel": 0}
     with pytest.raises(ValidationError, match=r"speaker left has no filter.*calibration/speaker-left.json"):
-        DomeRig.model_validate(rig)
+        LabRig.model_validate(rig)
 
 
 def test_video_encoder_optional():
-    assert DomeRig.model_validate(RIG).video_encoder is None
-    assert DomeRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc"}}).video_encoder.codec == "h264_nvenc"
+    assert LabRig.model_validate(RIG).video_encoder is None
+    assert LabRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc"}}).video_encoder.codec == "h264_nvenc"
     with pytest.raises(ValidationError, match="ffmpeg"):
-        DomeRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc", "ffmpeg": "x"}})
+        LabRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc", "ffmpeg": "x"}})

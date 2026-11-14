@@ -60,7 +60,7 @@ namespace OpenRigs.Video.Tests
             Assert.AreEqual(@"D:\Configs", writer.ConfigRoot);
         }
 
-        // The frames as OpenRigs.Devices' TriggeredSpinnaker include gives them, and so as every dome
+        // The frames as OpenRigs.Devices' TriggeredSpinnaker include gives them, and so as every
         // workflow's LogVideo takes them: a dynamic type its ExpressionTransform makes, not a
         // VideoDataFrame (the first rig run of LogVideoFfmpeg failed to build on this, 14 Nov 2026).
         const string SpinnakerHarness = @"<?xml version=""1.0"" encoding=""utf-8""?>

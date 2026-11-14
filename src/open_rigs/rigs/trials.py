@@ -1,9 +1,11 @@
-"""The dome tasks' trial log: the columns every dome task shares, and one experiment summarised from its files.
+"""The lab's trial log: the columns every task shares, and one experiment summarised from its files.
 
-Every dome task's schemas/trial-columns.yml starts with SHARED_COLUMNS, in that order, with these types, units and
-descriptions word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads
-every dome task. trialType, outcome, rewardSizeUl and punishSound are in the block by name, type and place, each
-described by its task. A task's own columns follow the block.
+Every task's schemas/trial-columns.yml starts with the shared block, in order, with these types, units and descriptions
+word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
+The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
+(QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, opto (OPTO_COLUMNS: laserCondition, laserPowerMw,
+laserTriggerTime) after punishTimeoutSeconds. trialType, outcome, rewardSizeUl and punishSound are in the core by
+name, type and place, each described by its task. A task's own columns follow the block.
 
 summarise reads one experiment's BonsaiData/BonsaiData_Trial_*.csv, BonsaiData/BonsaiData_Async_*.csv (each
 RewardDelivered row, Value the microlitres delivered), Settings/Settings_Task_*.json (the lead and the punishment)
@@ -20,10 +22,11 @@ and manifest.json (how the run ended), and checks the rows against each other an
   and on no trial without one when the task's timeout is above 0;
 - each rewarded trial (rewardSizeUl above 0, and Correct or autoRewarded) has a RewardDelivered row at its outcome.
 
+A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
 Performance is Rig Control's: Correct / (Correct + Incorrect), over the trials both
 spouts were offered where the task records bothSpouts; the response rate is the trials not NoResponse.
 
-A file without a column the checks read (harpTime, outcomeTime and the rest of the shared block) is one problem,
+A file without a column the checks read (harpTime, outcomeTime and the rest of the core) is one problem,
 not checked further; without a Settings_Task file the checks that need the task are one problem. `summarise-experiment
 <experiment folder> ...` prints each summary and each failed check, exiting 1 when one fails.
 
@@ -42,12 +45,14 @@ import statistics
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from open_rigs.rigs import video_frames
 
 # (name, type, unit or None, description or None: None where each task describes it)
-SHARED_COLUMNS: List[Tuple[str, str, Optional[str], Optional[str]]] = [
+Column = Tuple[str, str, Optional[str], Optional[str]]
+
+CORE_COLUMNS: List[Column] = [
     ("harpTime", "double", "s",
      "Harp time the row was complete, when the outcome was known (outcomeTime). The lab's time column, first in every "
      "log (lib-open-rigs specs/logging.md, section 4); a trial's moments are read from their own columns."),
@@ -60,14 +65,11 @@ SHARED_COLUMNS: List[Tuple[str, str, Optional[str], Optional[str]]] = [
     ("itiSeconds", "double", "s",
      "The inter-trial interval drawn for this trial (every trial draws its own), uniformly between "
      "trialStructure.itiMinSeconds and itiMaxSeconds: from itiStartTime to this trial's stimulus with a quiet mouse, "
-     "the time to drink included. The stage's quiet waits add quietWaitSeconds, so the stimulus was due at "
+     "the time to drink included. A task's quiet waits add quietWaitSeconds, so the stimulus was due at "
      "itiStartTime + itiSeconds + quietWaitSeconds (stimulusOnsetTime)."),
-    ("quietWaitSeconds", "double", "s",
-     "How long the stage's quiet waits (lickQuietSeconds, wheelQuietSeconds and wheelQuietCm; OpenRigs.Core QuietWait) "
-     "held this trial's Go past the end of its interval less the lead; 0 with the waits off or a quiet mouse."),
     ("trialStartTime", "double", "s",
      "Harp time the trial started (Go): the end of its interval less the lead, max(laserToStimulusSeconds, 0) in the "
-     "task file (Settings_Task), plus quietWaitSeconds."),
+     "task file (Settings_Task) and 0 without optogenetics, plus quietWaitSeconds where the task has quiet waits."),
     ("stimulusOnsetTime", "double", "s",
      "Harp time the workflow commanded the stimulus on, NaN if it never was: the first tick of the 1 ms Harp clock at "
      "or after trialStartTime plus the lead, in every experiment. The physical onset is in the hardware logs."),
@@ -81,6 +83,15 @@ SHARED_COLUMNS: List[Tuple[str, str, Optional[str], Optional[str]]] = [
     ("punishTimeoutSeconds", "double", "s",
      "The timeout after this trial: the task's punishment.timeoutSeconds when the trial was punished, else 0. The next "
      "interval starts after it (itiStartTime)."),
+]
+
+QUIET_WAIT_COLUMNS: List[Column] = [
+    ("quietWaitSeconds", "double", "s",
+     "How long the stage's quiet waits (lickQuietSeconds, wheelQuietSeconds and wheelQuietCm; OpenRigs.Core QuietWait) "
+     "held this trial's Go past the end of its interval less the lead; 0 with the waits off or a quiet mouse."),
+]
+
+OPTO_COLUMNS: List[Column] = [
     ("laserCondition", "int", None,
      "The Zapit condition sent to Zapit this trial (its conditions file's number, from 1), laser on or off: every trial "
      "of an optogenetics experiment has one, so laser on is laserPowerMw > 0, not laserCondition > 0. 0 without "
@@ -95,19 +106,42 @@ SHARED_COLUMNS: List[Tuple[str, str, Optional[str], Optional[str]]] = [
      "answered first (NaN) differ."),
 ]
 
+# Each opt-in block by the name a task gives it, with the core column it follows.
+BLOCKS: Dict[str, Tuple[str, List[Column]]] = {
+    "quietWait": ("itiSeconds", QUIET_WAIT_COLUMNS),
+    "opto": ("punishTimeoutSeconds", OPTO_COLUMNS),
+}
+
 TIME_COLUMN = "harpTime"
 TOLERANCE_S = 0.002  # Harp-clock waits land within a tick or two of 1 ms
 
 
-def shared_block_problems(columns: Dict[str, Any]) -> List[str]:
+def shared_columns(blocks: Iterable[str]) -> List[Column]:
+    """The shared block of a task using the opt-in `blocks` (names in BLOCKS): the core with each block in its place."""
+    chosen = set(blocks)
+    unknown = sorted(chosen - set(BLOCKS))
+    if unknown:
+        raise ValueError(f"no shared block {', '.join(unknown)}; the blocks are {', '.join(BLOCKS)}")
+    columns: List[Column] = []
+    for column in CORE_COLUMNS:
+        columns.append(column)
+        for name, (after, block) in BLOCKS.items():
+            if name in chosen and after == column[0]:
+                columns += block
+    return columns
+
+
+def shared_block_problems(columns: Dict[str, Any], blocks: Iterable[str]) -> List[str]:
     """What keeps a task's trial columns (its schemas/trial-columns.yml, read as a dict) from starting with the shared
-    block: each a sentence; none when the block is there, in order, with its types, units and descriptions."""
+    block of the opt-in `blocks` it uses (names in BLOCKS): each a sentence; none when the block is there, in order,
+    with its types, units and descriptions."""
+    shared = shared_columns(blocks)
     names = list(columns)
     problems = []
-    want = [name for name, _, _, _ in SHARED_COLUMNS]
+    want = [name for name, _, _, _ in shared]
     if names[: len(want)] != want:
         problems.append(f"the first {len(want)} columns are {names[:len(want)]}, not the shared block {want}")
-    for name, kind, unit, description in SHARED_COLUMNS:
+    for name, kind, unit, description in shared:
         entry = columns.get(name)
         if not isinstance(entry, dict):
             continue
@@ -116,7 +150,7 @@ def shared_block_problems(columns: Dict[str, Any]) -> List[str]:
         if entry.get("unit") != unit:
             problems.append(f"{name}'s unit is {entry.get('unit')}, not {unit}")
         if description is not None and entry.get("description") != description:
-            problems.append(f"{name}'s description is not the shared block's (open_rigs.rigs.dome_trials.SHARED_COLUMNS)")
+            problems.append(f"{name}'s description is not the shared block's (open_rigs.rigs.trials)")
     return problems
 
 
@@ -153,13 +187,17 @@ def _f(row: Dict[str, str], column: str) -> float:
     return float(row[column])
 
 
+def _quiet(row: Dict[str, str]) -> float:
+    """quietWaitSeconds, 0 in a log without the quietWait block."""
+    return _f(row, "quietWaitSeconds") if "quietWaitSeconds" in row else 0.0
+
+
 def _true(text: Any) -> bool:
     return str(text).strip().lower() == "true"
 
 
 # The columns summarise reads: of a trial row, and of an async row.
-TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds", "trialStartTime",
-               "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "punishSound", "punishTimeoutSeconds")
+TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "punishSound", "punishTimeoutSeconds")
 ASYNC_NEEDS = (TIME_COLUMN, "Event", "Value")
 
 
@@ -183,7 +221,7 @@ def _task(folder: Path) -> Optional[_Task]:
     for path in sorted(folder.glob("Settings/Settings_Task_*.json")):
         try:
             p = json.loads(path.read_text(encoding="utf-8-sig"))["taskParameters"]
-            return _Task(float(p["optogenetics"]["laserToStimulusSeconds"]), float(p["punishment"]["timeoutSeconds"]),
+            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), float(p["punishment"]["timeoutSeconds"]),
                          bool(p["punishment"]["sound"]["enabled"]))
         except (OSError, ValueError, KeyError, TypeError):
             return None
@@ -233,12 +271,12 @@ def _summarise(folder: Path) -> Summary:
             s.problems.append(f"trial {number}: outcome {row['outcome']!r} is not one of {', '.join(OUTCOMES)}")
         onset, end = _f(row, "stimulusOnsetTime"), _f(row, "outcomeTime")
         s.response_seconds.append(end - onset)
-        planned = _f(row, "itiSeconds") + _f(row, "quietWaitSeconds")
+        planned = _f(row, "itiSeconds") + _quiet(row)
         if abs(onset - _f(row, "itiStartTime") - planned) > TOLERANCE_S:
             s.problems.append(f"trial {number}: stimulus {onset - _f(row, 'itiStartTime'):.4f} s after its interval started, "
                               f"not itiSeconds + quietWaitSeconds = {planned:.4f} s")
-        if _f(row, "quietWaitSeconds") < 0:
-            s.problems.append(f"trial {number}: quietWaitSeconds {_f(row, 'quietWaitSeconds'):.4f} is negative")
+        if _quiet(row) < 0:
+            s.problems.append(f"trial {number}: quietWaitSeconds {_quiet(row):.4f} is negative")
         if task is not None:
             go = _f(row, "itiStartTime") + planned - task.lead
             if abs(_f(row, "trialStartTime") - go) > TOLERANCE_S:
@@ -293,7 +331,7 @@ def describe(s: Summary) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="One dome experiment summarised from its files, with its consistency checks.")
+    parser = argparse.ArgumentParser(description="One experiment summarised from its files, with its consistency checks.")
     parser.add_argument("folders", nargs="+", type=Path, help="experiment folders (ses-...)")
     parser.add_argument("--videos", action="store_true", help="also count each camera video's frames against its CSV (minutes)")
     args = parser.parse_args()

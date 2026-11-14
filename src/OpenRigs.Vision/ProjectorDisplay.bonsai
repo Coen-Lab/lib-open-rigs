@@ -6,7 +6,7 @@
                  xmlns:res="clr-namespace:Bonsai.Resources;assembly=Bonsai.System"
                  xmlns:vis="clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The dome's projection: a BonVision window on DisplayDevice, an orthographic view of azimuth -135 to 135 and elevation -22.5 to 82.5 degrees, mesh mapping and gamma correction from the input (rig.yml's projectionCalibration: meshMapPath, gammaLutPath). Stimuli draw on the DrawStimuli subject. Disposed on the render thread (DisposeOnRenderThread), so stopping from another thread cannot crash Bonsai.</Description>
+  <Description>A projector's display: a BonVision window on DisplayDevice, an orthographic view of azimuth -135 to 135 and elevation -22.5 to 82.5 degrees, mesh mapping and gamma correction from the input (rig.yml's projectionCalibration: meshMapPath, gammaLutPath). Stimuli draw on the DrawStimuli subject. Disposed on the render thread (DisposeOnRenderThread), so stopping from another thread cannot crash Bonsai.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -25,7 +25,7 @@
         <Property Name="Height" Description="The window height, in pixels: the display mode set at start when full screen." />
       </Expression>
       <Expression xsi:type="GroupWorkflow">
-        <Name>DomeWindow</Name>
+        <Name>ProjectorWindow</Name>
         <Workflow>
           <Nodes>
             <Expression xsi:type="ExternalizedMapping">

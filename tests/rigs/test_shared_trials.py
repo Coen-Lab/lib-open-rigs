@@ -1,10 +1,12 @@
-"""open_rigs.rigs.dome_trials: the dome tasks' shared trial columns, and one experiment from its files with its checks."""
+"""open_rigs.rigs.trials: the lab's shared trial columns, and one experiment from its files with its checks."""
 
 import csv
 import json
 import math
 
-from open_rigs.rigs.dome_trials import SHARED_COLUMNS, shared_block_problems, summarise
+import pytest
+
+from open_rigs.rigs.trials import CORE_COLUMNS, shared_block_problems, shared_columns, summarise
 
 COLUMNS = ["harpTime", "trialNumber", "trialType", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds",
            "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "punishSound", "punishTimeoutSeconds",
@@ -62,6 +64,14 @@ def test_a_consistent_experiment_has_no_problems(tmp_path):
     assert (s.requested_ul, s.delivered_ul) == (4.0, 4.0)
 
 
+def test_a_task_without_quiet_waits_or_optogenetics_is_checked_by_the_core(tmp_path):
+    trials = [{**t, "trialStartTime": t["stimulusOnsetTime"]} for t in _chain(4)]  # no lead without optogenetics
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    task = {"punishment": TASK["punishment"]}
+    s = summarise(_experiment(tmp_path, trials, rewards, columns=[c for c in COLUMNS if c != "quietWaitSeconds"], task=task))
+    assert s.problems == [] and s.trials == 4
+
+
 def test_a_file_without_outcomeTime_is_one_problem_not_a_crash(tmp_path):
     # Files from before 14 Nov 2026 have no outcomeTime; they are restructured, not read as they are.
     trials = _chain(4)
@@ -108,26 +118,50 @@ def test_a_run_that_never_closed_says_so(tmp_path):
     assert s.outcome == "stopped (not final: the workflow never finished closing)"
 
 
-def _block():
+BOTH = ("opto", "quietWait")
+
+
+def _block(blocks=BOTH):
     return {name: {"type": kind, **({"unit": unit} if unit else {}), "description": description or f"this task's {name}"}
-            for name, kind, unit, description in SHARED_COLUMNS}
+            for name, kind, unit, description in shared_columns(blocks)}
 
 
 def test_a_task_that_starts_with_the_shared_block_passes():
     columns = {**_block(), "endReason": {"type": "string", "description": "the task's own"}}
-    assert shared_block_problems(columns) == []
+    assert shared_block_problems(columns, BOTH) == []
+
+
+def test_each_block_sits_in_its_place_in_the_core():
+    core = [name for name, _, _, _ in CORE_COLUMNS]
+    assert [name for name, _, _, _ in shared_columns(())] == core
+    both = [name for name, _, _, _ in shared_columns(BOTH)]
+    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-4:] == [
+        "punishTimeoutSeconds", "laserCondition", "laserPowerMw", "laserTriggerTime"]
+    assert len(both) == 16 and len(core) == 12
+
+
+def test_a_task_without_a_block_is_held_to_the_core_alone():
+    assert shared_block_problems(_block(()), ()) == []
+    # A task naming a block its file lacks, or lacking one it names, is told.
+    assert shared_block_problems(_block(()), ("opto",))[0].startswith("the first 15 columns are")
+    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 12 columns are")
+
+
+def test_an_unknown_block_is_refused():
+    with pytest.raises(ValueError, match="no shared block laser; the blocks are quietWait, opto"):
+        shared_columns(("laser",))
 
 
 def test_a_change_to_the_shared_block_is_named():
     columns = _block()
     columns["itiSeconds"]["description"] += " Reworded."
     columns["laserCondition"]["type"] = "double"
-    assert shared_block_problems(columns) == [
-        "itiSeconds's description is not the shared block's (open_rigs.rigs.dome_trials.SHARED_COLUMNS)",
+    assert shared_block_problems(columns, BOTH) == [
+        "itiSeconds's description is not the shared block's (open_rigs.rigs.trials)",
         "laserCondition is double, not int",
     ]
     reordered = dict(reversed(list(_block().items())))
-    assert shared_block_problems(reordered)[0].startswith("the first 16 columns are")
+    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 16 columns are")
 
 
 def test_go_the_outcomes_and_the_error_sound_are_checked_against_the_task(tmp_path):

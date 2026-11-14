@@ -9,15 +9,15 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void PassesExactlyTheCount()
         {
-            RequireEntries.Check(new[] { "face", "pupil", "body" }, "camera", 3, "dome rig model, open_rigs.rigs.dome");
+            RequireEntries.Check(new[] { "face", "pupil", "body" }, "camera", 3, "RigHardware opens Camera-Face, -Pupil and -Body");
         }
 
         [TestMethod]
         public void RefusesAnotherCountNamingTheRule()
         {
             var ex = Assert.ThrowsException<InvalidOperationException>(() =>
-                RequireEntries.Check(new[] { "face", "body" }, "camera", 3, "dome rig model, open_rigs.rigs.dome"));
-            Assert.AreEqual("rig.yml lists 2 camera entries (face, body); it needs exactly 3 (dome rig model, open_rigs.rigs.dome).", ex.Message);
+                RequireEntries.Check(new[] { "face", "body" }, "camera", 3, "RigHardware opens Camera-Face, -Pupil and -Body"));
+            Assert.AreEqual("rig.yml lists 2 camera entries (face, body); it needs exactly 3 (RigHardware opens Camera-Face, -Pupil and -Body).", ex.Message);
         }
     }
 }

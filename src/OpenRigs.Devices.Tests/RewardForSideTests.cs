@@ -54,7 +54,7 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual("core:PlanReward", type(edges.Single(e => e.To == input).From));
         }
 
-        // One cap on a reward: LoadRewardLine's default, DeliverReward's two lines and the Python dome model's MAX_REWARD_UL.
+        // One cap on a reward: LoadRewardLine's default, DeliverReward's two lines and the lab rig model's MAX_REWARD_UL.
         [TestMethod]
         public void MaxRewardIsThePythonModels()
         {
@@ -67,7 +67,7 @@ namespace OpenRigs.Devices.Tests
             var caps = workflow.Descendants(core + "MaxRewardUl").Select(e => (double)e).ToList();
             Assert.AreEqual(2, caps.Count);
             Assert.IsTrue(caps.All(c => c == LoadRewardLine.DefaultMaxRewardUl), string.Join(", ", caps));
-            StringAssert.Matches(ZapitTests.DomePy(), new System.Text.RegularExpressions.Regex(
+            StringAssert.Matches(ZapitTests.PythonModel("rigs", "lab_rig.py"), new System.Text.RegularExpressions.Regex(
                 @"(?m)^MAX_REWARD_UL = " + LoadRewardLine.DefaultMaxRewardUl.ToString(System.Globalization.CultureInfo.InvariantCulture) + @"\r?$"));
         }
 

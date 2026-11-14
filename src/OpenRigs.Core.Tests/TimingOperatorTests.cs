@@ -115,7 +115,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void AnInputFromAnotherThreadThatEndsTheDelayDoesNotDeadlockTheClock()
         {
-            // As on a dome (BLUE-OPTO-2, 14 Nov 2026): the clock ticks on its own thread under its subject's
+            // As on a rig (BLUE-OPTO-2, 14 Nov 2026): the clock ticks on its own thread under its subject's
             // lock (Bonsai's BehaviorSubject is a ReplaySubject, which calls subscribers under its lock), and
             // a lick on another thread passes a DueSeconds 0 delay whose output ends the trial, unsubscribing
             // from the clock. Sending under HarpDelay's lock froze both threads within a few hundred trials.

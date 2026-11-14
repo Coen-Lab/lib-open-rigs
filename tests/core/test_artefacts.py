@@ -55,7 +55,7 @@ def test_schema_tags_references_and_keeps_them_strings():
     assert "label" in properties and SCHEMA_TAG not in properties["label"]
 
 
-class DomeRig(Rig):
+class ComposedRig(Rig):
     """A rig composing several devices, each carrying its own calibration references."""
 
     behavior_board: BehaviorBoard
@@ -63,9 +63,9 @@ class DomeRig(Rig):
     projection: ProjectionCorrection
 
 
-def dome_rig() -> DomeRig:
+def composed_rig() -> ComposedRig:
     # Validated from camelCase dicts, the way rig YAML arrives.
-    return DomeRig.model_validate(
+    return ComposedRig.model_validate(
         {
             "rootPath": "C:/Data",
             "behaviorBoard": {
@@ -91,7 +91,7 @@ def dome_rig() -> DomeRig:
 
 
 def test_composed_rig_lists_each_device_reference():
-    assert rig_artefacts(dome_rig()) == {
+    assert rig_artefacts(composed_rig()) == {
         "behaviorBoard.pulseController.outputs.DO1.artefact": "calibration/valve-DO1.json",
         "speakerArray.speakers.left.filter": "calibration/speaker-left.json",
         "projection.meshMap": "calibration/mesh.json",

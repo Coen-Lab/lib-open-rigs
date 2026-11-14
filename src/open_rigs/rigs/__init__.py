@@ -1,1 +1,1 @@
-"""The lab's rig schemas, one per kind of rig, shared by every workflow that runs on one (lab-only, not upstream)."""
+"""The lab's rig schema, shared by every workflow, and what reads its experiments (lab-only, not upstream)."""

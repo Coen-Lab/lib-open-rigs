@@ -25,7 +25,7 @@ namespace OpenRigs.Devices
 
         /// <summary>Gets or sets where the rule is set, for the message.</summary>
         [Description("Where the rule is set, for the message.")]
-        public string Rule { get; set; } = "dome rig model, open_rigs.rigs.dome";
+        public string Rule { get; set; } = "the workflow's rule";
 
         /// <summary>Checks each set of entries.</summary>
         public IObservable<Dictionary<string, TDevice>> Process<TDevice>(IObservable<Dictionary<string, TDevice>> source)

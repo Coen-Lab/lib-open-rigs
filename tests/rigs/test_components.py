@@ -1,52 +1,58 @@
+"""The lab's rig parts (open_rigs.components), read through the lab rig model."""
 import pytest
 from pydantic import ValidationError
 
-from open_rigs.rigs.behaviour_box import BehaviourBoxRig, VideoEncoder
+from open_rigs.components.harp_boards import HarpStepperDriver
+from open_rigs.components.video import VideoEncoder
+from open_rigs.rigs.lab_rig import LabRig
 
 RIG = {
     "rootPath": "C:\\Data\\B1",
     "rigId": "B1",
     "behaviorBoard": {"main": {"portName": "COM3", "usbSerial": "AB0M7PLB"}},
-    "camera": {"box": {"serialNumber": "12345"}},
+    "camera": {"overhead": {"serialNumber": "12345"}},
 }
 
 
 def test_named_entries():
-    rig = BehaviourBoxRig.model_validate(RIG)
+    rig = LabRig.model_validate(RIG)
     assert rig.behavior_board["main"].usb_serial == "AB0M7PLB"
-    assert rig.camera["box"].live_view is None
+    assert rig.camera["overhead"].live_view is None
 
 
 def test_pixel_format_mono8_unless_set():
-    assert BehaviourBoxRig.model_validate(RIG).camera["box"].pixel_format == "Mono8"
-    rig = BehaviourBoxRig.model_validate({**RIG, "camera": {"box": {"serialNumber": "12345", "pixelFormat": "Mono8"}}})
-    assert rig.camera["box"].pixel_format == "Mono8"
+    assert LabRig.model_validate(RIG).camera["overhead"].pixel_format == "Mono8"
+    rig = LabRig.model_validate({**RIG, "camera": {"overhead": {"serialNumber": "12345", "pixelFormat": "Mono8"}}})
+    assert rig.camera["overhead"].pixel_format == "Mono8"
     # LogVideo writes 8-bit frames only (audit, 11 Nov 2026).
     with pytest.raises(ValidationError):
-        BehaviourBoxRig.model_validate({**RIG, "camera": {"box": {"serialNumber": "12345", "pixelFormat": "Mono16"}}})
+        LabRig.model_validate({**RIG, "camera": {"overhead": {"serialNumber": "12345", "pixelFormat": "Mono16"}}})
 
 
 def test_no_version():
-    assert "version" not in BehaviourBoxRig.model_fields
-    assert "version" not in BehaviourBoxRig.model_validate(RIG).model_dump(by_alias=True)
+    assert "version" not in LabRig.model_fields
+    assert "version" not in LabRig.model_validate(RIG).model_dump(by_alias=True)
 
 
 def test_usb_serial_required():
     with pytest.raises(ValidationError):
-        BehaviourBoxRig.model_validate({**RIG, "behaviorBoard": {"main": {"portName": "COM3"}}})
+        LabRig.model_validate({**RIG, "behaviorBoard": {"main": {"portName": "COM3"}}})
 
 
 def test_wiring_by_channel_name():
     board = {
         "portName": "COM6",
         "usbSerial": "BG01WA0E",
+        "pulseController": {"outputs": {"DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DO1.json"},
+                                         "DO2": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0},
+                                         "DO3": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0}}},
         "wiring": {
             "DIPort0": {"device": "Photodiode", "note": "sync square"},
-            "DO0": {"device": "CameraTrigger", "targets": ["Camera-Box"]},
+            "DO0": {"device": "CameraTrigger", "targets": ["Camera-Overhead"]},
             "DO1": {"device": "RewardValve", "side": "left", "part": "?"},
         },
     }
-    rig = BehaviourBoxRig.model_validate({**RIG, "behaviorBoard": {"main": board}})
+    rig = LabRig.model_validate({**RIG, "behaviorBoard": {"main": board}})
     wiring = rig.behavior_board["main"].wiring
     assert wiring.di_port0.device == "Photodiode" and wiring.do1.side.value == "left"
     assert wiring.do2 is None, "a line left out is unknown"
@@ -55,18 +61,16 @@ def test_wiring_by_channel_name():
 
 
 def test_wiring_optional_and_side_checked():
-    assert BehaviourBoxRig.model_validate(RIG).behavior_board["main"].wiring is None
+    assert LabRig.model_validate(RIG).behavior_board["main"].wiring is None
     with pytest.raises(ValidationError):
-        BehaviourBoxRig.model_validate({**RIG, "behaviorBoard": {"main": {
+        LabRig.model_validate({**RIG, "behaviorBoard": {"main": {
             "portName": "COM3", "usbSerial": "X", "wiring": {"DO1": {"device": "RewardValve", "side": "middle"}}}}})
     with pytest.raises(ValidationError):
-        BehaviourBoxRig.model_validate({**RIG, "behaviorBoard": {"main": {
+        LabRig.model_validate({**RIG, "behaviorBoard": {"main": {
             "portName": "COM3", "usbSerial": "X", "wiring": {"DO1": {"side": "left"}}}}})
 
 
 def test_stepper_wiring_by_the_driver_s_names():
-    from open_rigs.rigs.behaviour_box import HarpStepperDriver
-
     entry = {"portName": "COM3", "usbSerial": "AQ03WRBF", "wiring": {
         "Motor0": {"device": "BaseTransverse"},
         "Motor1": {"device": "Radial", "side": "left"},
@@ -80,22 +84,22 @@ def test_stepper_wiring_by_the_driver_s_names():
 
 
 def test_wiring_schema_lists_every_channel():
-    schema = BehaviourBoxRig.model_json_schema(by_alias=True, mode="serialization")
+    schema = LabRig.model_json_schema(by_alias=True, mode="serialization")
     channels = list(schema["$defs"]["BoardWiring"]["properties"])
     assert channels[:4] == ["DIPort0", "DIPort1", "DIPort2", "DI3"] and len(channels) == 23
     assert {"DO0", "DO3", "AnalogInput1", "Rgb1"} <= set(channels)
 
 
 def test_video_encoder_libx264_and_path_unless_set():
-    assert BehaviourBoxRig.model_validate(RIG).video_encoder is None
-    rig = BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_qsv", "ffmpegPath": r"D:\ffmpeg\ffmpeg.exe"}})
+    assert LabRig.model_validate(RIG).video_encoder is None
+    rig = LabRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_qsv", "ffmpegPath": r"D:\ffmpeg\ffmpeg.exe"}})
     assert (rig.video_encoder.codec, rig.video_encoder.ffmpeg_path) == ("h264_qsv", r"D:\ffmpeg\ffmpeg.exe")
-    assert BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {}}).video_encoder.codec == "libx264"
+    assert LabRig.model_validate({**RIG, "videoEncoder": {}}).video_encoder.codec == "libx264"
     # codec: null in rig.yml is libx264, as OpenRigs.Video's VideoEncoder.Read takes it.
-    assert BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": None}}).video_encoder.codec == "libx264"
+    assert LabRig.model_validate({**RIG, "videoEncoder": {"codec": None}}).video_encoder.codec == "libx264"
     # OpenRigs.Video's FfmpegVideoWriter knows these three alone.
     with pytest.raises(ValidationError):
-        BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": "hevc_nvenc"}})
+        LabRig.model_validate({**RIG, "videoEncoder": {"codec": "hevc_nvenc"}})
 
 
 def test_video_encoder_codec_is_a_string_in_the_schema_so_rig_yml_can_say_h264_nvenc():
