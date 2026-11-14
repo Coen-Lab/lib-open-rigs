@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from open_rigs.rigs.behaviour_box import BehaviourBoxRig
+from open_rigs.rigs.behaviour_box import BehaviourBoxRig, VideoEncoder
 
 RIG = {
     "rootPath": "C:\\Data\\B1",
@@ -94,3 +94,9 @@ def test_video_encoder_libx264_and_path_unless_set():
     # OpenRigs.Video's FfmpegVideoWriter knows these three alone.
     with pytest.raises(ValidationError):
         BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": "hevc_nvenc"}})
+
+
+def test_video_encoder_codec_is_a_string_in_the_schema_so_rig_yml_can_say_h264_nvenc():
+    # An enum here generates a C# enum, and the workflow's YAML reader then refuses h264_nvenc at Start.
+    codec = VideoEncoder.model_json_schema()["properties"]["codec"]
+    assert codec["type"] == "string" and "enum" not in codec

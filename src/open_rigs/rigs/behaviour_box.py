@@ -129,8 +129,11 @@ class VideoEncoder(BaseSchema):
     """How this machine encodes its cameras' video: OpenRigs.Video's FfmpegVideoWriter (OpenRigs.Logging's LogVideoFfmpeg)
     reads it at Start. The encoder is the machine's, so it is one setting for every camera."""
 
-    codec: Literal["libx264", "h264_nvenc", "h264_qsv"] = Field(
+    # A string with a pattern, not a Literal: a Literal becomes a C# enum, and the workflow's YAML
+    # reader takes only the enum's C# names (H264Nvenc), never h264_nvenc. FfmpegVideoWriter checks it.
+    codec: str = Field(
         default="libx264",
+        pattern=r"^(libx264|h264_nvenc|h264_qsv)$",
         description="The FFmpeg H.264 encoder: h264_nvenc on an NVIDIA GPU, h264_qsv on Intel Quick Sync, libx264 (software, the default) on any machine with the cores for it.",
     )
     ffmpeg_path: Optional[str] = Field(
