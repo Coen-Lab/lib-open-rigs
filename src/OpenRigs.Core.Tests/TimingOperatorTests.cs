@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Threading;
+using System.Threading.Tasks;
 using Bonsai.Harp;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -108,6 +110,39 @@ namespace OpenRigs.Core.Tests
                 run.Input.OnNext("a");
                 Assert.IsInstanceOfType(run.Error, typeof(ArgumentOutOfRangeException));
             }
+        }
+
+        [TestMethod]
+        public void AnInputFromAnotherThreadThatEndsTheDelayDoesNotDeadlockTheClock()
+        {
+            // As on a dome (BLUE-OPTO-2, 14 Nov 2026): the clock ticks on its own thread under its subject's
+            // lock (Bonsai's BehaviorSubject is a ReplaySubject, which calls subscribers under its lock), and
+            // a lick on another thread passes a DueSeconds 0 delay whose output ends the trial, unsubscribing
+            // from the clock. Sending under HarpDelay's lock froze both threads within a few hundred trials.
+            var clock = new ReplaySubject<double>(1);
+            var ticking = true;
+            var ticker = new Thread(() =>
+            {
+                for (var ms = 0L; Volatile.Read(ref ticking); ms++) clock.OnNext(ms / 1000.0);
+            }) { IsBackground = true };
+            clock.OnNext(0);
+            ticker.Start();
+            var trials = Task.Run(() =>
+            {
+                for (var i = 0; i < 2000; i++)
+                {
+                    var input = new Subject<int>();
+                    var done = new ManualResetEventSlim();
+                    using (new HarpDelay { DueSeconds = 0 }.Process(input, clock).Take(1).Subscribe(_ => { }, () => done.Set()))
+                    {
+                        input.OnNext(i);
+                        if (!done.Wait(TimeSpan.FromSeconds(5))) throw new TimeoutException("trial " + i + " never ended");
+                    }
+                }
+            });
+            var finished = trials.Wait(TimeSpan.FromSeconds(60));
+            Volatile.Write(ref ticking, false);
+            Assert.IsTrue(finished, "HarpDelay deadlocked with its clock's thread");
         }
     }
 

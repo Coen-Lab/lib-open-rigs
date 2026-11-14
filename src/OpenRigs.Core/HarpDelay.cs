@@ -44,12 +44,20 @@ namespace OpenRigs.Core
                 var untimed = new List<Tuple<double, TSource>>();   // (delay, input) that came before the first tick
                 double? now = null;
                 bool sourceDone = false, stopped = false;
+                // Notifications are queued under the gate and sent outside it, one thread at a time:
+                // whichever thread finds no one sending sends the queue; the others queue and return.
+                // Sending under the gate deadlocked a dome (BLUE-OPTO-2, 14 Nov 2026): the clock's thread,
+                // holding the clock subject's lock (Bonsai's BehaviorSubject ticks under it), waited for the
+                // gate, while a lick's thread held the gate and, ending the trial downstream, waited for the
+                // clock subject's lock to unsubscribe.
+                var outbox = new Queue<Action>();
+                bool sending = false;
 
                 Action<Exception> fail = error =>
                 {
                     if (stopped) return;
                     stopped = true;
-                    observer.OnError(error);
+                    outbox.Enqueue(() => observer.OnError(error));
                 };
                 Action<double, TSource> schedule = (due, value) =>
                 {
@@ -62,73 +70,107 @@ namespace OpenRigs.Core
                     {
                         var item = timed[0];
                         timed.RemoveAt(0);
-                        observer.OnNext(Timestamped.Create(item.Item2, now.Value));
+                        var next = Timestamped.Create(item.Item2, now.Value);
+                        outbox.Enqueue(() => observer.OnNext(next));
                     }
                     if (!stopped && sourceDone && timed.Count == 0 && untimed.Count == 0)
                     {
                         stopped = true;
-                        observer.OnCompleted();
+                        outbox.Enqueue(observer.OnCompleted);
                     }
+                };
+                // Called under the gate: whether this thread is to send the queue.
+                Func<bool> claim = () =>
+                {
+                    if (sending || outbox.Count == 0) return false;
+                    sending = true;
+                    return true;
+                };
+                Action send = () =>
+                {
+                    while (true)
+                    {
+                        Action next;
+                        lock (gate)
+                        {
+                            if (outbox.Count == 0)
+                            {
+                                sending = false;
+                                return;
+                            }
+                            next = outbox.Dequeue();
+                        }
+                        try
+                        {
+                            next();
+                        }
+                        catch
+                        {
+                            lock (gate) sending = false;
+                            throw;
+                        }
+                    }
+                };
+                // Runs a handler under the gate, then sends what it queued unless another thread is sending.
+                Action<Action> handle = body =>
+                {
+                    bool mine;
+                    lock (gate)
+                    {
+                        body();
+                        mine = claim();
+                    }
+                    if (mine) send();
                 };
 
                 var clockSubscription = clock.Subscribe(
-                    seconds =>
+                    seconds => handle(() =>
                     {
-                        lock (gate)
+                        if (stopped) return;
+                        // Idle, a clock that goes backwards (SynchronizeTimestamp at start) gives the new time.
+                        if (now.HasValue && seconds < now.Value && timed.Count > 0)
                         {
-                            if (stopped) return;
-                            // Idle, a clock that goes backwards (SynchronizeTimestamp at start) gives the new time.
-                            if (now.HasValue && seconds < now.Value && timed.Count > 0)
-                            {
-                                fail(new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
-                                    "The Harp board's clock jumped back from {0} s to {1} s while {2} timed event(s) were waiting, " +
-                                    "so they could not be timed and the workflow stopped. Something reset the board's clock mid-experiment: " +
-                                    "start the experiment again, and if it happens again, report it.", now.Value, seconds, timed.Count)));
-                                return;
-                            }
-                            now = seconds;
-                            foreach (var item in untimed) schedule(seconds + item.Item1, item.Item2);
-                            untimed.Clear();
-                            pump();
+                            fail(new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                                "The Harp board's clock jumped back from {0} s to {1} s while {2} timed event(s) were waiting, " +
+                                "so they could not be timed and the workflow stopped. Something reset the board's clock mid-experiment: " +
+                                "start the experiment again, and if it happens again, report it.", now.Value, seconds, timed.Count)));
+                            return;
                         }
-                    },
-                    error => { lock (gate) fail(error); },
-                    () =>
+                        now = seconds;
+                        foreach (var item in untimed) schedule(seconds + item.Item1, item.Item2);
+                        untimed.Clear();
+                        pump();
+                    }),
+                    error => handle(() => fail(error)),
+                    () => handle(() =>
                     {
-                        lock (gate)
-                        {
-                            if (!stopped) fail(new InvalidOperationException("HarpDelay's clock ended before its input did, so what waits would never be emitted."));
-                        }
-                    });
+                        if (!stopped) fail(new InvalidOperationException("HarpDelay's clock ended before its input did, so what waits would never be emitted."));
+                    }));
 
                 var sourceSubscription = source.Subscribe(
-                    value =>
+                    value => handle(() =>
                     {
-                        lock (gate)
+                        if (stopped) return;
+                        var due = DueSeconds;
+                        if (!(due >= 0) || double.IsInfinity(due))
                         {
-                            if (stopped) return;
-                            var due = DueSeconds;
-                            if (!(due >= 0) || double.IsInfinity(due))
-                            {
-                                fail(new ArgumentOutOfRangeException(null, "HarpDelay's DueSeconds is " + due + "; it must be 0 or more seconds."));
-                                return;
-                            }
-                            if (now.HasValue) schedule(now.Value + due, value);
-                            else untimed.Add(Tuple.Create(due, value));
-                            if (now.HasValue) pump();
+                            fail(new ArgumentOutOfRangeException(null, "HarpDelay's DueSeconds is " + due + "; it must be 0 or more seconds."));
+                            return;
                         }
-                    },
-                    error => { lock (gate) fail(error); },
-                    () =>
+                        if (now.HasValue) schedule(now.Value + due, value);
+                        else untimed.Add(Tuple.Create(due, value));
+                        if (now.HasValue) pump();
+                    }),
+                    error => handle(() => fail(error)),
+                    () => handle(() =>
                     {
-                        lock (gate)
-                        {
-                            sourceDone = true;
-                            if (now.HasValue || untimed.Count == 0) pump();
-                        }
-                    });
+                        sourceDone = true;
+                        if (now.HasValue || untimed.Count == 0) pump();
+                    }));
 
-                return new CompositeDisposable(sourceSubscription, clockSubscription);
+                // Nothing queued is sent once unsubscribed.
+                var forget = Disposable.Create(() => { lock (gate) { stopped = true; outbox.Clear(); } });
+                return new CompositeDisposable(forget, sourceSubscription, clockSubscription);
             });
         }
     }
