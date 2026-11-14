@@ -88,6 +88,16 @@ def test_every_part_optional():
     assert box.behavior_board["main"].wiring is None and list(box.camera) == ["overhead"]
 
 
+def test_a_rig_built_by_field_name():
+    # A rig template is built in Python (coen-behaviour-box's examples/rig.py), its parts named by field.
+    from open_rigs.components.harp_boards import BehaviorBoard
+    from open_rigs.components.video import VideoEncoder
+
+    rig = LabRig(root_path="C:/Data", rig_id="S1", behavior_board={"main": BehaviorBoard(port_name="COM3", usb_serial="X")},
+                 video_encoder=VideoEncoder(codec="h264_qsv"))
+    assert rig.video_encoder.codec == "h264_qsv" and rig.rig_id == "S1"
+
+
 def test_one_valve_is_enough():
     rig = copy.deepcopy(RIG)
     del rig["zapit"]

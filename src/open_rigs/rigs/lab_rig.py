@@ -77,7 +77,10 @@ class LabRig(Rig):
             _refuse_unknown([str(key) for key in data if key not in known])
         rig = handler(data)
         if isinstance(data, dict):
-            _refuse_unknown(list(_unknown_keys(data, rig.model_dump(by_alias=True, exclude_unset=True))))
+            # A rig built in Python names its parts by field (video_encoder), which the dump below names by alias.
+            aliases = {field: info.alias or field for field, info in cls.model_fields.items()}
+            given = {aliases.get(str(key), key): value for key, value in data.items()}
+            _refuse_unknown(list(_unknown_keys(given, rig.model_dump(by_alias=True, exclude_unset=True))))
         return rig
 
     @model_validator(mode="after")
