@@ -88,8 +88,17 @@ def test_every_part_optional():
     assert box.behavior_board["main"].wiring is None and list(box.camera) == ["overhead"]
 
 
+def test_the_box_is_a_choice_of_the_lab_rig_s_parts():
+    from open_rigs.rigs.lab_rig import BehaviourBoxRig
+
+    box = BehaviourBoxRig.model_fields
+    assert set(box) < set(LabRig.model_fields) and {"behavior_board", "camera", "video_encoder"} <= set(box)
+    for name, info in box.items():
+        assert (info.annotation, info.description) == (LabRig.model_fields[name].annotation, LabRig.model_fields[name].description)
+
+
 def test_a_rig_built_by_field_name():
-    # A rig template is built in Python (coen-behaviour-box's examples/rig.py), its parts named by field.
+    # A workflow's rig template is built in Python, its parts named by field.
     from open_rigs.components.harp_boards import BehaviorBoard
     from open_rigs.components.video import VideoEncoder
 

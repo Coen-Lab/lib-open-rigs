@@ -4,7 +4,7 @@ Every lab workflow reads the same kind of `rig.yml`, modelled by `open_rigs.rigs
 
 ## The rig model and its parts
 
-`open_rigs.rigs.lab_rig.LabRig` (`src/open_rigs/rigs/lab_rig.py`) is the whole of a rig's `rig.yml`. Every part is optional: a rig's file lists the parts it has, each workflow takes the ones it drives, and a name a workflow asks for and does not find stops it at Start. A workflow's own rig model is this class, and its generated C# reads the file. The parts are in `src/open_rigs/components/`:
+`open_rigs.rigs.lab_rig.LabRig` (`src/open_rigs/rigs/lab_rig.py`) is the whole of a rig's `rig.yml`. Every part is optional: a rig's file lists the parts it has, each workflow takes the ones it drives, and a name a workflow asks for and does not find stops it at Start. A workflow's own rig model is this class, and its generated C# reads the file; a behaviour box's takes `BehaviourBoxRig` (the same module), LabRig's Behavior boards, cameras and video encoder alone, as the other parts' generated C# needs packages a box's Bonsai environment lacks. The parts are in `src/open_rigs/components/`:
 
 | Part | `rig.yml` key | Module |
 |---|---|---|

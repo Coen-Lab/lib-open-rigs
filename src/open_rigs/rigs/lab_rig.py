@@ -144,7 +144,19 @@ class LabRig(Rig):
         return self
 
 
-_ALIASES = {field: info.alias for field, info in BoardWiring.model_fields.items()}
+class BehaviourBoxRig(Rig):
+    """A behaviour box's choice of LabRig's parts: Behavior boards, cameras and the video encoder. A box's
+    workflow takes this, not LabRig, because the generated C# of the other parts needs packages a box's
+    Bonsai environment lacks (Harp.TimestampGeneratorGen3 0.1.1's TimerRate)."""
+
+    behavior_board: Dict[str, BehaviorBoard] = Field(
+        default_factory=dict, description=LabRig.model_fields["behavior_board"].description
+    )
+    camera: Dict[str, SpinnakerCamera] = Field(default_factory=dict, description=LabRig.model_fields["camera"].description)
+    video_encoder: Optional[VideoEncoder] = Field(default=None, description=LabRig.model_fields["video_encoder"].description)
+
+
+_ALIASES ={field: info.alias for field, info in BoardWiring.model_fields.items()}
 
 
 def _unknown_keys(given: Any, kept: Any, path: str = "") -> Iterator[str]:
