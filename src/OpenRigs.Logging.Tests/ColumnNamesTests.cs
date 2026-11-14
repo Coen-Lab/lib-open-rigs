@@ -36,7 +36,7 @@ namespace OpenRigs.Logging.Tests
         {
             var stamped = typeof(Bonsai.Harp.Timestamped<>).MakeGenericType(typeof(Trial));
             CollectionAssert.AreEqual(
-                new[] { "Seconds", "trialNumber", "outcome", "rewardSize", "stimulus.azimuth" },
+                new[] { "harpTime", "trialNumber", "outcome", "rewardSize", "stimulus.azimuth" },
                 CsvWriter.ColumnNames(stamped));
         }
 

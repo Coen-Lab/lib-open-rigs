@@ -18,14 +18,22 @@ namespace OpenRigs.Logging
     /// The Bonsai CsvWriter names a column by cutting its expression text at the last member
     /// separator, which drops the field name of every string and nullable column
     /// (bonsai-rx/bonsai#2662). This operator keeps the writer Bonsai builds and replaces only the
-    /// header. For a timestamped input the Value prefix is dropped, which leaves Seconds followed
-    /// by the record's own field names. Remove it once the upstream fix ships.
+    /// header. For a timestamped input the timestamp is named harpTime (TimeColumn) and the Value
+    /// prefix is dropped, which leaves harpTime followed by the record's own field names. The header
+    /// fix can go once the upstream fix ships; the harpTime name is the lab's (specs/logging.md).
     /// </remarks>
     [XmlType(Namespace = "clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging")]
-    [Description("Writes each element of the sequence to a delimited text file, with a header naming every column by its member path. For a timestamped input the Value prefix is dropped from the column names.")]
+    [Description("Writes each element of the sequence to a delimited text file, with a header naming every column by its member path. For a timestamped input the timestamp is the harpTime column and the Value prefix is dropped from the other column names.")]
     public class CsvWriter : Bonsai.IO.CsvWriter
     {
         const string ValuePrefix = "Value.";
+        const string TimestampMember = "Seconds";
+
+        /// <summary>
+        /// The name of a timestamped record's first column: the Harp time of the record (Bonsai.Harp's
+        /// Timestamped.Seconds), named for its clock rather than its unit (specs/logging.md, section 4).
+        /// </summary>
+        public const string TimeColumn = "harpTime";
 
         static readonly MethodInfo BuildCombinatorMethod = typeof(CombinatorExpressionBuilder)
             .GetMethod(nameof(BuildCombinator), BindingFlags.Instance | BindingFlags.NonPublic);
@@ -177,9 +185,12 @@ namespace OpenRigs.Logging
 
             if (IsTimestamped(root.Type))
             {
-                names = names.Select(name => name.StartsWith(ValuePrefix, StringComparison.Ordinal)
-                    ? name.Substring(ValuePrefix.Length)
-                    : name).ToArray();
+                // The timestamp's own Seconds is named for its clock; the record's fields lose the Value prefix.
+                names = names.Select(name => name == TimestampMember
+                    ? TimeColumn
+                    : name.StartsWith(ValuePrefix, StringComparison.Ordinal)
+                        ? name.Substring(ValuePrefix.Length)
+                        : name).ToArray();
             }
 
             var duplicate = names.GroupBy(name => name).FirstOrDefault(group => group.Count() > 1);
@@ -187,7 +198,7 @@ namespace OpenRigs.Logging
             {
                 throw new InvalidOperationException(
                     $"The column name '{duplicate.Key}' appears more than once in the header. " +
-                    "A timestamped record must not have its own Seconds field. Rename the field or log the record without it.");
+                    $"A timestamped record must not have its own {TimeColumn} field. Rename the field or log the record without it.");
             }
 
             return string.Join((string)delimiter.Value, names).Trim();

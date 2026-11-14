@@ -30,9 +30,9 @@ The CSV file contains one row per frame with these columns:
 
 | Column | Description |
 |--------|-------------|
-| `Seconds` | Harp hardware timestamp |
-| `FrameID` | Monotonically increasing frame counter from the camera |
-| `Timestamp` | Camera-internal timestamp |
+| `harpTime` | Harp hardware timestamp, in seconds |
+| `ChunkData.FrameID` | Monotonically increasing frame counter from the camera |
+| `ChunkData.Timestamp` | Camera-internal timestamp |
 
 ---
 

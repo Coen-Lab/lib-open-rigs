@@ -19,7 +19,7 @@ namespace OpenRigs.Logging.Tests
         // mean of a channel by a few levels, and the logged video has been encoded twice.
         const double ColorTolerance = 12;
 
-        static readonly string[] ExpectedHeader = { "Seconds", "Value.Width", "Value.Height" };
+        static readonly string[] ExpectedHeader = { "harpTime", "Width", "Height" };
 
         protected override string WorkflowFileName => "LogVideoTest.bonsai";
 

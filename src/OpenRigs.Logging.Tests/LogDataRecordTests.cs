@@ -15,7 +15,7 @@ namespace OpenRigs.Logging.Tests
     public class LogDataRecordTests : LoggingTestBase
     {
         const int Count = 4;
-        static readonly string[] ExpectedHeader = { "Seconds", "Label", "Count", "IsEven", "Maybe" };
+        static readonly string[] ExpectedHeader = { "harpTime", "Label", "Count", "IsEven", "Maybe" };
 
         protected override string WorkflowFileName => "LogDataRecordTest.bonsai";
 

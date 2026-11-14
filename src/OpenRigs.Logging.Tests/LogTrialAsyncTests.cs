@@ -16,7 +16,7 @@ namespace OpenRigs.Logging.Tests
     public class LogTrialTests : LoggingTestBase
     {
         const int Count = 5;
-        static readonly string[] ExpectedHeader = { "Seconds", "Label", "Count", "IsEven", "Maybe" };
+        static readonly string[] ExpectedHeader = { "harpTime", "Label", "Count", "IsEven", "Maybe" };
 
         protected override string WorkflowFileName => "LogTrialTest.bonsai";
 
@@ -44,13 +44,13 @@ namespace OpenRigs.Logging.Tests
 
     /// <summary>
     /// LogAsync declares AsyncEvents and writes every event sent to it into BonsaiData_Async, as
-    /// Seconds,Event,Detail,Value.
+    /// harpTime,Event,Detail,Value.
     /// </summary>
     [TestClass]
     public class LogAsyncTests : LoggingTestBase
     {
         const int Count = 4;
-        static readonly string[] ExpectedHeader = { "Seconds", "Event", "Detail", "Value" };
+        static readonly string[] ExpectedHeader = { "harpTime", "Event", "Detail", "Value" };
 
         protected override string WorkflowFileName => "LogAsyncTest.bonsai";
 
@@ -69,7 +69,7 @@ namespace OpenRigs.Logging.Tests
             for (var row = 0; row < Count; row++)
             {
                 var seconds = ParseDoubleColumn(rows[row], 0, ExpectedHeader, row, result);
-                Assert.IsTrue(seconds > previous, $"Expected rising Seconds in row {row}.{result.Describe()}");
+                Assert.IsTrue(seconds > previous, $"Expected rising harpTime in row {row}.{result.Describe()}");
                 previous = seconds;
                 Assert.AreEqual("RewardLeft", rows[row][1], result.Describe());
                 // A comma in Detail would split the row, so it is written as a semicolon.
@@ -195,7 +195,7 @@ namespace OpenRigs.Logging.Tests
             var path = LogFile("BonsaiData_Trial", "2026-11-05T08-00-00");
             using (var writer = new StreamWriter(path))
             {
-                LoggedRows.WriteRow(writer, "1.5,Correct", "Seconds,response", flush: true, publish: false);
+                LoggedRows.WriteRow(writer, "1.5,Correct", "harpTime,response", flush: true, publish: false);
                 Assert.AreEqual("1.5,Correct" + Environment.NewLine, ReadShared(path));
             }
         }
@@ -207,7 +207,7 @@ namespace OpenRigs.Logging.Tests
             var path = LogFile("BonsaiData_Trial", "2026-11-05T08-00-00");
             using (var writer = new StreamWriter(path))
             {
-                LoggedRows.WriteRow(writer, "1.5,Correct", "Seconds,response", flush: false, publish: false);
+                LoggedRows.WriteRow(writer, "1.5,Correct", "harpTime,response", flush: false, publish: false);
                 Assert.AreEqual(string.Empty, ReadShared(path));
             }
         }
@@ -220,21 +220,21 @@ namespace OpenRigs.Logging.Tests
             {
                 using (var first = new StreamWriter(LogFile("BonsaiData_Trial", "2026-11-05T08-00-00")))
                 {
-                    LoggedRows.WriteRow(first, "1,Correct", "Seconds,response", true, true);
-                    LoggedRows.WriteRow(first, "2,Incorrect", "Seconds,response", true, true);
+                    LoggedRows.WriteRow(first, "1,Correct", "harpTime,response", true, true);
+                    LoggedRows.WriteRow(first, "2,Incorrect", "harpTime,response", true, true);
                 }
                 using (var async = new StreamWriter(LogFile("BonsaiData_Async", "2026-11-05T08-00-00")))
                 {
-                    LoggedRows.WriteRow(async, "1.2,Go,,", "Seconds,Event,Detail,Value", true, true);
+                    LoggedRows.WriteRow(async, "1.2,Go,,", "harpTime,Event,Detail,Value", true, true);
                 }
                 using (var second = new StreamWriter(LogFile("BonsaiData_Trial", "2026-11-05T09-00-00")))
                 {
-                    LoggedRows.WriteRow(second, "3,NoResponse", "Seconds,response", true, true);
+                    LoggedRows.WriteRow(second, "3,NoResponse", "harpTime,response", true, true);
                 }
                 // A log with PublishRows off is written and not published.
                 using (var quiet = new StreamWriter(LogFile("BonsaiData_Other", "2026-11-05T08-00-00")))
                 {
-                    LoggedRows.WriteRow(quiet, "4,x", "Seconds,a", true, false);
+                    LoggedRows.WriteRow(quiet, "4,x", "harpTime,a", true, false);
                 }
             }
 
@@ -244,7 +244,7 @@ namespace OpenRigs.Logging.Tests
             // The trial log's rows go on from 0 to 2 across its two hourly files; the async log counts its own.
             CollectionAssert.AreEqual(new long[] { 0, 1, 0, 2 }, rows.Select(r => r.Row).ToArray());
             Assert.AreEqual("3,NoResponse", rows[3].Line);
-            Assert.AreEqual("Seconds,Event,Detail,Value", rows[2].Header);
+            Assert.AreEqual("harpTime,Event,Detail,Value", rows[2].Header);
         }
 
         [TestMethod]
