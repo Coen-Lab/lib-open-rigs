@@ -6,17 +6,26 @@ every dome task. trialType, outcome, rewardSizeUl and punishSound are in the blo
 described by its task. A task's own columns follow the block.
 
 summarise reads one experiment's BonsaiData/BonsaiData_Trial_*.csv, BonsaiData/BonsaiData_Async_*.csv (each
-RewardDelivered row, Value the microlitres delivered) and manifest.json (how the run ended), and checks the rows
-against each other:
+RewardDelivered row, Value the microlitres delivered), Settings/Settings_Task_*.json (the lead and the punishment)
+and manifest.json (how the run ended), and checks the rows against each other and the task:
 
-- trial numbers run 1, 2, 3 ... with none missing;
+- trial numbers run 1, 2, 3 ... with none missing, and each outcome is Correct, Incorrect or NoResponse;
+- each Go (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
+  quietWaitSeconds (never negative), within 2 ms;
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
+- each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
+  within 2 ms;
 - each interval after the first started at the last trial's outcome plus its punishTimeoutSeconds, within 2 ms;
+- the error sound (punishSound) played on each trial with a timeout when the task's punishment.sound is enabled,
+  and on no trial without one when the task's timeout is above 0;
 - each rewarded trial (rewardSizeUl above 0, and Correct or autoRewarded) has a RewardDelivered row at its outcome.
 
+Performance is Rig Control's: Correct / (Correct + Incorrect), over the trials both
+spouts were offered where the task records bothSpouts; the response rate is the trials not NoResponse.
+
 A file without a column the checks read (harpTime, outcomeTime and the rest of the shared block) is one problem,
-not checked further. `summarise-experiment <experiment folder> ...` prints each summary and each
-failed check, exiting 1 when one fails.
+not checked further; without a Settings_Task file the checks that need the task are one problem. `summarise-experiment
+<experiment folder> ...` prints each summary and each failed check, exiting 1 when one fails.
 """
 
 from __future__ import annotations
@@ -24,6 +33,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import statistics
 import sys
 from dataclasses import dataclass, field
@@ -44,21 +54,22 @@ SHARED_COLUMNS: List[Tuple[str, str, Optional[str], Optional[str]]] = [
     ("itiSeconds", "double", "s",
      "The inter-trial interval drawn for this trial (every trial draws its own), uniformly between "
      "trialStructure.itiMinSeconds and itiMaxSeconds: from itiStartTime to this trial's stimulus with a quiet mouse, "
-     "the time to drink included. The stage's quiet waits add quietWaitSeconds, so the stimulus was commanded at "
-     "itiStartTime + itiSeconds + quietWaitSeconds."),
+     "the time to drink included. The stage's quiet waits add quietWaitSeconds, so the stimulus was due at "
+     "itiStartTime + itiSeconds + quietWaitSeconds (stimulusOnsetTime)."),
     ("quietWaitSeconds", "double", "s",
      "How long the stage's quiet waits (lickQuietSeconds, wheelQuietSeconds and wheelQuietCm; OpenRigs.Core QuietWait) "
      "held this trial's Go past the end of its interval less the lead; 0 with the waits off or a quiet mouse."),
     ("trialStartTime", "double", "s",
      "Harp time the trial started (Go): the end of its interval less the lead, max(laserToStimulusSeconds, 0) in the "
-     "task file (in the manifest), or later by quietWaitSeconds."),
+     "task file (Settings_Task), plus quietWaitSeconds."),
     ("stimulusOnsetTime", "double", "s",
-     "Harp time the workflow commanded the stimulus on, NaN if it never was: trialStartTime plus the lead in every "
-     "experiment; with optogenetics the laser trigger was laserToStimulusSeconds before it. The physical onset is in "
-     "the hardware logs."),
+     "Harp time the workflow commanded the stimulus on, NaN if it never was: the first tick of the 1 ms Harp clock at "
+     "or after trialStartTime plus the lead, in every experiment. The physical onset is in the hardware logs."),
     ("outcomeTime", "double", "s",
-     "Harp time the outcome was known, the same time as harpTime, as its own column so that every moment of a trial "
-     "is named."),
+     "Harp time the workflow knew the outcome, the same time as harpTime, as its own column so that every moment of a "
+     "trial is named; the reward, the error sound and the timeout are timed from it. On a lick it is the Harp clock's "
+     "latest tick when the workflow saw the lick, a few ms after it; each lick's own Harp time is in the lick "
+     "detectors' logs."),
     ("rewardSizeUl", "double", "ul", None),
     ("punishSound", "bool", None, None),
     ("punishTimeoutSeconds", "double", "s",
@@ -71,6 +82,11 @@ SHARED_COLUMNS: List[Tuple[str, str, Optional[str], Optional[str]]] = [
     ("laserPowerMw", "double", "mW",
      "Laser power sent to Zapit for this trial (the task's optogenetics.laserPowerMw), as commanded, not measured. 0 on "
      "laser-off trials, without optogenetics, and on a trial answered before its trigger."),
+    ("laserTriggerTime", "double", "s",
+     "Harp time the workflow raised the Zapit trigger line (the laser, or at 0 mW the galvos and masking light alone): "
+     "the first tick of the 1 ms Harp clock at or after laserToStimulusSeconds before the stimulus was due. NaN without "
+     "optogenetics and on a trial that ended before its trigger, so a laser-off trial (a time, laserPowerMw 0) and one "
+     "answered first (NaN) differ."),
 ]
 
 TIME_COLUMN = "harpTime"
@@ -98,13 +114,17 @@ def shared_block_problems(columns: Dict[str, Any]) -> List[str]:
     return problems
 
 
+OUTCOMES = ("Correct", "Incorrect", "NoResponse")
+
+
 @dataclass
 class Summary:
     folder: str
     outcome: str  # the manifest's run outcome (completed, stopped, ...), "not final" when it never closed; or unknown
     trials: int
     correct: int
-    performance: float  # correct / trials; NaN with no trials
+    performance: float  # Rig Control's: Correct / (Correct + Incorrect), two-spout trials where recorded; NaN with none
+    responded: float = float("nan")  # the trials not NoResponse, of all; NaN with no trials
     response_seconds: List[float] = field(default_factory=list)  # each trial's outcome less its stimulus onset
     interval_seconds: List[float] = field(default_factory=list)  # each outcome to the next stimulus onset
     requested_ul: float = 0.0  # the task's rewards: rewardSizeUl of each rewarded trial
@@ -125,14 +145,41 @@ def _f(row: Dict[str, str], column: str) -> float:
     return float(row[column])
 
 
+def _true(text: Any) -> bool:
+    return str(text).strip().lower() == "true"
+
+
 # The columns summarise reads: of a trial row, and of an async row.
-TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds", "stimulusOnsetTime",
-               "outcomeTime", "rewardSizeUl", "punishTimeoutSeconds")
+TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds", "trialStartTime",
+               "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "punishSound", "punishTimeoutSeconds")
 ASYNC_NEEDS = (TIME_COLUMN, "Event", "Value")
 
 
 def _rewarded(row: Dict[str, str]) -> bool:
-    return _f(row, "rewardSizeUl") > 0 and (row["outcome"] == "Correct" or str(row.get("autoRewarded", "")).lower() == "true")
+    return _f(row, "rewardSizeUl") > 0 and (row["outcome"] == "Correct" or _true(row.get("autoRewarded", "")))
+
+
+@dataclass
+class _Task:
+    laser_to_stimulus: float  # optogenetics.laserToStimulusSeconds: signed, the trigger before the stimulus
+    timeout_seconds: float  # punishment.timeoutSeconds
+    sound: bool  # punishment.sound.enabled
+
+    @property
+    def lead(self) -> float:
+        return max(self.laser_to_stimulus, 0.0)
+
+
+def _task(folder: Path) -> Optional[_Task]:
+    """The experiment's task file values the checks need (Settings/Settings_Task_*.json), or None."""
+    for path in sorted(folder.glob("Settings/Settings_Task_*.json")):
+        try:
+            p = json.loads(path.read_text(encoding="utf-8-sig"))["taskParameters"]
+            return _Task(float(p["optogenetics"]["laserToStimulusSeconds"]), float(p["punishment"]["timeoutSeconds"]),
+                         bool(p["punishment"]["sound"]["enabled"]))
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+    return None
 
 
 def summarise(folder: Path) -> Summary:
@@ -150,7 +197,13 @@ def summarise(folder: Path) -> Summary:
     if missing:
         return Summary(folder.name, outcome, len(trials), 0, float("nan"), problems=missing)
     correct = sum(r["outcome"] == "Correct" for r in trials)
-    s = Summary(folder.name, outcome, len(trials), correct, correct / len(trials) if trials else float("nan"))
+    counted = [r for r in trials if r["outcome"] in ("Correct", "Incorrect") and _true(r.get("bothSpouts", "True"))]
+    s = Summary(folder.name, outcome, len(trials), correct,
+                sum(r["outcome"] == "Correct" for r in counted) / len(counted) if counted else float("nan"),
+                sum(r["outcome"] != "NoResponse" for r in trials) / len(trials) if trials else float("nan"))
+    task = _task(folder)
+    if trials and task is None:
+        s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the error sound not checked")
     rewards = [e for e in events if e["Event"] == "RewardDelivered"]
     s.delivered_ul = sum(float(e["Value"] or 0) for e in rewards)
     reward_times = [_f(e, TIME_COLUMN) for e in rewards]
@@ -158,12 +211,33 @@ def summarise(folder: Path) -> Summary:
         number = int(row["trialNumber"])
         if number != n + 1:
             s.problems.append(f"row {n + 1} is trial {number}: trial numbers should run 1, 2, 3 ...")
+        if row["outcome"] not in OUTCOMES:
+            s.problems.append(f"trial {number}: outcome {row['outcome']!r} is not one of {', '.join(OUTCOMES)}")
         onset, end = _f(row, "stimulusOnsetTime"), _f(row, "outcomeTime")
         s.response_seconds.append(end - onset)
         planned = _f(row, "itiSeconds") + _f(row, "quietWaitSeconds")
         if abs(onset - _f(row, "itiStartTime") - planned) > TOLERANCE_S:
             s.problems.append(f"trial {number}: stimulus {onset - _f(row, 'itiStartTime'):.4f} s after its interval started, "
                               f"not itiSeconds + quietWaitSeconds = {planned:.4f} s")
+        if _f(row, "quietWaitSeconds") < 0:
+            s.problems.append(f"trial {number}: quietWaitSeconds {_f(row, 'quietWaitSeconds'):.4f} is negative")
+        if task is not None:
+            go = _f(row, "itiStartTime") + planned - task.lead
+            if abs(_f(row, "trialStartTime") - go) > TOLERANCE_S:
+                s.problems.append(f"trial {number}: Go (trialStartTime) {_f(row, 'trialStartTime') - go:+.4f} s from its "
+                                  f"interval's end less the lead ({task.lead:g} s) plus quietWaitSeconds")
+            trigger = _f(row, "laserTriggerTime") if "laserTriggerTime" in row else float("nan")
+            due = _f(row, "itiStartTime") + planned - task.laser_to_stimulus
+            if not math.isnan(trigger) and abs(trigger - due) > TOLERANCE_S:
+                s.problems.append(f"trial {number}: laser trigger {trigger - due:+.4f} s from laserToStimulusSeconds "
+                                  f"({task.laser_to_stimulus:g} s) before the stimulus was due")
+            sounded, timed_out = _true(row["punishSound"]), _f(row, "punishTimeoutSeconds") > 0
+            if timed_out and sounded != task.sound:
+                s.problems.append(f"trial {number}: a timeout {'with' if sounded else 'without'} the error sound, but the "
+                                  f"task's punishment.sound is {'off' if sounded else 'on'}")
+            if not timed_out and sounded and task.timeout_seconds > 0:
+                s.problems.append(f"trial {number}: the error sound with no timeout, though the task's timeout is "
+                                  f"{task.timeout_seconds:g} s")
         if n:
             last = trials[n - 1]
             due = _f(last, "outcomeTime") + _f(last, "punishTimeoutSeconds")
@@ -174,7 +248,9 @@ def summarise(folder: Path) -> Summary:
         if _rewarded(row):
             s.requested_ul += _f(row, "rewardSizeUl")
             if not any(abs(t - end) <= TOLERANCE_S for t in reward_times):
-                s.problems.append(f"trial {number}: rewarded with rewardSizeUl {row['rewardSizeUl']} but no RewardDelivered at its outcome")
+                nearest = min(reward_times, key=lambda t: abs(t - end), default=None)
+                s.problems.append(f"trial {number}: rewarded with rewardSizeUl {row['rewardSizeUl']} but no RewardDelivered at its outcome"
+                                  + (f" (the nearest {(nearest - end) * 1000:+.0f} ms from it)" if nearest is not None else ""))
     return s
 
 
@@ -183,8 +259,12 @@ def describe(s: Summary) -> str:
     def spread(values: List[float]) -> str:
         return f"median {statistics.median(values):.2f} s (range {min(values):.2f} to {max(values):.2f})" if values else "none"
 
-    lines = [f"{s.folder}: {s.outcome}, {s.trials} trials, {s.correct} correct"
-             + (f" ({s.performance:.0%})" if s.trials else ""),
+    def percent(x: float) -> str:
+        return "none" if math.isnan(x) else f"{x:.0%}"
+
+    lines = [f"{s.folder}: {s.outcome}, {s.trials} trials, {s.correct} correct",
+             f"  performance {percent(s.performance)} (Correct / (Correct + Incorrect), two-spout trials, as Rig Control),"
+             f" responded {percent(s.responded)}",
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",
              f"  outcome to next stimulus: {spread(s.interval_seconds)}",
              f"  water: {s.requested_ul:g} ul asked by the task, {s.delivered_ul:g} ul delivered (RewardDelivered)"]

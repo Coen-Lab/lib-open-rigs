@@ -20,9 +20,15 @@ def _trial(n, start, iti, response, outcome="Correct", timeout=0.0, quiet=0.0, r
             "autoRewarded": auto}
 
 
-def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, columns=COLUMNS):
+TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "punishment": {"timeoutSeconds": 4.0, "sound": {"enabled": True}}}
+
+
+def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, columns=COLUMNS, task=TASK):
     folder = tmp_path / "ses-x_2026-11-14T01-00-00"
     (folder / "BonsaiData").mkdir(parents=True)
+    if task is not None:
+        (folder / "Settings").mkdir()
+        (folder / "Settings" / "Settings_Task_2026-11-14T01-00-00.json").write_text(json.dumps({"taskParameters": task}))
     with open(folder / "BonsaiData" / "BonsaiData_Trial_2026-11-14T01-00-00.csv", "w", newline="") as f:
         w = csv.DictWriter(f, columns, extrasaction="ignore")
         w.writeheader()
@@ -49,7 +55,7 @@ def test_a_consistent_experiment_has_no_problems(tmp_path):
     trials = _chain(4)
     rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
     s = summarise(_experiment(tmp_path, trials, rewards))
-    assert (s.outcome, s.trials, s.correct, s.performance) == ("completed", 4, 2, 0.5)
+    assert (s.outcome, s.trials, s.correct, s.performance, s.responded) == ("completed", 4, 2, 0.5, 1.0)
     assert s.problems == []
     assert s.response_seconds == [3.0] * 4
     assert [round(x, 6) for x in s.interval_seconds] == [2.5, 6.5, 2.5]
@@ -121,4 +127,51 @@ def test_a_change_to_the_shared_block_is_named():
         "laserCondition is double, not int",
     ]
     reordered = dict(reversed(list(_block().items())))
-    assert shared_block_problems(reordered)[0].startswith("the first 15 columns are")
+    assert shared_block_problems(reordered)[0].startswith("the first 16 columns are")
+
+
+def test_go_the_outcomes_and_the_error_sound_are_checked_against_the_task(tmp_path):
+    # A Go 5 s off, an outcome that is no outcome, a timeout without the sound and a sound without a timeout were
+    # all passed before (audit, 14 Nov 2026).
+    trials = _chain(4)
+    trials[0]["trialStartTime"] -= 5
+    trials[1]["punishSound"] = False  # Incorrect, with a 4 s timeout, the task's sound on
+    trials[2]["outcome"] = "Banana"
+    trials[2]["punishSound"] = True  # no timeout
+    text = "\n".join(summarise(_experiment(tmp_path, trials, [])).problems)
+    assert "trial 1: Go (trialStartTime) -5.0000 s from its interval's end less the lead (0.1 s) plus quietWaitSeconds" in text
+    assert "trial 2: a timeout without the error sound, but the task's punishment.sound is on" in text
+    assert "trial 3: outcome 'Banana' is not one of Correct, Incorrect, NoResponse" in text
+    assert "trial 3: the error sound with no timeout, though the task's timeout is 4 s" in text
+
+
+def test_a_negative_quiet_wait_is_named(tmp_path):
+    trials = [_trial(1, 1000.0, 2.5, 3.0, quiet=-0.5)]
+    s = summarise(_experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)]))
+    assert s.problems == ["trial 1: quietWaitSeconds -0.5000 is negative"]
+
+
+def test_the_laser_trigger_is_checked_when_there_was_one(tmp_path):
+    trials = _chain(3)
+    trials[0]["laserTriggerTime"] = trials[0]["stimulusOnsetTime"] - 0.1  # on time
+    trials[1]["laserTriggerTime"] = float("nan")  # none: no optogenetics, or answered first
+    trials[2]["laserTriggerTime"] = trials[2]["stimulusOnsetTime"] - 0.1 + 0.01  # 10 ms late
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    s = summarise(_experiment(tmp_path, trials, rewards, columns=COLUMNS + ["laserTriggerTime"]))
+    assert s.problems == ["trial 3: laser trigger +0.0100 s from laserToStimulusSeconds (0.1 s) before the stimulus was due"]
+
+
+def test_without_the_task_file_its_checks_are_one_problem(tmp_path):
+    trials = _chain(2)
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    s = summarise(_experiment(tmp_path, trials, rewards, task=None))
+    assert s.problems == ["no readable Settings/Settings_Task_*.json: Go, the laser trigger and the error sound not checked"]
+
+
+def test_performance_is_rig_controls(tmp_path):
+    # Correct / (Correct + Incorrect) over two-spout trials, as Rig Control; the share answered apart.
+    trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="NoResponse")]
+    for t, both in zip(trials, [True, True, False, True, True]):
+        t["bothSpouts"] = both
+    s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["bothSpouts"]))
+    assert (s.correct, round(s.performance, 4), s.responded) == (2, round(1 / 3, 4), 0.8)  # trial 3, one spout, left out
