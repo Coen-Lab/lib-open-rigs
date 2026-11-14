@@ -48,6 +48,23 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual(64, off.ToBytes()[1] & 64);  // the power is sent, not left to the conditions file
         }
 
+        [TestMethod]
+        public void AnArmedReplyMustBeTheTrialsConditionAndLaser()
+        {
+            ZapitTrial.CheckArmed(new ZapitReply { Command = ZapitCommandType.StartStimulus, Value = 3, LaserOn = 1 }, 7, 3, true);
+            ZapitTrial.CheckArmed(new ZapitReply { Command = ZapitCommandType.StartStimulus, Value = 3, LaserOn = 0 }, 7, 3, false);
+            foreach (var wrong in new[]
+            {
+                new ZapitReply { Command = ZapitCommandType.StartStimulus, Value = 2, LaserOn = 1 },
+                new ZapitReply { Command = ZapitCommandType.StartStimulus, Value = 3, LaserOn = 0 },
+                new ZapitReply { Command = ZapitCommandType.StartStimulus, Value = 3, LaserOn = 1, IsError = true },
+            })
+            {
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitTrial.CheckArmed(wrong, 7, 3, true));
+                StringAssert.Contains(ex.Message, "Zapit answered trial 7's StartStimulus (condition 3, laserOn 1)");
+            }
+        }
+
         [DataTestMethod]
         [DataRow(0, 1.0, "Trial 5 has Zapit condition 0")]
         [DataRow(255, 1.0, "Trial 5 has Zapit condition 255")]

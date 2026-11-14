@@ -48,6 +48,25 @@ namespace OpenRigs.Devices.Zapit
         }
 
         /// <summary>
+        /// Throws unless Zapit's reply to a trial's StartStimulus armed that trial's condition with the laser as the trial
+        /// asked: a refusal, or another condition or laser state, would log a trial Zapit did not run.
+        /// </summary>
+        /// <param name="reply">Zapit's reply to the trial's StartStimulus.</param>
+        /// <param name="trialNumber">The trial's number, for the refusal.</param>
+        /// <param name="conditionNumber">The condition the trial sent.</param>
+        /// <param name="laserOn">Whether the trial asked for the laser.</param>
+        public static void CheckArmed(ZapitReply reply, int trialNumber, int conditionNumber, bool laserOn)
+        {
+            int on = laserOn ? 1 : 0;
+            if (reply.IsError || reply.Value != conditionNumber || reply.LaserOn != on)
+            {
+                throw new InvalidOperationException(string.Format(
+                    "Zapit answered trial {0}'s StartStimulus (condition {1}, laserOn {2}) with {3}. Is the conditions file the task names loaded, is Zapit calibrated, and is the DAQ working?",
+                    trialNumber, conditionNumber, on, reply));
+            }
+        }
+
+        /// <summary>
         /// The trial's StartStimulus: its condition, the laser on or off (the galvos and masking light
         /// run either way), the power on a laser-on trial and 0 mW on a laser-off one, Zapit's own log
         /// on, and no start delay.
