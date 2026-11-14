@@ -14,8 +14,8 @@ against each other:
 - each interval after the first started at the last trial's outcome plus its punishTimeoutSeconds, within 2 ms;
 - each rewarded trial (rewardSizeUl above 0, and Correct or autoRewarded) has a RewardDelivered row at its outcome.
 
-Files written before the time column was named harpTime (Seconds) or before outcomeTime was a column are read too:
-the outcome is then the row's own time. `summarise-experiment <experiment folder> ...` prints each summary and each
+A file without a column the checks read (harpTime, outcomeTime and the rest of the shared block) is one problem,
+not checked further. `summarise-experiment <experiment folder> ...` prints each summary and each
 failed check, exiting 1 when one fails.
 """
 
@@ -74,7 +74,6 @@ SHARED_COLUMNS: List[Tuple[str, str, Optional[str], Optional[str]]] = [
 ]
 
 TIME_COLUMN = "harpTime"
-FORMER_TIME_COLUMN = "Seconds"
 TOLERANCE_S = 0.002  # Harp-clock waits land within a tick or two of 1 ms
 
 
@@ -118,8 +117,6 @@ def _rows(folder: Path, pattern: str) -> List[Dict[str, str]]:
     for log in sorted(folder.glob(pattern)):
         with open(log, newline="", encoding="utf-8-sig") as f:
             for row in csv.DictReader(f):
-                if TIME_COLUMN not in row and FORMER_TIME_COLUMN in row:
-                    row[TIME_COLUMN] = row.pop(FORMER_TIME_COLUMN)
                 rows.append(row)
     return rows
 
@@ -128,8 +125,10 @@ def _f(row: Dict[str, str], column: str) -> float:
     return float(row[column])
 
 
-def _outcome_time(row: Dict[str, str]) -> float:
-    return _f(row, "outcomeTime") if row.get("outcomeTime") not in (None, "") else _f(row, TIME_COLUMN)
+# The columns summarise reads: of a trial row, and of an async row.
+TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds", "stimulusOnsetTime",
+               "outcomeTime", "rewardSizeUl", "punishTimeoutSeconds")
+ASYNC_NEEDS = (TIME_COLUMN, "Event", "Value")
 
 
 def _rewarded(row: Dict[str, str]) -> bool:
@@ -146,6 +145,10 @@ def summarise(folder: Path) -> Summary:
         outcome = (run["outcome"] or "unknown") + (" (not final: the workflow never finished closing)" if run.get("final") is False else "")
     except (OSError, ValueError, KeyError, TypeError):
         outcome = "unknown"
+    missing = [f"BonsaiData_Trial has no {c} column" for c in TRIAL_NEEDS if trials and c not in trials[0]]
+    missing += [f"BonsaiData_Async has no {c} column" for c in ASYNC_NEEDS if events and c not in events[0]]
+    if missing:
+        return Summary(folder.name, outcome, len(trials), 0, float("nan"), problems=missing)
     correct = sum(r["outcome"] == "Correct" for r in trials)
     s = Summary(folder.name, outcome, len(trials), correct, correct / len(trials) if trials else float("nan"))
     rewards = [e for e in events if e["Event"] == "RewardDelivered"]
@@ -155,7 +158,7 @@ def summarise(folder: Path) -> Summary:
         number = int(row["trialNumber"])
         if number != n + 1:
             s.problems.append(f"row {n + 1} is trial {number}: trial numbers should run 1, 2, 3 ...")
-        onset, end = _f(row, "stimulusOnsetTime"), _outcome_time(row)
+        onset, end = _f(row, "stimulusOnsetTime"), _f(row, "outcomeTime")
         s.response_seconds.append(end - onset)
         planned = _f(row, "itiSeconds") + _f(row, "quietWaitSeconds")
         if abs(onset - _f(row, "itiStartTime") - planned) > TOLERANCE_S:
@@ -163,11 +166,11 @@ def summarise(folder: Path) -> Summary:
                               f"not itiSeconds + quietWaitSeconds = {planned:.4f} s")
         if n:
             last = trials[n - 1]
-            due = _outcome_time(last) + _f(last, "punishTimeoutSeconds")
+            due = _f(last, "outcomeTime") + _f(last, "punishTimeoutSeconds")
             if abs(_f(row, "itiStartTime") - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: interval started {_f(row, 'itiStartTime') - due:+.4f} s from the last "
                                   "outcome plus its timeout")
-            s.interval_seconds.append(onset - _outcome_time(last))
+            s.interval_seconds.append(onset - _f(last, "outcomeTime"))
         if _rewarded(row):
             s.requested_ul += _f(row, "rewardSizeUl")
             if not any(abs(t - end) <= TOLERANCE_S for t in reward_times):

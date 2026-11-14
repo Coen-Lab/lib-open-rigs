@@ -72,7 +72,7 @@ Loggers MAY expose `ChunkSize` so that a rig can choose a different whole-hour c
 
 Every logged record MUST carry a timestamp column named `harpTime`, in seconds on the Harp clock (seconds since 1904-01-01T00:00:00 UTC). For tabular formats it MUST be the first column. For Harp binary files the timestamp is part of the message encoding.
 
-The column is named for its clock, so a file itself says which clock its times are on (14 Nov 2026). Upstream ucl-open names it `Seconds`, after Bonsai.Harp's `Timestamped.Seconds`, and so did this fork's files until 14 Nov 2026; a reader takes either name as the same column.
+The column is named for its clock, so a file itself says which clock its times are on (14 Nov 2026). Upstream ucl-open names it `Seconds`, after Bonsai.Harp's `Timestamped.Seconds`; this fork's readers take only `harpTime`.
 
 `harpTime` is the time the record was complete: the event's time for an event, the outcome for a trial (a trial's row is built and written once, when its outcome is known). It is for splitting files by the hour (section 3) and lining files up with each other. A record spanning several moments, such as a trial, also names each moment as its own column ending in `Time` (`trialStartTime`, `stimulusOnsetTime`, `outcomeTime`), so an analysis reads a moment by its name, never by what the record's timestamp happens to be.
 

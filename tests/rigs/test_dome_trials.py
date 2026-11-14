@@ -20,7 +20,7 @@ def _trial(n, start, iti, response, outcome="Correct", timeout=0.0, quiet=0.0, r
             "autoRewarded": auto}
 
 
-def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, columns=COLUMNS, time="harpTime"):
+def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, columns=COLUMNS):
     folder = tmp_path / "ses-x_2026-11-14T01-00-00"
     (folder / "BonsaiData").mkdir(parents=True)
     with open(folder / "BonsaiData" / "BonsaiData_Trial_2026-11-14T01-00-00.csv", "w", newline="") as f:
@@ -29,7 +29,7 @@ def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, colu
         w.writerows(trials)
     with open(folder / "BonsaiData" / "BonsaiData_Async_2026-11-14T01-00-00.csv", "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow([time, "Event", "Detail", "Value"])
+        w.writerow(["harpTime", "Event", "Detail", "Value"])
         w.writerows([[t, "RewardDelivered", "left DO1", ul] for t, ul in rewards])
     (folder / "manifest.json").write_text(json.dumps({"run": {"outcome": outcome, "final": final}}))
     return folder
@@ -56,16 +56,11 @@ def test_a_consistent_experiment_has_no_problems(tmp_path):
     assert (s.requested_ul, s.delivered_ul) == (4.0, 4.0)
 
 
-def test_files_from_before_harpTime_and_outcomeTime_read_the_same(tmp_path):
-    # Seconds was the time column, and the row's own time the outcome, until 14 Nov 2026.
+def test_a_file_without_outcomeTime_is_one_problem_not_a_crash(tmp_path):
+    # Files from before 14 Nov 2026 have no outcomeTime; they are restructured, not read as they are.
     trials = _chain(4)
-    for t in trials:
-        t["Seconds"] = t.pop("harpTime")
-        del t["outcomeTime"]
-    old = [c if c != "harpTime" else "Seconds" for c in COLUMNS if c != "outcomeTime"]
-    rewards = [(t["Seconds"], 2.0) for t in trials if t["outcome"] == "Correct"]
-    s = summarise(_experiment(tmp_path, trials, rewards, columns=old, time="Seconds"))
-    assert s.problems == [] and s.response_seconds == [3.0] * 4 and s.delivered_ul == 4.0
+    s = summarise(_experiment(tmp_path, trials, [], columns=[c for c in COLUMNS if c != "outcomeTime"]))
+    assert s.problems == ["BonsaiData_Trial has no outcomeTime column"]
 
 
 def test_an_auto_rewarded_miss_is_a_rewarded_trial(tmp_path):
