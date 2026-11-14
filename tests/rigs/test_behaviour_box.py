@@ -88,9 +88,11 @@ def test_wiring_schema_lists_every_channel():
 
 def test_video_encoder_libx264_and_path_unless_set():
     assert BehaviourBoxRig.model_validate(RIG).video_encoder is None
-    rig = BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_qsv", "ffmpegPath": "D:\ffmpeg\ffmpeg.exe"}})
-    assert (rig.video_encoder.codec, rig.video_encoder.ffmpeg_path) == ("h264_qsv", "D:\ffmpeg\ffmpeg.exe")
+    rig = BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_qsv", "ffmpegPath": r"D:\ffmpeg\ffmpeg.exe"}})
+    assert (rig.video_encoder.codec, rig.video_encoder.ffmpeg_path) == ("h264_qsv", r"D:\ffmpeg\ffmpeg.exe")
     assert BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {}}).video_encoder.codec == "libx264"
+    # codec: null in rig.yml is libx264, as OpenRigs.Video's VideoEncoder.Read takes it.
+    assert BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": None}}).video_encoder.codec == "libx264"
     # OpenRigs.Video's FfmpegVideoWriter knows these three alone.
     with pytest.raises(ValidationError):
         BehaviourBoxRig.model_validate({**RIG, "videoEncoder": {"codec": "hevc_nvenc"}})

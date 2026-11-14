@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Dict, List, Literal, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from swc.aeon.schema import BaseSchema
 
 from open_rigs.core.rig import Rig
@@ -140,6 +140,12 @@ class VideoEncoder(BaseSchema):
         default=None,
         description="The full path of ffmpeg.exe. Left out: the first ffmpeg.exe on PATH. The workflow stops at Start when neither is there.",
     )
+
+    @field_validator("codec", mode="before")
+    @classmethod
+    def _null_codec_is_libx264(cls, value: object) -> object:
+        # rig.yml's codec: null is libx264, as OpenRigs.Video's VideoEncoder.Read takes it.
+        return "libx264" if value is None else value
 
 
 # A behaviour box's hardware, the same for every workflow that runs on one, so they all read
