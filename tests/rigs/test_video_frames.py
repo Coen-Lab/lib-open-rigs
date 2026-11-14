@@ -108,6 +108,7 @@ def test_an_mkv_without_ffprobe_is_not_counted(tmp_path, monkeypatch):
 
 
 def _mkv(path, frames):
+    assert FFMPEG is not None
     subprocess.run([FFMPEG, "-v", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=50", "-frames:v", str(frames),
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-f", "matroska", str(path)], check=True)
 
@@ -127,7 +128,7 @@ def test_a_truncated_mkv_is_counted_to_its_last_whole_frame(tmp_path):
     data = video.read_bytes()
     video.write_bytes(data[: len(data) * 2 // 3])
     (check,) = check_videos(tmp_path)
-    assert 30 < check.frames < 100
+    assert check.frames is not None and 30 < check.frames < 100
     assert check.problems == [f"Camera-Pupil/{video.name}: holds {check.frames} frames, but {video.stem}.csv lists 100 "
                               f"({100 - check.frames} missing from the video)"]
 
@@ -196,11 +197,73 @@ def test_a_killed_run_s_video_short_of_its_csv_is_a_problem(tmp_path, monkeypatc
     assert _exit_code(tmp_path, monkeypatch) == 1
 
 
-def test_a_killed_run_s_earlier_video_with_unlisted_frames_is_a_problem(tmp_path):
-    # Only a camera's last video was being written at the kill; an earlier one was closed with its CSV.
+def test_a_killed_run_s_video_before_the_last_with_unlisted_frames_is_a_note(tmp_path):
+    # A kill during an hour split's handover leaves the earlier file ahead of its CSV too; the next file's frameId
+    # follows the unlisted frames, so that step is no loss.
+    _manifest(tmp_path)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(105), rows=100)
+    _camera(tmp_path, "2026-11-14T11-00-00", _avi(10), rows=10, first_id=105)
+    first, last = check_videos(tmp_path)
+    assert first.problems == [] and first.notes == [
+        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 5 frames at the end have no CSV row"]
+    assert last.notes == [] and last.problems == []
+
+
+def test_a_killed_run_s_older_video_with_unlisted_frames_is_a_problem(tmp_path):
+    # Only the last two videos can be open at a kill; an older one was closed with its CSV.
     _manifest(tmp_path)
     _camera(tmp_path, "2026-11-14T10-00-00", _avi(105), rows=100)
     _camera(tmp_path, "2026-11-14T11-00-00", _avi(10), rows=10, first_id=100)
+    _camera(tmp_path, "2026-11-14T12-00-00", _avi(10), rows=10, first_id=110)
+    first, second, third = check_videos(tmp_path)
+    assert first.notes == [] and first.problems == [
+        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: holds 105 frames, but Camera-Pupil_2026-11-14T10-00-00.csv lists 100"]
+    assert second.problems == third.problems == []
+
+
+def test_a_killed_run_s_last_csv_too_short_for_a_rate_takes_an_earlier_one(tmp_path):
+    # The CSV is flushed once a second, so a kill can leave the last one with a single row.
+    _manifest(tmp_path)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(100), rows=100)
+    _camera(tmp_path, "2026-11-14T11-00-00", _avi(20), rows=1, first_id=100)
     first, last = check_videos(tmp_path)
-    assert first.notes == [] and len(first.problems) == 1
-    assert last.notes == [] and last.problems == []
+    assert first.problems == last.problems == []
+    assert last.notes == ["Camera-Pupil/Camera-Pupil_2026-11-14T11-00-00.avi: killed run: 19 frames at the end have no CSV row"]
+
+
+def _rig_settings(folder, rate):
+    (folder / "Settings").mkdir()
+    rig = {"behaviorBoard": {"main": {"cameraTriggerController": {"trigger0Enabled": True, "trigger0Frequency": rate}}}}
+    (folder / "Settings" / "Settings_Rig_2026-11-14T10-00-00.json").write_text(json.dumps(rig))
+
+
+def test_a_killed_run_s_only_csv_too_short_for_a_rate_takes_the_rig_s_trigger_rate(tmp_path):
+    _manifest(tmp_path)
+    _rig_settings(tmp_path, 50)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(20), rows=1)
+    (check,) = check_videos(tmp_path)
+    assert check.problems == [] and check.notes == [
+        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 19 frames at the end have no CSV row"]
+
+
+def test_a_killed_run_without_any_frame_rate_is_a_problem_saying_so(tmp_path):
+    _manifest(tmp_path)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(20), rows=1)
+    (check,) = check_videos(tmp_path)
+    assert check.notes == [] and check.problems == [
+        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: holds 20 frames, but Camera-Pupil_2026-11-14T10-00-00.csv lists 1"
+        " (no frame rate from its CSVs or the rig's camera trigger, so a killed run's tolerance cannot be applied)"]
+
+
+def test_old_behaviour_box_frame_id_steps_are_problems(tmp_path):
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(3), rows=3, column="FrameID")
+    _camera(tmp_path, "2026-11-14T11-00-00", _avi(2), rows=2, column="FrameID", first_id=4)
+    assert video_problems(tmp_path) == ["Camera-Pupil/Camera-Pupil_2026-11-14T11-00-00.avi: FrameID goes from 2 to 4 (1 frames lost)"]
+
+
+def test_a_csv_without_a_frame_id_column_is_a_note(tmp_path):
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(3), rows=3, column="Counter")
+    (check,) = check_videos(tmp_path)
+    assert check.problems == [] and check.notes == [
+        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: Camera-Pupil_2026-11-14T10-00-00.csv has no frame id column "
+        "(frameId, ChunkData.FrameID, Value.ChunkData.FrameID, FrameID), so frames lost by the camera are not checked"]
