@@ -326,7 +326,7 @@ namespace OpenRigs.LiveView
             return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out number) && number > 0;
         }
 
-        // YamlDotNet's booleans, any case, as app-rig-control's rig_yaml.py reads them: true, y, yes, on; false, n, no, off.
+        // YamlDotNet's booleans, any case: true, y, yes, on; false, n, no, off.
         public static bool TryYamlBool(string value, out bool flag)
         {
             switch (value.ToLowerInvariant())

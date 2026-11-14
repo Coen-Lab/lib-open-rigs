@@ -123,7 +123,7 @@ namespace OpenRigs.LiveView.Tests
                     && spares.Notes.Contains("the rig.yml entries camera: off: off, camera: list: [] have no settings, so every camera is passed over and none is streamed"), string.Join(" | ", spares.Notes));
                 var notDevices = Plan(root, "speakerArray:\n  main:\n    channels: 2\n  syncChannel: 3\n", name => null);
                 Check("a kind that is not a device, holding a value beside settings, is not named", !notDevices.Notes.Any(n => n.Contains("speakerArray")), string.Join(" | ", notDevices.Notes));
-                // L2-L3: enabled in YamlDotNet's words, as app-rig-control's rig_yaml.py reads it.
+                // L2-L3: enabled in YamlDotNet's words, as the workflow's own rig model reads it.
                 foreach (var word in new[] { "false", "False", "n", "No", "off", "OFF" })
                 {
                     var disabled = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: " + word + "\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
