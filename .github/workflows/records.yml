@@ -1,6 +1,8 @@
 # The records this repo owns, checked on every push to main and daily: fixtures\manifest\v3 and
 # fixtures\experiment-folder\v1 are what OpenRigs.Manifest writes and reads. The check is the package's
-# own console program, which needs only the .NET SDK and git; it starts no Bonsai.
+# own console program, which needs only the .NET SDK and git; it starts no Bonsai. The other lab
+# packages' console checks (Control, HarpDevices, LiveView) run here too: OpenRigs.yml's dotnet test
+# skips console programs.
 
 name: Records
 
@@ -28,3 +30,6 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet run --project src\OpenRigs.Manifest.Tests
+      - run: dotnet run --project src\OpenRigs.Control.Tests
+      - run: dotnet run --project src\OpenRigs.HarpDevices.Tests
+      - run: dotnet run --project src\OpenRigs.LiveView.Tests
