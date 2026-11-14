@@ -38,6 +38,7 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "src/OpenRigs.Control/ExperimentOperators.cs": 1,
     "src/OpenRigs.Control/OpenRigs.Control.csproj": 1,
     "src/OpenRigs.Control/README.md": 8,
+    "src/OpenRigs.Audio/OpenRigs.Audio.csproj": 1,
     "src/OpenRigs.Core/OpenRigs.Core.csproj": 1,
     "src/OpenRigs.Devices/OpenRigs.Devices.csproj": 1,
     "src/OpenRigs.HarpDevices.Tests/Program.cs": 2,

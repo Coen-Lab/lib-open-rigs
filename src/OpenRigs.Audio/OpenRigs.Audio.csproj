@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>A rig's speakers: rig.yml's speakerArray and their filters, sounds equalised for each speaker, and the lab's error sound.</Description>
+    <PackageTags>$(PackageTags) Audio</PackageTags>
+    <TargetFrameworks>net472</TargetFrameworks>
+    <Version>0.1.1-coen-lab.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="error_tone.wav" LogicalName="OpenRigs.Audio.error_tone.wav" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bonsai.Core" Version="2.9.0" />
+    <PackageReference Include="Bonsai.Dsp" Version="2.9.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="YamlDotNet" Version="16.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenRigs.Core\OpenRigs.Core.csproj" />
+  </ItemGroup>
+
+</Project>

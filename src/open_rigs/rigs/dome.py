@@ -42,7 +42,7 @@ class DomeSpeakerArray(SpeakerArray):
 
     @model_validator(mode="after")
     def _every_speaker_filtered(self):
-        # A dome plays every speaker equalised; OpenRigs.Devices DomeSpeakers.RequireFilters refuses at Start.
+        # Every speaker is played equalised; OpenRigs.Audio SpeakerSet.RequireFilters refuses at Start.
         missing = sorted(name for name, speaker in self.speakers.items() if speaker.filter is None)
         if missing:
             raise ValueError(
