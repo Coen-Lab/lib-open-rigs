@@ -104,7 +104,7 @@ def test_a_rig_built_by_field_name():
 
     rig = LabRig(root_path="C:/Data", rig_id="S1", behavior_board={"main": BehaviorBoard(port_name="COM3", usb_serial="X")},
                  video_encoder=VideoEncoder(codec="h264_qsv"))
-    assert rig.video_encoder.codec == "h264_qsv" and rig.rig_id == "S1"
+    assert rig.video_encoder is not None and rig.video_encoder.codec == "h264_qsv" and rig.rig_id == "S1"
 
 
 def test_one_valve_is_enough():
