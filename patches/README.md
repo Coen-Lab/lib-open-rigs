@@ -44,6 +44,7 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `5665dd7` | Python | `DomeRig` refuses keys a dome does not use, as the generated C# does at Start; wiring refusals give the line to add | Lab-only |
 | `55afb94` | Devices (.8), Python | `Zapit.ConnectZapit`, the domes' Zapit connection and its start checks (`CheckZapitReply`, `CheckZapitConditionCount`, `RequireZapitHardwareTrigger`) once; `ZapitTrial.ReplyMarginSeconds` and `ZAPIT_REPLY_MARGIN_SECONDS`; every dome speaker needs a filter (`DomeSpeakers.RequireFilters`, `DomeSpeakerArray`) | Lab-only |
 | `7cc06df` | Python | `open_rigs.rigs.dome`'s `MAX_REWARD_UL` (20) and `ZAPIT_MAX_RAMP_DOWN_SECONDS` (0.5), held by C# tests to `LoadRewardLine.DefaultMaxRewardUl`, `DeliverReward`'s two `MaxRewardUl` and `ZapitConditions.MaximumRampDownMs`; no package raised | Lab-only |
+| `954353d` | Python | `DomeRig` refuses a board whose ZapitTrigger line is in `outputPulseEnable`: the line, and the masking light on it, is held from the trigger until the workflow clears it, never a board-timed pulse (14 Nov 2026). `DomeHardware`'s `WithoutPulseLine` already dropped it at run time; no package raised | Lab-only |
 
 `OpenRigs.Streaming` is otherwise upstream's `src/OpenRigs.Streaming` at the base commit. It declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, at the listed versions, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
 
