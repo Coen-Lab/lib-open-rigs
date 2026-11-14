@@ -54,6 +54,18 @@ namespace OpenRigs.Video
         /// <summary>The codec's ffmpeg output arguments.</summary>
         public string CodecArguments => Codecs[Codec];
 
+        /// <summary>
+        /// Why a frame size cannot be encoded, or null when it can: every codec here encodes 4:2:0
+        /// (yuv420p, nv12), one chroma sample per 2 x 2 pixels, so width and height must be even.
+        /// </summary>
+        public string? RefuseSize(int width, int height)
+        {
+            if (width % 2 == 0 && height % 2 == 0) return null;
+            return "frames are " + width.ToString(CultureInfo.InvariantCulture) + " x " + height.ToString(CultureInfo.InvariantCulture) +
+                   ", but " + Codec + " encodes 4:2:0 colour, one sample per 2 x 2 pixels, so the width and height must both be even: " +
+                   "set the camera's region of interest to an even size";
+        }
+
         /// <summary>The encoder for this machine's rig.yml under a config root, with ffmpeg.exe found; throws naming what is missing.</summary>
         public static VideoEncoder ForThisRig(string configRoot)
         {

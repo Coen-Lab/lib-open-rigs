@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.IO;
+using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading;
@@ -46,6 +47,8 @@ namespace OpenRigs.Logging
                 }
 
                 var pending = new BlockingCollection<byte[]>();
+                // The writer thread's OnError and the source's OnNext must never overlap.
+                observer = Observer.Synchronize(observer, new object());
                 new Thread(() => Write(path, pending, observer))
                 {
                     IsBackground = false,

@@ -41,7 +41,7 @@ namespace OpenRigs.Video
         byte[]? buffer;
         int width, height, channels;
         Timer? deadline;
-        bool ending, deadlinePassed, warnedFull, behind;
+        bool ending, deadlinePassed, warnedFull, behind, closed;
         long received, written, dropped;
         int? exitCode;
         string? failure;  // the first thing that went wrong, null while all is well
@@ -196,8 +196,10 @@ namespace OpenRigs.Video
                     try { Write(frame); }
                     catch (RecordingException ex)
                     {
+                        // A frame ffmpeg cannot take: close its stdin, so it encodes what it holds
+                        // and finishes the file, rather than killing it.
                         Fail(ex.Message);
-                        Kill();
+                        Close();
                     }
                     catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException)
                     {
@@ -217,7 +219,14 @@ namespace OpenRigs.Video
                 try { csv?.Dispose(); }
                 catch (IOException ex) { Fail("the frame log " + CsvFileName + " could not be closed: " + ex.Message); }
                 Report();
-                lock (gate) deadline?.Dispose();
+                Process? ended;
+                lock (gate)
+                {
+                    deadline?.Dispose();
+                    ended = process;
+                    process = null;
+                }
+                ended?.Dispose();
                 done.Set();
             }
         }
@@ -247,19 +256,17 @@ namespace OpenRigs.Video
             }
             stdin!.Write(buffer!, 0, buffer!.Length);
             var chunk = frame.Value.ChunkData;
-            csv!.Write(frame.Seconds.ToString("R", CultureInfo.InvariantCulture));
-            csv.Write(',');
-            csv.Write(chunk.FrameID.ToString(CultureInfo.InvariantCulture));
-            csv.Write(',');
-            csv.Write(chunk.Timestamp.ToString(CultureInfo.InvariantCulture));
-            csv.Write(',');
-            csv.Write(chunk.ExposureTime.ToString("R", CultureInfo.InvariantCulture));
-            csv.Write(',');
-            csv.Write(chunk.Gain.ToString("R", CultureInfo.InvariantCulture));
-            csv.Write("\r\n");
-            var count = Interlocked.Increment(ref written);
-            // Every second's rows reach the file system, so a killed process leaves them for the video's frames.
-            if (count % Math.Max(1, (long)Math.Round(frameRate)) == 0) csv.Flush();
+            // Each row reaches the file system as its frame reaches ffmpeg: a killed Bonsai leaves
+            // ffmpeg its stdin's frames to finish the file with, and the CSV a row for each, short by
+            // at most the frame in hand. One small write a frame (50 a second) costs nothing beside
+            // the frame's own; a row buffered for a second would lose up to a second of rows.
+            csv!.Write(frame.Seconds.ToString("R", CultureInfo.InvariantCulture) + "," +
+                       chunk.FrameID.ToString(CultureInfo.InvariantCulture) + "," +
+                       chunk.Timestamp.ToString(CultureInfo.InvariantCulture) + "," +
+                       chunk.ExposureTime.ToString("R", CultureInfo.InvariantCulture) + "," +
+                       chunk.Gain.ToString("R", CultureInfo.InvariantCulture) + "\r\n");
+            csv.Flush();
+            Interlocked.Increment(ref written);
         }
 
         void Start(IplImage image)
@@ -269,14 +276,13 @@ namespace OpenRigs.Video
                 throw new RecordingException("the first frame is " + Describe(image) +
                     "; the video takes 8-bit frames with 1 channel (Mono8) or 3 (BGR)");
             }
+            var refused = encoder.RefuseSize(image.Width, image.Height);
+            if (refused != null) throw new RecordingException("the video cannot be started: " + refused);
             width = image.Width;
             height = image.Height;
             channels = image.Channels;
             buffer = new byte[width * height * channels];
             Directory.CreateDirectory(Path.GetDirectoryName(fileName)!);
-            csv = new StreamWriter(new FileStream(CsvFileName, FileMode.CreateNew, FileAccess.Write, FileShare.Read), new UTF8Encoding(false));
-            csv.Write(CsvHeader + "\r\n");
-            csv.Flush();
             var info = new ProcessStartInfo(encoder.FfmpegPath, encoder.Arguments(width, height, channels == 1 ? "gray" : "bgr24", frameRate, fileName))
             {
                 UseShellExecute = false,
@@ -291,19 +297,32 @@ namespace OpenRigs.Video
             try { started.Start(); }
             catch (System.ComponentModel.Win32Exception ex)
             {
+                started.Dispose();
                 throw new RecordingException(encoder.FfmpegPath + " could not be started: " + ex.Message);
             }
             started.BeginErrorReadLine();
             started.BeginOutputReadLine();
             lock (gate) process = started;
             stdin = started.StandardInput.BaseStream;
+            // Created once ffmpeg runs, so an ffmpeg that cannot start leaves no header-only CSV.
+            try
+            {
+                csv = new StreamWriter(new FileStream(CsvFileName, FileMode.CreateNew, FileAccess.Write, FileShare.Read), new UTF8Encoding(false));
+                csv.Write(CsvHeader + "\r\n");
+                csv.Flush();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                throw new RecordingException("the frame log " + CsvFileName + " could not be created: " + ex.Message);
+            }
         }
 
         // Closes ffmpeg's stdin, so it encodes what it holds and closes the file, and waits for it,
-        // at most until the deadline.
+        // at most until the deadline. Once only.
         void Close()
         {
-            if (process == null) return;
+            if (process == null || closed) return;
+            closed = true;
             try { stdin!.Close(); }
             catch (IOException ex) { Fail(Explain(ex)); }
             var exited = process.WaitForExit((int)stopTimeout.TotalMilliseconds);
@@ -329,6 +348,7 @@ namespace OpenRigs.Video
             lock (gate) running = process;
             if (running != null && running.WaitForExit(2000))
             {
+                running.WaitForExit();  // and its stderr read to the end, which says why
                 lock (gate) exitCode = deadlinePassed ? null : running.ExitCode;
                 return "ffmpeg stopped while recording (exit code " + running.ExitCode + ")" + LastErrors();
             }

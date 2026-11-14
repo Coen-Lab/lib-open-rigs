@@ -259,8 +259,80 @@ namespace OpenRigs.Video.Tests
             StringAssert.Contains(error.Message, "ffmpeg stopped while recording (exit code 1)");
         }
 
-        // ffmpeg killed mid-run (the whole process tree killed): the file is still a readable video,
-        // short by at most the open cluster (1 s) and what the encoder held.
+        // Real ffmpeg with an encoder it does not have (as h264_qsv on a machine without Quick
+        // Sync): it exits on the first frame, and the error carries ffmpeg's own stderr, which is
+        // read to its end before the error is made. Three times, as that read raced the error.
+        [TestMethod]
+        public void AnEncoderFfmpegLacks_TheErrorQuotesFfmpeg()
+        {
+            RequireFfmpeg();
+            for (var run = 0; run < 3; run++)
+            {
+                var video = Path.Combine(folder, "unavailable" + run + ".mkv");
+                var encoder = new VideoEncoder(VideoEncoder.DefaultCodec, ffmpeg,
+                    "-hide_banner -loglevel error -nostats -n -f rawvideo -pix_fmt gray -video_size " + Width + "x" + Height +
+                    " -framerate 50 -i pipe:0 -an -c:v no_such_encoder -f matroska \"" + video + "\"");
+                var recording = new FfmpegRecording(video, FrameRate, encoder, 50, TimeSpan.FromSeconds(5), TextWriter.Null);
+                foreach (var frame in Frames(30))
+                {
+                    try { recording.Add(frame); }
+                    catch (InvalidOperationException) { break; }
+                }
+                var problem = recording.Finish();
+                Assert.IsNotNull(problem);
+                StringAssert.Contains(problem, "no_such_encoder", "run " + run + ": ffmpeg's own words");
+            }
+        }
+
+        // A frame of another size mid-run: the recording fails naming it, and ffmpeg's stdin is
+        // closed so it finishes the file with every frame before it.
+        [TestMethod]
+        public void AFrameSizeChange_FailsAndFinishesTheFileWithTheFramesBefore()
+        {
+            RequireFfmpeg();
+            var recording = new FfmpegRecording(Video, FrameRate, VideoEncoder.Read(Path.Combine(folder, "none.yml"), Path.GetDirectoryName(ffmpeg)),
+                FfmpegVideoWriter.DefaultQueueCapacity, TimeSpan.FromSeconds(20), TextWriter.Null);
+            foreach (var frame in Frames(30)) recording.Add(frame);
+            recording.Add(Frame(30, Noise(new Random(1), 640, 480)));
+            var problem = recording.Finish();
+            StringAssert.Contains(problem, "frame 30 is 640 x 480");
+            Assert.AreEqual(0, recording.ExitCode, "ffmpeg finished the file, not killed");
+            Assert.AreEqual(30, DecodedFrames(Video));
+            Assert.AreEqual(31, File.ReadAllLines(recording.CsvFileName).Length);
+        }
+
+        // 4:2:0 needs an even width and height; an odd one is refused at the first frame, saying
+        // why, before ffmpeg starts or a file is made.
+        [DataTestMethod]
+        [DataRow(321, 240)]
+        [DataRow(320, 241)]
+        public void AnOddFrameSize_IsRefusedAtStartSayingWhy(int width, int height)
+        {
+            var ping = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "PING.EXE");
+            var recording = new FfmpegRecording(Video, FrameRate, new VideoEncoder("h264_nvenc", ping), 5, TimeSpan.FromSeconds(2), TextWriter.Null);
+            recording.Add(Frame(0, Noise(new Random(1), width, height)));
+            var problem = recording.Finish();
+            StringAssert.Contains(problem, "frames are " + width + " x " + height + ", but h264_nvenc encodes 4:2:0");
+            StringAssert.Contains(problem, "must both be even");
+            Assert.IsNull(recording.FfmpegProcessId);
+            Assert.IsFalse(File.Exists(Video));
+            Assert.IsFalse(File.Exists(recording.CsvFileName));
+        }
+
+        [TestMethod]
+        public void AnFfmpegThatCannotStart_LeavesNoCsv()
+        {
+            var notAnExe = Path.Combine(folder, "ffmpeg.exe");
+            File.WriteAllText(notAnExe, "");
+            var recording = new FfmpegRecording(Video, FrameRate, new VideoEncoder(VideoEncoder.DefaultCodec, notAnExe), 5, TimeSpan.FromSeconds(2), TextWriter.Null);
+            recording.Add(Frames(1)[0]);
+            StringAssert.Contains(recording.Finish(), "could not be started");
+            Assert.IsFalse(File.Exists(recording.CsvFileName));
+        }
+
+        // ffmpeg alone killed mid-run, as it is when Bonsai's whole process tree is killed (that
+        // case, with Bonsai, is LogVideoFfmpegHeadlessTests.BonsaiTreeKilled_*): the file is still
+        // a readable video, short by at most the open cluster (1 s) and what the encoder held.
         [TestMethod]
         public void AKilledFfmpegLeavesAReadableVideo()
         {

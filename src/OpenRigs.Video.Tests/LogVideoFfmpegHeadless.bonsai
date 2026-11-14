@@ -27,6 +27,8 @@
         <Property Name="Width" />
         <Property Name="Height" />
         <Property Name="Channels" />
+        <Property Name="StartSeconds" />
+        <Property Name="IntervalMs" />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="t:SyntheticFrames">
@@ -34,6 +36,8 @@
           <t:Width>320</t:Width>
           <t:Height>240</t:Height>
           <t:Channels>1</t:Channels>
+          <t:StartSeconds>3900000000</t:StartSeconds>
+          <t:IntervalMs>0</t:IntervalMs>
         </Combinator>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">

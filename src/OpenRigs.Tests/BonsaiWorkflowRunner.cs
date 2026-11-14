@@ -31,6 +31,58 @@ namespace OpenRigs.Tests
             TimeSpan? timeout = null,
             string workflowDirectory = null)
         {
+            var startInfo = CreateStartInfo(workflowFileName, properties, workflowDirectory);
+            var standardOutput = new StringBuilder();
+            var standardError = new StringBuilder();
+            using (var process = new Process { StartInfo = startInfo })
+            {
+                process.OutputDataReceived += (sender, e) => AppendLine(standardOutput, e.Data);
+                process.ErrorDataReceived += (sender, e) => AppendLine(standardError, e.Data);
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                var effectiveTimeout = timeout ?? DefaultTimeout;
+                if (!process.WaitForExit((int)effectiveTimeout.TotalMilliseconds))
+                {
+                    TryKill(process);
+                    throw new TimeoutException(
+                        $"The workflow '{workflowFileName}' did not terminate within {effectiveTimeout}.");
+                }
+
+                // The parameterless overload waits for the asynchronous output handlers to drain.
+                process.WaitForExit();
+                return new BonsaiWorkflowResult(
+                    process.ExitCode,
+                    standardOutput.ToString(),
+                    standardError.ToString(),
+                    $"{startInfo.FileName} {startInfo.Arguments}");
+            }
+        }
+
+        /// <summary>
+        /// Starts a workflow as <see cref="Run"/> does and returns at once, for a test that kills
+        /// it; its output is discarded. The caller disposes the process.
+        /// </summary>
+        public static Process Start(
+            string workflowFileName,
+            IEnumerable<KeyValuePair<string, string>> properties = null,
+            string workflowDirectory = null)
+        {
+            var process = new Process { StartInfo = CreateStartInfo(workflowFileName, properties, workflowDirectory) };
+            process.OutputDataReceived += (sender, e) => { };
+            process.ErrorDataReceived += (sender, e) => { };
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            return process;
+        }
+
+        static ProcessStartInfo CreateStartInfo(
+            string workflowFileName,
+            IEnumerable<KeyValuePair<string, string>> properties,
+            string workflowDirectory)
+        {
             var executablePath = GetBonsaiExecutablePath();
             var outputDirectory = workflowDirectory ?? GetOutputDirectory();
             var workflowPath = Path.Combine(outputDirectory, workflowFileName);
@@ -60,7 +112,7 @@ namespace OpenRigs.Tests
                 }
             }
 
-            var startInfo = new ProcessStartInfo(executablePath, arguments.ToString())
+            return new ProcessStartInfo(executablePath, arguments.ToString())
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -70,33 +122,6 @@ namespace OpenRigs.Tests
                 // running from there keeps any relative paths in workflow output predictable.
                 WorkingDirectory = Path.GetDirectoryName(executablePath)
             };
-
-            var standardOutput = new StringBuilder();
-            var standardError = new StringBuilder();
-            using (var process = new Process { StartInfo = startInfo })
-            {
-                process.OutputDataReceived += (sender, e) => AppendLine(standardOutput, e.Data);
-                process.ErrorDataReceived += (sender, e) => AppendLine(standardError, e.Data);
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-
-                var effectiveTimeout = timeout ?? DefaultTimeout;
-                if (!process.WaitForExit((int)effectiveTimeout.TotalMilliseconds))
-                {
-                    TryKill(process);
-                    throw new TimeoutException(
-                        $"The workflow '{workflowFileName}' did not terminate within {effectiveTimeout}.");
-                }
-
-                // The parameterless overload waits for the asynchronous output handlers to drain.
-                process.WaitForExit();
-                return new BonsaiWorkflowResult(
-                    process.ExitCode,
-                    standardOutput.ToString(),
-                    standardError.ToString(),
-                    $"{executablePath} {arguments}");
-            }
         }
 
         static string GetBonsaiExecutablePath()
