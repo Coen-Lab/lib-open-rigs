@@ -145,6 +145,14 @@ namespace OpenRigs.Manifest.Tests
             File.WriteAllText(file, "trialType:\n  type: integer\n");
             read = Json.Serialize(TrialColumns.Read(file, root, out note));
             Check("a column whose type is not int, double, bool or string is not copied, and noted", Field(read, "missing") == "true" && note != null && note.Contains("trialType"), read);
+            // L1-L4: YAML's nulls were copied as the text "~" or "null", and names differing only in case passed.
+            File.WriteAllText(file, "a:\n  type: int\n  unit: ~\n  description: null\nb:\n  type: int\n  unit: Null\n  description: NULL\nc:\n  type: int\n  unit:\n  description: 'null'\n");
+            read = Json.Serialize(TrialColumns.Read(file, root, out note));
+            Check("~, null, Null, NULL and empty are JSON null; a quoted 'null' is text", note == null
+                && new[] { "a.unit", "a.description", "b.unit", "b.description", "c.unit" }.All(k => Field(read, "columns." + k) == "null") && read.Contains("\"description\": \"null\""), read);
+            File.WriteAllText(file, "trialType:\n  type: int\nTrialType:\n  type: int\n");
+            read = Json.Serialize(TrialColumns.Read(file, root, out note));
+            Check("names differing only in case are not copied, and noted", Field(read, "missing") == "true" && note != null && note.Contains("trialType and TrialType differ only in case"), read);
             read = Json.Serialize(TrialColumns.Read("nowhere.yml", root, out note));
             Check("a missing file is noted, not an error", Field(read, "missing") == "true" && note != null, read);
             Check("blank reads nothing", TrialColumns.Read(" ", root, out note) == null && note == null, "read");
@@ -261,6 +269,28 @@ namespace OpenRigs.Manifest.Tests
             Check("... and null when none was passed", ManifestWriter.ControlSection(null, "a", "b", null, null, null, null).First(p => p.Key == "launch_id").Value == null, "not null");
             Check("a blank ingest script is null, not left out", Field(Json.Serialize(records["no-controller"]), "ingest_script") == "null", "left out");
             ExperimentFolder(repo);
+            RetiredNames(repo);
+        }
+
+        // L1-L2: rig-sync retired on 13 Nov 2026; the overnight copy is jacuzzi-ingest's ingest-rig. The lab's
+        // code and READMEs name it only in dated history: a sentence holding a date or "once".
+        static void RetiredNames(string repo)
+        {
+            Console.WriteLine("Retired names:");
+            var lab = new[] { "Control", "Manifest", "HarpDevices", "LiveView", "Vision" }
+                .SelectMany(p => new[] { "OpenRigs." + p, "OpenRigs." + p + ".Tests" }).Concat(new[] { "Shared" })
+                .Select(d => Path.Combine(repo, "src", d)).Where(Directory.Exists).ToList();
+            var self = Path.Combine(repo, "src", "OpenRigs.Manifest.Tests", "Program.cs");
+            var found = new List<string>();
+            foreach (var file in lab.SelectMany(d => Directory.GetFiles(d, "*.cs", SearchOption.AllDirectories)
+                .Concat(Directory.GetFiles(d, "README.md", SearchOption.TopDirectoryOnly))))
+            {
+                if (file.Split(Path.DirectorySeparatorChar).Any(part => part == "bin" || part == "obj") || file == self) continue;
+                var sentences = Regex.Split(File.ReadAllText(file), @"(?<=[.!?])\s+");
+                found.AddRange(sentences.Where(s => s.Contains("rig-sync") && !Regex.IsMatch(s, @"\b\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b|\bonce\b"))
+                    .Select(s => file.Substring(repo.Length).TrimStart('\\')));
+            }
+            Check("no lab .cs or README names rig-sync outside dated history", lab.Count >= 10 && found.Count == 0, found.Count == 0 ? lab.Count + " folders" : string.Join(", ", found.Distinct()));
         }
 
         // The one name two languages make (claude-tools docs\architecture\records.md, Experiment folder name):
@@ -602,7 +632,7 @@ namespace OpenRigs.Manifest.Tests
                 Check("a wildcard entry is noted, not expected", plan.Notes.Any(n => n.Contains("Camera-*/")) && !paths.Contains("*"), string.Join(" | ", plan.Notes));
                 var outside = ExpectedPlan.Create(@".\RigSchema\x.json;/abs.json;C:\data\x.json;../up.json;a/../b.json", null, n => null);
                 var outsidePaths = string.Join(", ", outside.Entries.Select(e => e.Path));
-                Check("a leading ./ is dropped, as rig-sync names the file", outsidePaths == "RigSchema/x.json", outsidePaths);
+                Check("a leading ./ is dropped, as the overnight copy names the file", outsidePaths == "RigSchema/x.json", outsidePaths);
                 Check("... and a rooted entry or one with .. is noted, not expected", outside.Notes.Count == 4 && outside.Notes.All(n => n.EndsWith("not a path inside the experiment folder.")), string.Join(" | ", outside.Notes));
                 // A Harp device's data is HarpMessage, told by name: the manifest does not reference Bonsai.Harp.
                 // 0.1.0-local.9: which entries are Harp devices is src\Shared\HarpRig.cs, the rule RecordHarpDevices
@@ -637,6 +667,9 @@ namespace OpenRigs.Manifest.Tests
                     empty.Notes.Count(n => n.Contains("has no settings")) == 1
                     && empty.Notes.Contains("The rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none of its files is expected.")
                     && string.Join(", ", empty.Entries.Select(e => e.Path)) == "Camera-Box/", string.Join(" | ", empty.Notes));
+                // L1-L1: auto;harp, as every lab workflow sets, wrote the note twice.
+                var autoHarp = ExpectedPlan.Create("auto;harp", emptyYml, n => typeof(object));
+                Check("auto;harp writes each note once", autoHarp.Notes.Count(n => n.Contains("has no settings")) == 1 && autoHarp.Notes.Distinct().Count() == autoHarp.Notes.Count, string.Join(" | ", autoHarp.Notes));
 
                 Console.WriteLine("ConfigRoot:");
                 var other = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", "--property:ConfigRoot=D:\\Test\\config" });

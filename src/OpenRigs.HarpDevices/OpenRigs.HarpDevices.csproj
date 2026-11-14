@@ -4,7 +4,7 @@
     <Description>OpenRigs HarpDevices Bonsai library. One node, RecordHarpDevices, checks every Harp device in the machine's rig.yml at Start by its board's USB serial, and writes each device's registers (WhoAmI, versions, serials) and register map into each experiment folder, asking the device for a register dump when the experiment starts.</Description>
     <PackageTags>$(PackageTags) Harp Logging</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.10</Version>
+    <Version>0.1.1-coen-lab.11</Version>
     <!-- Every public type and member is documented: the summaries are what the Bonsai editor shows. -->
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
   </PropertyGroup>

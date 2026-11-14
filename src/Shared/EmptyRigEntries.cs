@@ -19,10 +19,13 @@ namespace OpenRigs.Shared
         /// One phrase per such kind, naming the empty entries: "the rig.yml entry behaviorBoard: spare:
         /// has no settings, so every behaviorBoard is passed over". Empty when there is none or the file
         /// cannot be read (RigDevices.Read says why). A kind whose other values include a list or
-        /// a scalar with a value (speakerArray's syncChannel) is settings, not devices, and is never named.
+        /// a scalar with a value (speakerArray's syncChannel) is settings, not devices, and is never named,
+        /// unless it is a device kind (HarpRig.WhoAmIByKind, or <paramref name="deviceKinds"/>): there
+        /// every entry that is not a set of settings is named, whatever it holds (spare: none, off or []).
         /// </summary>
-        public static List<string> Find(string path)
+        public static List<string> Find(string path, IEnumerable<string> deviceKinds = null)
         {
+            var devices = new HashSet<string>(HarpRig.WhoAmIByKind.Keys.Concat(deviceKinds ?? Enumerable.Empty<string>()), StringComparer.Ordinal);
             var found = new List<string>();
             YamlMappingNode root;
             try
@@ -44,12 +47,21 @@ namespace OpenRigs.Shared
                 if (kindName == null || instances == null) continue;
                 var empty = instances.Children.Where(i => !(i.Value is YamlMappingNode)).ToList();
                 if (empty.Count == 0 || empty.Count == instances.Children.Count ||
-                    empty.Any(i => !(i.Value is YamlScalarNode) || RigDevices.Value(i.Value) != null)) continue;
+                    (!devices.Contains(kindName) && empty.Any(i => !(i.Value is YamlScalarNode) || RigDevices.Value(i.Value) != null))) continue;
                 found.Add("the rig.yml " + (empty.Count == 1 ? "entry " : "entries ") +
-                    string.Join(", ", empty.Select(i => kindName + ": " + RigDevices.Scalar(i.Key) + ":")) +
+                    string.Join(", ", empty.Select(i => kindName + ": " + RigDevices.Scalar(i.Key) + ":" + Shown(i.Value))) +
                     (empty.Count == 1 ? " has" : " have") + " no settings, so every " + kindName + " is passed over");
             }
             return found;
+        }
+
+        // What an entry holds, as rig.yml would show it after the key: nothing for null, " none", " []".
+        static string Shown(YamlNode node)
+        {
+            var sequence = node as YamlSequenceNode;
+            if (sequence != null) return sequence.Children.Count == 0 ? " []" : " [...]";
+            var value = RigDevices.Value(node);
+            return value == null ? string.Empty : " " + value;
         }
     }
 }

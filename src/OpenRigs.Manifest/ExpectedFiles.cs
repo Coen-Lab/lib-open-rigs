@@ -48,18 +48,24 @@ namespace OpenRigs.Manifest
             foreach (var raw in (expectedFiles ?? "").Split(';'))
             {
                 var entry = raw.Trim().Replace('\\', '/');
-                // rig-sync matches paths relative to the experiment folder (RigSchema/x.json), so ./ is dropped.
+                // The overnight copy (jacuzzi-ingest's ingest-rig) matches paths relative to the experiment folder, so ./ is dropped.
                 while (entry.StartsWith("./")) entry = entry.Substring(2);
                 if (entry.Length == 0) continue;
                 if (string.Equals(entry, Auto, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, false);
                 else if (string.Equals(entry, Harp, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, true);
-                // rig-sync matches a path or a folder, never a pattern: a wildcard would match nothing and hold the experiment back.
-                else if (entry.IndexOfAny(new[] { '*', '?' }) >= 0) plan.Notes.Add("ExpectedFiles entry " + entry + " is not expected: a wildcard is not a path. Name the folder (Camera-Box/) instead.");
+                // The overnight copy (jacuzzi-ingest's ingest-rig) matches a path or a folder, never a pattern: a wildcard would match nothing and hold the experiment back.
+                else if (entry.IndexOfAny(new[] { '*', '?' }) >= 0) plan.Note("ExpectedFiles entry " + entry + " is not expected: a wildcard is not a path. Name the folder (Camera-Box/) instead.");
                 else if (entry.StartsWith("/") || entry.Contains(":") || entry.Split('/').Contains(".."))
-                    plan.Notes.Add("ExpectedFiles entry " + entry + " is not expected: it is not a path inside the experiment folder.");
+                    plan.Note("ExpectedFiles entry " + entry + " is not expected: it is not a path inside the experiment folder.");
                 else plan.Add(entry, "listed in ExpectedFiles");
             }
             return plan;
+        }
+
+        // Each note once: auto;harp, as every lab workflow sets, reads rig.yml twice (audit L1-L1).
+        void Note(string note)
+        {
+            if (!Notes.Contains(note)) Notes.Add(note);
         }
 
         void Add(string path, string why)
@@ -73,19 +79,19 @@ namespace OpenRigs.Manifest
         {
             if (rigConfig == null)
             {
-                Notes.Add("ExpectedFiles is " + (harp ? Harp : Auto) + " but ConfigFiles names no rig.yml, so no device's files are expected.");
+                Note("ExpectedFiles is " + (harp ? Harp : Auto) + " but ConfigFiles names no rig.yml, so no device's files are expected.");
                 return;
             }
             string problem;
             var devices = RigDevices.Read(rigConfig, out problem);
             if (devices == null)
             {
-                Notes.Add(char.ToUpperInvariant(problem[0]) + problem.Substring(1) + " when the workflow was built, so no device's files are expected.");
+                Note(char.ToUpperInvariant(problem[0]) + problem.Substring(1) + " when the workflow was built, so no device's files are expected.");
                 return;
             }
             // An empty entry hides its whole kind from RigDevices.Read (audit L2-L1).
             foreach (var empty in EmptyRigEntries.Find(rigConfig))
-                Notes.Add(char.ToUpperInvariant(empty[0]) + empty.Substring(1) + " and none of its files is expected.");
+                Note(char.ToUpperInvariant(empty[0]) + empty.Substring(1) + " and none of its files is expected.");
             foreach (var device in devices)
             {
                 var name = device.Name;
@@ -99,13 +105,13 @@ namespace OpenRigs.Manifest
                     Add(name + "/" + name + "_device.json", why + "record");
                     string noMap;
                     if (HarpRig.RegisterMapFor(device.Kind, out noMap) != null) Add(name + "/" + name + ".yml", why + "register map");
-                    else Notes.Add(name + "/" + name + ".yml (" + entry + ") is not expected: " + noMap + ", so RecordHarpDevices writes no register map.");
+                    else Note(name + "/" + name + ".yml (" + entry + ") is not expected: " + noMap + ", so RecordHarpDevices writes no register map.");
                     continue;
                 }
                 var published = publishedType(name) != null ? name : publishedType(name + ".Data") != null ? name + ".Data" : null;
                 if (published == null)
                 {
-                    Notes.Add(name + " (" + entry + ") is not expected: the workflow publishes no " + name + " or " + name + ".Data before ExperimentManifest.");
+                    Note(name + " (" + entry + ") is not expected: the workflow publishes no " + name + " or " + name + ".Data before ExperimentManifest.");
                     continue;
                 }
                 Add(name + "/", entry + ", published as " + published);

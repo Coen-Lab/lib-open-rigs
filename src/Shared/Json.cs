@@ -12,7 +12,7 @@ namespace OpenRigs.Shared
         public void Add(string key, object value) { Add(new KeyValuePair<string, object>(key, value)); }
 
         /// <summary>Adds, or replaces a key already there ignoring case, where the later value wins, as Bonsai
-        /// takes a repeated --property. rig-sync's PowerShell refuses a file with keys differing only in case.</summary>
+        /// takes a repeated --property.</summary>
         public void Set(string key, object value)
         {
             var i = FindIndex(p => string.Equals(p.Key, key, StringComparison.OrdinalIgnoreCase));

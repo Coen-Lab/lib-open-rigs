@@ -42,7 +42,7 @@ namespace OpenRigs.Manifest
             return section;
         }
 
-        /// <summary>Each column by name, as written in the file; throws naming the column whose type is missing or not one of the four.</summary>
+        /// <summary>Each column by name, as written in the file; throws naming the column whose type is missing or not one of the four, or two keys differing only in case.</summary>
         public static JsonObject Columns(byte[] bytes)
         {
             var yaml = new YamlStream();
@@ -50,6 +50,7 @@ namespace OpenRigs.Manifest
             var root = yaml.Documents.Count > 0 ? yaml.Documents[0].RootNode as YamlMappingNode : null;
             if (root == null) throw new InvalidDataException("the file is empty or not a map of columns");
             var columns = new JsonObject();
+            RefuseCaseOnly(root, "columns");
             foreach (var pair in root.Children)
             {
                 var name = ((YamlScalarNode)pair.Key).Value;
@@ -68,13 +69,26 @@ namespace OpenRigs.Manifest
             var map = node as YamlMappingNode;
             if (map != null)
             {
+                RefuseCaseOnly(map, "keys");
                 var obj = new JsonObject();
                 foreach (var pair in map.Children) obj.Add(((YamlScalarNode)pair.Key).Value, Convert(pair.Value));
                 return obj;
             }
             var seq = node as YamlSequenceNode;
             if (seq != null) return seq.Children.Select(Convert).ToList();
-            return ((YamlScalarNode)node).Value;
+            // YAML's null, unquoted, is JSON's null, as YamlDotNet and PyYAML read it; a quoted 'null' is text.
+            var scalar = (YamlScalarNode)node;
+            if (scalar.Style == YamlDotNet.Core.ScalarStyle.Plain &&
+                (scalar.Value == "" || scalar.Value == "~" || scalar.Value == "null" || scalar.Value == "Null" || scalar.Value == "NULL")) return null;
+            return scalar.Value;
+        }
+
+        // FORMAT.md: no object has two keys differing only in case, as Windows PowerShell 5.1 refuses to read one.
+        static void RefuseCaseOnly(YamlMappingNode map, string what)
+        {
+            var clash = map.Children.Keys.Select(k => ((YamlScalarNode)k).Value)
+                .GroupBy(k => k, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
+            if (clash != null) throw new InvalidDataException(what + " " + string.Join(" and ", clash) + " differ only in case");
         }
     }
 }

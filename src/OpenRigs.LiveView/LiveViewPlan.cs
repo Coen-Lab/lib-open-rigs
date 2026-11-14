@@ -217,7 +217,7 @@ namespace OpenRigs.LiveView
                 return plan;
             }
             // An empty entry hides its whole kind from RigDevices.Read (audit L2-L1).
-            plan.Notes.AddRange(EmptyRigEntries.Find(RigDevices.PathFor(configRoot)).Select(e => e + " and none is streamed"));
+            plan.Notes.AddRange(EmptyRigEntries.Find(RigDevices.PathFor(configRoot), DeviceRecipe.All.Select(r => r.Kind)).Select(e => e + " and none is streamed"));
             foreach (var device in devices)
             {
                 plan.Consider(device, publishedType);
@@ -297,7 +297,7 @@ namespace OpenRigs.LiveView
                 switch (key)
                 {
                     case "enabled":
-                        if (bool.TryParse(value, out flag)) { if (!flag) return false; }
+                        if (TryYamlBool(value, out flag)) { if (!flag) return false; }
                         else Notes.Add(device.Name + ": liveView enabled '" + value + "' is not true or false; ignored");
                         break;
                     case "rate":
@@ -324,6 +324,17 @@ namespace OpenRigs.LiveView
         static bool TryPositive(string value, out double number)
         {
             return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out number) && number > 0;
+        }
+
+        // YamlDotNet's booleans, any case, as app-rig-control's rig_yaml.py reads them: true, y, yes, on; false, n, no, off.
+        public static bool TryYamlBool(string value, out bool flag)
+        {
+            switch (value.ToLowerInvariant())
+            {
+                case "true": case "y": case "yes": case "on": flag = true; return true;
+                case "false": case "n": case "no": case "off": flag = false; return true;
+                default: flag = false; return false;
+            }
         }
 
         /// <summary>Everything the inner workflow is made from, so it is remade only when this changes.</summary>

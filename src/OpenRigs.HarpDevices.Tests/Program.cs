@@ -94,6 +94,15 @@ namespace OpenRigs.HarpDevices.Tests
             }
         }
 
+        // The repository, found above the test output by its src\open_rigs.
+        static string RepoRoot()
+        {
+            var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "src", "open_rigs"))) directory = directory.Parent;
+            if (directory == null) throw new DirectoryNotFoundException("no src\\open_rigs above " + AppDomain.CurrentDomain.BaseDirectory);
+            return directory.FullName;
+        }
+
         static int Main()
         {
             // Loaded before any record looks for a register map, as a workflow decoding the board has it.
@@ -121,6 +130,13 @@ namespace OpenRigs.HarpDevices.Tests
                 Check("Harp.TimestampGeneratorGen3 0.1.1, which carries none, gets the lab's copy of its release's, saying so", tsg != null && tsg.Metadata.Contains("whoAmI: 1158") && tsg.Metadata.Contains("firmwareVersion: \"1.2\"") && tsg.From.StartsWith("Harp.TimestampGeneratorGen3 0.1.1 (device.yml from harp-tech/device.timestampgeneratorgen3 a463d1d"), tsg == null ? "none" : tsg.From);
                 Check("... and no other version does", OpenRigs.Shared.RegisterMaps.LabCopy("Harp.TimestampGeneratorGen3 0.1.2") == null, "found one");
                 Check("every lab copy is embedded", OpenRigs.Shared.RegisterMaps.LabCopies.Keys.All(k => OpenRigs.Shared.RegisterMaps.LabCopy(k) != null), "one is missing");
+                // L2-L2: HarpRig's WhoAmI table is the Python models' who_am_i values, as 7cc06df ties MAX_REWARD_UL.
+                var python = string.Join(", ", new[] { "harp.py", "lickety_split.py" }
+                    .SelectMany(f => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(Path.Combine(RepoRoot(), "src", "open_rigs", "devices", f)), @"(?m)^\s+who_am_i: ClassVar\[int\] = (\d+)\r?$")
+                        .Cast<System.Text.RegularExpressions.Match>().Select(m => int.Parse(m.Groups[1].Value)))
+                    .OrderBy(w => w));
+                var table = string.Join(", ", OpenRigs.Shared.HarpRig.WhoAmIByKind.Values.OrderBy(w => w));
+                Check("HarpRig's WhoAmI table is the Python models' who_am_i values (harp.py, lickety_split.py)", python == table, "Python " + python + "; C# " + table);
 
                 Console.WriteLine("The board at Start:");
                 var r = Recorder();
@@ -172,6 +188,24 @@ namespace OpenRigs.HarpDevices.Tests
                         WaitFor(() => written.Count > 1 || error != null);
                         var late = File.ReadAllText(Path.Combine(quiet, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
                         Check("no dump within the timeout writes what the board reported at connection, and says so", late.Contains("\"dumped\": false") && late.Contains("\"who_am_i\": 1216") && late.Contains("No register dump came"), late);
+                    }
+                }
+                {
+                    // L2-I1: a dump still coming at the timeout was recorded as dumped, without a word.
+                    var messages = new Subject<HarpMessage>();
+                    var path = new Subject<string>();
+                    var written = new List<string>();
+                    var cut = Recorder();
+                    cut.DumpQuiet = TimeSpan.FromSeconds(30);
+                    cut.DumpTimeout = TimeSpan.FromMilliseconds(300);
+                    using (cut.Process(messages, path).Subscribe(p => { lock (written) written.Add(p); }))
+                    {
+                        var experiment = Path.Combine(root, "ses-cut");
+                        path.OnNext(experiment);
+                        foreach (var m in Board(1216)) messages.OnNext(m);
+                        WaitFor(() => { lock (written) return written.Count > 0; });
+                        var json = File.ReadAllText(Path.Combine(experiment, "BehaviorBoard-Main", "BehaviorBoard-Main_device.json"));
+                        Check("a dump still coming at the timeout is recorded, with a note that it was cut off", json.Contains("\"dumped\": true") && json.Contains("so it was cut off"), json);
                     }
                 }
                 {
@@ -342,6 +376,17 @@ namespace OpenRigs.HarpDevices.Tests
                     emptyPlan.StartRefusal != null && emptyPlan.StartRefusal.Contains("the rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none is checked")
                     && emptyPlan.Notes.Any(n => n.StartsWith("the rig.yml entry behaviorBoard: spare:")) && emptyPlan.Recorded.Select(d => d.Name).SequenceEqual(new[] { "LicketySplit-Left" }),
                     emptyPlan.StartRefusal + " | " + string.Join(",", emptyPlan.Recorded.Select(d => d.Name)));
+                // L2-L5: under a Harp kind, an entry holding none, off or [] hides the kind as an empty one does.
+                var spareConfig = Path.Combine(root, "config-spare");
+                Directory.CreateDirectory(Path.Combine(spareConfig, Environment.MachineName));
+                File.WriteAllText(Path.Combine(spareConfig, Environment.MachineName, "rig.yml"),
+                    "behaviorBoard:\n  main:\n    portName: COM3\n    usbSerial: AB0M7PLB\n  spare: none\n" +
+                    "licketySplit:\n  left:\n    portName: COM4\n    usbSerial: E664C856C3913E37\n  old: off\n  list: []\n");
+                var sparePlan = HarpDevicePlan.Create(spareConfig, published);
+                Check("an entry holding none, off or [] beside a board stops the workflow at Start, naming it and what it holds",
+                    sparePlan.StartRefusal != null && sparePlan.StartRefusal.Contains("the rig.yml entry behaviorBoard: spare: none has no settings, so every behaviorBoard is passed over")
+                    && sparePlan.StartRefusal.Contains("the rig.yml entries licketySplit: old: off, licketySplit: list: [] have no settings, so every licketySplit is passed over")
+                    && sparePlan.Recorded.Count == 0, sparePlan.StartRefusal);
                 Check("... with rig.yml's port and USB serial, its kind's WhoAmI, and its commands", main != null && main.PortName == "COM3" && main.UsbSerial == "AB0M7PLB" && main.ExpectedWhoAmI == 1216 && main.HasCommands, main == null ? "none" : main.ToString());
                 var left = plan.Recorded.FirstOrDefault(d => d.Name == "LicketySplit-Left");
                 Check("a Lickety Split is checked against WhoAmI 1400", left != null && left.ExpectedWhoAmI == 1400 && !plan.Notes.Any(n => n.Contains("licketySplit")), left == null ? "none" : left.ToString());

@@ -42,7 +42,7 @@ camera:
       rate: 10        # per second, up to 1000
       width: 160      # video only
       height: 120     # video only
-      enabled: false  # not streamed at all
+      enabled: false  # not streamed at all; true, y, yes, on, false, n, no or off, any case, as YamlDotNet reads them (0.1.1-coen-lab.11 on)
 ```
 
 A bad value is reported in `liveview` and the default kept. A workflow that reads rig.yml into a strict schema (coen-behaviour-box's `DeserializeFromYaml`) must declare `liveView` in that schema, or rig.yml stops it at Start.

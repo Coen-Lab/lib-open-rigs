@@ -44,7 +44,7 @@ namespace OpenRigs.Vision
                             lock (gate) { renderThread = Thread.CurrentThread; }
                         });
                     },
-                    error => { },
+                    error => Console.Error.WriteLine("DisposeOnRenderThread: the shader window source failed: {0}", error),
                     () => { });
 
                 var inner = new SingleAssignmentDisposable();

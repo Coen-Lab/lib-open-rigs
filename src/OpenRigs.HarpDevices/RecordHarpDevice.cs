@@ -106,6 +106,8 @@ namespace OpenRigs.HarpDevices
                 {
                     Volatile.Write(ref started, true);
                     var fresh = new Dictionary<int, HarpMessage>();
+                    // The timeout came after FirmwareVersionLow: the dump was still coming, so it is cut off.
+                    var cutOff = false;
                     var reports = messages.Where(IsReport).Do(message => { lock (gate) fresh[message.Address] = message; });
                     // The dump has finished once FirmwareVersionLow has come and then nothing for DumpQuiet.
                     var dump = !HasCommands ? Observable.Return(false) : reports
@@ -113,7 +115,7 @@ namespace OpenRigs.HarpDevices
                         .Throttle(DumpQuiet)
                         .FirstAsync()
                         .Select(message => true)
-                        .Timeout(DumpTimeout, Observable.Defer(() => { lock (gate) return Observable.Return(fresh.ContainsKey(FirmwareVersionLow.Address)); }));
+                        .Timeout(DumpTimeout, Observable.Defer(() => { lock (gate) { cutOff = fresh.ContainsKey(FirmwareVersionLow.Address); return Observable.Return(cutOff); } }));
                     return dump.Select(dumped =>
                     {
                         Dictionary<int, HarpMessage> registers;
@@ -122,7 +124,7 @@ namespace OpenRigs.HarpDevices
                             registers = new Dictionary<int, HarpMessage>(atConnection);
                             foreach (var pair in fresh) registers[pair.Key] = pair.Value;
                         }
-                        return Write(path, usbSerial, registers, dumped, Volatile.Read(ref checkedBeforeStart));
+                        return Write(path, usbSerial, registers, dumped, cutOff, Volatile.Read(ref checkedBeforeStart));
                     });
                 }).Subscribe(observer);
                 return new CompositeDisposable(keep, records);
@@ -176,12 +178,13 @@ namespace OpenRigs.HarpDevices
         }
 
         // Writes the record and the register map, then stops the workflow if the board is of the wrong kind.
-        string Write(string pathPrefix, string usbSerial, Dictionary<int, HarpMessage> registers, bool dumped, bool checkedAtConnection)
+        string Write(string pathPrefix, string usbSerial, Dictionary<int, HarpMessage> registers, bool dumped, bool cutOff, bool checkedAtConnection)
         {
             var notes = new List<object>();
             if (!dumped) notes.Add(registers.Count == 0 ? "The device reported no registers, at connection or after the experiment folder appeared."
                 : !HasCommands ? "No register dump was asked for at the experiment's start (the workflow publishes no " + Name + HarpDevicePlan.CommandsSuffix + "): these are the registers the device reported when its port opened."
                 : "No register dump came within " + DumpTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture) + " s of the experiment folder appearing: these are the registers the device reported when its port opened.");
+            if (cutOff) notes.Add("The register dump was still coming " + DumpTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture) + " s after the experiment folder appeared, so it was cut off: a register it had not reached is the one the device reported when its port opened.");
 
             var whoAmI = U16(registers, WhoAmI.Address);
             // A board that reported no WhoAmI gets its kind's map, said to be so, so the experiment is

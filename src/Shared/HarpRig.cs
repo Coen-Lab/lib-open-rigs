@@ -8,7 +8,7 @@ namespace OpenRigs.Shared
     /// <summary>
     /// Which rig.yml entries are Harp devices, and what is known of each kind, decided one way for
     /// every package here: OpenRigs.HarpDevices records the devices, OpenRigs.Manifest expects
-    /// their files, and the two must agree on every entry or rig-sync holds experiments back.
+    /// their files, and the two must agree on every entry or the overnight copy (jacuzzi-ingest's ingest-rig) holds experiments back.
     /// </summary>
     internal static class HarpRig
     {

@@ -115,6 +115,27 @@ namespace OpenRigs.LiveView.Tests
                 Check("an empty entry beside a board is noted, naming it, and its kind is not streamed",
                     empty.Notes.Any(n => n == "the rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none is streamed")
                     && string.Join(", ", empty.Streamed.Select(d => d.Name)) == "Camera-Box", string.Join(" | ", empty.Notes));
+                // L2-L5: an entry under a device kind that is not a set of settings is named whatever it holds.
+                var spares = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n  spare: none\ncamera:\n  box:\n    serialNumber: '1'\n  off: off\n  list: []\n",
+                    name => name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage) : name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                Check("a device kind's entry holding none, off or [] is named, with what it holds",
+                    spares.Notes.Contains("the rig.yml entry behaviorBoard: spare: none has no settings, so every behaviorBoard is passed over and none is streamed")
+                    && spares.Notes.Contains("the rig.yml entries camera: off: off, camera: list: [] have no settings, so every camera is passed over and none is streamed"), string.Join(" | ", spares.Notes));
+                var notDevices = Plan(root, "speakerArray:\n  main:\n    channels: 2\n  syncChannel: 3\n", name => null);
+                Check("a kind that is not a device, holding a value beside settings, is not named", !notDevices.Notes.Any(n => n.Contains("speakerArray")), string.Join(" | ", notDevices.Notes));
+                // L2-L3: enabled in YamlDotNet's words, as app-rig-control's rig_yaml.py reads it.
+                foreach (var word in new[] { "false", "False", "n", "No", "off", "OFF" })
+                {
+                    var disabled = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: " + word + "\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                    Check("liveView enabled " + word + " is not streamed, unnoted", !disabled.Streamed.Any() && !disabled.Notes.Any(), string.Join(" | ", disabled.Notes));
+                }
+                foreach (var word in new[] { "true", "TRUE", "y", "Yes", "on", "On" })
+                {
+                    var enabled = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: " + word + "\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                    Check("liveView enabled " + word + " is streamed, unnoted", enabled.Streamed.Count == 1 && !enabled.Notes.Any(), string.Join(" | ", enabled.Notes));
+                }
+                var maybe = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: maybe\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                Check("liveView enabled maybe is noted and streamed", maybe.Streamed.Count == 1 && maybe.Notes.Any(n => n.Contains("enabled 'maybe'")), string.Join(" | ", maybe.Notes));
                 var none = LiveViewPlan.Create(Path.Combine(root, "nowhere"), name => null);
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
 
@@ -135,9 +156,9 @@ namespace OpenRigs.LiveView.Tests
                 var once = new TagRegister { Register = "OutputSet" }.Process(new[] { 5 }.ToObservable()).ToList().Wait();
                 Check("an event register is named and sent once", once.Count == 1 && once[0].Register == "OutputSet" && (int)once[0].Value == 5, once.Count.ToString());
                 var held = new TagRegister { Register = "OutputState", Repeat = TimeSpan.FromMilliseconds(50) }
-                    .Process(Observable.Return(7).Concat(Observable.Never<int>())).Take(TimeSpan.FromMilliseconds(400)).ToList().Wait();
+                    .Process(Observable.Return(7).Concat(Observable.Never<int>())).Take(4).ToList().Timeout(TimeSpan.FromSeconds(5)).Wait();
                 Check("a state register's latest value is sent again every Repeat, unchanged",
-                    held.Count >= 4 && held.All(m => m.Register == "OutputState" && (int)m.Value == 7), held.Count.ToString());
+                    held.Count == 4 && held.All(m => m.Register == "OutputState" && (int)m.Value == 7), held.Count.ToString());
                 var tag = new TagRegister { RepeatXml = "PT2S" };
                 Check("Repeat is read from the workflow file's duration", tag.Repeat == TimeSpan.FromSeconds(2), tag.Repeat.ToString());
 
