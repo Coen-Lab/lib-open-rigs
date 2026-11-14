@@ -7,6 +7,11 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
+  <!-- Workflows run from disk by headless Bonsai, with this output directory as its lib path -->
+  <ItemGroup>
+    <None Update="**\*.bonsai" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="MSTest.TestAdapter" Version="3.6.3" />
@@ -19,6 +24,8 @@
     <ProjectReference Include="..\OpenRigs.Video\OpenRigs.Video.csproj" />
     <!-- LogVideoFfmpeg.bonsai, built here with the writer -->
     <ProjectReference Include="..\OpenRigs.Logging\OpenRigs.Logging.csproj" />
+    <!-- BonsaiWorkflowRunner, for the headless runs -->
+    <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
   </ItemGroup>
 
 </Project>
