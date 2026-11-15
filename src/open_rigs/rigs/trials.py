@@ -78,7 +78,7 @@ CORE_COLUMNS: List[Column] = [
      "itiStartTime + itiSeconds + quietWaitSeconds (stimulusOnsetTime)."),
     ("trialStartTime", "double", "s",
      "Harp time the trial started (Go): the end of its interval less the lead, max(laserToStimulusSeconds, 0) in the "
-     "task file (Settings_Task) and 0 without optogenetics, plus quietWaitSeconds where the task has quiet waits."),
+     "task file (Settings_Task) and 0 for a task file with no optogenetics block, plus quietWaitSeconds where the task has quiet waits."),
     ("stimulusOnsetTime", "double", "s",
      "Harp time the workflow commanded the stimulus on, NaN if it never was: the first tick of the 1 ms Harp clock at "
      "or after trialStartTime plus the lead, in every experiment. The physical onset is in the hardware logs."),
