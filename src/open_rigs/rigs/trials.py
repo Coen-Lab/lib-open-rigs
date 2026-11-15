@@ -23,16 +23,19 @@ and manifest.json (how the run ended), and checks the rows against each other an
 - each rewarded trial (rewardSizeUl above 0, and Correct or autoRewarded) has a RewardDelivered row at its outcome.
 
 A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
-Performance is Rig Control's: Correct / (Correct + Incorrect), over the trials both
+Performance is Correct / (Correct + Incorrect), over the trials both
 spouts were offered where the task records bothSpouts; the response rate is the trials not NoResponse.
 
 A file without a column the checks read (harpTime, outcomeTime and the rest of the core) is one problem,
-not checked further; without a Settings_Task file the checks that need the task are one problem. `summarise-experiment
-<experiment folder> ...` prints each summary and each failed check, exiting 1 when one fails.
+not checked further; without a Settings_Task file the checks that need the task are one problem. A trial row with an
+empty cell, text or NaN in a number column is a problem and its trial is not checked, except a NaN stimulusOnsetTime
+(the stimulus never commanded), which is a NOTE, the trial left out of the response and interval times, and a NaN
+laserTriggerTime (no trigger), which is not checked. `summarise-experiment <experiment folder> ...` prints each summary,
+note and failed check, exiting 1 when a check fails.
 
 With videos (`summarise-experiment --videos`), each camera video is also checked against its CSV, its frames counted
 from the file (open_rigs.rigs.video_frames): minutes for a long session, so it is asked for, not done by default. A killed
-run's last second of frames with no CSV row is printed as a NOTE, not a problem (see video_frames).
+run's last frame with no CSV row is printed as a NOTE, not a problem (see video_frames).
 """
 
 from __future__ import annotations
@@ -163,7 +166,7 @@ class Summary:
     outcome: str  # the manifest's run outcome (completed, stopped, ...), "not final" when it never closed; or unknown
     trials: int
     correct: int
-    performance: float  # Rig Control's: Correct / (Correct + Incorrect), two-spout trials where recorded; NaN with none
+    performance: float  # Correct / (Correct + Incorrect), two-spout trials where recorded; NaN with none
     responded: float = float("nan")  # the trials not NoResponse, of all; NaN with no trials
     response_seconds: List[float] = field(default_factory=list)  # each trial's outcome less its stimulus onset
     interval_seconds: List[float] = field(default_factory=list)  # each outcome to the next stimulus onset
@@ -199,6 +202,27 @@ def _true(text: Any) -> bool:
 # The columns summarise reads: of a trial row, and of an async row.
 TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "punishSound", "punishTimeoutSeconds")
 ASYNC_NEEDS = (TIME_COLUMN, "Event", "Value")
+# A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an empty cell or
+# text is a problem and the row's checks are skipped.
+TRIAL_NUMBERS = ("trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime",
+                 "rewardSizeUl", "punishTimeoutSeconds", "quietWaitSeconds", "laserTriggerTime")
+NAN_ALLOWED = ("stimulusOnsetTime", "laserTriggerTime")
+
+
+def _not_numbers(row: Dict[str, str]) -> List[str]:
+    """Each of a trial row's number columns that is not a number it may hold, as `column 'cell'`."""
+    bad = []
+    for column in TRIAL_NUMBERS:
+        if column not in row:
+            continue
+        try:
+            value = float(row[column])
+        except (TypeError, ValueError):
+            bad.append(f"{column} {row[column]!r}")
+            continue
+        if math.isnan(value) and column not in NAN_ALLOWED:
+            bad.append(f"{column} {row[column]!r}")
+    return bad
 
 
 def _rewarded(row: Dict[str, str]) -> bool:
@@ -262,19 +286,35 @@ def _summarise(folder: Path) -> Summary:
         s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the error sound not checked")
     rewards = [e for e in events if e["Event"] == "RewardDelivered"]
     s.delivered_ul = sum(float(e["Value"] or 0) for e in rewards)
-    reward_times = [_f(e, TIME_COLUMN) for e in rewards]
+    reward_times = []
+    for e in rewards:
+        try:
+            reward_times.append(_f(e, TIME_COLUMN))
+        except (TypeError, ValueError):
+            s.problems.append(f"BonsaiData_Async: a RewardDelivered row's {TIME_COLUMN} {e[TIME_COLUMN]!r} is not a number")
+    last: Optional[Dict[str, str]] = None  # the row before, when its numbers could be read
     for n, row in enumerate(trials):
-        number = int(row["trialNumber"])
+        bad = _not_numbers(row)
+        if bad:
+            s.problems.append(f"row {n + 1}: {', '.join(bad)} not a number, so the trial is not checked")
+            last = None
+            continue
+        number = int(_f(row, "trialNumber"))
         if number != n + 1:
             s.problems.append(f"row {n + 1} is trial {number}: trial numbers should run 1, 2, 3 ...")
         if row["outcome"] not in OUTCOMES:
             s.problems.append(f"trial {number}: outcome {row['outcome']!r} is not one of {', '.join(OUTCOMES)}")
         onset, end = _f(row, "stimulusOnsetTime"), _f(row, "outcomeTime")
-        s.response_seconds.append(end - onset)
+        shown = not math.isnan(onset)
         planned = _f(row, "itiSeconds") + _quiet(row)
-        if abs(onset - _f(row, "itiStartTime") - planned) > TOLERANCE_S:
-            s.problems.append(f"trial {number}: stimulus {onset - _f(row, 'itiStartTime'):.4f} s after its interval started, "
-                              f"not itiSeconds + quietWaitSeconds = {planned:.4f} s")
+        if not shown:
+            s.notes.append(f"trial {number}: stimulusOnsetTime NaN, the stimulus never commanded: left out of the "
+                           "response and interval times")
+        else:
+            s.response_seconds.append(end - onset)
+            if abs(onset - _f(row, "itiStartTime") - planned) > TOLERANCE_S:
+                s.problems.append(f"trial {number}: stimulus {onset - _f(row, 'itiStartTime'):.4f} s after its interval started, "
+                                  f"not itiSeconds + quietWaitSeconds = {planned:.4f} s")
         if _quiet(row) < 0:
             s.problems.append(f"trial {number}: quietWaitSeconds {_quiet(row):.4f} is negative")
         if task is not None:
@@ -294,13 +334,14 @@ def _summarise(folder: Path) -> Summary:
             if not timed_out and sounded and task.timeout_seconds > 0:
                 s.problems.append(f"trial {number}: the error sound with no timeout, though the task's timeout is "
                                   f"{task.timeout_seconds:g} s")
-        if n:
-            last = trials[n - 1]
+        if last is not None:
             due = _f(last, "outcomeTime") + _f(last, "punishTimeoutSeconds")
             if abs(_f(row, "itiStartTime") - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: interval started {_f(row, 'itiStartTime') - due:+.4f} s from the last "
                                   "outcome plus its timeout")
-            s.interval_seconds.append(onset - _f(last, "outcomeTime"))
+            if shown:
+                s.interval_seconds.append(onset - _f(last, "outcomeTime"))
+        last = row
         if _rewarded(row):
             s.requested_ul += _f(row, "rewardSizeUl")
             if not any(abs(t - end) <= TOLERANCE_S for t in reward_times):
@@ -319,7 +360,7 @@ def describe(s: Summary) -> str:
         return "none" if math.isnan(x) else f"{x:.0%}"
 
     lines = [f"{s.folder}: {s.outcome}, {s.trials} trials, {s.correct} correct",
-             f"  performance {percent(s.performance)} (Correct / (Correct + Incorrect), two-spout trials, as Rig Control),"
+             f"  performance {percent(s.performance)} (Correct / (Correct + Incorrect), two-spout trials),"
              f" responded {percent(s.responded)}",
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",
              f"  outcome to next stimulus: {spread(s.interval_seconds)}",

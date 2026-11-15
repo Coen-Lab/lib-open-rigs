@@ -3,9 +3,11 @@
 import csv
 import json
 import math
+import sys
 
 import pytest
 
+from open_rigs.rigs import trials as trials_module
 from open_rigs.rigs.trials import CORE_COLUMNS, shared_block_problems, shared_columns, summarise
 
 COLUMNS = ["harpTime", "trialNumber", "trialType", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds",
@@ -106,6 +108,34 @@ def test_each_inconsistency_is_named(tmp_path):
     assert "trial 1: rewarded with rewardSizeUl 2.0 but no RewardDelivered" in text
 
 
+def test_a_trial_without_a_stimulus_is_a_note_and_left_out_of_the_times(tmp_path):
+    # stimulusOnsetTime is NaN when the stimulus was never commanded; NaN would pass every tolerance and poison the median.
+    trials = _chain(4)
+    trials[1]["stimulusOnsetTime"] = float("nan")
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    s = summarise(_experiment(tmp_path, trials, rewards))
+    assert s.problems == []
+    assert s.notes == ["trial 2: stimulusOnsetTime NaN, the stimulus never commanded: left out of the response and interval times"]
+    assert s.response_seconds == [3.0] * 3
+    assert [round(x, 6) for x in s.interval_seconds] == [6.5, 2.5]
+
+
+def test_a_nan_or_empty_number_is_a_problem_not_a_pass_or_a_crash(tmp_path, monkeypatch, capsys):
+    trials = _chain(4)
+    trials[1]["outcomeTime"] = ""  # float("") raised and stopped the command
+    trials[2]["itiStartTime"] = float("nan")  # abs(nan - due) > tolerance is False, so it passed
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    folder = _experiment(tmp_path, trials, rewards)
+    s = summarise(folder)
+    assert s.problems == ["row 2: outcomeTime '' not a number, so the trial is not checked",
+                          "row 3: itiStartTime 'nan' not a number, so the trial is not checked"]
+    assert s.response_seconds == [3.0, 3.0] and s.interval_seconds == []
+    monkeypatch.setattr(sys, "argv", ["summarise-experiment", str(folder)])
+    with pytest.raises(SystemExit) as stop:
+        trials_module.main()
+    assert stop.value.code == 1 and "PROBLEM row 2: outcomeTime ''" in capsys.readouterr().out
+
+
 def test_no_trials_and_no_manifest(tmp_path):
     folder = _experiment(tmp_path, [], [])
     (folder / "manifest.json").unlink()
@@ -203,7 +233,7 @@ def test_without_the_task_file_its_checks_are_one_problem(tmp_path):
 
 
 def test_performance_is_rig_controls(tmp_path):
-    # Correct / (Correct + Incorrect) over two-spout trials, as Rig Control; the share answered apart.
+    # Correct / (Correct + Incorrect) over two-spout trials; the share answered apart.
     trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="NoResponse")]
     for t, both in zip(trials, [True, True, False, True, True]):
         t["bothSpouts"] = both
