@@ -86,3 +86,7 @@ Keep a task's outcome logic (what counts as the response, and the reward, penalt
 ## Video logging
 
 `RigHardware` publishes each camera's frames on `Camera-<Name>.Data`, and `LogCameras` logs all three with `OpenRigs.Logging:LogVideoFfmpeg.bonsai`, `FrameRate` from the board's `Trigger0Frequency`. It is included inside the workflow's experiment logs, the `SelectMany` that `PathPrefix` starts, so each video is named once the experiment folder is.
+
+## A workflow's checks and stage search
+
+Each lab workflow's `scripts\check-workflow.ps1` runs `open_rigs\scripts\check-workflow.ps1` on itself, from the open-rigs its `pyproject.toml` pins (in its `.venv`), and its `scripts\add-names.ps1` runs `open_rigs\scripts\add-names.ps1` with its own streams and retired names, so neither script is copied into a workflow. Its `tests\test_workflow.py` holds its `main.bonsai` to the lab's rules with `open_rigs.rigs.workflow_lint` (wall-clock waits, HarpDelay clocks, subjects a per-trial graph closes, the mixer's boot delay, Zapit, the manual reward, the penalty sound, commands, the README's blocks, the layout, the RngSeed event and the camera logs). Its `suggest-stage` finds a mouse's experiments with `open_rigs.rigs.experiments` (`ROOTS`, `find`), the one list of where they are. `ReadTextFile` (Core) reads a file when its path arrives, such as the task file at Go.
