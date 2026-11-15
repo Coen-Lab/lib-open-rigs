@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -14,7 +14,7 @@ namespace OpenRigs.Devices.Tests
         {
             var assembly = typeof(LickSpoutStage).Assembly;
             string text;
-            using (var stream = assembly.GetManifestResourceStream("OpenRigs.Devices.HarpLickSpoutStage.bonsai"))
+            using (var stream = assembly.GetManifestResourceStream("OpenRigs.Devices.LickSpoutStage.bonsai"))
             using (var reader = new StreamReader(stream)) text = reader.ReadToEnd();
             var heard = Regex.Matches(text, @"<orcl:Name>(\w+)</orcl:Name>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
             var sent = Regex.Matches(text, @"<dev:Command>(\w+)</dev:Command>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
