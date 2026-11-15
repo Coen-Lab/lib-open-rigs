@@ -32,17 +32,20 @@ namespace OpenRigs.Audio
         static Tuple<int, Mat> Read(Stream stream, string name, int sampleRate, bool samples)
         {
             var reader = new BinaryReader(stream);
-            if (new string(reader.ReadChars(4)) != "RIFF") throw new InvalidDataException("not a WAV file: " + name);
+            // A chunk id is four bytes, read as bytes: ReadChars decodes UTF-8 and can take more than four.
+            string Id() => System.Text.Encoding.ASCII.GetString(reader.ReadBytes(4));
+            if (Id() != "RIFF") throw new InvalidDataException("not a WAV file: " + name);
             reader.ReadInt32();
-            if (new string(reader.ReadChars(4)) != "WAVE") throw new InvalidDataException("not a WAV file: " + name);
+            if (Id() != "WAVE") throw new InvalidDataException("not a WAV file: " + name);
             short format = 0, channels = 0, bits = 0;
             int rate = 0;
             while (reader.BaseStream.Position + 8 <= reader.BaseStream.Length)
             {
-                string id = new string(reader.ReadChars(4));
+                string id = Id();
                 int size = reader.ReadInt32();
                 if (id == "fmt ")
                 {
+                    if (size < 16) throw new InvalidDataException("its fmt chunk is " + size + " bytes, short of PCM's 16 (no bit depth): " + name);
                     format = reader.ReadInt16();
                     channels = reader.ReadInt16();
                     rate = reader.ReadInt32();

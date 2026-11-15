@@ -125,6 +125,38 @@ namespace OpenRigs.Video.Tests
 
         // OpenRigs.Devices' TriggeredSpinnaker include gives a type of its own with VideoDataFrame's
         // members, not a VideoDataFrame; the writer reads it by member name and passes it on as it came.
+        // A Mono8 camera's 256 grey levels, 256 flat 16 x 16 blocks, come back as 256 levels: the
+        // video is full range (-color_range pc). Limited range (16 to 235) kept 220 of them.
+        [TestMethod]
+        public void KeepsEveryGreyLevel()
+        {
+            RequireFfmpeg();
+            var image = new IplImage(new Size(256, 256), IplDepth.U8, 1);
+            for (var y = 0; y < 256; y++)
+            {
+                var row = Enumerable.Range(0, 256).Select(x => (byte)(y / 16 * 16 + x / 16)).ToArray();
+                Marshal.Copy(row, 0, image.ImageData + y * image.WidthStep, row.Length);
+            }
+            var recording = new FfmpegRecording(Video, FrameRate, VideoEncoder.Read(Path.Combine(folder, "none.yml"), Path.GetDirectoryName(ffmpeg)),
+                FfmpegVideoWriter.DefaultQueueCapacity, TimeSpan.FromSeconds(20), TextWriter.Null);
+            for (var id = 0; id < 5; id++) recording.Add(Frame(id, image));
+            Assert.IsNull(recording.Finish());
+            var info = new ProcessStartInfo(ffmpeg, "-v error -i \"" + Video + "\" -frames:v 1 -f rawvideo -pix_fmt gray pipe:1")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(info);
+            using var decoded = new MemoryStream();
+            process.StandardOutput.BaseStream.CopyTo(decoded);
+            process.WaitForExit();
+            var pixels = decoded.ToArray();
+            var levels = Enumerable.Range(0, 256).Select(i => pixels[(i / 16 * 16 + 8) * 256 + i % 16 * 16 + 8]).ToArray();
+            Assert.AreEqual(256, levels.Distinct().Count(), "grey levels kept");
+            CollectionAssert.AreEqual(Enumerable.Range(0, 256).Select(i => (byte)i).ToArray(), levels);
+        }
+
         [TestMethod]
         public void TakesAnyFrameTypeWithImageAndChunkData()
         {

@@ -7,7 +7,8 @@ namespace OpenRigs.Core
     /// A trial's quiet waits on the Harp clock, counted from the interval's start: Go needs every spout released for
     /// lickQuietSeconds (a held contact blocks Go), and the wheel's distance (forward and back added) within wheelQuietCm over
     /// the last wheelQuietSeconds; Go is the first moment at or after earliest at which both hold. With both off, Go is
-    /// earliest. One class for every task, so all of them wait alike.
+    /// earliest. One class for every task, so all of them wait alike. Not thread-safe, as a List is not: a task calls it
+    /// under the one lock its lick, wheel and clock inputs share.
     /// </summary>
     public class QuietWait
     {

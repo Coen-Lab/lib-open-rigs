@@ -24,12 +24,14 @@ namespace OpenRigs.Video
         // Each codec's output arguments, tuned for 8-bit mono cameras at 50 Hz: no B-frames, so every
         // frame leaves the encoder as soon as it is encoded and nothing waits at Stop; quality-targeted
         // rate control, so a noisy camera costs bytes, not frames. yuv420p (nv12 for Quick Sync) is the
-        // input every H.264 decoder takes; a mono frame's chroma is flat and costs almost nothing.
+        // input every H.264 decoder takes; a mono frame's chroma is flat and costs almost nothing. Full
+        // range (-color_range pc, flagged in the stream): limited range (16 to 235) kept 220 of a Mono8
+        // camera's 256 grey levels.
         static readonly Dictionary<string, string> Codecs = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            { "libx264", "-c:v libx264 -preset veryfast -crf 20 -bf 0 -pix_fmt yuv420p" },
-            { "h264_nvenc", "-c:v h264_nvenc -preset p4 -rc vbr -cq 20 -b:v 0 -bf 0 -pix_fmt yuv420p" },
-            { "h264_qsv", "-c:v h264_qsv -preset veryfast -global_quality 20 -bf 0 -pix_fmt nv12" },
+            { "libx264", "-c:v libx264 -preset veryfast -crf 20 -bf 0 -pix_fmt yuv420p -color_range pc" },
+            { "h264_nvenc", "-c:v h264_nvenc -preset p4 -rc vbr -cq 20 -b:v 0 -bf 0 -pix_fmt yuv420p -color_range pc" },
+            { "h264_qsv", "-c:v h264_qsv -preset veryfast -global_quality 20 -bf 0 -pix_fmt nv12 -color_range pc" },
         };
 
         /// <summary>The codecs rig.yml may name.</summary>
