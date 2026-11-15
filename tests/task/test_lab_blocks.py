@@ -38,7 +38,7 @@ def test_optogenetics_has_no_lab_default_for_the_design():
 
 
 def test_optogenetics_schema_holds_the_same_rule():
-    # rig-control checks a task file against the schema, not the model.
+    # The launching app checks a task file against the schema, not the model.
     schema = Optogenetics.model_json_schema(by_alias=True)
     assert schema["if"]["properties"] == {"useZapit": {"const": True}}
     assert schema["then"]["required"] == ["laserPowerMw"]
