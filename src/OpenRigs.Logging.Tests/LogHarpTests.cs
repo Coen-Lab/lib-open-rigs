@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -106,7 +106,7 @@ namespace OpenRigs.Logging.Tests
         {
             return RunWorkflow(new Dictionary<string, string>
             {
-                // The workflow should externalize LogHarpDevice's LogName under this display name.
+                // The workflow should externalize LogHarpDevice's Name under this display name.
                 { "HarpLogName", logName },
                 { "Count", count.ToString(CultureInfo.InvariantCulture) },
                 // The workflow's 0.5 s default made 100 samples a 50 s wait; what is checked is the

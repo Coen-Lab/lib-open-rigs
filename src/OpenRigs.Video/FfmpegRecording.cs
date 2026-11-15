@@ -148,7 +148,9 @@ namespace OpenRigs.Video
         public string? Finish()
         {
             End();
-            if (!done.Wait(stopTimeout + TimeSpan.FromSeconds(1)))
+            // Once the deadline has killed ffmpeg the writer only has to see it exit: up to 5 s more for that, as
+            // a loaded CI runner took over a second (15 Nov 2026), and the report then says it was killed.
+            if (!done.Wait(stopTimeout + TimeSpan.FromSeconds(1)) && !(DeadlinePassed && done.Wait(TimeSpan.FromSeconds(5))))
             {
                 return "The recording of " + fileName + " did not finish within " + stopTimeout.TotalSeconds + " s of its end.";
             }
@@ -175,6 +177,8 @@ namespace OpenRigs.Video
             catch (ThreadStateException) { }  // already finished
             queue.CompleteAdding();
         }
+
+        bool DeadlinePassed { get { lock (gate) return deadlinePassed; } }
 
         /// <summary>Waits for the writer to finish, at most a timeout; true when it has.</summary>
         public bool Wait(TimeSpan timeout) => done.Wait(timeout);

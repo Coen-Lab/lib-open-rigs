@@ -256,7 +256,7 @@ namespace OpenRigs.Video.Tests
             foreach (var frame in Frames(20)) recording.Add(frame);
             var clock = Stopwatch.StartNew();
             var problem = recording.Finish();
-            Assert.IsTrue(clock.Elapsed < TimeSpan.FromSeconds(3.5), "Finish waits about the stop timeout: " + clock.Elapsed);
+            Assert.IsTrue(clock.Elapsed < TimeSpan.FromSeconds(8), "Finish waits at most the stop timeout, a second, and 5 s for a killed ffmpeg to exit: " + clock.Elapsed);
             Assert.IsNotNull(problem);
             StringAssert.Contains(problem, "was killed");
             StringAssert.Contains(problem, "frames were dropped");

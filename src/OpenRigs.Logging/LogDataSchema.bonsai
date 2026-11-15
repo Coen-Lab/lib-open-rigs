@@ -66,7 +66,7 @@
               <Combinator xsi:type="p1:JsonWriter">
                 <p1:FileName>Schema.json</p1:FileName>
                 <p1:Suffix>None</p1:Suffix>
-                <p1:Buffered>true</p1:Buffered>
+                <p1:Buffered>false</p1:Buffered>
                 <p1:Overwrite>false</p1:Overwrite>
               </Combinator>
             </Expression>

@@ -43,14 +43,13 @@ namespace OpenRigs.Core.Tests
         public void WeighStable_IgnoresTheReplayedReadingFromBeforeTheStep()
         {
             // A BehaviorSubject replays its last value; a window of 1 must not accept it.
+            // The fresh reading comes 50 ms after WeighStable's own step ends, and never completes the subject: a timer
+            // started before WeighStable subscribed closed it first on a slow CI runner (15 Nov 2026).
             var readings = new BehaviorSubject<WeightMeasurement>(new WeightMeasurement(0, 99f, 1f));
-            var step = Observable.Timer(TimeSpan.FromMilliseconds(30)).Select(_ => 0);
-            var fresh = Observable.Timer(TimeSpan.FromMilliseconds(80)).Select(_ => new WeightMeasurement(1, 1f, 1f));
-            using (fresh.Subscribe(readings))
-            {
-                var weight = new WeighStable { SettleWindow = 1, TimeoutSeconds = 10 }.Process(step, readings).ToList().Timeout(TimeSpan.FromSeconds(30)).Wait();
-                Assert.AreEqual(1.0, weight.Single(), 1e-6);
-            }
+            var step = Observable.Timer(TimeSpan.FromMilliseconds(30)).Select(_ => 0)
+                .Finally(() => Observable.Timer(TimeSpan.FromMilliseconds(50)).Subscribe(_ => readings.OnNext(new WeightMeasurement(1, 1f, 1f))));
+            var weight = new WeighStable { SettleWindow = 1, TimeoutSeconds = 10 }.Process(step, readings).ToList().Timeout(TimeSpan.FromSeconds(30)).Wait();
+            Assert.AreEqual(1.0, weight.Single(), 1e-6);
         }
 
         [TestMethod]
