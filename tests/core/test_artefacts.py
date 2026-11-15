@@ -6,7 +6,7 @@ from open_rigs.components.audio import SpeakerArray, SpeakerFilter
 from open_rigs.core.artefacts import SCHEMA_TAG, ArtefactPath, rig_artefacts
 from open_rigs.core.rig import Rig
 from open_rigs.devices.behavior_board import BehaviorBoard
-from open_rigs.vision.projection import MeshMap, ProjectionCorrection
+from open_rigs.vision.projection import MeshMap
 
 
 class Sensor(BaseModel):
@@ -60,7 +60,6 @@ class ComposedRig(Rig):
 
     behavior_board: BehaviorBoard
     speaker_array: SpeakerArray
-    projection: ProjectionCorrection
 
 
 def composed_rig() -> ComposedRig:
@@ -85,7 +84,6 @@ def composed_rig() -> ComposedRig:
                     "right": {"position": {"azimuth": 90, "elevation": 15}, "channel": 1},
                 },
             },
-            "projection": {"meshMap": "calibration/mesh.json"},
         }
     )
 
@@ -94,7 +92,6 @@ def test_composed_rig_lists_each_device_reference():
     assert rig_artefacts(composed_rig()) == {
         "behaviorBoard.pulseController.outputs.DO1.artefact": "calibration/valve-DO1.json",
         "speakerArray.speakers.left.filter": "calibration/speaker-left.json",
-        "projection.meshMap": "calibration/mesh.json",
     }
 
 
