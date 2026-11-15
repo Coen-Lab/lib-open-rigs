@@ -1,0 +1,173 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:spk="clr-namespace:Bonsai.Spinnaker;assembly=Bonsai.Spinnaker"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>One hardware-triggered Spinnaker camera, Name (Camera-&lt;Entry&gt;), from its entry under camera in rig.yml (RigConfigs): publishes the entry as the AsyncSubject Name and opens the camera with its serialNumber, exposureTime, gain, binning and pixelFormat (blank keeps the format stored on the camera). Its trigger is the Behavior board Board's camera trigger whose wiring line (device CameraTrigger) names the camera in targets; the workflow stops at start, naming the camera, unless exactly one enabled trigger names it and its exposure fits the trigger period with 1 ms to spare. Announces Name to CamerasOpen once acquiring (CameraTriggers starts the trigger when every camera has), pairs each frame with its trigger pulse's Harp time (the board's Event messages only), a dropped frame leaving a gap in frameId with the later times kept, and publishes the frames on DataSubjectName (Name.Data). Its first frame is announced into ReadyStages as Name. Stops the workflow, naming the camera, if no frame comes for 15 s. Logs the video as Name (LogVideoFfmpeg, every frame, at the trigger's frequency) once the experiment folder exists (PathPrefix).</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" Description="The camera's name in the data, Camera-&lt;Entry&gt; such as Camera-Face: its rig.yml entry, its subjects, its Ready stage and its folder." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Camera</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="Board" Description="The Behavior board whose camera trigger drives the camera, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:CameraTrigger">
+          <dev:MarginMicroseconds>1000</dev:MarginMicroseconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="SerialNumber" Selector="Camera.Settings.SerialNumber" />
+          <Property Name="ExposureTime" Selector="Camera.Settings.ExposureTime" />
+          <Property Name="Gain" Selector="Camera.Settings.Gain" />
+          <Property Name="Binning" Selector="Camera.Settings.Binning" />
+          <Property Name="PixelFormat" Selector="Camera.Settings.PixelFormat" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="BoardDataSubjectName" Description="Board.Data: the subject the board's messages are published on." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="Output" Selector="Output" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:CameraTriggerPulses">
+          <dev:Output>0</dev:Output>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vid:TriggeredSpinnaker">
+          <spk:Index xsi:nil="true" />
+          <spk:SerialNumber>UNMAPPED</spk:SerialNumber>
+          <spk:ColorProcessing>Default</spk:ColorProcessing>
+          <vid:ExposureTime>0</vid:ExposureTime>
+          <vid:Gain>0</vid:Gain>
+          <vid:Name />
+          <vid:Binning>1</vid:Binning>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:GapWatchdog">
+          <core:GapSeconds>15</core:GapSeconds>
+          <core:Message>no frame for 15 s, so the run was stopped. Usually the trigger cable from the board's trigger output to the camera; also check the camera's USB cable. Then Start again.</core:Message>
+          <core:Name />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="DataSubjectName" Description="Name.Data: the subject the camera's timestamped frames are published on." />
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PathPrefix</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="FrameRate" Selector="Frequency" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="ConfigRoot" Description="The root of the machines' rig configuration, &lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml, whose videoEncoder names the codec." />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogVideoFfmpeg.bonsai">
+        <Name />
+        <FrameRate>50</FrameRate>
+        <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="Stage" Selector="Name" />
+        </PropertyMappings>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="3" Label="Source2" />
+      <Edge From="0" To="4" Label="Source2" />
+      <Edge From="0" To="6" Label="Source1" />
+      <Edge From="0" To="15" Label="Source3" />
+      <Edge From="0" To="16" Label="Source2" />
+      <Edge From="0" To="27" Label="Source2" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="5" To="7" Label="Source1" />
+      <Edge From="6" To="8" Label="Source1" />
+      <Edge From="7" To="8" Label="Source2" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="9" To="13" Label="Source1" />
+      <Edge From="9" To="25" Label="Source1" />
+      <Edge From="10" To="15" Label="Source2" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="12" To="14" Label="Source1" />
+      <Edge From="13" To="14" Label="Source2" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="18" Label="Source1" />
+      <Edge From="17" To="18" Label="Source2" />
+      <Edge From="17" To="19" Label="Source1" />
+      <Edge From="17" To="22" Label="Source1" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="20" To="21" Label="Source1" />
+      <Edge From="22" To="24" Label="Source1" />
+      <Edge From="23" To="24" Label="Source2" />
+      <Edge From="24" To="27" Label="Source1" />
+      <Edge From="25" To="27" Label="Source3" />
+      <Edge From="26" To="27" Label="Source4" />
+      <Edge From="6" To="28" Label="Source1" />
+      <Edge From="28" To="20" Label="Source2" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

@@ -26,15 +26,19 @@ namespace OpenRigs.Core
         [Description("The error the workflow stops with: what stopped arriving, and what to check.")]
         public string Message { get; set; } = string.Empty;
 
+        /// <summary>Gets or sets what is watched, such as a camera's name, put before Message; blank for none.</summary>
+        [Description("What is watched, such as a camera's name (Camera-Face), put before Message so one message serves every instance of a device. Blank for none.")]
+        public string Name { get; set; }
+
         /// <summary>Passes the values through until a gap longer than GapSeconds.</summary>
         public IObservable<TSource> Process<TSource>(IObservable<TSource> source)
         {
             return Observable.Defer(() =>
             {
                 var gapSeconds = GapSeconds;
-                var message = Message;
+                var message = string.IsNullOrWhiteSpace(Name) ? Message : Name.Trim() + ": " + Message;
                 if (!(gapSeconds > 0)) throw new InvalidOperationException("GapWatchdog has a GapSeconds of " + gapSeconds + "; it must be more than 0.");
-                if (string.IsNullOrWhiteSpace(message)) throw new InvalidOperationException("GapWatchdog has no Message: say what stopped arriving and what to check.");
+                if (string.IsNullOrWhiteSpace(Message)) throw new InvalidOperationException("GapWatchdog has no Message: say what stopped arriving and what to check.");
                 // The deadline runs on a thread of its own, not the thread pool's, which a busy rig can hold
                 // past it. TimeoutException, as Timeout throws: its message reaches the operator without a
                 // "Parameter name" line.

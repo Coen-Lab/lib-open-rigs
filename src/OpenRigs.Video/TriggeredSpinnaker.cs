@@ -3,6 +3,8 @@ using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Bonsai.Harp;
 using SpinnakerNET;
 
@@ -15,7 +17,6 @@ namespace OpenRigs.Video
         {
             ExposureTime = 1e6 / 50 - 1000;
             Binning = 1;
-            PixelFormat = PixelFormatEnums.Mono8.ToString();
         }
 
         // SpinnakerCapture opens and configures the camera on a MemberwiseClone of this node, while
@@ -60,6 +61,9 @@ namespace OpenRigs.Video
             }
         }
 
+        [Description("The camera's name in the data, Camera-<Entry> such as Camera-Face: announced to CamerasOpen once the camera is acquiring, so its trigger can start.")]
+        public string Name { get; set; }
+
         [Description("The size of the binning area of the sensor, e.g. a binning size of 2 specifies a 2x2 binning region. Taken only when the camera opens.")]
         public int Binning { get; set; }
 
@@ -81,15 +85,36 @@ namespace OpenRigs.Video
                 live.Camera = camera;
             }
             base.Configure(camera);
+            AnnounceOnceAcquiring(camera, Name);
+        }
+
+        // SpinnakerCapture begins acquisition after Configure with no hook after it, and a camera in
+        // trigger mode drops a trigger that comes before. So the camera is watched from here until it
+        // streams, then announced; it is never announced if it closes first.
+        void AnnounceOnceAcquiring(IManagedCamera camera, string name)
+        {
+            Task.Factory.StartNew(() =>
+            {
+                while (true)
+                {
+                    lock (live)
+                    {
+                        if (live.Camera != camera || !camera.IsInitialized()) return;
+                        if (camera.IsStreaming()) break;
+                    }
+                    Thread.Sleep(1);
+                }
+                CamerasOpen.Announce(name);
+            }, TaskCreationOptions.LongRunning);
         }
 
         void ConfigureCamera(IManagedCamera camera)
         {
             try { camera.AcquisitionStop.Execute(); }
             catch { }
-            // Before binning and the region: a format change can change their limits. Blank means Mono8,
-            // as coen-qc-preflight-rig reads it (audit, 11 Nov 2026).
-            camera.PixelFormat.Value = string.IsNullOrWhiteSpace(PixelFormat) ? "Mono8" : PixelFormat.Trim();
+            // Before binning and the region: a format change can change their limits. Blank keeps the
+            // format stored on the camera, as upstream does.
+            if (!string.IsNullOrWhiteSpace(PixelFormat)) camera.PixelFormat.Value = PixelFormat.Trim();
             camera.BinningSelector.Value = BinningSelectorEnums.All.ToString();
             camera.BinningHorizontalMode.Value = BinningHorizontalModeEnums.Sum.ToString();
             camera.BinningVerticalMode.Value = BinningVerticalModeEnums.Sum.ToString();
@@ -116,6 +141,7 @@ namespace OpenRigs.Video
 
         public IObservable<Timestamped<VideoDataFrame>> Generate<TPayload>(IObservable<Timestamped<TPayload>> source)
         {
+            if (string.IsNullOrWhiteSpace(Name)) throw new InvalidOperationException("A TriggeredSpinnaker has no Name; map the camera piece's Name onto it.");
             var frames = Generate().Finally(() => { lock (live) live.Camera = null; });
             return frames
                 // In the camera's callback, before Spinnaker releases the chunk data: the exposure

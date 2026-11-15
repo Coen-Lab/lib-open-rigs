@@ -92,6 +92,16 @@ namespace OpenRigs.Core.Tests
             Assert.AreEqual(Message, ex.Message);
         }
 
+        [TestMethod]
+        public void PutsItsNameBeforeTheMessage()
+        {
+            var dog = new GapWatchdog { GapSeconds = 0.2, Message = "no frame for 0.2 s.", Name = "Camera-Face" };
+            var ex = Assert.ThrowsException<TimeoutException>(() => dog.Process(Observable.Never<int>()).Wait());
+            Assert.AreEqual("Camera-Face: no frame for 0.2 s.", ex.Message);
+            dog.Message = "";
+            Assert.ThrowsException<InvalidOperationException>(() => dog.Process(Observable.Return(1)).Wait());
+        }
+
         [DataTestMethod]
         [DataRow(0.0, Message, "GapSeconds of 0")]
         [DataRow(1.0, " ", "has no Message")]

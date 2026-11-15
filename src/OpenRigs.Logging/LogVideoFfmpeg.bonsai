@@ -16,7 +16,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="LogName" Description="The base name of the video log, without extension." />
+        <Property Name="Name" Description="The device's name in the data, such as Camera-Face: its folder and the start of its files' names." />
         <Property Name="FrameRate" />
         <Property Name="ConfigRoot" />
       </Expression>
