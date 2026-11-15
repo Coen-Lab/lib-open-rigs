@@ -32,6 +32,8 @@ PER_ELEMENT = {"rx:SelectMany", "rx:CreateObservable", "rx:Concat", "rx:Switch"}
 SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
 SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
+ZAPIT_FOR_TASK = "OpenRigs.Devices:Zapit.ConnectForTask.bonsai"
+MANUAL_REWARDS = "OpenRigs.Devices:BehaviorBoard.ManualRewards.bonsai"
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
 DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
@@ -67,7 +69,7 @@ LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage'
 # Lab includes read from the package (never from the workflow), found in OpenRigs.Devices.dll by the start of their
 # Description: a rig list holds only pieces, and is expanded in place.
 RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The domes' hardware"}
-SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage"}
+SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task"}
 # lib-open-rigs' own source, when this module runs from it (its tests); a workflow's lint reads its package instead.
 LIB_SRC = Path(__file__).parents[2]
 BLOCK_SUBJECTS = {
@@ -518,41 +520,48 @@ def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[int]) -> 
 
 
 def zapit_include_problems(wf: Workflow) -> list[str]:
-    """Zapit is lib-open-rigs' Zapit.ConnectZapit, given the task's conditions file in an optogenetics experiment, and
-    nothing of its connect, check and refusal chain is built in the workflow."""
-    nodes, edges = scope(wf.named("Zapit"))
+    """Zapit is lib-open-rigs' Zapit.ConnectForTask, included once (ConnectZapit given the task's conditions file in an
+    optogenetics experiment), and nothing of its connect, check and refusal chain is built in the workflow."""
+    problems = [] if wf.text.count(f'Path="{ZAPIT_FOR_TASK}"') == 1 else ["the workflow does not include Zapit.ConnectForTask once"]
+    if f'Path="{ZAPIT_INCLUDE}"' in wf.text:
+        problems.append("the workflow includes Zapit.ConnectZapit itself (Zapit.ConnectForTask does)")
+    kinds = {kind(n) for n in wf.root.iter(W + "Expression")}
+    problems += [f"the workflow builds {local} itself" for local in ("zap:ZapitClient", "zap:CheckZapitConditionCount") if local in kinds]
+    problems += ["the workflow declares ZapitCommands, which ConnectZapit declares"
+                 for n in wf.root.iter(W + "Expression") if n.get(XSI, "").startswith("rx:") and _name(n) == "ZapitCommands"]
+    return problems
+
+
+def zapit_for_task_problems(root: ET.Element) -> list[str]:
+    """Zapit.ConnectForTask gives ConnectZapit the task file's optogenetics.zapitConfigPath behind a Condition on
+    optogenetics.useZapit. `root` is OpenRigs.Devices' Zapit/ConnectForTask.bonsai."""
+    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     includes = [i for i, n in enumerate(nodes) if n.get("Path") == ZAPIT_INCLUDE]
     if len(includes) != 1:
-        return ["the Zapit group does not include Zapit.ConnectZapit once"]
+        return ["ConnectForTask does not include Zapit.ConnectZapit once"]
     path = [nodes[i] for i in upstream(edges, includes[0])]
     problems = []
     if not any(n.findtext(W + "Selector") == "TaskParameters.Optogenetics.ZapitConfigPath" for n in path):
         problems.append("ConnectZapit is not given TaskParameters.Optogenetics.ZapitConfigPath")
     if not any(n.get(XSI) == "rx:Condition" and "Optogenetics.UseZapit" in ET.tostring(n, encoding="unicode") for n in path):
         problems.append("ConnectZapit is not behind a Condition on Optogenetics.UseZapit")
-    kinds = {kind(n) for n in wf.root.iter(W + "Expression")}
-    problems += [f"the workflow builds {local} itself" for local, found in (
-        ("zap:ZapitClient", "zap:ZapitClient" in kinds), ("zap:CheckZapitConditionCount", "zap:CheckZapitConditionCount" in kinds),
-        ("ConnectZapit</Name>", "ConnectZapit</Name>" in wf.text)) if found]
-    problems += ["the workflow declares ZapitCommands, which ConnectZapit declares"
-                 for n in wf.root.iter(W + "Expression") if n.get(XSI, "").startswith("rx:") and n.findtext(RX + "Name") == "ZapitCommands"]
     return problems
 
 
 def manual_reward_problems(wf: Workflow) -> list[str]:
-    """RewardLeft and RewardRight each give ManualRewardDropUl, 2.5 ul, at the side rig.yml names; no setting."""
-    problems = []
-    if "ManualRewardUl" in wf.text:
-        problems.append("ManualRewardUl is still named")
-    nodes, edges = scope(wf.named("Initialization"))
-    subject = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:BehaviorSubject" and n.findtext(W + "Name") == "ManualRewardDropUl"]
-    sources = [a for a, b, _ in edges if subject and b == subject[0]]
-    if len(sources) != 1 or float(nodes[sources[0]].findtext(f".//{W}Value") or "nan") != MANUAL_REWARD_DROP_UL:
-        problems.append(f"ManualRewardDropUl is not a BehaviorSubject of {MANUAL_REWARD_DROP_UL} in Initialization")
-    users = [n.findtext(W + "Name") for n in wf.named("Commands").iter(W + "Expression") if n.get(XSI) == "SubscribeSubject"]
-    if users.count("ManualRewardDropUl") != 2:
-        problems.append("RewardLeft and RewardRight do not both give ManualRewardDropUl")
+    """RewardLeft and RewardRight are BehaviorBoard.ManualRewards', included once: 2.5 ul at that side, no setting, and
+    the workflow handles neither itself."""
+    problems = [] if wf.text.count(f'Path="{MANUAL_REWARDS}"') == 1 else ["the workflow does not include BehaviorBoard.ManualRewards once"]
+    problems += [f"{name} is still named" for name in ("ManualRewardUl", "ManualRewardDropUl") if name in wf.text]
+    own = _on_commands(wf.root) & {"RewardLeft", "RewardRight"}
+    problems += [f"the workflow handles {name} itself (ManualRewards does)" for name in sorted(own)]
     return problems
+
+
+def manual_rewards_drop_problems(root: ET.Element) -> list[str]:
+    """ManualRewards gives MANUAL_REWARD_DROP_UL on each side. `root` is OpenRigs.Devices' BehaviorBoard/ManualRewards.bonsai."""
+    drops = [float(_value(n)) for n in root.iter(W + "Expression") if kind(n) == "DoubleProperty"]
+    return [] if drops == [MANUAL_REWARD_DROP_UL] * 2 else [f"ManualRewards gives {drops} ul, not {MANUAL_REWARD_DROP_UL} on each side"]
 
 
 def penalty_sound_problems(wf: Workflow) -> list[str]:
@@ -606,6 +615,8 @@ def undeclared_commands(wf: Workflow) -> list[str]:
     handled = _on_commands(wf.named("Commands"))
     if any(p == LICK_SPOUT_STAGE for p, _ in hardware(wf)):
         handled |= lick_spout_stage_commands(wf)
+    if f'Path="{MANUAL_REWARDS}"' in wf.text:
+        handled |= _on_commands(package_include(wf, MANUAL_REWARDS))
     return sorted(handled - declared)
 
 

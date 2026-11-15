@@ -373,3 +373,16 @@ def test_each_include_read_from_the_package_is_found_by_its_description(tmp_path
     monkeypatch.setattr(lint, "LIB_SRC", tmp_path / "nowhere")
     wf = workflow(tmp_path, include(lint.DEVICES + "DomeHardware.bonsai", "<ReadyWaitsFor>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body</ReadyWaitsFor>"))
     assert len(lint.required_devices(wf)) == 9
+
+def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
+    def root(resource: str) -> lint.ET.Element:
+        return lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
+    assert lint.zapit_for_task_problems(root("Zapit/ConnectForTask.bonsai")) == []
+    assert lint.manual_rewards_drop_problems(root("BehaviorBoard/ManualRewards.bonsai")) == []
+    commands = '<Command><Name>RewardLeft</Name></Command><Command><Name>RewardRight</Name></Command>'
+    group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
+    wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.MANUAL_REWARDS) + group + commands)
+    assert lint.zapit_include_problems(wf) == [] and lint.manual_reward_problems(wf) == [] and lint.undeclared_commands(wf) == []
+    undeclared = workflow(tmp_path / "b", include(lint.MANUAL_REWARDS) + group)
+    assert lint.undeclared_commands(undeclared) == ["RewardLeft", "RewardRight"]
+    assert lint.zapit_include_problems(undeclared) == ["the workflow does not include Zapit.ConnectForTask once"]
