@@ -32,6 +32,41 @@ namespace OpenRigs.Core.Tests
         }
 
         [TestMethod]
+        public void EachValueRestartsTheGap()
+        {
+            // Values every 0.3 s for 1.5 s against a 0.5 s gap: a watchdog that timed from subscription alone
+            // would stop at 0.5 s. A run where the runner held the test's thread past 0.45 s between values
+            // proves nothing, so it is tried again.
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                var dog = new GapWatchdog { GapSeconds = 0.5, Message = Message };
+                var source = new Subject<int>();
+                Exception error = null;
+                var longest = TimeSpan.Zero;
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                using (dog.Process(source).Subscribe(_ => { }, e => error = e))
+                {
+                    for (var i = 0; i < 6; i++)
+                    {
+                        System.Threading.Thread.Sleep(300);
+                        if (clock.Elapsed > longest) longest = clock.Elapsed;
+                        clock.Restart();
+                        source.OnNext(i);
+                    }
+                    System.Threading.Thread.Sleep(100);
+                    if (clock.Elapsed > longest) longest = clock.Elapsed;
+                    var seen = System.Threading.Volatile.Read(ref error);
+                    if (longest < TimeSpan.FromSeconds(0.45))
+                    {
+                        Assert.IsNull(seen, "a value 0.3 s after the last stopped it");
+                        return;
+                    }
+                }
+            }
+            Assert.Inconclusive("the runner held the test's thread past 0.45 s between values in every attempt");
+        }
+
+        [TestMethod]
         public void StopsWithItsMessageAfterAGapMidRun()
         {
             var dog = new GapWatchdog { GapSeconds = 0.5, Message = Message };
