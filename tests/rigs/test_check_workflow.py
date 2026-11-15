@@ -38,7 +38,6 @@ def lacks(id: str, version: str, found: str) -> str:
     ("0.1.1-fork-lab.14", "OpenRigs.Core.Extra.0.1.1-fork-lab.14", "none"),
     ("1.0", "OpenRigs.Core.1.0.0", None),
     ("1.0.0", "OpenRigs.Core.1.0", None),
-    ("0.1.1-Fork-Lab.14", "OpenRigs.Core.0.1.1-fork-lab.14", None),
     ("2.10", "OpenRigs.Core.2.1", "2.1"),
     ("2.1", "OpenRigs.Core.2.10", "2.10"),
 ])
@@ -74,20 +73,21 @@ def test_each_stale_package_is_one_line_naming_what_is_wanted_and_found_with_no_
 
 
 @windows_only
-def test_an_assembly_bonsai_config_does_not_locate_comes_from_the_version_it_names(tmp_path):
-    # Sorted by name, fork-lab.9 came before fork-lab.14.
+def test_the_resolver_takes_an_assembly_bonsai_config_does_not_locate_from_the_version_it_names(tmp_path):
+    # Sorted by name, fork-lab.9 came before fork-lab.14, so a resolver over every Packages folder took 9.
     repo = environment(tmp_path, {"OpenRigs.Core": "0.1.1-fork-lab.14"},
                        ["OpenRigs.Core.0.1.1-fork-lab.9", "OpenRigs.Core.0.1.1-fork-lab.14"])
-    for version in ("9", "14"):
-        lib = repo / ".bonsai" / "Packages" / f"OpenRigs.Core.0.1.1-fork-lab.{version}" / "lib" / "net472"
-        lib.mkdir(parents=True)
-        (lib / "OpenRigs.Core.dll").write_bytes(b"")
+    libs = [repo / ".bonsai" / "Packages" / f"OpenRigs.Core.0.1.1-fork-lab.{version}" / "lib" / "net472" for version in ("9", "14")]
     command = (
-        f"$ErrorActionPreference = 'Stop'; $bonsaiDir = '{repo / '.bonsai'}'; "
-        f"$ast = [Management.Automation.Language.Parser]::ParseFile('{SCRIPT}', [ref]$null, [ref]$null); "
+        f"$ErrorActionPreference = 'Stop'; $bonsaiDir = '{repo / '.bonsai'}'; $bin = '{tmp_path / 'bin'}'; "
+        + "".join(f"$null = New-Item -ItemType Directory '{lib}'; Add-Type -TypeDefinition 'public class Marker {{}}' "
+                  f"-OutputAssembly '{lib / 'OpenRigs.Core.dll'}'; " for lib in libs)
+        + f"$ast = [Management.Automation.Language.Parser]::ParseFile('{SCRIPT}', [ref]$null, [ref]$null); "
         "foreach ($f in $ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] }, $false)) "
         "{ . ([scriptblock]::Create($f.Extent.Text)) }; "
-        "Find-PackageAssembly @(Get-Packages | Where-Object { $_.Folder } | ForEach-Object { $_.Folder }) 'OpenRigs.Core'")
+        # Initialize-Assemblies registers the resolver, then stops at loading Bonsai.Core, which this repository lacks.
+        "try { Initialize-Assemblies } catch {}; "
+        "$script:resolver.Invoke($null, [ResolveEventArgs]::new('OpenRigs.Core')).Location")
     run = subprocess.run(POWERSHELL + ["-Command", command], capture_output=True, text=True, timeout=120)
     assert run.stderr == ""
-    assert run.stdout.strip() == str(repo / ".bonsai" / "Packages" / "OpenRigs.Core.0.1.1-fork-lab.14" / "lib" / "net472" / "OpenRigs.Core.dll")
+    assert run.stdout.strip() == str(libs[1] / "OpenRigs.Core.dll")

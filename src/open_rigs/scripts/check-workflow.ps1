@@ -25,7 +25,7 @@ $template = Join-Path (Split-Path -Parent (Split-Path -Parent $self)) 'rigs\rig-
 
 # A folder keeps the package's own version, which NuGet may have normalised in Bonsai.config (openal.redist.2.0.7.0 for
 # 2.0.7), so trailing .0 parts are not compared.
-function Get-NormalVersion([string]$v) { $parts = $v.ToLowerInvariant() -split '-', 2; ($parts[0] -replace '(\.0)+$', '') + $(if ($parts.Count -gt 1) { '-' + $parts[1] }) }
+function Get-NormalVersion([string]$v) { $parts = $v -split '-', 2; ($parts[0] -replace '(\.0)+$', '') + $(if ($parts.Count -gt 1) { '-' + $parts[1] }) }
 
 # Each package Bonsai.config names: its id, the version it names, its folder in .bonsai\Packages at that version ($null
 # when there is none) and every version of it there.
