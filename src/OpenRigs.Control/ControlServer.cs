@@ -580,6 +580,10 @@ namespace OpenRigs.Control
                     var phase = state.Locked(() => state.Phase);
                     if (phase != ExperimentPhase.Ready)
                         return Refuse("not ready (phase " + phase + ")");
+                    // The experiment's folder and manifest are named by both: an empty one makes no record.
+                    var missing = new[] { "SubjectId", "SessionId" }.Where((n, i) => string.IsNullOrWhiteSpace(i == 0 ? state.SubjectId : state.SessionId)).ToList();
+                    if (missing.Count > 0)
+                        return Refuse("the workflow was started with no " + string.Join(" or ", missing) + ", which name the experiment: start it again with both set");
                     // One lock: the snapshot, the check and GoRequested, so a ParameterDefault
                     // or ParameterMaximum landing between them cannot show Go a value it did not
                     // take. A value set before the workflow learned the limit (ParameterMaximum

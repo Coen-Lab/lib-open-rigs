@@ -203,6 +203,21 @@ namespace OpenRigs.Control.Tests
                 slow.Dispose();
             }
 
+            Console.WriteLine("Go with no SessionId:");
+            {
+                const string blankEndpoint = "tcp://127.0.0.1:5644";
+                var server = Server(blankEndpoint);
+                server.SessionId = " ";
+                using (server.Generate().Subscribe(_ => { }, _ => { }))
+                using (var socket = new RequestSocket(">" + blankEndpoint))
+                {
+                    ControlState.Current.SetPhase(ExperimentPhase.Ready);
+                    var go = Ask(socket, new { cmd = "go" });
+                    Check("Go is refused, naming the empty SessionId", !Ok(go) && ((string)go["why"]).Contains("no SessionId"), go.ToString());
+                    Check("... and not requested", !ControlState.Current.GoRequested, "requested");
+                }
+            }
+
             Console.WriteLine("Two declared with one name:");
             {
                 // S2-L2: the second was shadowed by the first in set and command.

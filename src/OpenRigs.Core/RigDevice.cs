@@ -54,7 +54,18 @@ namespace OpenRigs.Core
             var kind = LowerFirst(parts[0]);
             var entry = LowerFirst(parts[1]);
             TDevice device;
-            if (entries != null && entries.TryGetValue(entry, out device)) return device;
+            if (entries != null && entries.TryGetValue(entry, out device))
+            {
+                // A device on a serial port (a Harp board) without one would fail to open, naming no device.
+                if (device == null) throw new ArgumentException(string.Format("rig.yml's {0} {1} ({2}) is empty: give its settings.", kind, entry, name));
+                var port = device.GetType().GetProperty("PortName");
+                if ((port != null && port.PropertyType == typeof(string) && string.IsNullOrWhiteSpace((string)port.GetValue(device, null))))
+                {
+                    throw new ArgumentException(string.Format(
+                        "rig.yml's {0} {1} ({2}) has no portName: give the COM port it is on, such as portName: COM3.", kind, entry, name));
+                }
+                return device;
+            }
 
             var has = entries == null || entries.Count == 0
                 ? string.Format("Its {0} section has no entries.", kind)

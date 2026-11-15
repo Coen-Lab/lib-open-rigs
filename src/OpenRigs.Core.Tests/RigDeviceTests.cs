@@ -32,6 +32,20 @@ namespace OpenRigs.Core.Tests
             StringAssert.Contains(ex.Message, "Its camera section has no entries.");
         }
 
+        public class Board { public string PortName { get; set; } }
+
+        [TestMethod]
+        public void ABoardWithNoPortNameOrAnEmptyEntryIsRefusedByName()
+        {
+            var boards = new Dictionary<string, Board> { { "main", new Board() }, { "spare", null }, { "ok", new Board { PortName = "COM3" } } };
+            Func<string, Board> take = name => new RigDevice { Name = name }.Process(Observable.Return(boards)).Wait().Settings;
+            Assert.AreEqual("COM3", take("BehaviorBoard-Ok").PortName);
+            var ex = Assert.ThrowsException<ArgumentException>(() => take("BehaviorBoard-Main"));
+            StringAssert.Contains(ex.Message, "rig.yml's behaviorBoard main (BehaviorBoard-Main) has no portName");
+            ex = Assert.ThrowsException<ArgumentException>(() => take("BehaviorBoard-Spare"));
+            StringAssert.Contains(ex.Message, "rig.yml's behaviorBoard spare (BehaviorBoard-Spare) is empty");
+        }
+
         [TestMethod]
         public void AnUnsetOrMalformedNameFailsAtStart()
         {

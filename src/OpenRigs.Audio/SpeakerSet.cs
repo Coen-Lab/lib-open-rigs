@@ -64,12 +64,17 @@ namespace OpenRigs.Audio
         /// <summary>
         /// A sound (one row) equalised for the speaker on a channel: correlated with its filter's taps, centred on the
         /// middle tap and zero beyond the ends, so as long as the input and not delayed (the taps are symmetric, so this
-        /// is the convolution too). Unchanged on a channel no speaker is on.
+        /// is the convolution too). Stops on a channel no speaker is on: a sound asked to be equalised is never played as it is.
         /// </summary>
         public Mat Equalise(Mat sound, int channel)
         {
             var speaker = Speakers.FirstOrDefault(s => s.Channel == channel);
-            return speaker == null ? ToFloat(sound) : Equalise(sound, speaker.Kernel);
+            if (speaker == null)
+            {
+                throw new InvalidOperationException("Channel " + channel + " has no speaker in rig.yml's speakerArray.speakers, so a sound there cannot be equalised: " +
+                                                    "play it on a speaker's channel (" + string.Join(", ", Speakers.Select(s => s.Name + " " + s.Channel)) + ").");
+            }
+            return Equalise(sound, speaker.Kernel);
         }
 
         /// <summary>
@@ -167,7 +172,7 @@ namespace OpenRigs.Audio
         /// rig.yml's speakerArray, each speaker's filter read relative to rig.yml's folder. Stops, naming every problem,
         /// on a speaker without a filter (RequireFilters), a filter missing, without taps,
         /// not symmetric, for another rate or measured on another machine; a speaker or syncChannel outside the
-        /// device's channels, two speakers on one channel, or an penaltySoundChannel with no speaker on it.
+        /// device's channels, a speaker on syncChannel, two speakers on one channel, or a penaltySoundChannel with no speaker on it.
         /// </summary>
         public static SpeakerSet Load(string rigFile, string machineName = null)
         {
@@ -267,6 +272,10 @@ namespace OpenRigs.Audio
             if (set.SyncChannel.HasValue && (set.SyncChannel < 0 || set.SyncChannel >= set.ChannelCount))
             {
                 problems.Add("syncChannel " + set.SyncChannel + range);
+            }
+            foreach (var speaker in read.Where(s => s.Channel == set.SyncChannel))
+            {
+                problems.Add("speaker '" + speaker.Name + "' is on syncChannel " + speaker.Channel + ", which the sync copy needs to itself");
             }
             if (set.PenaltySoundChannel.HasValue && !read.Any(s => s.Channel == set.PenaltySoundChannel))
             {

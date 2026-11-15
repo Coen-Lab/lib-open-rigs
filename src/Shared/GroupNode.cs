@@ -17,8 +17,17 @@ namespace OpenRigs.Shared
     {
         static readonly PropertyInfo BuildContextProperty = typeof(WorkflowExpressionBuilder).GetProperty(
             "BuildContext", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-        static readonly MethodInfo GetVariableMethod = typeof(ExpressionBuilder).Assembly
-            .GetType("Bonsai.Expressions.IBuildContext").GetMethod("GetVariable");
+        static readonly Type BuildContextType = typeof(ExpressionBuilder).Assembly.GetType("Bonsai.Expressions.IBuildContext");
+        static readonly MethodInfo GetVariableMethod = BuildContextType == null ? null : BuildContextType.GetMethod("GetVariable");
+
+        static void RequireBuildContext()
+        {
+            if (BuildContextProperty != null && GetVariableMethod != null) return;
+            throw new InvalidOperationException(string.Format(
+                "This lab group node reads Bonsai.Core's internal build context (WorkflowExpressionBuilder.BuildContext, IBuildContext.GetVariable), " +
+                "written against Bonsai.Core 2.9.0; Bonsai.Core {0} lacks it. Use Bonsai 2.9, or update OpenRigs' GroupNode for this version.",
+                typeof(ExpressionBuilder).Assembly.GetName().Version));
+        }
 
         /// <summary>
         /// The subject the enclosing workflow publishes under this name, as the expression a
@@ -28,6 +37,7 @@ namespace OpenRigs.Shared
         /// </summary>
         public static Expression Subject(WorkflowExpressionBuilder node, string name)
         {
+            RequireBuildContext();
             var context = BuildContextProperty.GetValue(node, null);
             if (context == null) return null;
             try

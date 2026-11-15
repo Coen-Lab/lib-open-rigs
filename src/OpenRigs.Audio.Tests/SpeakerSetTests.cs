@@ -61,6 +61,22 @@ namespace OpenRigs.Audio.Tests
         }
 
         [TestMethod]
+        public void ASpeakerOnTheSyncChannelIsRefusedAtLoad()
+        {
+            var error = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(extra: "  syncChannel: 2\n  penaltySoundChannel: 2\n"), "TEST-RIG"));
+            StringAssert.Contains(error.Message, "speaker 'centre' is on syncChannel 2, which the sync copy needs to itself");
+        }
+
+        [TestMethod]
+        public void EqualisingOnAChannelWithNoSpeakerIsRefused()
+        {
+            var set = SpeakerSet.Load(Rig(), "TEST-RIG");
+            var error = Assert.ThrowsException<InvalidOperationException>(() => set.Layout(Row(0, 1, 0), new[] { 5 }, 1));
+            StringAssert.Contains(error.Message, "Channel 5 has no speaker");
+            set.Layout(Row(0, 1, 0), new[] { 5 }, 1, equalise: false).Dispose();
+        }
+
+        [TestMethod]
         public void ABufferPlaysOnlyOnItsChannelsEqualisedAndScaled()
         {
             var set = SpeakerSet.Load(Rig(), "TEST-RIG");
