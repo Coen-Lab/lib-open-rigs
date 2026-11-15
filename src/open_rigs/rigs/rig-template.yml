@@ -1,0 +1,154 @@
+# yaml-language-server: $schema=../schemas/lab_rig.json
+#
+# The lab's rig configuration TEMPLATE: the lab rig model (open_rigs.rigs.lab_rig.LabRig), which every
+# lab workflow reads with OpenRigs.Devices' generated classes (namespace OpenRigs.Devices.Rigs).
+#
+# Per-rig configuration files are NOT committed. To deploy a rig:
+#   1. Copy this file to <ConfigRoot>\<MACHINE-NAME>\rig.yml, where ConfigRoot is
+#      C:\Coen-Lab-Local\RigConfigs (the lab's place, kept apart from production's C:\RigConfigs),
+#      e.g. C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-2\rig.yml. The workflow resolves the
+#      directory by hostname and fails at startup if it or rig.yml is missing.
+#   2. Fill in the values for that rig. Calibration artefacts (valve curves and the like) go in
+#      calibration\ beside rig.yml and are referenced by paths relative to that directory.
+#   3. Off-repo copies should replace the $schema path above with an absolute path to
+#      open_rigs\schemas\lab_rig.json (or a raw GitHub URL) to keep editor validation working.
+#
+rootPath: C:\Coen-Lab-Local\Acquired-Data   # the acquisition folder itself: experiments go to <rootPath>\sub-<mouse>\ses-...
+rigId: XX                 # two capitals or a capital and a digit, such as G1: rig-control's session numbering
+
+# Each kind of device is a group of named entries: behaviorBoard: main: is BehaviorBoard-Main in the
+# data and in live view. The workflow takes each device it drives by that name and stops at startup,
+# naming what this file has, if one is missing. usbSerial is the board's USB serial, an FTDI chip's
+# or a Pico's flash id (rig-setup's hardware scan lists each port's): RecordHarpDevices checks at
+# Start that the board on each portName has it, for every Harp board here, and stops the workflow
+# saying which board is where if not.
+behaviorBoard:
+  main:
+    portName: COM1
+    usbSerial: CHANGE-ME
+    pulseController:
+      outputPulseEnable: "DO1, DO2"   # never DO3: the ZapitTrigger line is held, not pulsed (lab rig model refuses it)
+      # Each reward valve is a CalibratedPulse: its curve, in calibration\ beside this file, plans every
+      # reward's pulses at the gap it was calibrated at. The ZapitTrigger line is held high, never pulsed.
+      outputs:
+        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
+        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
+    # What each line drives (lab rig model, open_rigs.rigs.lab_rig): one RewardValve per side and one
+    # ZapitTrigger. The workflow reads the reward and Zapit lines from here.
+    wiring:
+      DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
+      DO1: { device: RewardValve, side: left }
+      DO2: { device: RewardValve, side: right }
+      DO3: { device: ZapitTrigger, note: also the masking light }
+    cameraTriggerController:
+      trigger0Enabled: true     # camera trigger 0 shares the DO0 pin
+      trigger0Frequency: 50     # Hz
+      trigger1Enabled: false    # camera trigger 1 shares the DO1 pin, a reward valve's
+      trigger1Frequency: 50     # Hz, used only if trigger 1 is enabled
+    runningWheel:
+      wheelDiameterMm: 75       # mm; the measured wheel on every dome (9 Nov 2026)
+      countsPerRev: 4096
+
+timestampGeneratorGen3:
+  main:
+    portName: COM2
+    usbSerial: CHANGE-ME
+    timerFrequency: Timer1000Hz
+
+# The lick spout stage's two Harp StepperDriver boards (HarpLickSpoutStage): board a drives the base
+# transverse, left radial and right radial axes, board b the left and right elevations.
+stepperDriver:
+  a:
+    portName: COM3
+    usbSerial: CHANGE-ME
+  b:
+    portName: COM4
+    usbSerial: CHANGE-ME
+
+licketySplit:
+  left:
+    portName: COM5
+    usbSerial: CHANGE-ME            # a Pico's flash id, such as E664C856C360B937
+    channel0TriggerThreshold: 0     # ADC counts above which a lick registers
+    channel0UntriggerThreshold: 0   # ADC counts below which the lick ends
+  right:
+    portName: COM6
+    usbSerial: CHANGE-ME
+    channel0TriggerThreshold: 0
+    channel0UntriggerThreshold: 0
+
+# Exactly three cameras, on the board's trigger 0 (RigHardware).
+camera:
+  face:
+    serialNumber: "00000000"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+  pupil:
+    serialNumber: "00000000"
+    exposureTime: 19000    # microseconds
+    gain: 20
+    binning: 1
+  body:
+    serialNumber: "00000000"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+
+# Every camera's video is encoded on the rig's NVIDIA GPU (RTX 5060 on every dome); libx264, the
+# CPU encoder, when this section is left out.
+videoEncoder:
+  codec: h264_nvenc
+
+# Full paths into this rig's calibration folder; the placeholder is the machine name.
+projectionCalibration:
+  meshMapPath: C:\Coen-Lab-Local\RigConfigs\CHANGE-ME\calibration\MeshMap.csv
+  gammaLutPath: C:\Coen-Lab-Local\RigConfigs\CHANGE-ME\calibration\gammalut.bmp
+
+speakerArray:
+  device:                   # the mixer and the stimulus loader read these
+    deviceName: Speakers (XMOS xCORE-200 MC (UAC2.0))
+    hostApi: Windows WDM-KS
+    sampleRate: 48000       # Hz; the stimulus WAVs and speaker filters must be at this rate
+    channelCount: 32
+    suggestedLatency: 0.002 # s
+    bootDelay: 3.0          # s before the mixer starts: a fault while the sound card boots can blue-screen the PC
+  syncChannel: 31           # the sync copy of each stimulus (OpenRigs.Audio SyncCopy)
+  syncGain: 0.2
+  penaltySoundChannel: 2    # the penalty sound's channel
+  unusedChannels: [30]      # not connected
+  # Speakers currently wired on this rig. Position is relative to the subject:
+  # azimuth 0 = straight ahead, positive to the right; elevation 0 = horizontal.
+  # filter: the speaker's SpeakerFilter artefact (FIR taps for the device's sample rate), relative
+  # to this directory, measured on this machine. Every speaker needs one: the workflow stops at Start
+  # naming a speaker without (OpenRigs.Audio LoadSpeakers). A task's stimuli are its own files, not rig
+  # calibration files; the penalty sound is the lab's, on penaltySoundChannel alone.
+  speakers:
+    left:
+      position: { azimuth: -90, elevation: 15 }
+      channel: 0
+      filter: calibration/speaker-left.json
+    right:
+      position: { azimuth: 90, elevation: 15 }
+      channel: 1
+      filter: calibration/speaker-right.json
+    centre:
+      position: { azimuth: 0, elevation: 15 }
+      channel: 2
+      filter: calibration/speaker-centre.json
+
+# Zapit optogenetics server (tcpServer section of the Zapit settings file). Contacted only when the
+# task sets optogenetics.useZapit: true. The trigger is the board's ZapitTrigger line in wiring.
+zapit:
+  host: 127.0.0.1           # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
+  port: 1488
+  hardwareTriggered: false  # true once the ZapitTrigger line is cabled to the Zapit DAQ trigger input
+
+# The stage's in position, in steps, for a mouse with no positions file of its own
+lickSpoutDefaultPosition:
+  baseTransverse: 0
+  leftRadial: 0
+  rightRadial: 0
+  leftElevation: 0
+  rightElevation: 0

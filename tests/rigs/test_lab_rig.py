@@ -185,3 +185,21 @@ def test_video_encoder_optional():
     assert LabRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc"}}).video_encoder.codec == "h264_nvenc"
     with pytest.raises(ValidationError, match="ffmpeg"):
         LabRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc", "ffmpeg": "x"}})
+
+
+def test_the_lab_rig_template_validates_and_fits_the_committed_schema():
+    # Every lab workflow's rig.yml starts from this file and is read by OpenRigs.Devices.Rigs, generated
+    # from schemas/lab_rig.json: regenerate both with `uv run regenerate-lab-rig`.
+    import json
+    from importlib import resources
+
+    import yaml
+
+    from open_rigs._generators.lab_rig import build_schema
+
+    package = resources.files("open_rigs")
+    template = yaml.safe_load((package / "rigs" / "rig-template.yml").read_text(encoding="utf-8"))
+    rig = LabRig.model_validate(template)
+    assert rig.behavior_board["main"].wiring.do3.device == "ZapitTrigger"
+    committed = json.loads((package / "schemas" / "lab_rig.json").read_text(encoding="utf-8"))
+    assert committed == json.loads(json.dumps(build_schema()))
