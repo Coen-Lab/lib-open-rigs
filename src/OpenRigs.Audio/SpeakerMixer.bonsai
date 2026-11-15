@@ -7,7 +7,7 @@
                  xmlns:cvn="clr-namespace:OpenCV.Net;assembly=OpenCV.Net"
                  xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A rig's speakers and their mixer, for every workflow that plays sounds. Loads rig.yml's speakers and their filters once at Start (LoadSpeakers, from RigFile) into the AsyncSubject Speakers, and starts the mixer on rig.yml's speakerArray.device (from RigConfigs) no sooner than 3 s after Start, or rig.yml's longer bootDelaySeconds: deliberate, as a fault while the sound card boots can blue-screen the PC, so never remove or shorten it. It plays four sounds over each other, each a mixer buffer already at its level (SpeakerBuffer, PenaltySoundBuffer, SpeakerSet.Buffer: every level in dBFS RMS, from the task file, each buffer carrying its own), multicast into the BehaviorSubject it declares for it: StimulusSounds (each trial's stimulus), RewardToneSounds, PenaltySounds and BackgroundNoise (one buffer, looped, faded in over 2 s when it comes). The mixer plays StimulusSounds, RewardToneSounds and PenaltySounds through a PublishSubject each (Mixer&lt;name&gt;): a sound starts only once the one before it on its source has finished. A stimulus or penalty sound sent before the mixer has started stops the workflow, naming it (CheckMixerStarted); a reward tone sent before is not played, as a manual drop before Go may be. BackgroundNoise plays when the mixer starts. A workflow sends only what it plays. Needs RigFile and RigConfigs (OpenRigs.Devices RigHardware and the lab rig model) and Bonsai.Mixer in the workflow's environment.</Description>
+  <Description>A rig's speakers and their mixer, for every workflow that plays sounds. Loads rig.yml's speakers and their filters once at Start (LoadSpeakers, from RigFile) into the AsyncSubject Speakers, and starts the mixer on rig.yml's speakerArray.device (from RigConfigs) no sooner than 3 s after Start, or rig.yml's longer bootDelaySeconds: deliberate, as a fault while the sound card boots can blue-screen the PC, so never remove or shorten it. It plays four sounds over each other, each a mixer buffer already at its level (SpeakerBuffer, PenaltySoundBuffer, SpeakerSet.Buffer: every level in dBFS RMS, from the task file, each buffer carrying its own), multicast into the BehaviorSubject it declares for it: StimulusSounds (each trial's stimulus), RewardToneSounds, PenaltySounds and BackgroundNoise (one buffer, looped, faded in over 2 s when it comes). The mixer plays StimulusSounds, RewardToneSounds and PenaltySounds through a PublishSubject each (Mixer&lt;name&gt;): a sound starts only once the one before it on its source has finished. A stimulus or penalty sound sent before the mixer has started stops the workflow, naming it (CheckMixerStarted); a reward tone sent before is not played, as a manual drop before Go may be. BackgroundNoise plays when the mixer starts. Once the mixer has started it multicasts MixerStarted into RigHardware's ReadyStages, so Ready waits for it on a workflow that sets RigHardware's ReadyWaitsFor to HarpClockSet, SpoutsHomed, MixerStarted. A workflow sends only what it plays. Needs RigFile, RigConfigs and ReadyStages (OpenRigs.Devices RigHardware and the lab rig model) and Bonsai.Mixer in the workflow's environment.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -237,6 +237,17 @@
       <Expression xsi:type="SubscribeSubject">
         <Name>Mixer</Name>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Mixer</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="StringProperty">
+          <Value>MixerStarted</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -266,6 +277,8 @@
       <Edge From="36" To="39" Label="Source1" />
       <Edge From="41" To="39" Label="Source2" />
       <Edge From="39" To="37" Label="Source1" />
+      <Edge From="42" To="43" Label="Source1" />
+      <Edge From="43" To="44" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

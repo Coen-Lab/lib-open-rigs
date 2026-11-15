@@ -8,14 +8,14 @@ using System.Reactive.Linq;
 namespace OpenRigs.Core
 {
     /// <summary>
-    /// Watches the names of start-up stages as they arrive. Completes once every name in
-    /// <see cref="Expected"/> has arrived; if <see cref="TimeoutSeconds"/> of wall-clock time pass
-    /// first, stops the workflow with an error naming the stages that arrived and those that never did.
+    /// Watches the names of start-up stages as they arrive. Emits the last of them and completes once
+    /// every name in <see cref="Expected"/> has arrived, so what follows it, such as a Ready report,
+    /// runs then; if <see cref="TimeoutSeconds"/> of wall-clock time pass first, stops the workflow with
+    /// an error naming the stages that arrived and those that never did.
     /// </summary>
     [Combinator]
     [DefaultProperty("Expected")]
-    [Description("Watches the names of start-up stages as they arrive. Completes once every name in Expected has arrived; if TimeoutSeconds pass first (wall clock, from subscription), stops the workflow with an error naming the stages that arrived and those that never did.")]
-    [WorkflowElementCategory(ElementCategory.Sink)]
+    [Description("Watches the names of start-up stages as they arrive. Emits the last of them and completes once every name in Expected has arrived; if TimeoutSeconds pass first (wall clock, from subscription), stops the workflow with an error naming the stages that arrived and those that never did.")]
     public class StartupWatchdog
     {
         /// <summary>Gets or sets the stages that must all arrive, comma separated.</summary>
@@ -69,7 +69,7 @@ namespace OpenRigs.Core
                         what, timeoutSeconds, seen.Count > 0 ? string.Join(", ", seen) : "nothing", string.Join(", ", missing))));
                 });
 
-                return stages.Amb(timeout).IgnoreElements();
+                return stages.Amb(timeout);
             });
         }
     }

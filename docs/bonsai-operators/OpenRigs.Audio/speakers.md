@@ -45,9 +45,9 @@ Every sound plays at a level, never a gain: `levelDbfs`, in dBFS RMS, the RMS of
 
 - loads the speakers once at Start (`RigFile` -> `LoadSpeakers` -> `Speakers`, an `AsyncSubject`);
 - starts the mixer on `rig.yml`'s `speakerArray.device` (from `RigConfigs`), never sooner than 3 s after Start, or `device.bootDelaySeconds` if longer: deliberate, as a fault while the sound card boots can blue-screen the PC, so never remove or shorten it;
-- plays four sounds over each other, one mixer source each, from the `BehaviorSubject` of `Mat` it declares for it: `StimulusSounds` (each trial's stimulus), `RewardToneSounds`, `PenaltySounds` and `BackgroundNoise` (one buffer, looped, faded in over 2 s when it comes). Each buffer already carries its level, so the mixer plays them at gain 1. The mixer reads `StimulusSounds`, `RewardToneSounds` and `PenaltySounds` through a `PublishSubject` each (`Mixer<name>`), so a sound sent before the mixer has started is never played at its start: a stimulus or penalty sound sent then stops the workflow, naming it and the boot delay (`CheckMixerStarted`), as the trial log would record it as sent; a reward tone sent then is not played, as a manual drop before Go may be. `RigHardware`'s Ready does not wait for the mixer. A sound sent while the one before it on its source is still playing is queued behind it (`AppendBuffer` appends to the source's playback queue): it starts only after the previous one has finished. `BackgroundNoise` plays when the mixer starts. A workflow multicasts only what it plays, from a per-trial graph if it likes (a `BehaviorSubject` is not closed by it).
+- plays four sounds over each other, one mixer source each, from the `BehaviorSubject` of `Mat` it declares for it: `StimulusSounds` (each trial's stimulus), `RewardToneSounds`, `PenaltySounds` and `BackgroundNoise` (one buffer, looped, faded in over 2 s when it comes). Each buffer already carries its level, so the mixer plays them at gain 1. The mixer reads `StimulusSounds`, `RewardToneSounds` and `PenaltySounds` through a `PublishSubject` each (`Mixer<name>`), so a sound sent before the mixer has started is never played at its start: a stimulus or penalty sound sent then stops the workflow, naming it and the boot delay (`CheckMixerStarted`), as the trial log would record it as sent; a reward tone sent then is not played, as a manual drop before Go may be. Once the mixer has started it multicasts `MixerStarted` into `RigHardware`'s `ReadyStages`; a workflow that includes `SpeakerMixer` sets `RigHardware`'s `ReadyWaitsFor` to `HarpClockSet, SpoutsHomed, MixerStarted`, so Ready, and with it Go, comes only once the mixer plays (see [Building Blocks](../../articles/building-blocks.md#ready)), and `CheckMixerStarted` is the safety net behind it. A sound sent while the one before it on its source is still playing is queued behind it (`AppendBuffer` appends to the source's playback queue): it starts only after the previous one has finished. `BackgroundNoise` plays when the mixer starts. A workflow multicasts only what it plays, from a per-trial graph if it likes (a `BehaviorSubject` is not closed by it).
 
-It needs Bonsai.Mixer in the workflow's environment.
+It needs `RigHardware` (its `RigFile` and `ReadyStages`) and Bonsai.Mixer in the workflow's environment.
 
 ---
 
@@ -68,7 +68,8 @@ It needs Bonsai.Mixer in the workflow's environment.
 ## In a workflow
 
 ```
-IncludeWorkflow OpenRigs.Audio:SpeakerMixer.bonsai          (Speakers, the mixer, its four sound subjects)
+IncludeWorkflow OpenRigs.Devices:RigHardware.bonsai         (ReadyWaitsFor: HarpClockSet, SpoutsHomed, MixerStarted)
+IncludeWorkflow OpenRigs.Audio:SpeakerMixer.bonsai          (Speakers, the mixer, its four sound subjects, MixerStarted)
 
 SubscribeSubject TaskConfig -> TaskParameters.<sound>.LevelDbfs ─┐
 SubscribeSubject Speakers ─┐                                       │

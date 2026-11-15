@@ -150,11 +150,12 @@ namespace OpenRigs.Core.Tests
     public class StartupWatchdogTests
     {
         [TestMethod]
-        public void CompletesOnceEveryStageHasArrived()
+        public void EmitsTheLastStageOnceEveryStageHasArrived()
         {
             var stages = new[] { "Board", "Steppers", "Board" }.ToObservable();
             var watchdog = new StartupWatchdog { Expected = "Steppers, Board", TimeoutSeconds = 5 };
-            Assert.IsTrue(watchdog.Process(stages).IsEmpty().Timeout(TimeSpan.FromSeconds(2)).Wait());
+            var ready = watchdog.Process(stages).ToList().Timeout(TimeSpan.FromSeconds(2)).Wait();
+            Assert.AreEqual("Steppers", string.Join(", ", ready));
         }
 
         [TestMethod]

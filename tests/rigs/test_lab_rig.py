@@ -210,3 +210,8 @@ def test_the_mixer_boot_delay_is_in_seconds_and_a_speaker_has_no_gain():
     defs = LabRig.model_json_schema(by_alias=True)["$defs"]
     assert "bootDelaySeconds" in defs["AudioDevice"]["properties"] and "bootDelay" not in defs["AudioDevice"]["properties"]
     assert "gain" not in defs["Speaker"]["properties"]
+
+
+def test_the_reward_valve_lines_are_wiring_s():
+    assert LabRig.model_validate(RIG).reward_valve_lines() == {1, 2}
+    assert LabRig.model_validate(rig_with(DO2={"device": "RewardValve", "side": "right"}, DO3={"device": "ZapitTrigger"})).reward_valve_lines() == {2}

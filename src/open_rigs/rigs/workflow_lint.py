@@ -30,9 +30,15 @@ SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "
 BLOCK_SUBJECTS = {
     "OpenRigs.Devices:Zapit.ConnectZapit.bonsai": {"ZapitCommands": "rx:BehaviorSubject"},
     SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
+    "OpenRigs.Devices:RigHardware.bonsai": {"ReadyStages": "rx:ReplaySubject"},
 }
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
 RIG_HARDWARE = "OpenRigs.Devices:RigHardware.bonsai"
+# The stages RigHardware's Ready waits for (its ReadyWaitsFor), and on a workflow that includes SpeakerMixer.
+READY_STAGES = ("HarpClockSet", "SpoutsHomed")
+READY_STAGES_WITH_MIXER = READY_STAGES + ("MixerStarted",)
+# The PulseController's subject that fires a pulse of the line's set width (the DO line, 1 to 3, as an int).
+FIXED_WIDTH_PULSE = "TriggerPulse"
 # The lab's Bonsai setup, one copy that each workflow's .bonsai\Setup.ps1 runs from the open-rigs it pins.
 SETUP_BONSAI = Path(__file__).parents[1] / "scripts" / "setup-bonsai.ps1"
 SETUP_BONSAI_RUN = "open_rigs\\scripts\\setup-bonsai.ps1"
@@ -40,11 +46,11 @@ MANUAL_REWARD_DROP_UL = 2.5  # RewardLeft and RewardRight each give this, before
 
 
 class Workflow:
-    """A workflow repository's src\\main.bonsai, as text and as XML."""
+    """A workflow repository's src\\main.bonsai (or another workflow in src), as text and as XML."""
 
-    def __init__(self, repo: Path):
+    def __init__(self, repo: Path, file: str = "main.bonsai"):
         self.repo = Path(repo)
-        self.text = (self.repo / "src" / "main.bonsai").read_text(encoding="utf-8-sig")
+        self.text = (self.repo / "src" / file).read_text(encoding="utf-8-sig")
         self.root = ET.fromstring(self.text.encode("utf-8"))
 
     def named(self, name: str) -> ET.Element:
@@ -163,13 +169,6 @@ def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
     return found
 
 
-def startup_watchdog_readers(wf: Workflow) -> int:
-    """How many nodes read a StartupWatchdog's output: it completes once every stage has come and never emits, so a
-    node fed by it never sees a value (seen on a rig, 14 Nov 2026: Ready never came)."""
-    return sum(1 for nodes, edges in _scopes(wf.root) for i, n in enumerate(nodes)
-               if kind(n).endswith(":StartupWatchdog") for a, _, _ in edges if a == i)
-
-
 def mixer_boot_delay_problems(root: ET.Element) -> list[str]:
     """The mixer starts no sooner than 3 s after Start, or rig.yml's longer bootDelaySeconds: a fault while the sound card
     boots can blue-screen the PC (deliberate; never remove or shorten it). `root` is OpenRigs.Audio's SpeakerMixer.bonsai,
@@ -266,13 +265,109 @@ def sound_level_problems(wf: Workflow) -> list[str]:
 
 
 def rig_hardware_problems(wf: Workflow) -> list[str]:
-    """RigHardware reports Ready, starts the cameras and holds the startup watchdog: the workflow repeats none of it."""
-    problems = [] if wf.text.count(f'Path="{RIG_HARDWARE}"') == 1 else ["the workflow does not include RigHardware once"]
-    problems += [f"the workflow has its own {what}" for what, found in (
+    """RigHardware reports Ready, starts the cameras and holds the startup watchdog: the workflow repeats none of it.
+    On a workflow that includes SpeakerMixer, RigHardware's ReadyWaitsFor adds MixerStarted, so Ready (and Go) waits for
+    the mixer's boot; on one without, it is left at HarpClockSet, SpoutsHomed, as nothing would send MixerStarted."""
+    includes = [n for n in wf.root.iter(W + "Expression") if n.get("Path") == RIG_HARDWARE]
+    if len(includes) != 1:
+        return ["the workflow does not include RigHardware once"]
+    problems = [f"the workflow has its own {what}" for what, found in (
         ("Ready report", re.search(r"<orcl:Phase>Ready</orcl:Phase>", wf.text)),
         ("StartupWatchdog", ":StartupWatchdog\"" in wf.text),
         ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
+    waits = includes[0].findtext(W + "ReadyWaitsFor")
+    given = tuple(s.strip() for s in waits.split(",") if s.strip()) if waits is not None else READY_STAGES
+    mixer = f'Path="{SPEAKER_MIXER}"' in wf.text
+    wanted = READY_STAGES_WITH_MIXER if mixer else READY_STAGES
+    if given != wanted:
+        problems.append(f"RigHardware's ReadyWaitsFor is {', '.join(given)}, not {', '.join(wanted)}, on a workflow "
+                        + ("that includes SpeakerMixer" if mixer else "without SpeakerMixer"))
     return problems
+
+
+def _name(n: ET.Element) -> str:
+    return n.findtext(W + "Name") or n.findtext(RX + "Name") or ""
+
+
+def _value(n: ET.Element) -> str:
+    return child(n, W + "Combinator").findtext(W + "Value") or ""
+
+
+def rig_ready_problems(root: ET.Element) -> list[str]:
+    """RigHardware reports Ready from its ReadyWatchdog alone, a StartupWatchdog that passes on once every stage its
+    ReadyWaitsFor names has come, over its own HarpClockSet and SpoutsHomed merged with ReadyStages, the ReplaySubject a
+    block that holds Ready multicasts its stage into (SpeakerMixer's MixerStarted). `root` is OpenRigs.Devices'
+    RigHardware.bonsai."""
+    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+
+    def sources(i: int) -> list[int]:
+        return [a for a, b, _ in edges if b == i]
+
+    ready = [i for i, n in enumerate(nodes) if _name(n) == "Ready" and kind(n) == "orcl:ReportPhase"]
+    watchdog = sources(ready[0]) if len(ready) == 1 else []
+    if not (len(watchdog) == 1 and _name(nodes[watchdog[0]]) == "ReadyWatchdog"
+            and kind(nodes[watchdog[0]]) == "core:StartupWatchdog"):
+        return ["Ready is not fed by ReadyWatchdog alone"]
+    problems = []
+    expected = child(nodes[watchdog[0]], W + "Combinator").findtext("{clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core}Expected")
+    if tuple(s.strip() for s in (expected or "").split(",")) != READY_STAGES:
+        problems.append(f"ReadyWatchdog's Expected is not {', '.join(READY_STAGES)} by default")
+    mapped = [p.get("DisplayName") for a in sources(watchdog[0]) if nodes[a].get(XSI) == "ExternalizedMapping"
+              for p in nodes[a].iter(W + "Property") if p.get("Name") == "Expected"]
+    if mapped != ["ReadyWaitsFor"]:
+        problems.append("ReadyWatchdog's Expected is not RigHardware's ReadyWaitsFor")
+    merge = [a for a in sources(watchdog[0]) if kind(nodes[a]) == "rx:Merge"]
+    stages = {(_name(nodes[a]) if nodes[a].get(XSI) == "SubscribeSubject" else _value(nodes[a]) if kind(nodes[a]) == "StringProperty" else "")
+              for a in (sources(merge[0]) if len(merge) == 1 else [])}
+    if stages != set(READY_STAGES) | {"ReadyStages"}:
+        problems.append("ReadyWatchdog does not watch HarpClockSet, SpoutsHomed and ReadyStages merged")
+    if not any(n.get(XSI) == "rx:ReplaySubject" and _name(n) == "ReadyStages" for n in nodes):
+        problems.append("RigHardware does not declare the ReplaySubject ReadyStages")
+    return problems
+
+
+def mixer_ready_problems(root: ET.Element) -> list[str]:
+    """SpeakerMixer multicasts MixerStarted into RigHardware's ReadyStages once the mixer has started (its Mixer
+    subject's value), the stage Ready waits for on a workflow that plays sound. `root` is OpenRigs.Audio's
+    SpeakerMixer.bonsai."""
+    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+    for a, b, _ in edges:
+        for c in [c for b2, c, _ in edges if b2 == b]:
+            first, middle, last = nodes[a], nodes[b], nodes[c]
+            if (first.get(XSI) == "SubscribeSubject" and _name(first) == "Mixer"
+                    and kind(middle) == "StringProperty" and _value(middle) == "MixerStarted"
+                    and last.get(XSI) == "MulticastSubject" and _name(last) == "ReadyStages"):
+                return []
+    return ["SpeakerMixer does not multicast MixerStarted into ReadyStages once the mixer has started"]
+
+
+def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[int]) -> list[str]:
+    """Every fixed-width pulse the workflow may fire on a RewardValve line (`valve_lines`, rig.yml's, from
+    LabRig.reward_valve_lines). A valve gives water only in pulses sized for it: a reward's by DeliverReward
+    (LoadRewardLine, PlanReward), a calibration's by its own FirePulses, both on TriggerCalibratedPulse. Refused: a
+    value multicast into the PulseController's TriggerPulse (a pulse of whatever width the line's register holds)
+    unless an IntProperty gives it a line that is not a valve's, and a board message that pulses, sets or sizes a
+    valve's line itself (OutputSet, OutputPulseEnable, PulseDO<n>)."""
+    subjects = {FIXED_WIDTH_PULSE} | set(re.findall(r"<TriggerPulseSubjectName>(\w+)</TriggerPulseSubjectName>", wf.text))
+    found = []
+    for nodes, edges in _scopes(wf.root):
+        for i, node in enumerate(nodes):
+            if node.get(XSI) == "MulticastSubject" and _name(node) in subjects:
+                feeds = [nodes[a] for a, b, _ in edges if b == i]
+                if len(feeds) != 1 or kind(feeds[0]) != "IntProperty":
+                    found.append(f"{_name(node)} is sent a line no IntProperty gives, so it may be a RewardValve's")
+                elif int(_value(feeds[0])) in valve_lines:
+                    found.append(f"{_name(node)} fires a fixed-width pulse on DO{_value(feeds[0])}, a RewardValve")
+            payload = next((e for e in node if e.tag.endswith("}Payload")), None)
+            if payload is None:
+                continue
+            ptype = payload.get(XSI) or ""
+            written = " ".join(payload.itertext())
+            for line in sorted(valve_lines):
+                if ptype.endswith(f":CreatePulseDO{line}Payload") or (
+                        re.search(r":Create(OutputSet|OutputPulseEnable)Payload$", ptype) and re.search(rf"\bDO{line}\b", written)):
+                    found.append(f"{_name(node) or ptype.split(':')[-1]} writes DO{line}, a RewardValve, itself")
+    return found
 
 def zapit_include_problems(wf: Workflow) -> list[str]:
     """Zapit is lib-open-rigs' Zapit.ConnectZapit, given the task's conditions file in an optogenetics experiment, and

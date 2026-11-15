@@ -47,7 +47,7 @@ def test_a_stimulus_or_penalty_sound_sent_while_the_mixer_boots_stops_the_workfl
 
 
 def workflow(tmp_path: Path, nodes: str) -> lint.Workflow:
-    (tmp_path / "src").mkdir()
+    (tmp_path / "src").mkdir(parents=True)
     (tmp_path / "src" / "main.bonsai").write_text(HEAD + nodes + "</Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
     return lint.Workflow(tmp_path)
 
@@ -106,3 +106,71 @@ def test_a_sound_needs_its_level_from_the_task_file_and_the_shared_mixer(tmp_pat
     unmapped = sound_workflow(tmp_path / "b", nodes + '<Expression xsi:type="Combinator"><Combinator xsi:type="mix:StartMixer" /></Expression>', "")
     assert lint.sound_level_problems(unmapped) == ["aud:SpeakerBuffer is not given LevelDbfs from the task file's levelDbfs"]
     assert lint.speaker_mixer_problems(unmapped) == ["the workflow uses Bonsai.Mixer's StartMixer itself"]
+
+def test_ready_waits_for_every_stage_in_ready_waits_for_and_the_mixer_sends_mixer_started():
+    rig_hardware = (ROOT / "src" / "OpenRigs.Devices" / "RigHardware.bonsai").read_text(encoding="utf-8-sig")
+    assert lint.rig_ready_problems(lint.ET.fromstring(rig_hardware.encode("utf-8"))) == []
+    zipped = rig_hardware.replace('<Edge From="120" To="122" Label="Source1" />', '<Edge From="119" To="122" Label="Source1" />')
+    assert zipped != rig_hardware
+    assert lint.rig_ready_problems(lint.ET.fromstring(zipped.encode("utf-8"))) == ["Ready is not fed by ReadyWatchdog alone"]
+    unwatched = rig_hardware.replace('<Edge From="121" To="119" Label="Source3" />', "")
+    assert lint.rig_ready_problems(lint.ET.fromstring(unwatched.encode("utf-8"))) == [
+        "ReadyWatchdog does not watch HarpClockSet, SpoutsHomed and ReadyStages merged"]
+    mixer = (ROOT / "src" / "OpenRigs.Audio" / "SpeakerMixer.bonsai").read_text(encoding="utf-8-sig")
+    assert lint.mixer_ready_problems(lint.ET.fromstring(mixer.encode("utf-8"))) == []
+    silent = mixer.replace("<Value>MixerStarted</Value>", "<Value>Mixer</Value>")
+    assert lint.mixer_ready_problems(lint.ET.fromstring(silent.encode("utf-8"))) == [
+        "SpeakerMixer does not multicast MixerStarted into ReadyStages once the mixer has started"]
+
+
+def test_a_workflow_with_the_mixer_makes_ready_wait_for_it_and_one_without_does_not(tmp_path):
+    rig = f'<Expression xsi:type="IncludeWorkflow" Path="{lint.RIG_HARDWARE}">{{}}</Expression>'
+    mixer = f'<Expression xsi:type="IncludeWorkflow" Path="{lint.SPEAKER_MIXER}" />'
+    waits = "<ReadyWaitsFor>HarpClockSet, SpoutsHomed, MixerStarted</ReadyWaitsFor>"
+    assert lint.rig_hardware_problems(workflow(tmp_path / "a", rig.format(waits) + mixer)) == []
+    assert lint.rig_hardware_problems(workflow(tmp_path / "b", rig.format(""))) == []
+    assert lint.rig_hardware_problems(workflow(tmp_path / "c", rig.format("") + mixer)) == [
+        "RigHardware's ReadyWaitsFor is HarpClockSet, SpoutsHomed, not HarpClockSet, SpoutsHomed, MixerStarted, "
+        "on a workflow that includes SpeakerMixer"]
+    assert lint.rig_hardware_problems(workflow(tmp_path / "d", rig.format(waits))) == [
+        "RigHardware's ReadyWaitsFor is HarpClockSet, SpoutsHomed, MixerStarted, not HarpClockSet, SpoutsHomed, "
+        "on a workflow without SpeakerMixer"]
+
+
+def pulse_workflow(tmp_path: Path, nodes: str, edges: str) -> lint.Workflow:
+    beh = ('xmlns:beh="clr-namespace:Bonsai.Harp.Behavior;assembly=Bonsai.Harp.Behavior" '
+           'xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp" '
+           'xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core" ')
+    (tmp_path / "src").mkdir(parents=True)
+    (tmp_path / "src" / "main.bonsai").write_text(HEAD.replace("xmlns=", beh + "xmlns=") + nodes + "</Nodes><Edges>" + edges
+                                                  + "</Edges></Workflow></WorkflowBuilder>", encoding="utf-8")
+    return lint.Workflow(tmp_path)
+
+
+def test_a_fixed_width_pulse_on_a_reward_valve_is_refused_and_a_calibrated_one_is_not(tmp_path):
+    line = '<Expression xsi:type="Combinator"><Combinator xsi:type="IntProperty"><Value>{}</Value></Combinator></Expression>'
+    send = '<Expression xsi:type="MulticastSubject"><Name>{}</Name></Expression>'
+    edge = '<Edge From="0" To="1" Label="Source1" />'
+    valves = {1, 2}
+    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "a", line.format(3) + send.format("TriggerPulse"), edge), valves) == []
+    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "b", line.format(2) + send.format("TriggerPulse"), edge), valves) == [
+        "TriggerPulse fires a fixed-width pulse on DO2, a RewardValve"]
+    computed = '<Expression xsi:type="SubscribeSubject"><Name>RewardValveLines</Name></Expression>' + send.format("TriggerPulse")
+    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "c", computed, edge), valves) == [
+        "TriggerPulse is sent a line no IntProperty gives, so it may be a RewardValve's"]
+    written = ('<Expression xsi:type="beh:CreateMessage"><harp:MessageType>Write</harp:MessageType>'
+               '<harp:Payload xsi:type="beh:CreateOutputSetPayload"><beh:OutputSet>DO1</beh:OutputSet></harp:Payload></Expression>'
+               '<Expression xsi:type="beh:CreateMessage"><harp:MessageType>Write</harp:MessageType>'
+               '<harp:Payload xsi:type="beh:CreatePulseDO2Payload"><beh:PulseDO2>10</beh:PulseDO2></harp:Payload></Expression>'
+               '<Expression xsi:type="beh:CreateMessage"><harp:MessageType>Write</harp:MessageType>'
+               '<harp:Payload xsi:type="beh:CreateOutputSetPayload"><beh:OutputSet>DO3</beh:OutputSet></harp:Payload></Expression>')
+    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "d", written, ""), valves) == [
+        "CreateOutputSetPayload writes DO1, a RewardValve, itself", "CreatePulseDO2Payload writes DO2, a RewardValve, itself"]
+    calibrated = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orc:FirePulses" /></Expression>'
+                  + send.format("TriggerCalibratedPulse"))
+    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "e", calibrated, edge), valves) == []
+    renamed = ('<Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.PulseController.bonsai">'
+               '<TriggerPulseSubjectName>TriggerValve</TriggerPulseSubjectName></Expression>'
+               + line.format(1) + send.format("TriggerValve"))
+    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "f", renamed, '<Edge From="1" To="2" Label="Source1" />'), valves) == [
+        "TriggerValve fires a fixed-width pulse on DO1, a RewardValve"]

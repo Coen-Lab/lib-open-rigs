@@ -83,6 +83,13 @@ class LabRig(Rig):
             _refuse_unknown(list(_unknown_keys(given, rig.model_dump(by_alias=True, exclude_unset=True))))
         return rig
 
+    def reward_valve_lines(self) -> set[int]:
+        """The DO lines (1 to 3) wiring names as a RewardValve, on every board (for
+        workflow_lint.fixed_width_pulses_on_reward_valves)."""
+        return {int(alias.removeprefix("DO")) for board in self.behavior_board.values() if board.wiring
+                for field, alias in _ALIASES.items()
+                if (line := getattr(board.wiring, field)) is not None and line.device == REWARD_VALVE}
+
     @model_validator(mode="after")
     def _wired_lines(self):
         zapit_boards = []

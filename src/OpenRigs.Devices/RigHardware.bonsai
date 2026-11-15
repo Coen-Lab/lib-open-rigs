@@ -8,8 +8,9 @@
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A rig's Behavior board, timestamp generator, two-driver lick spout stage, two lick detectors and three cameras, from rig.yml, for every workflow that drives them. Takes each device's entry by name from RigConfigs (BehaviorBoard-Main, TimestampGeneratorGen3-Main, StepperDriver-A and -B, LicketySplit-Left and -Right, Camera-Face, -Pupil and -Body, each an AsyncSubject of that name; rig.yml must list exactly three cameras) and opens it behind its &lt;Name&gt;.Data and &lt;Name&gt;.Commands subjects. Publishes RigFile (rig.yml's path), HarpClockSet (the first Timestamp within 2 s of UTC), ZapitTriggerLine (the board line wiring gives ZapitTrigger: never pulsed, cleared when the workflow stops), WheelDistanceCm, LickStateLeft and LickStateRight; the board takes TriggerCalibratedPulse and TriggerPulse. Each camera runs on the board's trigger 0, publishes Camera-&lt;Name&gt;.Data and stops the workflow at start if its exposure does not fit the trigger period (ExposureFitsTrigger); its video is logged by OpenRigs.Logging's LogCameras. Includes HarpLickSpoutStage, with this mouse's positions file calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml. Starts the cameras' trigger 2 s after Start (StartCameras, once they are open), and reports Ready to the controller (OpenRigs.Control ReportPhase) once the Harp clock is set and the spouts are homed, stopping the workflow, naming what never came, if that takes longer than 180 s (StartupWatchdog; the stage homes its five motors together, each within 60 s). Needs RigConfigs, RigConfigDirectory and SubjectId from the workflow, and OpenRigs.Control's ExperimentControl.</Description>
+  <Description>A rig's Behavior board, timestamp generator, two-driver lick spout stage, two lick detectors and three cameras, from rig.yml, for every workflow that drives them. Takes each device's entry by name from RigConfigs (BehaviorBoard-Main, TimestampGeneratorGen3-Main, StepperDriver-A and -B, LicketySplit-Left and -Right, Camera-Face, -Pupil and -Body, each an AsyncSubject of that name; rig.yml must list exactly three cameras) and opens it behind its &lt;Name&gt;.Data and &lt;Name&gt;.Commands subjects. Publishes RigFile (rig.yml's path), HarpClockSet (the first Timestamp within 2 s of UTC), ZapitTriggerLine (the board line wiring gives ZapitTrigger: never pulsed, cleared when the workflow stops), WheelDistanceCm, LickStateLeft and LickStateRight; the board takes TriggerCalibratedPulse and TriggerPulse. Each camera runs on the board's trigger 0, publishes Camera-&lt;Name&gt;.Data and stops the workflow at start if its exposure does not fit the trigger period (ExposureFitsTrigger); its video is logged by OpenRigs.Logging's LogCameras. Includes HarpLickSpoutStage, with this mouse's positions file calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml. Starts the cameras' trigger 2 s after Start (StartCameras, once they are open), and reports Ready to the controller (OpenRigs.Control ReportPhase) once every stage ReadyWaitsFor names has come: the Harp clock set (HarpClockSet) and the spouts homed (SpoutsHomed), and on a workflow that includes OpenRigs.Audio's SpeakerMixer the mixer started (MixerStarted, which SpeakerMixer multicasts into ReadyStages, the ReplaySubject declared here for a block that holds Ready). It stops the workflow, naming what never came, if that takes longer than 180 s (StartupWatchdog; the stage homes its five motors together, each within 60 s). Needs RigConfigs, RigConfigDirectory and SubjectId from the workflow, and OpenRigs.Control's ExperimentControl.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -543,22 +544,28 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Name>ReadyWatchdog</Name>
-        <Description>Stops the workflow, naming what never came, if the rig is not ready 180 s after Start (the stage homes its five motors together, each within 60 s). It completes without a value, so nothing reads its output.</Description>
+        <Description>Passes on once every stage in ReadyWaitsFor has come, and stops the workflow, naming what never came, if the rig is not ready 180 s after Start (the stage homes its five motors together, each within 60 s).</Description>
         <Combinator xsi:type="core:StartupWatchdog">
           <core:Expected>HarpClockSet, SpoutsHomed</core:Expected>
           <core:TimeoutSeconds>180</core:TimeoutSeconds>
-          <core:What>Readying the rig (the Harp clock and the spout stage's homing)</core:What>
+          <core:What>Readying the rig (the stages RigHardware's ReadyWaitsFor names)</core:What>
         </Combinator>
       </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:Zip" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ReadyStages</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Name>Ready</Name>
-        <Description>Reports Ready to the controller once the Harp clock is set and the spouts are homed.</Description>
+        <Description>Reports Ready to the controller once every stage in ReadyWaitsFor has come.</Description>
         <Combinator xsi:type="orcl:ReportPhase">
           <orcl:Phase>Ready</orcl:Phase>
         </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:ReplaySubject" TypeArguments="sys:String">
+        <rx:Name>ReadyStages</rx:Name>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Expected" DisplayName="ReadyWaitsFor" Description="The stages Ready waits for, comma separated: HarpClockSet, SpoutsHomed, and MixerStarted on a workflow that includes OpenRigs.Audio's SpeakerMixer." />
       </Expression>
     </Nodes>
     <Edges>
@@ -654,9 +661,9 @@
       <Edge From="115" To="119" Label="Source1" />
       <Edge From="118" To="119" Label="Source2" />
       <Edge From="119" To="120" Label="Source1" />
-      <Edge From="114" To="121" Label="Source1" />
-      <Edge From="117" To="121" Label="Source2" />
-      <Edge From="121" To="122" Label="Source1" />
+      <Edge From="121" To="119" Label="Source3" />
+      <Edge From="120" To="122" Label="Source1" />
+      <Edge From="124" To="120" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
