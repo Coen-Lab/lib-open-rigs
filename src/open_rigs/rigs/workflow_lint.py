@@ -81,6 +81,8 @@ BLOCK_SUBJECTS = {
     CLOCK_FROM_GENERATOR: {"Timestamp": "rx:BehaviorSubject"},
     CLOCK_FROM_BOARD: {"Timestamp": "rx:BehaviorSubject"},
 }
+# Lab includes that include a BLOCK_SUBJECTS block, so a workflow including one has that block's subjects.
+CARRIED_BLOCKS = {ZAPIT_FOR_TASK: ZAPIT_INCLUDE}
 # A piece's command subject is a BehaviorSubject, its data subject a PublishSubject (named by its properties).
 PIECE_SUBJECTS = {"CommandsSubjectName": "rx:BehaviorSubject", "DataSubjectName": "rx:PublishSubject"}
 # The PulseController's subject that fires a pulse of the line's set width (the DO line, 1 to 3, as an int).
@@ -205,8 +207,9 @@ def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
     PublishSubject or ReplaySubject, so the first trial's graph closes it for good (seen on a rig, 14 Nov 2026)."""
     declared: dict[str, str] = {}
     pieces = hardware(wf)
+    carried = {inner for outer, inner in CARRIED_BLOCKS.items() if f'Path="{outer}"' in wf.text}
     for path, subjects in BLOCK_SUBJECTS.items():
-        if f'Path="{path}"' in wf.text or any(p == path for p, _ in pieces):
+        if f'Path="{path}"' in wf.text or path in carried or any(p == path for p, _ in pieces):
             declared.update(subjects)
     for _, props in pieces:
         declared.update({props[p]: subject for p, subject in PIECE_SUBJECTS.items() if props.get(p)})
@@ -405,7 +408,8 @@ def required_devices(wf: Workflow) -> list[tuple[str, str]]:
 
 def hardware_problems(wf: Workflow) -> list[str]:
     """The workflow's devices are the lab's pieces, put together so that any combination builds and runs: ReadLabRig
-    and ReadyGate once each, ReadyGate before every piece (a board's log waits for HarpClockSet, which ReadyGate
+    and ReadyGate once each, ReadLabRig first (a rig list holds none: a piece's log waits for PathPrefix, whose
+    LogLabExperiment reads RigConfigs), ReadyGate before every piece (a board's log waits for HarpClockSet, which ReadyGate
     declares); exactly one clock; each piece's Name unique and its subject properties that Name's .Commands and .Data;
     every Board a Behavior board piece and every Camera a camera piece; one CameraTriggers exactly when there is a
     camera, expecting every camera; ReadyGate's ReadyWaitsFor exactly the stages the pieces announce (HarpClockSet,
@@ -421,6 +425,8 @@ def hardware_problems(wf: Workflow) -> list[str]:
     if paths.count(LICK_SPOUT_STAGE) > 1:
         problems.append("the workflow includes LickSpoutStage more than once")
     gate = paths.index(READY_GATE) if READY_GATE in paths else len(paths)
+    if READ_LAB_RIG in paths[gate:]:
+        problems.append("ReadLabRig comes after ReadyGate")
     problems += [f"{p.split(':')[1].removesuffix('.bonsai')} {props.get('Name') or props.get('Board') or ''}".rstrip()
                  + " comes before ReadyGate" for p, props in pieces[:gate] if p in PIECES]
     names = [props.get("Name", "") for p, props in pieces if "Name" in PIECES.get(p, ())]
@@ -625,7 +631,7 @@ def undeclared_commands(wf: Workflow) -> list[str]:
     """Every command the workflow or its lick spout stage handles that its ExperimentControl does not declare:
     ControlServer refuses an undeclared command, so it would never fire."""
     declared = set(re.findall(r"<Command>\s*<Name>(\w+)</Name>", wf.text))
-    handled = _on_commands(wf.named("Commands"))
+    handled = _on_commands(wf.root)
     if any(p == LICK_SPOUT_STAGE for p, _ in hardware(wf)):
         handled |= lick_spout_stage_commands(wf)
     if f'Path="{MANUAL_REWARDS}"' in wf.text:

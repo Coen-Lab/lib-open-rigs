@@ -2,19 +2,15 @@
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The domes' hardware (every such rig has the same devices and names in rig.yml), as device pieces: the configuration (ReadLabRig, ConfigRoot), the Ready gate (ReadyGate, ReadyWaitsFor), the clock (TimestampGeneratorGen3-Main), the Behavior board BehaviorBoard-Main with its pulsed reward lines, Zapit trigger line and running wheel (WheelDistanceCm), the lick detectors LicketySplit-Left and -Right (LickStateLeft, LickStateRight), the lick spout stage (StepperDriver-A and -B), and the cameras Camera-Face, Camera-Pupil, Camera-Body on the board's camera triggers. Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it. A task that plays sound includes OpenRigs.Audio's SpeakerMixer itself and adds MixerStarted to ReadyWaitsFor.</Description>
+  <Description>The domes' hardware (every such rig has the same devices and names in rig.yml), as device pieces after the workflow's own ReadLabRig (which every workflow includes once, before this: a piece's log waits for PathPrefix, whose LogLabExperiment reads RigConfigs, so RigConfigs defined in here would be defined in terms of itself): the Ready gate (ReadyGate, ReadyWaitsFor), the clock (TimestampGeneratorGen3-Main), the Behavior board BehaviorBoard-Main with its pulsed reward lines, Zapit trigger line and running wheel (WheelDistanceCm), the lick detectors LicketySplit-Left and -Right (LickStateLeft, LickStateRight), the lick spout stage (StepperDriver-A and -B), and the cameras Camera-Face, Camera-Pupil, Camera-Body on the board's camera triggers. Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it. A task that plays sound includes OpenRigs.Audio's SpeakerMixer itself and adds MixerStarted to ReadyWaitsFor.</Description>
   <Workflow>
     <Nodes>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="ConfigRoot" Description="The root under which each machine has its own configuration directory, ConfigRoot\MachineName\rig.yml." />
-      </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="ReadyWaitsFor" Description="The stages Ready waits for, comma separated: HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, and MixerStarted on a workflow that includes SpeakerMixer." />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="SpoutStepSize" Description="Motor steps each spout nudge moves, read at each nudge." />
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai" />
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
         <ReadyWaitsFor>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body</ReadyWaitsFor>
       </Expression>
@@ -83,9 +79,8 @@
       </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="3" Label="Source1" />
-      <Edge From="1" To="4" Label="Source1" />
-      <Edge From="2" To="12" Label="Source1" />
+      <Edge From="0" To="2" Label="Source1" />
+      <Edge From="1" To="10" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

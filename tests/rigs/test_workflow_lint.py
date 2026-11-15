@@ -22,6 +22,10 @@ def test_the_block_subjects_are_what_each_block_declares():
         text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
         declared = dict((name, f"rx:{kind}") for kind, name in re.findall(r'xsi:type="rx:(\w+Subject)"[^>]*>\s*<(?:rx:)?Name>([\w.-]+)<', text))
         assert {name: declared.get(name) for name in subjects} == subjects
+    for outer, inner in lint.CARRIED_BLOCKS.items():
+        package, resource = outer.split(":")
+        text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
+        assert f'Path="{inner}"' in text
 
 
 def test_the_speaker_mixer_starts_no_sooner_than_3_s_after_start():
@@ -180,15 +184,18 @@ def test_a_new_combination_of_the_lab_s_devices_needs_no_hardware_code(tmp_path)
 def test_the_dome_rig_list_is_expanded_with_the_workflow_s_settings(tmp_path):
     waits = "HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted"
     rig_list = include(lint.DEVICES + "DomeHardware.bonsai", f"<ReadyWaitsFor>{waits}</ReadyWaitsFor>")
-    wf = workflow(tmp_path, rig_list + include(lint.SPEAKER_MIXER))
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + rig_list + include(lint.SPEAKER_MIXER))
     assert lint.hardware_problems(wf) == []
     assert [name for name, _ in lint.required_devices(wf)] == [
         "TimestampGeneratorGen3-Main", "BehaviorBoard-Main", "LicketySplit-Left", "LicketySplit-Right",
         "StepperDriver-A", "StepperDriver-B", "Camera-Face", "Camera-Pupil", "Camera-Body"]
-    unwaited = workflow(tmp_path / "b", include(lint.DEVICES + "DomeHardware.bonsai") + include(lint.SPEAKER_MIXER))
+    unwaited = workflow(tmp_path / "b", include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + include(lint.SPEAKER_MIXER))
     assert lint.hardware_problems(unwaited) == [
         "ReadyGate's ReadyWaitsFor is HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, not "
         "HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted"]
+    # The rig list holds no ReadLabRig: RigConfigs defined inside it would be defined in terms of itself.
+    late = workflow(tmp_path / "c", rig_list + include(lint.SPEAKER_MIXER) + include(lint.READ_LAB_RIG))
+    assert lint.hardware_problems(late) == ["ReadLabRig comes after ReadyGate"]
 
 
 def test_a_broken_combination_is_named(tmp_path):
