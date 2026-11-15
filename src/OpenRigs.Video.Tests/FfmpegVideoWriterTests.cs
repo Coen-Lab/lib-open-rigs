@@ -230,6 +230,26 @@ namespace OpenRigs.Video.Tests
             Assert.AreEqual(problem + Environment.NewLine, File.ReadAllText(recording.ErrorFileName));
         }
 
+        // CI (15 Nov 2026): on a loaded runner the kill came seconds late. The deadline and the
+        // read of ffmpeg's output must not wait for a thread-pool thread.
+        [TestMethod]
+        public void AnFfmpegThatNeverFinishes_IsKilledOnTimeWhenTheThreadPoolIsBusy()
+        {
+            ThreadPool.GetMinThreads(out var workers, out _);
+            var release = new ManualResetEventSlim();  // not disposed: queued items may still wait on it
+            var recording = Stuck(capacity: 5, stopTimeout: TimeSpan.FromSeconds(1));
+            foreach (var frame in Frames(20)) recording.Add(frame);
+            try
+            {
+                for (var j = 0; j < workers * 4; j++) ThreadPool.QueueUserWorkItem(_ => release.Wait());
+                var clock = Stopwatch.StartNew();
+                var problem = recording.Finish();
+                Assert.IsTrue(clock.Elapsed < TimeSpan.FromSeconds(2), "Finish waits about the stop timeout: " + clock.Elapsed);
+                StringAssert.Contains(problem, "was killed");
+            }
+            finally { release.Set(); }
+        }
+
         [TestMethod]
         public void AFullQueue_NeverBlocksTheCamerasThread()
         {

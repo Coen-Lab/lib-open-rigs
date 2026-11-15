@@ -40,7 +40,8 @@ namespace OpenRigs.Video
         StreamWriter? csv;
         byte[]? buffer;
         int width, height, channels;
-        Timer? deadline;
+        Thread? deadline;
+        Thread[] readers = new Thread[0];
         bool ending, deadlinePassed, warnedFull, behind, closed;
         long received, written, dropped;
         int? exitCode;
@@ -162,8 +163,10 @@ namespace OpenRigs.Video
             {
                 if (ending) return;
                 ending = true;
-                // Fires once: the file must close by then, or ffmpeg is killed so the thread can end.
-                deadline = new Timer(_ => Expire(), null, stopTimeout, Timeout.InfiniteTimeSpan);
+                // The file must close by then, or ffmpeg is killed so the writer can end. A thread of its
+                // own, not a timer: a busy thread pool ran a timer's kill seconds late (CI, 15 Nov 2026).
+                deadline = new Thread(() => { if (!done.Wait(stopTimeout)) Expire(); }) { IsBackground = true, Name = "ffmpeg deadline " + Path.GetFileName(fileName) };
+                deadline.Start();
             }
             try { thread.IsBackground = false; }
             catch (ThreadStateException) { }  // already finished
@@ -222,7 +225,6 @@ namespace OpenRigs.Video
                 Process? ended;
                 lock (gate)
                 {
-                    deadline?.Dispose();
                     ended = process;
                     process = null;
                 }
@@ -292,16 +294,15 @@ namespace OpenRigs.Video
                 RedirectStandardOutput = true,
             };
             var started = new Process { StartInfo = info };
-            started.ErrorDataReceived += (sender, e) => Remember(e.Data);
-            started.OutputDataReceived += (sender, e) => Remember(e.Data);
             try { started.Start(); }
             catch (System.ComponentModel.Win32Exception ex)
             {
                 started.Dispose();
                 throw new RecordingException(encoder.FfmpegPath + " could not be started: " + ex.Message);
             }
-            started.BeginErrorReadLine();
-            started.BeginOutputReadLine();
+            // ffmpeg's output is read on threads of its own, not the thread pool's (Process's
+            // BeginErrorReadLine), so its last words are in when it exits however busy the pool is.
+            readers = new[] { ReadLines(started.StandardError), ReadLines(started.StandardOutput) };
             lock (gate) process = started;
             stdin = started.StandardInput.BaseStream;
             // Created once ffmpeg runs, so an ffmpeg that cannot start leaves no header-only CSV.
@@ -326,7 +327,7 @@ namespace OpenRigs.Video
             try { stdin!.Close(); }
             catch (IOException ex) { Fail(Explain(ex)); }
             var exited = process.WaitForExit((int)stopTimeout.TotalMilliseconds);
-            if (exited) process.WaitForExit();  // and its stderr read to the end
+            if (exited) ReadToTheEnd();
             lock (gate)
             {
                 if (exited && !deadlinePassed)
@@ -348,7 +349,7 @@ namespace OpenRigs.Video
             lock (gate) running = process;
             if (running != null && running.WaitForExit(2000))
             {
-                running.WaitForExit();  // and its stderr read to the end, which says why
+                ReadToTheEnd();  // ffmpeg's stderr says why
                 lock (gate) exitCode = deadlinePassed ? null : running.ExitCode;
                 return "ffmpeg stopped while recording (exit code " + running.ExitCode + ")" + LastErrors();
             }
@@ -370,6 +371,27 @@ namespace OpenRigs.Video
         void Fail(string what)
         {
             lock (gate) failure ??= what;
+        }
+
+        Thread ReadLines(StreamReader reader)
+        {
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    string? line;
+                    while ((line = reader.ReadLine()) != null) Remember(line);
+                }
+                catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException) { }  // closed with the process
+            }) { IsBackground = true, Name = "ffmpeg output " + Path.GetFileName(fileName) };
+            thread.Start();
+            return thread;
+        }
+
+        // Once ffmpeg has exited: its output read to the end, at most 2 s (a child it left could hold the pipe open).
+        void ReadToTheEnd()
+        {
+            foreach (var reader in readers) reader.Join(TimeSpan.FromSeconds(2));
         }
 
         void Remember(string? line)
