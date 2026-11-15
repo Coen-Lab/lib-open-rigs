@@ -137,7 +137,7 @@ def level_dbfs(default: float, sound: str):
         description=f"{sound}'s level in dBFS RMS: the RMS of the sound over its whole length as the task gives it, before the speaker's "
         f"equalisation, against full scale (a full-scale sine is -3). The lab's default {default:g}. The workflow stops as the sound's buffer is "
         f"built (at Go for a sound built once, at its trial for one built each trial) if any peak would reach {PEAK_LIMIT_DBFS:g} dBFS after "
-        f"equalisation",
+        f"equalisation. Sounds overlapping on a speaker share its headroom: each buffer's peak is checked, not their mix",
     )
 
 

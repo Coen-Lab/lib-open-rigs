@@ -8,7 +8,8 @@ namespace OpenRigs.Audio
     /// Sound levels in dBFS RMS, the lab's measure of how loud a sound plays: the RMS of the sound over its whole length,
     /// as the task gives it (before equalisation), against full scale 1, so a full-scale square wave is 0 dBFS and a
     /// full-scale sine -3 dBFS. Every sound a task plays is given its level, never a gain, and every buffer's peak stays
-    /// under <see cref="PeakLimitDbfs"/> after equalisation. The lab's defaults are here and in open_rigs.core.task.
+    /// under <see cref="PeakLimitDbfs"/> after equalisation. Sounds overlapping on a speaker share its headroom: each
+    /// buffer's peak is checked, not their mix. The lab's defaults are here and in open_rigs.core.task.
     /// </summary>
     public static class SoundLevel
     {

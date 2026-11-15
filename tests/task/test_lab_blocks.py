@@ -93,3 +93,9 @@ def test_optogenetics_lead_and_reply_margin_fit_in_the_shortest_interval(lead, f
     else:
         with pytest.raises(ValueError, match=r"reply margin must be at most trial_structure.iti_min_seconds \(3.4 s\)"):
             opto.check_lead_fits(3.4)
+
+
+def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
+    # Each buffer's peak is checked as it is built; two sounds playing at once on one speaker add up.
+    help_text = StimulusSound.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]
+    assert "Sounds overlapping on a speaker share its headroom: each buffer's peak is checked, not their mix" in help_text
