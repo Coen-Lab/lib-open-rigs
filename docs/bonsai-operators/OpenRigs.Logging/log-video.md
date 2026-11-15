@@ -1,6 +1,6 @@
 # Log Video
 
-`LogVideo` writes a camera stream to disk as an AVI video file and an accompanying CSV metadata file. Frames are grouped into chunks, compressed with the FMP4 codec, and written alongside a row-per-frame metadata file that records the Harp timestamp, frame ID and camera timestamp for every frame. Exposure and gain are fixed while recording, so they are recorded once with the experiment's settings, not per frame. This keeps video and electrophysiology data on the same clock for offline alignment.
+`LogVideo` writes a camera stream to disk as an AVI video file and an accompanying CSV metadata file. Frames are grouped into chunks, compressed with the FMP4 codec, and written alongside a row-per-frame metadata file that records the Harp timestamp, frame ID, exposure time, and gain for every frame. This keeps video and electrophysiology data on the same clock for offline alignment.
 
 ---
 
@@ -13,9 +13,9 @@
 The workflow groups incoming frames by time (`GroupByTime` with `ChunkSize = 1`), then writes two parallel outputs:
 
 - **VideoWriter** - encodes frames to `.avi` using the FMP4 codec at the configured `FrameRate`.
-- **CsvWriter** - records per-frame metadata (timestamp, frame ID, camera timestamp) to a `.csv` file.
+- **CsvWriter** - records per-frame metadata (timestamp, frame ID, exposure, gain) to a `.csv` file.
 
-File paths are built by `FormatFileName` from the `PathPrefix` subject (published by [LogController](log-controller.md)), the `LogName` property and the start of each chunk: `<LogName>\<LogName>_<DateTime>.avi` and `.csv`, a new pair each hour, as `LogRawVideo` writes.
+File paths are built from the `PathPrefix` subject (published by [LogController](log-controller.md)) plus the `LogName` property.
 
 ### Externalized properties
 
@@ -30,9 +30,11 @@ The CSV file contains one row per frame with these columns:
 
 | Column | Description |
 |--------|-------------|
-| `harpTime` | Harp hardware timestamp, in seconds |
-| `ChunkData.FrameID` | Monotonically increasing frame counter from the camera |
-| `ChunkData.Timestamp` | Camera-internal timestamp |
+| `Seconds` | Harp hardware timestamp |
+| `FrameID` | Monotonically increasing frame counter from the camera |
+| `Timestamp` | Camera-internal timestamp |
+| `ExposureTime` | Actual exposure duration in microseconds |
+| `Gain` | Analogue gain applied by the camera |
 
 ---
 

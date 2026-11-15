@@ -19,7 +19,7 @@ namespace OpenRigs.Logging.Tests
         // mean of a channel by a few levels, and the logged video has been encoded twice.
         const double ColorTolerance = 12;
 
-        static readonly string[] ExpectedHeader = { "harpTime", "Width", "Height" };
+        static readonly string[] ExpectedHeader = { "Seconds", "Value.Width", "Value.Height" };
 
         protected override string WorkflowFileName => "LogVideoTest.bonsai";
 
@@ -119,56 +119,6 @@ namespace OpenRigs.Logging.Tests
                 new Regex($@"^{Regex.Escape(LogName)}_.+\.avi$"),
                 $"Expected the video file to sit inside the '{LogName}' folder and be prefixed with " +
                 $"it.{result.Describe()}");
-        }
-
-        // A session crossing the hour opens a new pair, named by the chunk's start, and never writes
-        // over the one before (audit, 5 Nov 2026). The test's time base steps an hour per tick, so
-        // every frame falls in an hour of its own.
-        [TestMethod]
-        public void LogRawVideo_AcrossTheHour_WritesOnePairPerHourAndLosesNoFrame()
-        {
-            const string LogName = "TestVideo";
-            const int FrameCount = 5;
-            GenerateSourceVideo(FrameCount, width: 160, height: 120);
-            var result = RunWorkflow(new Dictionary<string, string>
-            {
-                { "FileName", SourceVideo },
-                { "PlaybackRate", SourceFrameRate.ToString(CultureInfo.InvariantCulture) },
-                { "LogName", LogName },
-                { "TimeStep", "3600" }
-            });
-
-            var videos = Directory.GetFiles(LogRoot, "*.avi", SearchOption.AllDirectories);
-            var metadata = Directory.GetFiles(LogRoot, "*.csv", SearchOption.AllDirectories);
-            Assert.IsTrue(videos.Length >= 2, $"Expected a new video once the hour turned, found {videos.Length}.{result.Describe()}");
-            CollectionAssert.AreEquivalent(
-                Array.ConvertAll(videos, v => Path.ChangeExtension(v, null)),
-                Array.ConvertAll(metadata, m => Path.ChangeExtension(m, null)),
-                $"Expected each hour's video and metadata in a pair.{result.Describe()}");
-
-            var rows = 0;
-            foreach (var file in metadata) rows += File.ReadAllLines(file).Length - 1;
-            Assert.AreEqual(FrameCount, rows, $"Expected every frame in one hour's metadata or another.{result.Describe()}");
-        }
-
-        [TestMethod]
-        public void LogVideo_IsLogRawVideo_ApartFromItsFrameAndColumns()
-        {
-            static string Read(string name)
-            {
-                var assembly = typeof(LoggedRows).Assembly;
-                using var stream = assembly.GetManifestResourceStream($"OpenRigs.Logging.{name}");
-                Assert.IsNotNull(stream, $"Missing embedded resource '{name}'.");
-                using var reader = new StreamReader(stream);
-                return reader.ReadToEnd().Replace("\r\n", "\n");
-            }
-
-            var raw = Read("LogRawVideo.bonsai")
-                .Replace("<Selector>Value</Selector>", "<Selector>Value.Image</Selector>")
-                .Replace(
-                    "<io:Selector>Seconds,Value.Width,Value.Height</io:Selector>",
-                    "<io:Selector>Seconds,Value.ChunkData.FrameID,Value.ChunkData.Timestamp</io:Selector>");
-            Assert.AreEqual(raw, Read("LogVideo.bonsai"));
         }
 
         /// <summary>

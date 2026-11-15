@@ -37,32 +37,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## Bonsai.FFmpeg
-
-`local_packages/Bonsai.FFmpeg.0.2.0-uniquepipe.nupkg` is a modified copy of [Bonsai.FFmpeg](https://github.com/bonsai-rx/ffmpeg) 0.2.0 (commit `ee403aeca3d6ecb214487a5c41d94b2f2b541526`). The change gives each recording its own named pipe, so starting a recording while the previous one is still being encoded no longer fails with "All pipe instances are busy." The patch is `patches/bonsai-ffmpeg-unique-pipe.patch`. It is redistributed under the MIT License, carried in the package's `LICENSE` file:
-
-```
-Copyright (c) Bonsai Foundation CIC and Contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
 ## Harp.TimestampGeneratorGen3 device.yml
 
 `src/Shared/RegisterMaps/Harp.TimestampGeneratorGen3-0.1.1.device.yml`, embedded in OpenRigs.HarpDevices and OpenRigs.Manifest, is an unmodified copy of `device.yml` from [harp-tech/device.timestampgeneratorgen3](https://github.com/harp-tech/device.timestampgeneratorgen3) at commit `a463d1d`, the source of the Harp.TimestampGeneratorGen3 0.1.1 package, which does not carry it. It is redistributed under the MIT License, carried in that package's `LICENSE` file:
