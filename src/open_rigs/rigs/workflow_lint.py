@@ -20,6 +20,7 @@ XSI = "{http://www.w3.org/2001/XMLSchema-instance}type"
 RX = "{clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core}"
 SCRIPT = "{clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions}"
 AUDIO = "{clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio}"
+CONTROL = "{clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control}"
 FINITE = ("rx:Take", "rx:TakeLast", "rx:First", "rx:Last")
 WALL_CLOCK = ("rx:Timer", "rx:Delay", "rx:DelaySubscription", "rx:Throttle", "rx:Timeout", "rx:Interval", "rx:TimeInterval",
               "rx:Timestamp", "gl:Timer", "gl:Delay")
@@ -43,16 +44,26 @@ FIXED_WIDTH_PULSE = "TriggerPulse"
 SETUP_BONSAI = Path(__file__).parents[1] / "scripts" / "setup-bonsai.ps1"
 SETUP_BONSAI_RUN = "open_rigs\\scripts\\setup-bonsai.ps1"
 MANUAL_REWARD_DROP_UL = 2.5  # RewardLeft and RewardRight each give this, before and during a run (15 Nov 2026)
+# The prefix each check names a type by ("core:HarpDelay"), by CLR namespace. A workflow's own prefix can differ: a Bonsai
+# save numbers those of packages that fix none (OpenRigs.Core as p1:), and a workflow may name it orc:.
+PREFIXES = {"Bonsai.Reactive": "rx", "Bonsai.Dsp": "dsp", "Bonsai.Shaders": "gl", "Bonsai.Mixer": "mix", "OpenRigs.Core": "core",
+            "OpenRigs.Audio": "aud", "OpenRigs.Control": "orcl", "OpenRigs.Devices.Zapit": "zap"}
 
 
 class Workflow:
-    """A workflow repository's src\\main.bonsai (or another workflow in src), as text and as XML."""
+    """A workflow repository's src\\main.bonsai (or another workflow in src), as text and as XML, its root's xsi:type
+    prefixes those of PREFIXES."""
 
     def __init__(self, repo: Path, file: str = "main.bonsai"):
         self.repo = Path(repo)
         self.file = file
         self.text = (self.repo / "src" / file).read_text(encoding="utf-8-sig")
         self.root = ET.fromstring(self.text.encode("utf-8"))
+        ours = {p: PREFIXES[ns] for p, ns in re.findall(r'xmlns:(\w+)="clr-namespace:([\w.]*);', self.text) if ns in PREFIXES}
+        for e in self.root.iter():
+            prefix, _, local = (e.get(XSI) or "").partition(":")
+            if local and prefix in ours:
+                e.set(XSI, f"{ours[prefix]}:{local}")
 
     def named(self, name: str) -> ET.Element:
         """The first node named `name`, at any depth; a ValueError naming it when there is none (not a bare StopIteration)."""
@@ -263,8 +274,9 @@ def sound_level_problems(wf: Workflow) -> list[str]:
             selectors = [nodes[a].findtext(W + "Selector") or "" for a in upstream(edges, i)]
             if "LevelDbfs" not in names or not any(s.startswith("TaskParameters.") and s.endswith("LevelDbfs") for s in selectors):
                 problems.append(f"{node.findtext(W + 'Name') or kind(node)} is not given LevelDbfs from the task file's levelDbfs")
-    problems += [f"the workflow scales a sound itself ({op})" for op in ("dsp:ConvertScale", "dsp:Rescale") if f'"{op}"' in wf.text]
-    if re.search(r"<aud:Gain>|Property Name=\"Gain\"", wf.text):
+    kinds = {kind(n) for n in wf.root.iter(W + "Expression")}
+    problems += [f"the workflow scales a sound itself ({op})" for op in ("dsp:ConvertScale", "dsp:Rescale") if op in kinds]
+    if any(e.tag == AUDIO + "Gain" for e in wf.root.iter()) or 'Property Name="Gain"' in wf.text:
         problems.append("a sound's Gain is set in the workflow")
     return problems
 
@@ -388,8 +400,10 @@ def zapit_include_problems(wf: Workflow) -> list[str]:
         problems.append("ConnectZapit is not given TaskParameters.Optogenetics.ZapitConfigPath")
     if not any(n.get(XSI) == "rx:Condition" and "Optogenetics.UseZapit" in ET.tostring(n, encoding="unicode") for n in path):
         problems.append("ConnectZapit is not behind a Condition on Optogenetics.UseZapit")
-    problems += [f"the workflow builds {local} itself" for local in ("zap:ZapitClient", "zap:CheckZapitConditionCount", "ConnectZapit</Name>")
-                 if local in wf.text]
+    kinds = {kind(n) for n in wf.root.iter(W + "Expression")}
+    problems += [f"the workflow builds {local} itself" for local, found in (
+        ("zap:ZapitClient", "zap:ZapitClient" in kinds), ("zap:CheckZapitConditionCount", "zap:CheckZapitConditionCount" in kinds),
+        ("ConnectZapit</Name>", "ConnectZapit</Name>" in wf.text)) if found]
     problems += ["the workflow declares ZapitCommands, which ConnectZapit declares"
                  for n in wf.root.iter(W + "Expression") if n.get(XSI, "").startswith("rx:") and n.findtext(RX + "Name") == "ZapitCommands"]
     return problems
@@ -457,7 +471,8 @@ def undeclared_commands(wf: Workflow) -> list[str]:
     """Every command the workflow or its lick spout stage handles that its ExperimentControl does not declare:
     ControlServer refuses an undeclared command, so it would never fire."""
     declared = set(re.findall(r"<Command>\s*<Name>(\w+)</Name>", wf.text))
-    handled = set(re.findall(r"<orcl:Name>(\w+)</orcl:Name>", ET.tostring(wf.named("Commands"), encoding="unicode")))
+    # From the tree: ET.tostring writes its own prefixes (ns2:Name), so a regex on <orcl:Name> found none.
+    handled = {c.findtext(CONTROL + "Name") for c in wf.named("Commands").iter(W + "Combinator") if c.get(XSI) == "orcl:OnCommand"} - {None}
     if RIG_HARDWARE in wf.text:
         handled |= lick_spout_stage_commands(wf)
     return sorted(handled - declared)

@@ -143,6 +143,24 @@ def test_a_workflow_s_own_ready_report_is_found_under_any_prefix(tmp_path):
     assert lint.rig_hardware_problems(workflow(tmp_path, rig + own)) == ["the workflow has its own Ready report"]
 
 
+def test_a_lab_type_is_found_under_the_prefix_a_bonsai_save_gives_it(tmp_path):
+    p1 = 'xmlns:p1="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core" '
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.bonsai").write_text(
+        HEAD.replace("xmlns=", p1 + "xmlns=") + '<Expression xsi:type="GroupWorkflow"><Name>TaskLogic</Name><Workflow><Nodes>'
+        '<Expression xsi:type="Combinator"><Combinator xsi:type="p1:HarpDelay" /></Expression></Nodes><Edges /></Workflow></Expression>'
+        "</Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
+    assert lint.harp_delays_off_the_clock(lint.Workflow(tmp_path)) == (1, ["HarpDelay"])
+
+
+def test_a_command_the_workflow_handles_and_does_not_declare_is_found(tmp_path):
+    on = '<Expression xsi:type="Combinator"><Combinator xsi:type="c:OnCommand"><c:Name>{}</c:Name></Combinator></Expression>'
+    wf = workflow(tmp_path, '<Expression xsi:type="GroupWorkflow" xmlns:c="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control">'
+                  '<Name>Commands</Name><Workflow><Nodes>' + on.format("RewardLeft") + on.format("Flush")
+                  + "</Nodes><Edges /></Workflow></Expression><Command><Name>RewardLeft</Name></Command>")
+    assert lint.undeclared_commands(wf) == ["Flush"]
+
+
 def test_a_node_not_in_the_workflow_is_named_not_a_bare_stop_iteration(tmp_path):
     try:
         workflow(tmp_path, "").named("TaskLogic")
