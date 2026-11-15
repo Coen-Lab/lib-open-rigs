@@ -544,7 +544,7 @@ def experiment_log_problems(wf: Workflow) -> list[str]:
     # first: LogLabExperiment inside a group with a Timestamp reader, or after the pieces, is defined in terms of itself.
     top = nodes_and_edges(child(wf.root, W + "Workflow"))[0]
     paths = [n.get("Path") for n in top]
-    log = f"OpenRigs.Logging:LogLabExperiment.bonsai"
+    log = "OpenRigs.Logging:LogLabExperiment.bonsai"
     if log in wf.text and log not in paths:
         problems.append("LogLabExperiment is not a top-level node of its own")
     elif log in paths:
