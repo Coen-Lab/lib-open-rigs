@@ -4,7 +4,7 @@
     <Description>A rig's speakers: rig.yml's speakerArray and their filters, sounds equalised for each speaker, and the lab's error sound.</Description>
     <PackageTags>$(PackageTags) Audio</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.1</Version>
+    <Version>0.1.1-coen-lab.2</Version>
   </PropertyGroup>
 
   <ItemGroup>

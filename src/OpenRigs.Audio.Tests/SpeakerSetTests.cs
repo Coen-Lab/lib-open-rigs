@@ -117,6 +117,24 @@ namespace OpenRigs.Audio.Tests
         }
 
         [TestMethod]
+        public void EveryChannelProblemIsNamed()
+        {
+            const string twoSpeakers =
+                "    left:\n      channel: 0\n      filter: calibration/speaker-left.json\n" +
+                "    right:\n      channel: 1\n      filter: calibration/speaker-right.json\n";
+            // speakers.md's old example: speakers on 0 and 1, the error sound on 2, where it would play unequalised.
+            var unheard = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(twoSpeakers), "TEST-RIG"));
+            StringAssert.Contains(unheard.Message, "errorSoundChannel 2 has no speaker on it, and the error sound is never played unequalised: set it to a speaker's channel (left 0, right 1)");
+            var shared = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(
+                twoSpeakers.Replace("channel: 1", "channel: 0"), "  errorSoundChannel: 0\n"), "TEST-RIG"));
+            StringAssert.Contains(shared.Message, "speakers 'left', 'right' share channel 0: each speaker needs its own");
+            var outside = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(
+                twoSpeakers.Replace("channel: 1", "channel: 32"), "  syncChannel: 40\n  errorSoundChannel: 0\n"), "TEST-RIG"));
+            StringAssert.Contains(outside.Message, "speaker 'right' channel 32 is not one of the audio device's 32 channels (0 to 31, speakerArray.device.channelCount)");
+            StringAssert.Contains(outside.Message, "syncChannel 40 is not one of the audio device's 32 channels");
+        }
+
+        [TestMethod]
         public void TheErrorSoundNeedsAnErrorChannel()
         {
             var set = SpeakerSet.Load(Rig(extra: "  syncChannel: 31\n"), "TEST-RIG");

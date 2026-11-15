@@ -124,7 +124,8 @@ namespace OpenRigs.Audio
         /// <summary>
         /// rig.yml's speakerArray, each speaker's filter read relative to rig.yml's folder. Stops, naming every problem,
         /// on a speaker without a filter (RequireFilters), a filter missing, without taps,
-        /// not symmetric, for another rate or measured on another machine.
+        /// not symmetric, for another rate or measured on another machine; a speaker or syncChannel outside the
+        /// device's channels, two speakers on one channel, or an errorSoundChannel with no speaker on it.
         /// </summary>
         public static SpeakerSet Load(string rigFile, string machineName = null)
         {
@@ -157,6 +158,7 @@ namespace OpenRigs.Audio
             };
             var problems = new List<string>();
             var loaded = new List<Speaker>();
+            var read = new List<Speaker>();  // every speaker, its filter good or not, for the channel checks
             var folder = Path.GetDirectoryName(path);
             foreach (var entry in entries)
             {
@@ -168,6 +170,7 @@ namespace OpenRigs.Audio
                     AzimuthDeg = Number(Child(position, "azimuth")),
                     ElevationDeg = Number(Child(position, "elevation")),
                 };
+                read.Add(speaker);
                 var filterPath = Text(Child(entry.Settings, "filter"));
                 var full = Path.GetFullPath(Path.IsPathRooted(filterPath) ? filterPath : Path.Combine(folder, filterPath));
                 if (!File.Exists(full))
@@ -208,6 +211,24 @@ namespace OpenRigs.Audio
                 speaker.Kernel = new Mat(1, filter.Taps.Count, Depth.F32, 1);
                 Marshal.Copy(filter.Taps.Select(tap => (float)tap).ToArray(), 0, speaker.Kernel.Data, filter.Taps.Count);
                 loaded.Add(speaker);
+            }
+            var range = " is not one of the audio device's " + set.ChannelCount + " channels (0 to " + (set.ChannelCount - 1) + ", speakerArray.device.channelCount)";
+            foreach (var speaker in read.Where(s => s.Channel < 0 || s.Channel >= set.ChannelCount))
+            {
+                problems.Add("speaker '" + speaker.Name + "' channel " + speaker.Channel + range);
+            }
+            foreach (var shared in read.GroupBy(s => s.Channel).Where(g => g.Count() > 1))
+            {
+                problems.Add("speakers " + string.Join(", ", shared.Select(s => "'" + s.Name + "'")) + " share channel " + shared.Key + ": each speaker needs its own");
+            }
+            if (set.SyncChannel.HasValue && (set.SyncChannel < 0 || set.SyncChannel >= set.ChannelCount))
+            {
+                problems.Add("syncChannel " + set.SyncChannel + range);
+            }
+            if (set.ErrorSoundChannel.HasValue && !read.Any(s => s.Channel == set.ErrorSoundChannel))
+            {
+                problems.Add("errorSoundChannel " + set.ErrorSoundChannel + " has no speaker on it, and the error sound is never played unequalised: " +
+                             "set it to a speaker's channel (" + string.Join(", ", read.Select(s => s.Name + " " + s.Channel)) + ")");
             }
             if (problems.Count > 0) throw new InvalidOperationException("The speakers cannot be used: " + string.Join("; ", problems) + ".");
             set.Speakers = loaded.AsReadOnly();

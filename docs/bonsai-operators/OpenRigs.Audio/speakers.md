@@ -23,10 +23,10 @@ speakerArray:
       channel: 1
       filter: calibration/speaker-right.json
   syncChannel: 31          # optional: a task's sync copy
-  errorSoundChannel: 2     # the error sound's speaker
+  errorSoundChannel: 1     # the error sound's speaker: a speaker's channel
 ```
 
-Each speaker needs a filter: a calibration artefact with `taps` (symmetric), `sampleRate` and `machineName` (see [Calibration](../../articles/calibration.md)). A speaker is never played unequalised.
+Each speaker needs a filter: a calibration artefact with `taps` (symmetric), `sampleRate` and `machineName` (see [Calibration](../../articles/calibration.md)). A speaker is never played unequalised, so `errorSoundChannel` must be a speaker's channel. Each speaker has a channel of its own, and every channel, `syncChannel` included, is below `channelCount`.
 
 ---
 
@@ -34,7 +34,7 @@ Each speaker needs a filter: a calibration artefact with `taps` (symmetric), `sa
 
 | Operator | Input | Output | What it does |
 |---|---|---|---|
-| `LoadSpeakers` | the path of this machine's `rig.yml` (RigHardware's `RigFile` subject) | `SpeakerSet` | Loads every speaker, its channel and its filter, once. Stops the workflow, naming every problem, on a speaker without a filter, or a filter missing, without taps, not symmetric, for another rate or measured on another machine (`MachineName`, empty for this one). Keep its output in an `AsyncSubject`, such as `Speakers`. |
+| `LoadSpeakers` | the path of this machine's `rig.yml` (RigHardware's `RigFile` subject) | `SpeakerSet` | Loads every speaker, its channel and its filter, once. Stops the workflow, naming every problem, on a speaker without a filter, or a filter missing, without taps, not symmetric, for another rate or measured on another machine (`MachineName`, empty for this one); and on a speaker or `syncChannel` outside the device's channels, two speakers on one channel, or an `errorSoundChannel` with no speaker on it. Keep its output in an `AsyncSubject`, such as `Speakers`. |
 | `SpeakerBuffer` | `(SpeakerSet, Mat)` or `(SpeakerSet, IList<Mat>)` | `Mat` or `IList<Mat>` | The mixer's buffer for a sound of one row: on each of `Channels` (empty: every speaker in `rig.yml`), equalised for that speaker (`Equalise`, true for a stimulus, false for a background noise), times `Gain`; every other channel silent. A list gives one buffer per sound, such as a table of tones. |
 | `ErrorSoundBuffer` | `SpeakerSet` | `Mat` | The lab's error sound (`error_tone.wav`, embedded in the package) on `rig.yml`'s `errorSoundChannel` alone, equalised for that speaker, at `ErrorSound.Level` (0.5) times `Gain`. Map `Gain` from the task's `punishment.sound.gain`, and make the buffer once at load, not at each error. |
 | `CheckWaveRate` | the mixer's sample rate | the rate | Stops the workflow if a WAV file the mixer plays (`FileName`, relative to `src`) is at another rate: nothing converts it, so it would play at the wrong pitch and speed. |
