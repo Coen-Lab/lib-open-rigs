@@ -177,7 +177,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void NothingAskedPlansNoPulses()
         {
-            foreach (var ul in new[] { 0.0, -1.0, double.NaN })
+            foreach (var ul in new[] { 0.0, -1.0 })
             {
                 var plan = PlanReward.Plan(Calibrated(), ul);
                 Assert.AreEqual(0, plan.Count);
@@ -217,10 +217,21 @@ namespace OpenRigs.Core.Tests
             var line = Calibrated();
             Assert.AreEqual(20, line.MaxRewardUl);
             Assert.AreEqual(7, PlanReward.Plan(line, 20).Count);  // the maximum itself is planned
-            foreach (var ul in new[] { 30.0, 1e12, double.PositiveInfinity })
+            foreach (var ul in new[] { 30.0, 1e12 })
             {
                 var ex = Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(line, ul));
                 StringAssert.Contains(ex.Message, "more than the 20 ul one reward may give");
+            }
+        }
+
+        [TestMethod]
+        public void RefusesAVolumeThatIsNotANumberNamingTheSide()
+        {
+            // NaN and infinities planned no pulses, silently (or, +infinity, refused as too large).
+            foreach (var ul in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+            {
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(Calibrated(), ul));
+                StringAssert.Contains(ex.Message, "reward on the " + Calibrated().Side + " spout, which is not a volume");
             }
         }
 

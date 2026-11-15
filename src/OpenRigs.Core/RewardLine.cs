@@ -237,11 +237,11 @@ namespace OpenRigs.Core
 
     /// <summary>
     /// Plans each reward on its line: a volume in microlitres becomes equal pulses of one whole
-    /// width inside the calibration's range. A volume of 0 or less plans no pulses; a volume above the line's <see cref="RewardLine.MaxRewardUl"/>, or one that would
+    /// width inside the calibration's range. A volume of 0 or less plans no pulses; one that is not a number or infinite, a volume above the line's <see cref="RewardLine.MaxRewardUl"/>, or one that would
     /// take more than 65535 pulses, stops the workflow.
     /// </summary>
     [Combinator]
-    [Description("Plans each reward, a (microlitres, RewardLine) pair: the fewest equal pulses inside the calibrated width range, width = (ul per pulse - intercept) / slope rounded to whole ms, raised to the shortest calibrated width (Clamped) when the volume per pulse is below it. DeliveredUl comes from the rounded width. 0 ul or less plans no pulses; more than the line's MaxRewardUl stops the workflow.")]
+    [Description("Plans each reward, a (microlitres, RewardLine) pair: the fewest equal pulses inside the calibrated width range, width = (ul per pulse - intercept) / slope rounded to whole ms, raised to the shortest calibrated width (Clamped) when the volume per pulse is below it. DeliveredUl comes from the rounded width. 0 ul or less plans no pulses; a volume that is not a number or infinite, or more than the line's MaxRewardUl, stops the workflow.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PlanReward
     {
@@ -255,6 +255,13 @@ namespace OpenRigs.Core
         public static RewardPlan Plan(RewardLine line, double requestedUl)
         {
             var plan = new RewardPlan { RewardLine = line, RequestedUl = requestedUl };
+            if (double.IsNaN(requestedUl) || double.IsInfinity(requestedUl))
+            {
+                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                    "The task asked for a {0} ul reward on the {1} spout, which is not a volume, so the workflow stopped " +
+                    "without opening the valve. Check the reward size in the task's settings.",
+                    requestedUl, line.Side));
+            }
             if (requestedUl > line.MaxRewardUl)
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
@@ -262,7 +269,7 @@ namespace OpenRigs.Core
                     "without opening the valve. Check the reward size in the task's settings (30 typed for 3.0?), or raise DeliverReward's MaxRewardUl.",
                     requestedUl, line.Side, line.MaxRewardUl));
             }
-            if (!(requestedUl > 0) || double.IsInfinity(requestedUl)) return plan;
+            if (requestedUl <= 0) return plan;
 
             var fit = line.Calibration.LinearFit;
             var largestUl = fit.Slope * fit.MaxX + fit.Intercept;
