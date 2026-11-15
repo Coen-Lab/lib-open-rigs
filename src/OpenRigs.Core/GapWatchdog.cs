@@ -1,6 +1,7 @@
 using Bonsai;
 using System;
 using System.ComponentModel;
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 
 namespace OpenRigs.Core
@@ -34,8 +35,15 @@ namespace OpenRigs.Core
                 var message = Message;
                 if (!(gapSeconds > 0)) throw new InvalidOperationException("GapWatchdog has a GapSeconds of " + gapSeconds + "; it must be more than 0.");
                 if (string.IsNullOrWhiteSpace(message)) throw new InvalidOperationException("GapWatchdog has no Message: say what stopped arriving and what to check.");
-                // TimeoutException, as Timeout throws: its message reaches the operator without a "Parameter name" line.
-                return source.Timeout(TimeSpan.FromSeconds(gapSeconds), Observable.Defer(() => Observable.Throw<TSource>(new TimeoutException(message))));
+                // The deadline runs on a thread of its own, not the thread pool's, which a busy rig can hold
+                // past it. TimeoutException, as Timeout throws: its message reaches the operator without a
+                // "Parameter name" line.
+                return Observable.Using(
+                    () => new EventLoopScheduler(),
+                    scheduler => source.Timeout(
+                        TimeSpan.FromSeconds(gapSeconds),
+                        Observable.Defer(() => Observable.Throw<TSource>(new TimeoutException(message))),
+                        scheduler));
             });
         }
     }

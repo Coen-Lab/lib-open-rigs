@@ -1,31 +1,51 @@
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace OpenRigs.Core.Tests
 {
+    // Values are sent from the test's own thread, never a thread-pool timer, so a loaded runner
+    // (CI, 15 Nov 2026) cannot make a value miss its gap.
     [TestClass]
     public class GapWatchdogTests
     {
-        const string Message = "No frame from Camera-Body for 0.3 s.";
+        const string Message = "No frame from Camera-Body for 0.5 s.";
 
         [TestMethod]
         public void PassesValuesThatComeInTime()
         {
-            var dog = new GapWatchdog { GapSeconds = 0.3, Message = Message };
-            var values = dog.Process(Observable.Interval(TimeSpan.FromMilliseconds(50)).Take(8)).ToList().Wait();
-            CollectionAssert.AreEqual(Enumerable.Range(0, 8).Select(i => (long)i).ToList(), values.ToList());
+            var dog = new GapWatchdog { GapSeconds = 5, Message = Message };
+            var source = new Subject<int>();
+            var seen = new List<int>();
+            Exception error = null;
+            var completed = false;
+            using (dog.Process(source).Subscribe(seen.Add, e => error = e, () => completed = true))
+            {
+                for (var i = 0; i < 8; i++) source.OnNext(i);
+                source.OnCompleted();
+            }
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5, 6, 7 }, seen);
+            Assert.IsNull(error);
+            Assert.IsTrue(completed);
         }
 
         [TestMethod]
         public void StopsWithItsMessageAfterAGapMidRun()
         {
-            var dog = new GapWatchdog { GapSeconds = 0.3, Message = Message };
-            var stream = Observable.Interval(TimeSpan.FromMilliseconds(50)).Take(3).Concat(Observable.Never<long>());
+            var dog = new GapWatchdog { GapSeconds = 0.5, Message = Message };
+            var source = new Subject<int>();
             var seen = 0;
-            var ex = Assert.ThrowsException<TimeoutException>(() => dog.Process(stream).Do(_ => seen++).Wait());
-            Assert.AreEqual(Message, ex.Message);
+            var stopped = new System.Threading.ManualResetEventSlim();
+            Exception error = null;
+            using (dog.Process(source).Subscribe(_ => seen++, e => { error = e; stopped.Set(); }))
+            {
+                for (var i = 0; i < 3; i++) source.OnNext(i);
+                Assert.IsTrue(stopped.Wait(TimeSpan.FromSeconds(30)), "the gap never stopped it");
+            }
+            Assert.IsInstanceOfType(error, typeof(TimeoutException));
+            Assert.AreEqual(Message, error.Message);
             Assert.AreEqual(3, seen, "the values before the gap pass through");
         }
 
