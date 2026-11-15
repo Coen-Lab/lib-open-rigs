@@ -27,13 +27,13 @@ PER_ELEMENT = {"rx:SelectMany", "rx:CreateObservable", "rx:Concat", "rx:Switch"}
 # The subjects a lab block declares for the workflow, and their kind: a multicast into them is not seen in the workflow's XML.
 SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
 SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
-BLOCK_SUBJECTS = {
-    "OpenRigs.Devices:Zapit.ConnectZapit.bonsai": {"ZapitCommands": "rx:BehaviorSubject"},
-    SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
-    "OpenRigs.Devices:RigHardware.bonsai": {"ReadyStages": "rx:ReplaySubject"},
-}
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
 RIG_HARDWARE = "OpenRigs.Devices:RigHardware.bonsai"
+BLOCK_SUBJECTS = {
+    ZAPIT_INCLUDE: {"ZapitCommands": "rx:BehaviorSubject"},
+    SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
+    RIG_HARDWARE: {"ReadyStages": "rx:ReplaySubject"},
+}
 # The stages RigHardware's Ready waits for (its ReadyWaitsFor), and on a workflow that includes SpeakerMixer.
 READY_STAGES = ("HarpClockSet", "SpoutsHomed")
 READY_STAGES_WITH_MIXER = READY_STAGES + ("MixerStarted",)
@@ -200,15 +200,12 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
     SpeakerMixer.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
 
-    def name(n: ET.Element) -> str:
-        return n.findtext(W + "Name") or n.findtext(RX + "Name") or ""
-
     def inputs(i: int) -> list[tuple[str, str, str]]:
-        return sorted((label, nodes[a].get(XSI) or "", name(nodes[a])) for a, b, label in edges if b == i)
+        return sorted((label, nodes[a].get(XSI) or "", _name(nodes[a])) for a, b, label in edges if b == i)
 
     def read_by_append_buffer(subject: str) -> bool:
         return any(kind(nodes[b]) == "mix:AppendBuffer" and label == "Source1" and nodes[a].get(XSI) == "SubscribeSubject"
-                   and name(nodes[a]) == subject for a, b, label in edges)
+                   and _name(nodes[a]) == subject for a, b, label in edges)
 
     def checked(i: int, sound: str) -> bool:
         node = nodes[i]
@@ -217,10 +214,10 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
 
     problems = []
     for sound in SPEAKER_MIXER_SOUNDS[:3]:
-        relays = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:PublishSubject" and name(n) == f"Mixer{sound}"]
+        relays = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:PublishSubject" and _name(n) == f"Mixer{sound}"]
         feeds = [a for r in relays for a, b, _ in edges if b == r]
         if sound == "RewardToneSounds":
-            fed = [(nodes[a].get(XSI), name(nodes[a])) for a in feeds] == [("SubscribeSubject", sound)]
+            fed = [(nodes[a].get(XSI), _name(nodes[a])) for a in feeds] == [("SubscribeSubject", sound)]
         else:
             fed = len(feeds) == 1 and checked(feeds[0], sound)
         if not (len(relays) == 1 and fed and read_by_append_buffer(f"Mixer{sound}")):
@@ -369,6 +366,7 @@ def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[int]) -> 
                     found.append(f"{_name(node) or ptype.split(':')[-1]} writes DO{line}, a RewardValve, itself")
     return found
 
+
 def zapit_include_problems(wf: Workflow) -> list[str]:
     """Zapit is lib-open-rigs' Zapit.ConnectZapit, given the task's conditions file in an optogenetics experiment, and
     nothing of its connect, check and refusal chain is built in the workflow."""
@@ -426,6 +424,7 @@ def penalty_sound_problems(wf: Workflow) -> list[str]:
         return problems + (["the workflow reads its own penalty sound file"] if "Sound.Path" in wf.text else [])
     return ["no PenaltySoundBuffer"]
 
+
 def readme_missing_blocks(wf: Workflow) -> list[str]:
     """Every OpenRigs operator and include the workflow uses that its README's Shared Blocks table does not name."""
     readme = (wf.repo / "README.md").read_text(encoding="utf-8")
@@ -451,7 +450,7 @@ def undeclared_commands(wf: Workflow) -> list[str]:
     ControlServer refuses an undeclared command, so it would never fire."""
     declared = set(re.findall(r"<Command>\s*<Name>(\w+)</Name>", wf.text))
     handled = set(re.findall(r"<orcl:Name>(\w+)</orcl:Name>", ET.tostring(wf.named("Commands"), encoding="unicode")))
-    if "OpenRigs.Devices:RigHardware.bonsai" in wf.text:
+    if RIG_HARDWARE in wf.text:
         handled |= lick_spout_stage_commands(wf)
     return sorted(handled - declared)
 
@@ -529,9 +528,8 @@ def expected_files_problems(wf: Workflow) -> list[str]:
             entries[path.strip()] = condition.strip() or None
     writes, problems, devices, harp = {}, [], False, False
     for node in wf.root.iter(W + "Expression"):
-        kind, include = node.get(XSI) or "", node.get("Path") or ""
-        inner = next((c for c in node if c.tag == W + "Combinator"), None)  # a Combinator node's type is its child's
-        local = ((inner.get(XSI) or "") if kind == "Combinator" and inner is not None else kind).split(":")[-1]
+        include = node.get("Path") or ""
+        local = kind(node).split(":")[-1]
         if include in NAMED_LOGS:
             name = next((c.text for c in node if c.tag in (W + "LogName", W + "Name") and c.text), None)
             if name is None:
