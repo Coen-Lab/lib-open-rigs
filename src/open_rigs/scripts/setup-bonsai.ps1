@@ -39,5 +39,23 @@ if (Test-Path $tracked) {
 }
 & .\Bonsai.exe --no-editor
 $restoreExit = $LASTEXITCODE
+# After a good restore, each package folder Bonsai.config no longer names goes: the restore adds a folder per version
+# and never removes one, so every package bump left the old one behind (15 Nov 2026: one rig held three old versions
+# beside the current ones). Bonsai loads from the AssemblyLocation paths only, so none was in use. A
+# folder keeps the package's own version, which NuGet may have normalised in Bonsai.config (openal.redist.2.0.7.0 for
+# 2.0.7), so trailing .0 parts are not compared. A folder not named <id>.<version> is left alone.
+if ($restoreExit -eq 0 -and (Test-Path ".\Packages") -and (Test-Path ".\Bonsai.config")) {
+    function Get-NormalVersion([string]$v) { $parts = $v -split '-', 2; ($parts[0] -replace '(\.0)+$', '') + $(if ($parts.Count -gt 1) { '-' + $parts[1] }) }
+    $named = @{}
+    foreach ($p in ([xml](Get-Content ".\Bonsai.config" -Raw)).PackageConfiguration.Packages.Package) {
+        $named["$($p.id).$(Get-NormalVersion $p.version)".ToLowerInvariant()] = $true
+    }
+    foreach ($dir in Get-ChildItem ".\Packages" -Directory) {
+        $m = [regex]::Match($dir.Name, '^(.+?)\.(\d+(\.\d+)*(-.+)?)$')
+        if (-not $m.Success -or $named.ContainsKey("$($m.Groups[1].Value).$(Get-NormalVersion $m.Groups[2].Value)".ToLowerInvariant())) { continue }
+        try { Remove-Item -LiteralPath $dir.FullName -Recurse -Force -ErrorAction Stop; "Removed $($dir.Name), which Bonsai.config no longer names" }
+        catch { [Console]::Error.WriteLine("Could not remove $($dir.Name): $($_.Exception.Message)") }
+    }
+}
 Pop-Location
 exit $restoreExit
