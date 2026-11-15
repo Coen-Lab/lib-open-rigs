@@ -25,8 +25,8 @@ if (!(Test-Path "./Bonsai.exe")) {
     Move-Item -Path "temp.config" "NuGet.config" -Force -ErrorAction SilentlyContinue
     Remove-Item -Path "temp.zip"
 }
-# The workflow's layout (config\main.layout), when it has one, into the editor's per-machine file. rig-setup runs
-# this again when the layout changes (3 Nov 2026: a node added in front of Hardware moved its window index). A
+# The workflow's layout (config\main.layout), when it has one, into the editor's per-machine file. A rig's setup
+# runs this again when the layout changes (3 Nov 2026: a node added in front of Hardware moved its window index). A
 # different one already here is kept beside it as main.saved.layout.
 $layout = ".\Settings\src\main.layout"
 $tracked = "..\config\main.layout"
