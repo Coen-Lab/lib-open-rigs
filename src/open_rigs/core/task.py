@@ -1,4 +1,3 @@
-import math
 from typing import Optional
 
 from pydantic import ConfigDict, Field, model_validator
@@ -23,23 +22,28 @@ class Task(BaseSchema):
 # task file, and Penalty as its penalty field.
 
 
-class QuietWait(BaseSchema):
+class TaskBlock(BaseSchema):
+    """A block of a task file whose numbers are all finite: YAML's .inf and .nan are refused, so no wait is endless and
+    no rule's comparison passes a NaN. Every lab block is one, and so is a task's model built on QuietWait or Optogenetics."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+
+class QuietWait(TaskBlock):
     """A training stage's quiet waits before Go, counted from the interval's start (OpenRigs.Core QuietWait)."""
 
     lick_quiet_seconds: float = Field(
         default=0.0,
         ge=0,
-        allow_inf_nan=False,
         description="Quiet wait: Go needs this long with every spout released, in seconds, counted from the interval's start and restarted by every touch and release; a held contact (a paw or chin on a spout) holds Go until released, so licks for the last reward cannot carry into the next trial; 0: off. It lengthens the interval only when the mouse licks late in it (quietWaitSeconds)",
     )
     wheel_quiet_seconds: float = Field(
         default=0.0,
         ge=0,
-        allow_inf_nan=False,
         description="Quiet wait: Go needs this long with the wheel still, in seconds, counted from the interval's start: the wheel's distance (forward and back added) over the last wheelQuietSeconds must stay within wheelQuietCm; 0: off (with wheelQuietCm 0)",
     )
     wheel_quiet_cm: float = Field(
-        default=0.0, ge=0, allow_inf_nan=False, description="The most the wheel may move, forward and back added, within the last wheelQuietSeconds before Go, in cm; 0: off (with wheelQuietSeconds 0)"
+        default=0.0, ge=0, description="The most the wheel may move, forward and back added, within the last wheelQuietSeconds before Go, in cm; 0: off (with wheelQuietSeconds 0)"
     )
 
     @model_validator(mode="after")
@@ -49,7 +53,7 @@ class QuietWait(BaseSchema):
         return self
 
 
-class Optogenetics(BaseSchema):
+class Optogenetics(TaskBlock):
     """Zapit optogenetic stimulation: what every task's optogenetics block holds. A task adds its own laser timing.
 
     Every trial of an optogenetics experiment sends Zapit a condition from the conditions file loaded in Zapit, laser-on
@@ -92,7 +96,6 @@ class Optogenetics(BaseSchema):
         description="Probability that a trial after trialsBeforeLaser is a laser-on trial, shared equally by every condition in the conditions file; all other trials are laser-off trials, sent a condition with the laser off",
     )
     laser_to_stimulus_seconds: float = Field(
-        allow_inf_nan=False,
         description="Signed, in seconds: the trigger (the ZapitTrigger line) comes this long before the stimulus; 0 with it; negative after it. Go is the end of the interval less the lead, max(this, 0), once the stage's quiet waits hold, and the stimulus comes the lead after Go in every experiment, optogenetics on or off, so timing never reveals Zapit; the trigger only with optogenetics. Zapit is armed during the interval and adds no time. Refused above itiMinSeconds - 0.2 s (Zapit's reply margin); each task adds its own limits",
     )
     trials_before_laser: int = Field(
@@ -105,8 +108,6 @@ class Optogenetics(BaseSchema):
             raise ValueError("use_zapit is on but zapit_config_path is empty")
         if self.use_zapit and self.laser_power_mw is None:
             raise ValueError("use_zapit is on but laser_power_mw is not set")
-        if self.laser_power_mw is not None and not math.isfinite(self.laser_power_mw):
-            raise ValueError(f"laser_power_mw ({self.laser_power_mw}) must be a finite number of mW")
         return self
 
     def check_lead_fits(self, iti_min_seconds: float) -> None:
@@ -144,19 +145,19 @@ def level_dbfs(default: float, sound: str):
     )
 
 
-class StimulusSound(BaseSchema):
+class StimulusSound(TaskBlock):
     """A task's stimulus sounds, each played at levelDbfs (OpenRigs.Audio SpeakerBuffer or SpeakerSet.Buffer)."""
 
     level_dbfs: float = level_dbfs(STIMULUS_LEVEL_DBFS, "Each stimulus sound")
 
 
-class RewardTone(BaseSchema):
+class RewardTone(TaskBlock):
     """A task's reward tone, played at levelDbfs."""
 
     level_dbfs: float = level_dbfs(REWARD_TONE_LEVEL_DBFS, "The reward tone")
 
 
-class BackgroundNoise(BaseSchema):
+class BackgroundNoise(TaskBlock):
     """The background noise, one level for the experiment: looped on every speaker unequalised, faded in over 2 s once
     the task file is read at Go (OpenRigs.Audio SpeakerMixer)."""
 
@@ -164,14 +165,14 @@ class BackgroundNoise(BaseSchema):
     level_dbfs: float = level_dbfs(BACKGROUND_LEVEL_DBFS, "The background noise")
 
 
-class PenaltySound(BaseSchema):
+class PenaltySound(TaskBlock):
     """The lab's penalty sound (OpenRigs.Audio PenaltySoundBuffer, the same in every task), on rig.yml's speakerArray.penaltySoundChannel alone, equalised for that speaker."""
 
     enabled: bool = Field(default=True, description="Whether the penalty sound plays with every timeout")
     level_dbfs: float = level_dbfs(PENALTY_LEVEL_DBFS, "The penalty sound")
 
 
-class Penalty(BaseSchema):
+class Penalty(TaskBlock):
     """What a wrong or missed trial costs: a timeout, and the penalty sound with it (the trial log's penaltySound and
     penaltyTimeoutSeconds). Each task says which trials are penalised; timeoutSeconds has no lab default: each task file gives it."""
 

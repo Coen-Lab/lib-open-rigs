@@ -32,6 +32,19 @@ def test_quiet_wait_refuses_an_endless_wait(key):
         Stage.model_validate({"label": "a", key: float("inf"), "wheelQuietCm": 1})
 
 
+def test_a_task_s_own_field_on_a_lab_block_is_finite_too():
+    class TimedStage(QuietWait):
+        time_limit_seconds: float
+
+    with pytest.raises(ValidationError, match="finite number"):
+        TimedStage.model_validate({"timeLimitSeconds": float("inf")})
+
+
+def test_penalty_refuses_an_endless_timeout():
+    with pytest.raises(ValidationError, match="finite number"):
+        Penalty.model_validate({"timeoutSeconds": float("inf")})
+
+
 @pytest.mark.parametrize("lead", [float("nan"), float("-inf")])
 def test_optogenetics_refuses_a_lead_that_is_not_a_number(lead):
     with pytest.raises(ValidationError, match="finite number"):
