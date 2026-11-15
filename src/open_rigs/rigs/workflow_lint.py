@@ -54,12 +54,23 @@ def kind(node: ET.Element) -> str:
     return (combinator.get(XSI) if combinator is not None else node.get(XSI)) or ""
 
 
+def child(element: ET.Element, tag: str) -> ET.Element:
+    """`element`'s first `tag` child; a workflow without it is malformed, so its absence fails loudly."""
+    found = element.find(tag)
+    if found is None:
+        raise ValueError(f"{element.findtext(W + 'Name') or element.tag} has no {tag.removeprefix(W)}")
+    return found
+
+
+def nodes_and_edges(workflow: ET.Element) -> tuple[list[ET.Element], list[tuple[int, int, str]]]:
+    """A Workflow element's nodes and edges (from, to, label; "" for an unlabelled edge)."""
+    edges = [(int(e.attrib["From"]), int(e.attrib["To"]), e.get("Label", "")) for e in child(workflow, W + "Edges")]
+    return list(child(workflow, W + "Nodes")), edges
+
+
 def scope(node: ET.Element) -> tuple[list[ET.Element], list[tuple[int, int, str]]]:
     """A nested workflow's nodes and edges (from, to, label)."""
-    workflow = node.find(W + "Workflow")
-    nodes = list(workflow.find(W + "Nodes"))
-    edges = [(int(e.get("From")), int(e.get("To")), e.get("Label")) for e in workflow.find(W + "Edges")]
-    return nodes, edges
+    return nodes_and_edges(child(node, W + "Workflow"))
 
 
 def upstream(edges: list[tuple[int, int, str]], start: int) -> set[int]:
@@ -76,9 +87,7 @@ def upstream(edges: list[tuple[int, int, str]], start: int) -> set[int]:
 
 def _scopes(root: ET.Element):
     for workflow in root.iter(W + "Workflow"):
-        nodes = list(workflow.find(W + "Nodes"))
-        edges = [(int(e.get("From")), int(e.get("To")), e.get("Label")) for e in workflow.find(W + "Edges")]
-        yield nodes, edges
+        yield nodes_and_edges(workflow)
 
 
 def wall_clock_waits(wf: Workflow, group: str = "TaskLogic") -> list[str]:
@@ -130,14 +139,15 @@ def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
 
     for n in wf.root.iter(W + "Expression"):
         if is_subject(n):
-            declared[n.findtext(RX + "Name")] = n.get(XSI)
+            declared[n.findtext(RX + "Name", "")] = n.get(XSI, "")
     found: list[str] = []
 
     def walk(workflow: ET.Element, nested: bool, local: set[str]) -> None:
-        local = local | {n.findtext(RX + "Name") for n in workflow.find(W + "Nodes") if is_subject(n)}
-        for n in workflow.find(W + "Nodes"):
+        nodes = child(workflow, W + "Nodes")
+        local = local | {n.findtext(RX + "Name", "") for n in nodes if is_subject(n)}
+        for n in nodes:
             if n.get(XSI) == "MulticastSubject" and nested:
-                name = n.findtext(W + "Name")
+                name = n.findtext(W + "Name", "")
                 if name not in local and declared.get(name) != "rx:BehaviorSubject":
                     found.append(name)
             inner = n.find(W + "Workflow")
@@ -145,7 +155,7 @@ def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
                 per = n.get(XSI) in PER_ELEMENT
                 walk(inner, nested or per, set() if per else local)
 
-    walk(wf.root.find(W + "Workflow"), False, set())
+    walk(child(wf.root, W + "Workflow"), False, set())
     return found
 
 
@@ -167,7 +177,7 @@ def mixer_boot_delay_problems(root: ET.Element) -> list[str]:
         return ["the Mixer group has no MixerBootDelay"]
     delay = nodes[delays[0]]
     problems = []
-    if kind(delay) != "rx:DelaySubscription" or delay.find(W + "Combinator").findtext(RX + "DueTime") != "PT3S":
+    if kind(delay) != "rx:DelaySubscription" or child(delay, W + "Combinator").findtext(RX + "DueTime") != "PT3S":
         problems.append("MixerBootDelay is not a DelaySubscription of PT3S")
     expressions = [nodes[a].findtext(SCRIPT + "Expression") for a in upstream(edges, delays[0])]
     if "TimeSpan.FromSeconds(Math.Max(3.0, SpeakerArray.Device.BootDelay))" not in expressions:
@@ -247,7 +257,7 @@ def manual_reward_problems(wf: Workflow) -> list[str]:
     nodes, edges = scope(wf.named("Initialization"))
     subject = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:BehaviorSubject" and n.findtext(W + "Name") == "ManualRewardDropUl"]
     sources = [a for a, b, _ in edges if subject and b == subject[0]]
-    if len(sources) != 1 or float(next(nodes[sources[0]].iter(W + "Value")).text) != MANUAL_REWARD_DROP_UL:
+    if len(sources) != 1 or float(nodes[sources[0]].findtext(f".//{W}Value") or "nan") != MANUAL_REWARD_DROP_UL:
         problems.append(f"ManualRewardDropUl is not a BehaviorSubject of {MANUAL_REWARD_DROP_UL} in Initialization")
     users = [n.findtext(W + "Name") for n in wf.named("Commands").iter(W + "Expression") if n.get(XSI) == "SubscribeSubject"]
     if users.count("ManualRewardDropUl") != 2:
