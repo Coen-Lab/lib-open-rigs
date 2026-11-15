@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from open_rigs.core.calibration import CalibrationCurve, CalibrationPoint, LinearFit
+from open_rigs.core.calibration import CalibrationCurve, CalibrationPoint, DispenseProcedure, LinearFit
 
 FIXTURE = Path(__file__).parents[2] / "fixtures" / "calibration" / "valve-DO1.json"
 
@@ -93,3 +93,8 @@ def test_fixture_round_trips_unchanged():
 def test_linear_fit_refuses_a_range_it_cannot_plan_in(fit):
     with pytest.raises(ValidationError):
         LinearFit(**fit)
+
+
+def test_a_dispense_procedure_names_no_unit_beside_pulse_width_ms():
+    # pulseWidthMs is in ms; a free xUnit beside it could only disagree. The curve written from it says ms.
+    assert "xUnit" not in DispenseProcedure.model_json_schema(by_alias=True)["properties"]

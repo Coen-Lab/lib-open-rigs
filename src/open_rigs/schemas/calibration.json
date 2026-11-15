@@ -181,12 +181,6 @@
           "title": "XName",
           "type": "string"
         },
-        "xUnit": {
-          "default": "ms",
-          "description": "Unit of the quantity fired.",
-          "title": "XUnit",
-          "type": "string"
-        },
         "primingPulses": {
           "default": 5,
           "description": "Pulses fired before the baseline weighing to fill the line.",

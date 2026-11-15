@@ -111,7 +111,6 @@ namespace OpenRigs.Core.Calibration
             {
                 var gate = new object();
                 List<Burst> bursts = null;
-                string unit = "";
                 int index = 0, fired = 0;
                 bool due = false;
                 string note = "";
@@ -123,7 +122,7 @@ namespace OpenRigs.Core.Calibration
                 Func<string> dueText = () => index == 0
                     ? string.Format("Weigh Now: the baseline, the container's weight {0}.",
                         bursts[0].Count > 0 ? "after " + bursts[0].Count + " priming pulses" : "before any pulse")
-                    : string.Format("Weigh Now: {0}, after {1} pulses of {2} {3}.", bursts[index].Name, bursts[index].Count, bursts[index].PulseWidthMs, unit);
+                    : string.Format("Weigh Now: {0}, after {1} pulses of {2} ms.", bursts[index].Name, bursts[index].Count, bursts[index].PulseWidthMs);
                 Action land = () =>
                 {
                     // FirePulses completes once its last pulse has closed, so the drop has landed
@@ -147,7 +146,6 @@ namespace OpenRigs.Core.Calibration
                     lock (gate)
                     {
                         var p = settings.Procedure;
-                        unit = p.XUnit ?? "";
                         int gap = p.Samples.Max(s => s.PulseGapMs);
                         bursts = new List<Burst>();
                         bursts.Add(new Burst
@@ -182,7 +180,7 @@ namespace OpenRigs.Core.Calibration
                         if (pulse == null || bursts == null || due || index >= bursts.Count) return;
                         fired++;
                         var burst = bursts[index];
-                        say(string.Format("Firing {0}: pulse {1} of {2}, {3} {4}. Wait.", burst.Name, fired, burst.Count, burst.PulseWidthMs, unit));
+                        say(string.Format("Firing {0}: pulse {1} of {2}, {3} ms. Wait.", burst.Name, fired, burst.Count, burst.PulseWidthMs));
                         if (fired >= burst.Count) land();
                     }
                 }, observer.OnError));

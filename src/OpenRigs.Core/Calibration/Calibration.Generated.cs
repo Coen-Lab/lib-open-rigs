@@ -564,8 +564,6 @@ namespace OpenRigs.Core.Calibration
     
         private string _xName;
     
-        private string _xUnit;
-    
         private int _primingPulses;
     
         private int? _primingPulseWidthMs;
@@ -580,7 +578,6 @@ namespace OpenRigs.Core.Calibration
         {
             _samples = new System.Collections.Generic.List<DispenseSample>();
             _xName = "pulse_width";
-            _xUnit = "ms";
             _primingPulses = 5;
             _densityGPerMl = 1D;
             _settleWindow = 10;
@@ -591,7 +588,6 @@ namespace OpenRigs.Core.Calibration
         {
             _samples = other._samples;
             _xName = other._xName;
-            _xUnit = other._xUnit;
             _primingPulses = other._primingPulses;
             _primingPulseWidthMs = other._primingPulseWidthMs;
             _densityGPerMl = other._densityGPerMl;
@@ -633,24 +629,6 @@ namespace OpenRigs.Core.Calibration
             set
             {
                 _xName = value;
-            }
-        }
-    
-        /// <summary>
-        /// Unit of the quantity fired.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("xUnit")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="xUnit")]
-        [System.ComponentModel.DescriptionAttribute("Unit of the quantity fired.")]
-        public string XUnit
-        {
-            get
-            {
-                return _xUnit;
-            }
-            set
-            {
-                _xUnit = value;
             }
         }
     
@@ -758,7 +736,6 @@ namespace OpenRigs.Core.Calibration
         {
             stringBuilder.Append("Samples = " + _samples + ", ");
             stringBuilder.Append("XName = " + _xName + ", ");
-            stringBuilder.Append("XUnit = " + _xUnit + ", ");
             stringBuilder.Append("PrimingPulses = " + _primingPulses + ", ");
             stringBuilder.Append("PrimingPulseWidthMs = " + _primingPulseWidthMs + ", ");
             stringBuilder.Append("DensityGPerMl = " + _densityGPerMl + ", ");

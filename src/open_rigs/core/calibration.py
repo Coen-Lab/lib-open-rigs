@@ -118,7 +118,6 @@ class DispenseProcedure(CalibrationSchema):
 
     samples: List[DispenseSample] = Field(min_length=2, description="Pulse widths to measure, each fired and weighed in turn.")
     x_name: str = Field(default="pulse_width", description="Name of the quantity fired.")
-    x_unit: str = Field(default="ms", description="Unit of the quantity fired.")
     priming_pulses: int = Field(
         default=5, ge=0, description="Pulses fired before the baseline weighing to fill the line."
     )

@@ -24,7 +24,6 @@ namespace OpenRigs.Core.Tests
                         new DispenseSample { PulseWidthMs = 20, Repeats = 2, PulseGapMs = 1 }
                     },
                     PrimingPulses = priming,
-                    XUnit = "ms",
                     SettleWindow = 10,
                     WeighTimeoutS = 60
                 },
@@ -101,6 +100,9 @@ namespace OpenRigs.Core.Tests
             Assert.IsTrue(seen.Any(e => e.Prompt.Contains("1.0 g refused")), "a weight mid-burst was taken");
             Assert.IsTrue(seen.Any(e => e.Prompt.Contains("'heavy' is not a weight")), "text was taken as a weight");
             Assert.IsTrue(seen.Last().Prompt.StartsWith("Every weight taken"));
+            // pulseWidthMs is in ms, so the prompts say ms; the procedure names no unit of its own.
+            Assert.IsTrue(seen.Any(e => e.Prompt.StartsWith("Firing sample 1 of 2: pulse 1 of 2, 10 ms.")), "a pulse's prompt has its width in ms");
+            Assert.IsTrue(seen.Any(e => e.Prompt.StartsWith("Weigh Now: sample 1 of 2, after 2 pulses of 10 ms.")), "a weighing's prompt has its width in ms");
             Assert.IsTrue(seen.Where(e => e.Reading.HasValue).All(e => e.Reading.Value.IsStable));
         }
 
