@@ -23,6 +23,33 @@ $bin = Join-Path ([IO.Path]::GetTempPath()) ('check-workflow-' + (Split-Path $Re
 $bonsaiDir = Join-Path $Repo '.bonsai'
 $template = Join-Path (Split-Path -Parent (Split-Path -Parent $self)) 'rigs\rig-template.yml'
 
+# A folder keeps the package's own version, which NuGet may have normalised in Bonsai.config (openal.redist.2.0.7.0 for
+# 2.0.7), so trailing .0 parts are not compared.
+function Get-NormalVersion([string]$v) { $parts = $v.ToLowerInvariant() -split '-', 2; ($parts[0] -replace '(\.0)+$', '') + $(if ($parts.Count -gt 1) { '-' + $parts[1] }) }
+
+# Each package Bonsai.config names: its id, the version it names, its folder in .bonsai\Packages at that version ($null
+# when there is none) and every version of it there.
+function Get-Packages {
+    $dirs = @(Get-ChildItem (Join-Path $bonsaiDir 'Packages') -Directory)
+    foreach ($p in ([xml](Get-Content (Join-Path $bonsaiDir 'Bonsai.config') -Raw)).PackageConfiguration.Packages.Package) {
+        $prefix = $p.id + '.'
+        $versions = @($dirs | Where-Object { $_.Name.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -and $_.Name.Substring($prefix.Length) -match '^\d' })
+        [pscustomobject]@{
+            Id      = $p.id
+            Version = $p.version
+            Folder  = $versions | Where-Object { (Get-NormalVersion $_.Name.Substring($prefix.Length)) -eq (Get-NormalVersion $p.version) } | Select-Object -First 1 -ExpandProperty FullName
+            Found   = @($versions | ForEach-Object { $_.Name.Substring($prefix.Length) })
+        }
+    }
+}
+
+# An assembly Bonsai.config does not locate, from the package folders at the versions it names: never another version
+# left in .bonsai\Packages.
+function Find-PackageAssembly([string[]]$folders, [string]$name) {
+    $folders | ForEach-Object { Get-ChildItem $_ -Recurse -Filter "$name.dll" -ErrorAction SilentlyContinue } |
+        Where-Object { $_.FullName -match '\\lib\\net4' } | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+}
+
 function Initialize-Assemblies {
     [xml]$cfg = Get-Content (Join-Path $bonsaiDir 'Bonsai.config') -Raw
     $map = @{}
@@ -35,17 +62,14 @@ function Initialize-Assemblies {
     foreach ($f in $cfg.PackageConfiguration.LibraryFolders.LibraryFolder) {
         if ($f.platform -eq 'x64') { $env:PATH = (Join-Path $bonsaiDir $f.path) + ';' + $env:PATH }
     }
-    $script:resolveMap = $map; $script:resolvePkgs = Join-Path $bonsaiDir 'Packages'
+    $script:resolveMap = $map; $script:resolveFolders = @(Get-Packages | Where-Object { $_.Folder } | ForEach-Object { $_.Folder })
     $script:resolver = [ResolveEventHandler]{
         param($s, $e)
         $n = (New-Object Reflection.AssemblyName $e.Name).Name
         $loaded = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq $n } | Select-Object -First 1
         if ($loaded) { return $loaded }
         $p = $script:resolveMap[$n]
-        if (-not $p) {
-            $p = Get-ChildItem $script:resolvePkgs -Recurse -Filter "$n.dll" -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -match '\\lib\\net4' } | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-        }
+        if (-not $p) { $p = Find-PackageAssembly $script:resolveFolders $n }
         if ($p -and (Test-Path $p)) { return [Reflection.Assembly]::LoadFrom($p) }
         return $null
     }
@@ -248,15 +272,12 @@ if ($Step -eq 'Checks') {
 
 if (-not (Test-Path (Join-Path $bonsaiDir 'Packages'))) { throw "No .bonsai\Packages in $Repo. Run .bonsai\Setup.ps1 first." }
 # Every package Bonsai.config names, at its version, in .bonsai\Packages: a Bonsai.config moved on since the last setup
-# otherwise fails the build only as "proxy for the unknown type". A folder keeps the package's own version, which
-# NuGet may have normalised in Bonsai.config (openal.redist.2.0.7.0 for 2.0.7), so trailing .0 parts are not compared.
-function Get-NormalVersion([string]$v) { $parts = $v -split '-', 2; ($parts[0] -replace '(\.0)+$', '') + $(if ($parts.Count -gt 1) { '-' + $parts[1] }) }
-$folders = @(Get-ChildItem (Join-Path $bonsaiDir 'Packages') -Directory | ForEach-Object { $_.Name.ToLowerInvariant() })
-$stale = @(([xml](Get-Content (Join-Path $bonsaiDir 'Bonsai.config') -Raw)).PackageConfiguration.Packages.Package | Where-Object {
-    $id = $_.id.ToLowerInvariant() + '.'; $want = Get-NormalVersion $_.version.ToLowerInvariant()
-    -not @($folders | Where-Object { $_.StartsWith($id) -and (Get-NormalVersion $_.Substring($id.Length)) -eq $want }).Count
-} | ForEach-Object { "$($_.id) $($_.version)" })
-if ($stale.Count) { throw ".bonsai\Packages lacks what Bonsai.config names: $($stale -join ', '). Run .bonsai\Setup.ps1." }
+# otherwise fails the build only as "proxy for the unknown type".
+$stale = @(Get-Packages | Where-Object { -not $_.Folder })
+foreach ($p in $stale) {
+    "check-workflow: .bonsai\Packages lacks $($p.Id) $($p.Version), the version Bonsai.config names (found: $(if ($p.Found.Count) { $p.Found -join ', ' } else { 'none' })). Run .bonsai\Setup.ps1."
+}
+if ($stale.Count) { exit 1 }
 if (-not (Test-Path $template)) { throw "No lab rig template at $template." }
 # NuGet sources: nuget.org, local_packages and every local folder .bonsai\NuGet.config lists, so a lab package new
 # to this machine's NuGet cache is found.
