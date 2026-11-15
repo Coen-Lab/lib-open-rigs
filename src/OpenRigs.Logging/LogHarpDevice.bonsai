@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
@@ -16,7 +16,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="LogName" />
+        <Property Name="LogName" DisplayName="Name" Description="The device's name in the data, Kind-Instance: its folder and the start of its files' names." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogHarp.bonsai">
         <LogName>HarpDevice</LogName>

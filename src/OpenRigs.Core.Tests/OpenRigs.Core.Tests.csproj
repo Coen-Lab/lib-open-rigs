@@ -11,8 +11,14 @@
     <PackageReference Include="MSTest.TestFramework" Version="3.6.3" />
   </ItemGroup>
 
+  <!-- Test workflows are launched from disk by the Bonsai CLI rather than embedded -->
+  <ItemGroup>
+    <None Update="**\*.bonsai" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Core\OpenRigs.Core.csproj" />
+    <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-﻿using Bonsai;
+using Bonsai;
 using System;
 using System.ComponentModel;
 using System.Linq;
@@ -65,7 +65,7 @@ namespace OpenRigs.Video
 
         // A string, not PixelFormatEnums, so rig.yml's pixelFormat maps onto it; the camera refuses an
         // unknown name when it opens.
-        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write, Mono8 (rig.yml's pixelFormat; blank is Mono8). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
+        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write such as Mono8 (rig.yml's pixelFormat). Blank keeps the format stored on the camera. Taken only when the camera opens.")]
         public string PixelFormat { get; set; }
 
         bool IsOpen()

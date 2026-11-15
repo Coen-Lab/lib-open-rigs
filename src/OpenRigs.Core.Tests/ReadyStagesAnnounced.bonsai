@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Three stages announced into ReadyStages at 0, 0.5 and 1.5 s; the workflow never completes on its own, so Ready stops it with an error saying READY (StartupWatchdog stops it naming what never came).</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Timer">
+          <rx:DueTime>PT0S</rx:DueTime>
+          <rx:Period>PT0S</rx:Period>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage>A</core:Stage>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Timer">
+          <rx:DueTime>PT0.5S</rx:DueTime>
+          <rx:Period>PT0S</rx:Period>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage>B</core:Stage>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Timer">
+          <rx:DueTime>PT1.5S</rx:DueTime>
+          <rx:Period>PT0S</rx:Period>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage>C</core:Stage>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:StartupWatchdog">
+          <core:Expected>A, B, C</core:Expected>
+          <core:TimeoutSeconds>10</core:TimeoutSeconds>
+          <core:What>Readying the test rig</core:What>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Format">
+        <Format>READY after {0}</Format>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:ThrowError" />
+      </Expression>
+      <Expression xsi:type="rx:ReplaySubject" TypeArguments="sys:String">
+        <rx:Name>ReadyStages</rx:Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
