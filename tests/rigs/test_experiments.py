@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from open_rigs.rigs.experiments import LIVE_DATA, ROOTS, find, unanswered, written_by
+from open_rigs.rigs.experiments import find, unanswered, written_by
 
 
 @dataclass
@@ -23,7 +23,7 @@ def experiment(root: Path, name: str, when: str = "", manifest: bool = False, da
     if when:
         (folder / "when.txt").write_text(when)
     if manifest:
-        (folder / "manifest.json").write_text(json.dumps({"source": {"repo": "ucl-open/coen-dome-navigation"}}))
+        (folder / "manifest.json").write_text(json.dumps({"source": {"repo": "lab/task-a"}}))
     if data:
         (folder / "BonsaiData").mkdir()
     return folder
@@ -53,13 +53,12 @@ def test_an_unreadable_or_manifest_only_experiment_and_a_silent_share_are_said(t
 
 def test_a_manifest_names_its_repo_and_an_unreadable_one_counts(tmp_path):
     manifest = tmp_path / "manifest.json"
-    manifest.write_text(json.dumps({"source": {"repo": "ucl-open/av-dome"}}))
-    assert written_by(manifest, ["coen-dome-decision-making", "av-dome"])
-    assert not written_by(manifest, ["coen-dome-navigation"])
+    manifest.write_text(json.dumps({"source": {"repo": "lab/task-b"}}))
+    assert written_by(manifest, ["task-c", "task-b"])
+    assert not written_by(manifest, ["task-a"])
     manifest.write_text("{")
-    assert written_by(manifest, ["coen-dome-navigation"])
+    assert written_by(manifest, ["task-a"])
 
 
-def test_the_roots_are_the_rig_staging_live_data_and_production_and_a_missing_local_folder_has_none(tmp_path):
-    assert LIVE_DATA in ROOTS and Path(r"C:\data") in ROOTS
+def test_a_missing_local_folder_has_no_experiments_and_is_not_a_silent_share(tmp_path):
     assert not unanswered(tmp_path / "missing")

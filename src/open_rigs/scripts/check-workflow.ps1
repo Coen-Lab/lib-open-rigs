@@ -62,8 +62,8 @@ function Write-FilledTemplate {
     $text = [IO.File]::ReadAllText($template)
     $serials = 'BG01WA0E', 'AQ03WH45', 'AQ03WRBG', 'AQ03WW0D', 'E664C856C360B937', 'E664C856C31F4637'
     foreach ($s in $serials) { $text = ([regex]'usbSerial: CHANGE-ME').Replace($text, "usbSerial: $s", 1) }
-    $text = $text.Replace('rigId: XX', 'rigId: D1').Replace('serialNumber: "00000000"', "serialNumber: '1'").Replace("rootPath: C:\Coen-Lab-Local\Acquired-Data", "rootPath: $bin").Replace('RigConfigs\CHANGE-ME\', "RigConfigs\$([Environment]::MachineName)\")
-    foreach ($left in 'CHANGE-ME', 'rigId: XX', 'serialNumber: "00000000"', "rootPath: C:\Coen-Lab-Local\Acquired-Data") {
+    $text = $text.Replace('rigId: XX', 'rigId: D1').Replace('serialNumber: "00000000"', "serialNumber: '1'").Replace('rootPath: CHANGE-ME', "rootPath: $bin").Replace('RigConfigs\CHANGE-ME\', "RigConfigs\$([Environment]::MachineName)\")
+    foreach ($left in 'CHANGE-ME', 'rigId: XX', 'serialNumber: "00000000"') {
         if ($text.Contains($left)) { throw "check-workflow: the template still holds '$left' after filling; update Write-FilledTemplate." }
     }
     [IO.File]::WriteAllText($rigYml, $text)

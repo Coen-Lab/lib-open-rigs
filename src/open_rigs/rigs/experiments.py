@@ -1,7 +1,5 @@
-"""Where a mouse's experiments are, and the search every task's suggest-stage makes through them (standard library only).
+"""The search every task's suggest-stage makes through a mouse's experiments, given where they are (standard library only).
 
-An experiment is on the rig until rig-sync copies it, then in the server's staging, then filed in Live-Data;
-production av-dome's are on its rig under C:\\data\\<dataset>\\ and filed in Live-Data under AV_Dome...\\sub-<id>\\.
 A share that does not answer, an experiment that cannot be read, or one with only its manifest left (its data
 ingested elsewhere) is said in `unread`, never passed over: it may be the mouse's last experiment.
 """
@@ -11,10 +9,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence, Tuple
-
-LIVE_DATA = Path(r"\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01n9-pcoen00")
-ROOTS = [Path(r"C:\Coen-Lab-Local\Acquired-Data"), Path(r"\\128.40.51.157\rigs\staging"), LIVE_DATA, Path(r"C:\data")]
-
 
 # Reads one experiment folder: (the experiment, which has `when`, or None when it does not count; whether only
 # its manifest is left).

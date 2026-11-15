@@ -26,7 +26,7 @@ PER_ELEMENT = {"rx:SelectMany", "rx:CreateObservable", "rx:Concat", "rx:Switch"}
 # The subjects a lab block declares for the workflow, and their kind: a multicast into them is not seen in the workflow's XML.
 BLOCK_SUBJECTS = {"OpenRigs.Devices:Zapit.ConnectZapit.bonsai": {"ZapitCommands": "rx:BehaviorSubject"}}
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
-MANUAL_REWARD_DROP_UL = 2.5  # Pip, 15 Nov 2026: RewardLeft and RewardRight each give this, before and during a run
+MANUAL_REWARD_DROP_UL = 2.5  # RewardLeft and RewardRight each give this, before and during a run (15 Nov 2026)
 
 
 class Workflow:
@@ -99,7 +99,7 @@ def harp_delays_off_the_clock(wf: Workflow, group: str = "TaskLogic") -> tuple[i
 
 def finite_async_event_senders(wf: Workflow) -> tuple[int, list[str]]:
     """(the multicasts into AsyncEvents, the finite operators upstream of any): a MulticastSubject passes on its source's
-    completion, so a Take ahead of it completed the shared subject at trial 1 (Tom Childs, 9 Nov 2026). A sender that
+    completion, so a Take ahead of it completed the shared subject at trial 1 (9 Nov 2026). A sender that
     logs once takes its one value after the multicast."""
     senders, finite = 0, []
     for nodes, edges in _scopes(wf.root):

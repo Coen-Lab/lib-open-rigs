@@ -4,22 +4,21 @@
 # lab workflow reads with OpenRigs.Devices' generated classes (namespace OpenRigs.Devices.Rigs).
 #
 # Per-rig configuration files are NOT committed. To deploy a rig:
-#   1. Copy this file to <ConfigRoot>\<MACHINE-NAME>\rig.yml, where ConfigRoot is
-#      C:\Coen-Lab-Local\RigConfigs (the lab's place, kept apart from production's C:\RigConfigs),
-#      e.g. C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-2\rig.yml. The workflow resolves the
-#      directory by hostname and fails at startup if it or rig.yml is missing.
+#   1. Copy this file to <ConfigRoot>\<MACHINE-NAME>\rig.yml, where ConfigRoot is the workflow's
+#      ResolveRigConfigDirectory ConfigRoot. The workflow resolves the directory by hostname and fails
+#      at startup if it or rig.yml is missing.
 #   2. Fill in the values for that rig. Calibration artefacts (valve curves and the like) go in
 #      calibration\ beside rig.yml and are referenced by paths relative to that directory.
 #   3. Off-repo copies should replace the $schema path above with an absolute path to
 #      open_rigs\schemas\lab_rig.json (or a raw GitHub URL) to keep editor validation working.
 #
-rootPath: C:\Coen-Lab-Local\Acquired-Data   # the acquisition folder itself: experiments go to <rootPath>\sub-<mouse>\ses-...
-rigId: XX                 # two capitals or a capital and a digit, such as G1: rig-control's session numbering
+rootPath: CHANGE-ME       # the acquisition folder itself: experiments go to <rootPath>\sub-<mouse>\ses-...
+rigId: XX                 # two capitals or a capital and a digit, such as G1: the session numbering
 
 # Each kind of device is a group of named entries: behaviorBoard: main: is BehaviorBoard-Main in the
 # data and in live view. The workflow takes each device it drives by that name and stops at startup,
 # naming what this file has, if one is missing. usbSerial is the board's USB serial, an FTDI chip's
-# or a Pico's flash id (rig-setup's hardware scan lists each port's): RecordHarpDevices checks at
+# or a Pico's flash id (a hardware scan lists each port's): RecordHarpDevices checks at
 # Start that the board on each portName has it, for every Harp board here, and stops the workflow
 # saying which board is where if not.
 behaviorBoard:
@@ -101,10 +100,10 @@ camera:
 videoEncoder:
   codec: h264_nvenc
 
-# Full paths into this rig's calibration folder; the placeholder is the machine name.
+# Full paths into this rig's calibration folder (<ConfigRoot>\<MACHINE-NAME>\calibration).
 projectionCalibration:
-  meshMapPath: C:\Coen-Lab-Local\RigConfigs\CHANGE-ME\calibration\MeshMap.csv
-  gammaLutPath: C:\Coen-Lab-Local\RigConfigs\CHANGE-ME\calibration\gammalut.bmp
+  meshMapPath: C:\RigConfigs\CHANGE-ME\calibration\MeshMap.csv
+  gammaLutPath: C:\RigConfigs\CHANGE-ME\calibration\gammalut.bmp
 
 speakerArray:
   device:                   # the mixer and the stimulus loader read these
