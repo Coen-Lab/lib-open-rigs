@@ -519,6 +519,19 @@ def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[int]) -> 
     return found
 
 
+def experiment_log_problems(wf: Workflow) -> list[str]:
+    """The experiment's shared logs are OpenRigs.Logging's LogLabExperiment (folder, BonsaiData_Async, Settings_Rig,
+    Settings_Experiment, Recording) and LogControlEvents (the controller's events), each included once; the workflow
+    builds none of them itself."""
+    problems = [f"the workflow does not include {name} once" for name in ("LogLabExperiment", "LogControlEvents")
+                if wf.text.count(f'Path="OpenRigs.Logging:{name}.bonsai"') != 1]
+    problems += [f"the workflow includes {name} itself (LogLabExperiment does)" for name in ("LogController", "LogAsync")
+                 if f'Path="OpenRigs.Logging:{name}.bonsai"' in wf.text]
+    problems += [f"the workflow logs {name} itself (LogLabExperiment does)" for name in ("Settings_Rig", "Settings_Experiment")
+                 if f"<Name>{name}</Name>" in wf.text]
+    return problems
+
+
 def zapit_include_problems(wf: Workflow) -> list[str]:
     """Zapit is lib-open-rigs' Zapit.ConnectForTask, included once (ConnectZapit given the task's conditions file in an
     optogenetics experiment), and nothing of its connect, check and refusal chain is built in the workflow."""
@@ -654,12 +667,13 @@ NAMED_LOGS = ("OpenRigs.Logging:LogData.bonsai", "OpenRigs.Logging:LogDataSchema
 FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is written, or None)]
     "OpenRigs.Logging:LogTrial.bonsai": [("BonsaiData_Trial", None)],
     "OpenRigs.Logging:LogAsync.bonsai": [("BonsaiData_Async", None)],
+    "OpenRigs.Logging:LogLabExperiment.bonsai": [("Settings_Rig", None), ("Settings_Experiment", None), ("BonsaiData_Async", None)],
     "OpenRigs.Devices:Zapit.ZapitLogs.bonsai": [("BonsaiData_ZapitReplies", "Optogenetics"), ("Settings_ZapitConditions", "Optogenetics")],
 }
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
                *DEVICE_GROUPS, LICK_SPOUT_STAGE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)
-NO_FILES = ("OpenRigs.Logging:LogController.bonsai", "OpenRigs.Logging:FormatFileName.bonsai")
+NO_FILES = ("OpenRigs.Logging:LogController.bonsai", "OpenRigs.Logging:FormatFileName.bonsai", "OpenRigs.Logging:LogControlEvents.bonsai")
 # Writers whose file the workflow's XML cannot name: a workflow logs through the blocks above instead.
 OTHER_WRITERS = {"CsvWriter", "MatrixWriter", "VideoWriter", "ImageWriter", "TextWriter", "BinaryWriter", "FileCapture",
                  "MessageWriter", "ObjectWriter", "JsonWriter", "BinaryLogWriter", "FfmpegVideoWriter"}

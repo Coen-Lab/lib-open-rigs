@@ -344,6 +344,8 @@ def test_the_fixed_logs_are_the_names_their_blocks_write():
     for path, logs in lint.FIXED_LOGS.items():
         package, resource = path.split(":")
         text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
+        if 'Path="OpenRigs.Logging:LogAsync.bonsai"' in text:  # a block that includes LogAsync writes its log too
+            text += (ROOT / "src" / "OpenRigs.Logging" / "LogAsync.bonsai").read_text(encoding="utf-8-sig")
         assert all(f">{name}<" in text for name, _ in logs), path
 
 
@@ -386,3 +388,13 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     undeclared = workflow(tmp_path / "b", include(lint.MANUAL_REWARDS) + group)
     assert lint.undeclared_commands(undeclared) == ["RewardLeft", "RewardRight"]
     assert lint.zapit_include_problems(undeclared) == ["the workflow does not include Zapit.ConnectForTask once"]
+
+
+def test_the_shared_experiment_logs_are_the_lab_s_two_includes(tmp_path):
+    both = include("OpenRigs.Logging:LogLabExperiment.bonsai") + include("OpenRigs.Logging:LogControlEvents.bonsai")
+    assert lint.experiment_log_problems(workflow(tmp_path, both)) == []
+    own = include("OpenRigs.Logging:LogController.bonsai") + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Rig</Name>")
+    assert lint.experiment_log_problems(workflow(tmp_path / "b", own)) == [
+        "the workflow does not include LogLabExperiment once", "the workflow does not include LogControlEvents once",
+        "the workflow includes LogController itself (LogLabExperiment does)", "the workflow logs Settings_Rig itself (LogLabExperiment does)"]
+    assert lint.expected_files_problems(workflow(tmp_path / "c", both + manifest_node("BonsaiData/BonsaiData_Async_;Settings/Settings_Rig_;Settings/Settings_Experiment_"))) == []

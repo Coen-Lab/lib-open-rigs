@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Each controller event (ControlEvents: a command by its name, else its kind, with the event as Detail) as an AsyncEvent named Control, stamped on the Harp clock (Timestamp), into AsyncEvents (LogLabExperiment's LogAsync), so BonsaiData_Async records every command, set and Go. Its own include, not LogLabExperiment's: a device's log waits for LogLabExperiment's PathPrefix and the clock waits for the device, so one include holding both PathPrefix and a Timestamp reader is "defined in terms of itself".</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>new((it.Kind.ToString() == "Command" ? it.Name : it.Kind.ToString()) as Event, it.ToString() as Detail)</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orl:CreateAsyncEvent">
+          <orl:Event>Control</orl:Event>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="Bonsai.Harp:WithLatestTimestamp.bonsai">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>AsyncEvents</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
