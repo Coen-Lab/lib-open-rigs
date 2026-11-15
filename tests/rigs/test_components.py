@@ -24,7 +24,7 @@ def test_pixel_format_mono8_unless_set():
     assert LabRig.model_validate(RIG).camera["overhead"].pixel_format == "Mono8"
     rig = LabRig.model_validate({**RIG, "camera": {"overhead": {"serialNumber": "12345", "pixelFormat": "Mono8"}}})
     assert rig.camera["overhead"].pixel_format == "Mono8"
-    # LogVideo writes 8-bit frames only (audit, 11 Nov 2026).
+    # LogVideoFfmpeg writes 8-bit frames only (audit, 11 Nov 2026).
     with pytest.raises(ValidationError):
         LabRig.model_validate({**RIG, "camera": {"overhead": {"serialNumber": "12345", "pixelFormat": "Mono16"}}})
 

@@ -11,7 +11,7 @@ from open_rigs.video import SpinnakerCamera as _SpinnakerCamera
 class SpinnakerCamera(_SpinnakerCamera):
     __doc__ = _SpinnakerCamera.__doc__
     live_view: Optional[LiveView] = Field(default=None, description="Live view settings for this camera (OpenRigs.LiveView).")
-    # Only formats LogVideo writes: its FFmpeg writer takes 8-bit frames alone (audit, 11 Nov 2026).
+    # Only formats the cameras' logger writes: LogVideoFfmpeg's FfmpegVideoWriter takes 8-bit frames alone (audit, 11 Nov 2026).
     pixel_format: Literal["Mono8"] = Field(
         default="Mono8",
         description="The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write: Mono8. Set each time the camera opens, so a format stored on the camera is never used. Mono8 when not set.",
