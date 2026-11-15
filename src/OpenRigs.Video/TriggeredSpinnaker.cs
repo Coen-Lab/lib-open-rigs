@@ -1,7 +1,9 @@
 using Bonsai;
 using System;
 using System.ComponentModel;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -142,7 +144,8 @@ namespace OpenRigs.Video
         public IObservable<Timestamped<VideoDataFrame>> Generate<TPayload>(IObservable<Timestamped<TPayload>> source)
         {
             if (string.IsNullOrWhiteSpace(Name)) throw new InvalidOperationException("A TriggeredSpinnaker has no Name; map the camera piece's Name onto it.");
-            var frames = Generate().Finally(() => { lock (live) live.Camera = null; });
+            var name = Name;
+            var frames = Observable.Using(() => Register(name, this), _ => Generate()).Finally(() => { lock (live) live.Camera = null; });
             return frames
                 // In the camera's callback, before Spinnaker releases the chunk data: the exposure
                 // and gain each frame was taken with, as the camera reports them.
@@ -151,6 +154,65 @@ namespace OpenRigs.Video
                 .FillGaps(frame => frame.ChunkData.FrameID, (previous, current) => (int)(current - previous - 1))
                 .Zip(source, (frame, payload) => Timestamped.Create(frame, payload.Seconds))
                 .Where(timestamped => timestamped.Value != null);
+        }
+
+        // The running cameras by Name, so a block outside the camera piece (CameraLiveSetting) can set
+        // a camera's exposure or gain while it runs. A PropertyMapping reaches only a node in its own graph.
+        static readonly Dictionary<string, TriggeredSpinnaker> Running = new Dictionary<string, TriggeredSpinnaker>();
+
+        static IDisposable Register(string name, TriggeredSpinnaker camera)
+        {
+            lock (Running)
+            {
+                if (Running.ContainsKey(name)) throw new InvalidOperationException("Two cameras are named " + name + "; each camera piece needs its own Name.");
+                Running.Add(name, camera);
+            }
+            return Disposable.Create(() => { lock (Running) Running.Remove(name); });
+        }
+
+        /// <summary>Sets the exposure or gain of the running camera named <paramref name="name"/>, at once if it is open.</summary>
+        public static void SetLive(string name, CameraSetting setting, double value)
+        {
+            TriggeredSpinnaker camera;
+            lock (Running)
+            {
+                if (!Running.TryGetValue(name, out camera)) throw new InvalidOperationException("No camera named " + name + " is running, so its " + setting + " cannot be set.");
+            }
+            if (setting == CameraSetting.ExposureTime) camera.ExposureTime = value;
+            else camera.Gain = value;
+        }
+    }
+
+    /// <summary>A camera setting that can change while the camera runs.</summary>
+    public enum CameraSetting
+    {
+        /// <summary>The exposure, in microseconds.</summary>
+        ExposureTime,
+        /// <summary>The gain, in dB.</summary>
+        Gain
+    }
+
+    /// <summary>
+    /// Sets a running camera's exposure or gain to each value, straight away if the camera is open, so
+    /// a controller parameter can change it while the rig is ready (the preview shows the change).
+    /// </summary>
+    [Combinator]
+    [Description("Sets the exposure (us) or gain (dB) of the running camera Name (a SpinnakerCamera piece's Name) to each value, straight away if it is open, and passes the value on.")]
+    [WorkflowElementCategory(ElementCategory.Sink)]
+    public class CameraLiveSetting
+    {
+        /// <summary>Gets or sets the camera's name.</summary>
+        [Description("The camera's Name, such as Camera-Overhead.")]
+        public string Name { get; set; }
+
+        /// <summary>Gets or sets which setting each value sets.</summary>
+        [Description("The setting each value sets: ExposureTime (us) or Gain (dB).")]
+        public CameraSetting Setting { get; set; }
+
+        /// <summary>Sets the camera's setting to each value.</summary>
+        public IObservable<double> Process(IObservable<double> source)
+        {
+            return source.Do(value => TriggeredSpinnaker.SetLive(Name, Setting, value));
         }
     }
 }

@@ -1,0 +1,133 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Optional live controls for one SpinnakerCamera piece, Camera: two experiment parameters the workflow declares on ExperimentControl, ExposureParameter (us) and GainParameter (dB), each taken straight to the open camera when the controller sets it (OnParameterSet, CameraLiveSetting), so the preview shows the change while ready; Go fixes them. One second after Start, once the controller's server is up, shows rig.yml's exposureTime and gain as the parameters' values (ParameterDefault) and limits a set exposure to the camera's trigger period less 1000 us (ParameterMaximum), so a longer one is refused at the controller instead of stopping the workflow. Board is the camera's board, for its trigger.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="Camera" Description="The camera piece's Name, such as Camera-Overhead." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="ExposureParameter" Description="The experiment parameter that sets the camera's exposure, in us, such as CameraExposureUs." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="GainParameter" Description="The experiment parameter that sets the camera's gain, in dB, such as CameraGainDb." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="Board" Description="The camera's Behavior board, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnParameterSet">
+          <orcl:Name />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>Convert.ToDouble(it)</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vid:CameraLiveSetting">
+          <vid:Name />
+          <vid:Setting>ExposureTime</vid:Setting>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnParameterSet">
+          <orcl:Name />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>Convert.ToDouble(it)</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vid:CameraLiveSetting">
+          <vid:Name />
+          <vid:Setting>Gain</vid:Setting>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:DelaySubscription">
+          <rx:DueTime>PT1S</rx:DueTime>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:CameraTrigger">
+          <dev:MarginMicroseconds>1000</dev:MarginMicroseconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Camera.Settings.ExposureTime</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ParameterDefault">
+          <orcl:Name />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Camera.Settings.Gain</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ParameterDefault">
+          <orcl:Name />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Name>ExposureLimit</scr:Name>
+        <scr:Description>The longest exposure that fits the trigger period, less CameraTrigger's 1000 us margin.</scr:Description>
+        <scr:Expression>1000000.0 / Frequency - 1000.0</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ParameterMaximum">
+          <orcl:Name />
+        </Combinator>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="7" Label="Source2" />
+      <Edge From="0" To="11" Label="Source2" />
+      <Edge From="0" To="12" Label="Source1" />
+      <Edge From="1" To="5" Label="Source2" />
+      <Edge From="1" To="18" Label="Source2" />
+      <Edge From="1" To="22" Label="Source2" />
+      <Edge From="2" To="9" Label="Source2" />
+      <Edge From="2" To="20" Label="Source2" />
+      <Edge From="3" To="13" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="12" To="14" Label="Source1" />
+      <Edge From="13" To="14" Label="Source2" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="16" To="19" Label="Source1" />
+      <Edge From="16" To="21" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="21" To="22" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
