@@ -25,7 +25,7 @@ def test_quiet_wait_refuses_half_a_wheel_wait(seconds, cm):
         Stage(label="a", wheel_quiet_seconds=seconds, wheel_quiet_cm=cm)
 
 
-# A wait of inf never reaches Go and the run waits silently; a NaN lead passed check_lead_fits (every comparison false).
+# A wait of inf never reaches a trial's start and the run waits silently; a NaN lead passed check_lead_fits (every comparison false).
 @pytest.mark.parametrize("key", ["lickQuietSeconds", "wheelQuietSeconds"])
 def test_quiet_wait_refuses_an_endless_wait(key):
     with pytest.raises(ValidationError, match="finite number"):

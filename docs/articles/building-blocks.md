@@ -69,8 +69,8 @@ The model refuses a `rig.yml` whose wiring has a `RewardValve` without its `side
 | `LoadSpeakers`, `SpeakerBuffer`, `PenaltySoundBuffer`, `CheckWaveRate`, `SoundLevel` | Audio | see [Sound](#sound) |
 | `ExposureFitsTrigger` | Video | refuses a camera exposure longer than its trigger period allows |
 | `DisposeOnRenderThread` | Vision | disposes the display on the GL thread |
-| `QuietWait` | Core | a trial's quiet waits before Go: both spouts released for `lickQuietSeconds` (a held contact holds Go), the wheel within `wheelQuietCm`, forward and back added, over the last `wheelQuietSeconds`; one class for every task |
-| `RngSeed.Resolve` | Core | a task's random seed: the task file's `rngSeed`, or a new one each experiment when it is null. Log it once, as the `RngSeed` event at trial 1's Go |
+| `QuietWait` | Core | a trial's quiet waits before its start: both spouts released for `lickQuietSeconds` (a held contact holds the start), the wheel within `wheelQuietCm`, forward and back added, over the last `wheelQuietSeconds`; one class for every task |
+| `RngSeed.Resolve` | Core | a task's random seed: the task file's `rngSeed`, or a new one each experiment when it is null. Log it once, as the `RngSeed` event at trial 1's start |
 | `GapWatchdog` | Core | passes a stream through and stops the workflow with its own `Message` once nothing has come for `GapSeconds`, from subscription or the last value: a stream that stops mid-run, such as a camera's frames (Rx's `Timeout` says only "The operation has timed out.") |
 | `LoadRewardLine`, `PlanReward`, `FirePulses` | Core | a side's reward line, each reward's pulses and their firing on the Harp clock: see [Calibration](calibration.md) |
 | `HarpDelay` | Core | delays each input by `DueSeconds` of Harp time (its second input, `Timestamp`): every wait in a task |
@@ -94,7 +94,7 @@ Every task's `schemas\trial-columns.yml` starts with the shared block, in order,
 
 Keep a task's outcome logic (what counts as the response, and the reward, penalty sound and spouts that follow) in one C# operator that runs on every tick, the way a corridor task's state machine runs on every position update. Nodes that run only at an outcome pay .NET's first-run compile at trial 1's: in a two-spout task whose choice, row and consequence are a chain of nodes, trial 1's reward came 8 to 20 ms after its outcome and every later one within 2 ms (measured 14 Nov 2026; neither writing the row on its own thread nor compiling the task's C# at Start changed it, and only an earlier outcome through the same nodes did). `summarise-experiment` reports a reward more than 2 ms late.
 
-`uv run summarise-experiment <experiment folder>` (`open_rigs.rigs.trials.summarise`) reads one experiment from its files alone and checks the rows against each other and the task file: trial numbers and outcomes, each Go, stimulus and laser trigger within 2 ms of where the task puts it, each interval starting at the last outcome plus its timeout, the penalty sound with each timeout, and a `RewardDelivered` row for each rewarded trial. A log without `quietWaitSeconds` has no quiet waits, and a task file without `optogenetics` no lead. Its performance is Correct / (Correct + Incorrect) over the trials both spouts were offered.
+`uv run summarise-experiment <experiment folder>` (`open_rigs.rigs.trials.summarise`) reads one experiment from its files alone and checks the rows against each other and the task file: trial numbers and outcomes, each trial's start, stimulus and laser trigger within 2 ms of where the task puts it, each interval starting at the last outcome plus its timeout, the penalty sound with each timeout, and a `RewardDelivered` row for each rewarded trial. A log without `quietWaitSeconds` has no quiet waits, and a task file without `optogenetics` no lead. Its performance is Correct / (Correct + Incorrect) over the trials both spouts were offered.
 
 ## Video logging
 

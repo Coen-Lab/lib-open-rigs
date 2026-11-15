@@ -205,7 +205,7 @@ def test_a_change_to_the_shared_block_is_named():
 
 
 def test_go_the_outcomes_and_the_penalty_sound_are_checked_against_the_task(tmp_path):
-    # A Go 5 s off, an outcome that is no outcome, a timeout without the sound and a sound without a timeout were
+    # A trial start 5 s off, an outcome that is no outcome, a timeout without the sound and a sound without a timeout were
     # all passed before (audit, 14 Nov 2026).
     trials = _chain(4)
     trials[0]["trialStartTime"] -= 5
@@ -213,7 +213,7 @@ def test_go_the_outcomes_and_the_penalty_sound_are_checked_against_the_task(tmp_
     trials[2]["outcome"] = "Banana"
     trials[2]["penaltySound"] = True  # no timeout
     text = "\n".join(summarise(_experiment(tmp_path, trials, [])).problems)
-    assert "trial 1: Go (trialStartTime) -5.0000 s from its interval's end less the lead (0.1 s) plus quietWaitSeconds" in text
+    assert "trial 1: trial start (trialStartTime) -5.0000 s from its interval's end less the lead (0.1 s) plus quietWaitSeconds" in text
     assert "trial 2: a timeout without the penalty sound, but the task's penalty.sound is on" in text
     assert "trial 3: outcome 'Banana' is not one of Correct, Incorrect, NoResponse" in text
     assert "trial 3: the penalty sound with no timeout, though the task's timeout is 4 s" in text

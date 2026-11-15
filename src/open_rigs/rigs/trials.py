@@ -12,7 +12,7 @@ RewardDelivered row, Value the microlitres delivered), Settings/Settings_Task_*.
 and manifest.json (how the run ended), and checks the rows against each other and the task:
 
 - trial numbers run 1, 2, 3 ... with none missing, and each outcome is Correct, Incorrect or NoResponse;
-- each Go (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
+- each trial's start (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
   quietWaitSeconds (never negative), within 2 ms;
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
 - each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
@@ -77,7 +77,7 @@ CORE_COLUMNS: List[Column] = [
      "the time to drink included. A task's quiet waits add quietWaitSeconds, so the stimulus was due at "
      "itiStartTime + itiSeconds + quietWaitSeconds (stimulusOnsetTime)."),
     ("trialStartTime", "double", "s",
-     "Harp time the trial started (Go): the end of its interval less the lead, max(laserToStimulusSeconds, 0) in the "
+     "Harp time the trial started: the end of its interval less the lead, max(laserToStimulusSeconds, 0) in the "
      "task file (Settings_Task) and 0 for a task file with no optogenetics block, plus quietWaitSeconds where the task has quiet waits."),
     ("stimulusOnsetTime", "double", "s",
      "Harp time the workflow commanded the stimulus on, NaN if it never was: the first tick of the 1 ms Harp clock at "
@@ -97,7 +97,7 @@ CORE_COLUMNS: List[Column] = [
 QUIET_WAIT_COLUMNS: List[Column] = [
     ("quietWaitSeconds", "double", "s",
      "How long the stage's quiet waits (lickQuietSeconds, wheelQuietSeconds and wheelQuietCm; OpenRigs.Core QuietWait) "
-     "held this trial's Go past the end of its interval less the lead; 0 with the waits off or a quiet mouse."),
+     "held this trial's start past the end of its interval less the lead; 0 with the waits off or a quiet mouse."),
 ]
 
 OPTO_COLUMNS: List[Column] = [
@@ -330,7 +330,7 @@ def _summarise(folder: Path) -> Summary:
         if task is not None:
             go = _f(row, "itiStartTime") + planned - task.lead
             if abs(_f(row, "trialStartTime") - go) > TOLERANCE_S:
-                s.problems.append(f"trial {number}: Go (trialStartTime) {_f(row, 'trialStartTime') - go:+.4f} s from its "
+                s.problems.append(f"trial {number}: trial start (trialStartTime) {_f(row, 'trialStartTime') - go:+.4f} s from its "
                                   f"interval's end less the lead ({task.lead:g} s) plus quietWaitSeconds")
             trigger = _f(row, "laserTriggerTime") if "laserTriggerTime" in row else float("nan")
             due = _f(row, "itiStartTime") + planned - task.laser_to_stimulus

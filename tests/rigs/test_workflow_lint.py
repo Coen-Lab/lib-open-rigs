@@ -277,3 +277,14 @@ def test_the_fixed_logs_are_the_names_their_blocks_write():
         package, resource = path.split(":")
         text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
         assert all(f">{name}<" in text for name, _ in logs), path
+
+
+def test_the_rng_seed_event_is_fed_by_the_trial_start_subject_alone(tmp_path):
+    def logic(subject: str) -> lint.Workflow:
+        sub = f'<Expression xsi:type="SubscribeSubject"><Name>{subject}</Name></Expression>'
+        seed = '<Expression xsi:type="ExternalizedMapping"><Name>RngSeed</Name></Expression>'
+        return pulse_workflow(tmp_path / subject, '<Expression xsi:type="GroupWorkflow"><Name>TaskLogic</Name><Workflow><Nodes>' + sub + seed
+                              + '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow></Expression>', "")
+
+    assert lint.rng_seed_problems(logic("TrialStart")) == []
+    assert lint.rng_seed_problems(logic("TrialGo")) == ["RngSeed is not fed by TrialStart alone"]

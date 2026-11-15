@@ -495,15 +495,15 @@ def layout_problems(wf: Workflow) -> list[str]:
 
 
 def rng_seed_problems(wf: Workflow) -> list[str]:
-    """The RngSeed event is logged once, at TaskLogic's top level from trial 1's Go (TrialGo), and nowhere else."""
+    """The RngSeed event is logged once, at TaskLogic's top level from trial 1's start (TrialStart), and nowhere else."""
     nodes, edges = scope(wf.named("TaskLogic"))
     seeds = [i for i, n in enumerate(nodes) if n.findtext(W + "Name") == "RngSeed"]
     everywhere = [n for n in wf.root.iter(W + "Expression") if n.findtext(W + "Name") == "RngSeed"]
     if len(seeds) != 1 or len(everywhere) != 1:
         return [f"RngSeed is {len(everywhere)} node(s), {len(seeds)} at TaskLogic's top level; it is one, there"]
     sources = [nodes[a] for a, b, _ in edges if b == seeds[0]]
-    if len(sources) != 1 or sources[0].get(XSI) != "SubscribeSubject" or sources[0].findtext(W + "Name") != "TrialGo":
-        return ["RngSeed is not fed by TrialGo alone"]
+    if len(sources) != 1 or sources[0].get(XSI) != "SubscribeSubject" or sources[0].findtext(W + "Name") != "TrialStart":
+        return ["RngSeed is not fed by TrialStart alone"]
     return []
 
 
