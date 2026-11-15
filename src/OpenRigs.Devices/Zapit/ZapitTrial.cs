@@ -103,6 +103,42 @@ namespace OpenRigs.Devices.Zapit
             };
         }
 
+        /// <summary>
+        /// Why the task file's lead is refused, or null: the trigger comes laserToStimulusSeconds before the stimulus,
+        /// and Zapit's armed reply needs <see cref="ReplyMarginSeconds"/> before the trigger, all inside the shortest
+        /// interval (open_rigs.core.task Optogenetics.check_lead_fits, the same rule).
+        /// </summary>
+        public static string LeadProblem(double laserToStimulusSeconds, double itiMinSeconds)
+        {
+            if (laserToStimulusSeconds + ReplyMarginSeconds <= itiMinSeconds + 1e-9) return null;
+            return string.Format(
+                "optogenetics.laserToStimulusSeconds ({0} s) plus Zapit's {1} s reply margin must be at most trialStructure.itiMinSeconds ({2} s), the shortest interval",
+                laserToStimulusSeconds, ReplyMarginSeconds, itiMinSeconds);
+        }
+
+        /// <summary>
+        /// The stop for a hardware-triggered trial whose trigger came before Zapit's armed reply: the task stops rather
+        /// than move the trigger.
+        /// </summary>
+        public static InvalidOperationException NotArmedByTrigger(int trialNumber, double triggerSeconds)
+        {
+            return new InvalidOperationException(string.Format(
+                "Zapit had not answered trial {0}'s StartStimulus by its trigger at {1} s on the Harp clock, so the workflow stopped rather than move the trigger. Is Zapit running and answering quickly?",
+                trialNumber, triggerSeconds));
+        }
+
+        /// <summary>
+        /// One optogenetics trial's draw: a condition from the conditions file, each equally likely, then the laser on with
+        /// laserOnProbability once the first trialsBeforeLaser trials are past, and the power with it (0 mW when off).
+        /// </summary>
+        public static void Draw(Random random, int trialNumber, int conditionCount, int trialsBeforeLaser, double laserOnProbability, double laserPowerMw,
+            out int condition, out bool laserOn, out double powerMw)
+        {
+            condition = random.Next(conditionCount) + 1;
+            laserOn = trialNumber > trialsBeforeLaser && random.NextDouble() < laserOnProbability;
+            powerMw = laserOn ? laserPowerMw : 0;
+        }
+
         /// <summary>A Behavior board write that sets (<paramref name="set"/> true) or clears <paramref name="line"/>.</summary>
         public static HarpMessage LineMessage(DigitalOutputs line, bool set)
         {

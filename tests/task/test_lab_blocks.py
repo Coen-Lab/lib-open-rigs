@@ -50,3 +50,13 @@ def test_penalty_sound_is_on_by_default_and_the_timeout_has_no_lab_default():
     assert penalty.sound.enabled and penalty.sound.gain == 1
     with pytest.raises(ValidationError, match="timeoutSeconds"):
         Penalty.model_validate({})
+
+
+@pytest.mark.parametrize("lead, fits", [(3.2, True), (3.3, False), (-1.0, True)])
+def test_optogenetics_lead_and_reply_margin_fit_in_the_shortest_interval(lead, fits):
+    opto = Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": lead})
+    if fits:
+        opto.check_lead_fits(3.4)
+    else:
+        with pytest.raises(ValueError, match=r"reply margin must be at most trial_structure.iti_min_seconds \(3.4 s\)"):
+            opto.check_lead_fits(3.4)

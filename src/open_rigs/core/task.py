@@ -5,6 +5,8 @@ from pydantic import ConfigDict, Field, model_validator
 
 from swc.aeon.schema import BaseSchema
 
+from open_rigs.components.zapit import ZAPIT_REPLY_MARGIN_SECONDS
+
 
 class TaskParameters(BaseSchema):
     rng_seed: Optional[float] = Field(
@@ -103,6 +105,16 @@ class Optogenetics(BaseSchema):
         if self.laser_power_mw is not None and not math.isfinite(self.laser_power_mw):
             raise ValueError(f"laser_power_mw ({self.laser_power_mw}) must be a finite number of mW")
         return self
+
+    def check_lead_fits(self, iti_min_seconds: float) -> None:
+        """Refuses a lead that, with Zapit's reply margin, does not fit in the shortest interval (OpenRigs.Devices
+        ZapitTrial.LeadProblem, the same rule). Each task's model calls it with its trial_structure.iti_min_seconds."""
+        lead = self.laser_to_stimulus_seconds
+        if lead + ZAPIT_REPLY_MARGIN_SECONDS > iti_min_seconds + 1e-9:
+            raise ValueError(
+                f"optogenetics.laser_to_stimulus_seconds ({lead} s) plus Zapit's {ZAPIT_REPLY_MARGIN_SECONDS} s reply margin must be at most "
+                f"trial_structure.iti_min_seconds ({iti_min_seconds} s), the shortest interval"
+            )
 
 
 class PenaltySound(BaseSchema):

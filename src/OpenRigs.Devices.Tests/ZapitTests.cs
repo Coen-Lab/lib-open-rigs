@@ -300,5 +300,34 @@ namespace OpenRigs.Devices.Tests
                 }
             }
         }
+        [DataTestMethod]
+        [DataRow(3.2, true)]
+        [DataRow(3.3, false)]
+        [DataRow(-1.0, true)]
+        public void TheLeadAndReplyMarginFitInTheShortestInterval(double lead, bool fits)
+        {
+            var problem = ZapitTrial.LeadProblem(lead, 3.4);
+            Assert.AreEqual(fits, problem == null, problem);
+        }
+
+        [TestMethod]
+        public void NoLaserOnTrialBeforeTrialsBeforeLaserArePast()
+        {
+            var random = new Random(1);
+            for (int trial = 1; trial <= 200; trial++)
+            {
+                int condition; bool laserOn; double powerMw;
+                ZapitTrial.Draw(random, trial, 2, 5, 1.0, 3.5, out condition, out laserOn, out powerMw);
+                Assert.IsTrue(condition == 1 || condition == 2);
+                Assert.AreEqual(trial > 5, laserOn);
+                Assert.AreEqual(laserOn ? 3.5 : 0, powerMw);
+            }
+        }
+
+        [TestMethod]
+        public void ATriggerBeforeTheArmedReplyNamesTheTrial()
+        {
+            StringAssert.Contains(ZapitTrial.NotArmedByTrigger(7, 12.5).Message, "trial 7's StartStimulus by its trigger at 12.5 s");
+        }
     }
 }
