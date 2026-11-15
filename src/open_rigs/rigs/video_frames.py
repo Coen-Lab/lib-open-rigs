@@ -183,11 +183,6 @@ def check_videos(folder: Path, ffprobe: Optional[str] = None, killed: Optional[b
     return checks
 
 
-def video_problems(folder: Path, ffprobe: Optional[str] = None) -> List[str]:
-    """Every problem with an experiment's videos, each a sentence; none when every video holds every frame its CSV lists."""
-    return [p for check in check_videos(folder, ffprobe) for p in check.problems]
-
-
 def describe(check: VideoCheck) -> str:
     frames = "not counted" if check.frames is None else f"{check.frames} frames"
     rows = "no CSV" if check.rows is None else f"CSV {check.rows} rows"

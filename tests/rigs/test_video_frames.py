@@ -8,10 +8,14 @@ import sys
 import pytest
 
 from open_rigs.rigs import video_frames
-from open_rigs.rigs.video_frames import avi_frames, check_videos, video_problems
+from open_rigs.rigs.video_frames import avi_frames, check_videos
 
 FFMPEG = shutil.which("ffmpeg")
 needs_ffmpeg = pytest.mark.skipif(FFMPEG is None or shutil.which("ffprobe") is None, reason="ffmpeg and ffprobe are not on PATH")
+
+
+def video_problems(folder):
+    return [p for check in check_videos(folder) for p in check.problems]
 
 
 def _chunk(tag: bytes, data: bytes, size=None) -> bytes:
