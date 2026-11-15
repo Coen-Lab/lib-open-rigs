@@ -59,11 +59,32 @@ namespace OpenRigs.Devices.Tests
             Assert.ThrowsException<System.Collections.Generic.KeyNotFoundException>(() => WiredOutputs.Find(LabRigTests.Deserialize("rootPath: x\n"), "BehaviorBoard-Main", "RewardValve"));
         }
 
-        [TestMethod]
-        public void PulseLinesLoseTheHeldLine()
+        static Rigs.LabRig PulsedRig(string enabled, string wiring)
         {
-            var lines = new WithoutPulseLine().Process(System.Reactive.Linq.Observable.Return(Tuple.Create(DigitalOutputs.DO1 | DigitalOutputs.DO2 | DigitalOutputs.DO3, DigitalOutputs.DO3)));
-            Assert.AreEqual(DigitalOutputs.DO1 | DigitalOutputs.DO2, System.Reactive.Linq.Observable.Wait(lines));
+            return LabRigTests.Deserialize("behaviorBoard:\n  main:\n    portName: COM1\n    pulseController:\n      outputPulseEnable: " + enabled + "\n    wiring:\n" + wiring);
+        }
+
+        [TestMethod]
+        public void PulseLinesLoseTheZapitTriggerLine()
+        {
+            var rig = PulsedRig("DO1, DO2, DO3", "      DO1: { device: RewardValve, side: left }\n      DO2: { device: RewardValve, side: right }\n      DO3: { device: ZapitTrigger }\n");
+            Assert.AreEqual(DigitalOutputs.DO1 | DigitalOutputs.DO2, PulseEnabledLines.Find(rig, "BehaviorBoard-Main"));
+        }
+
+        [TestMethod]
+        public void PulseLinesNeedNoZapitTrigger()
+        {
+            var rig = PulsedRig("DO1", "      DO1: { device: RewardValve, side: left }\n");
+            Assert.AreEqual(DigitalOutputs.DO1, PulseEnabledLines.Find(rig, "BehaviorBoard-Main"));
+        }
+
+        // A valve on a line the board does not pulse would be opened by TriggerPulse and left open.
+        [TestMethod]
+        public void RefusesAValveLineThatIsNotPulsed()
+        {
+            var rig = PulsedRig("DO1", "      DO1: { device: RewardValve, side: left }\n      DO2: { device: RewardValve, side: right }\n");
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => PulseEnabledLines.Find(rig, "BehaviorBoard-Main"));
+            StringAssert.Contains(ex.Message, "puts a RewardValve on DO2");
         }
 
         [TestMethod]

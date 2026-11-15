@@ -1,22 +1,48 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
                  xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>One Harp Behavior board, Name (BehaviorBoard-&lt;Entry&gt;), from its entry under behaviorBoard in rig.yml (RigConfigs): publishes the entry as the AsyncSubject Name, opens the board on its portName behind Name.Data and Name.Commands (a BehaviorSubject, so a per-trial graph that sends a command and completes leaves it open), and logs the board as Name once the experiment folder exists and the Harp clock is set. When the workflow stops, however it stops, it clears the lines wiring gives a ZapitTrigger (held high by Zapit), once the board has closed its port (ClearOutputsOnStop). Its lines are driven by the pieces that use them (PulseOutputs, ZapitTriggerLine, RunningWheel, CameraTriggers, ClockFromBoard). Stops the workflow at start, naming the entries rig.yml has, if rig.yml has no entry by that name.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="CommandsSubjectName" Description="The name of the input &quot;commands&quot; Subject" Category="Subjects" />
+        <Property Name="Name" Description="The board's name in the data, BehaviorBoard-&lt;Entry&gt; such as BehaviorBoard-Main: its rig.yml entry, its subjects and its folder." />
       </Expression>
-      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
-        <rx:Name>BehaviorCommands</rx:Name>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>BehaviorBoard</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="PortName" />
-        <Property Name="DumpRegisters" />
-        <Property Name="Heartbeat" />
+        <Property Name="Name" DisplayName="CommandsSubjectName" Description="Name.Commands: the subject the board takes its commands from." />
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="beh:Device">
@@ -24,26 +50,72 @@
           <harp:OperationLed>Off</harp:OperationLed>
           <harp:DumpRegisters>true</harp:DumpRegisters>
           <harp:VisualIndicators>Off</harp:VisualIndicators>
-          <harp:Heartbeat>Disabled</harp:Heartbeat>
+          <harp:Heartbeat>Enabled</harp:Heartbeat>
           <harp:IgnoreErrors>false</harp:IgnoreErrors>
-          <harp:PortName>COMx</harp:PortName>
+          <harp:PortName>UNMAPPED</harp:PortName>
         </Combinator>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="EventsSubjectName" Description="The name of the output &quot;Events&quot; Subject" Category="Subjects" />
+        <Property Name="Name" DisplayName="DataSubjectName" Description="Name.Data: the subject the board's messages are published on." />
       </Expression>
       <Expression xsi:type="rx:PublishSubject">
-        <Name>BehaviorEvents</Name>
+        <Name />
       </Expression>
-      <Expression xsi:type="WorkflowOutput" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogHarpDevice.bonsai">
+        <Name />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PortName" Selector="Settings.PortName" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:WiredLines">
+          <dev:Device>ZapitTrigger</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="Outputs" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ClearOutputsOnStop">
+          <dev:PortName>UNMAPPED</dev:PortName>
+          <dev:Outputs>DO3</dev:Outputs>
+        </Combinator>
+      </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="1" Label="Source1" />
-      <Edge From="1" To="3" Label="Source1" />
-      <Edge From="2" To="3" Label="Source2" />
-      <Edge From="3" To="5" Label="Source1" />
-      <Edge From="4" To="5" Label="Source2" />
+      <Edge From="0" To="3" Label="Source2" />
+      <Edge From="0" To="4" Label="Source2" />
+      <Edge From="0" To="7" Label="Source1" />
+      <Edge From="0" To="14" Label="Source2" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
       <Edge From="5" To="6" Label="Source1" />
+      <Edge From="5" To="9" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="10" Label="Source2" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="19" Label="Source1" />
+      <Edge From="0" To="15" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="15" To="17" Label="Source1" />
+      <Edge From="16" To="19" Label="Source2" />
+      <Edge From="17" To="18" Label="Source1" />
+      <Edge From="18" To="19" Label="Source3" />
+      <Edge From="19" To="12" Label="Source1" />
+      <Edge From="11" To="12" Label="Source2" />
+      <Edge From="11" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

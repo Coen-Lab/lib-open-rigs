@@ -122,16 +122,72 @@ namespace OpenRigs.Devices
         }
     }
 
-    /// <summary>The pulse-enabled lines without one line, which the workflow holds high and clears itself.</summary>
+    /// <summary>
+    /// The lines a Behavior board pulses: rig.yml's pulseController.outputPulseEnable without any line
+    /// wiring gives the ZapitTrigger (held high by Zapit, and cleared when the workflow stops). Stops the
+    /// workflow, naming the line, when a line wired as a RewardValve is not among them: TriggerPulse would
+    /// then open the valve and leave it open.
+    /// </summary>
     [Combinator]
-    [Description("The pulse-enabled lines (first) without the second line, which the workflow holds high and clears itself.")]
+    [Description("The board's pulse-enabled lines, rig.yml's pulseController.outputPulseEnable without the ZapitTrigger's line, from the lab rig model (RigConfigs). Stops the workflow if a RewardValve line is not pulse-enabled.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
-    public class WithoutPulseLine
+    public class PulseEnabledLines
     {
-        /// <summary>Removes the line from each set of pulse-enabled lines.</summary>
-        public IObservable<DigitalOutputs> Process(IObservable<Tuple<DigitalOutputs, DigitalOutputs>> source)
+        /// <summary>Gets or sets the board's name, Kind-Instance.</summary>
+        [Description("The board's name, such as BehaviorBoard-Main.")]
+        public string Board { get; set; }
+
+        /// <summary>The pulse-enabled lines of each rig.</summary>
+        public IObservable<DigitalOutputs> Process(IObservable<LabRig> source)
         {
-            return source.Select(value => value.Item1 & ~value.Item2);
+            return source.Select(rig => Find(rig, Board));
+        }
+
+        /// <summary>The lines <paramref name="board"/> pulses, or an exception naming a valve line it would not.</summary>
+        public static DigitalOutputs Find(LabRig rig, string board)
+        {
+            var entry = OpenRigs.Core.RigDevice.Find(rig.BehaviorBoard, board);
+            var enabled = entry.PulseController == null ? default(DigitalOutputs) : entry.PulseController.OutputPulseEnable;
+            var pulsed = enabled & ~WiredLines.Find(entry, "ZapitTrigger");
+            var unpulsed = WiredLines.Find(entry, "RewardValve") & ~pulsed;
+            if (unpulsed != default(DigitalOutputs))
+            {
+                throw new InvalidOperationException(string.Format(
+                    "{0}'s wiring in rig.yml puts a RewardValve on {1}, which its pulseController.outputPulseEnable does not pulse: a reward would open the valve and leave it open. Add {1} to outputPulseEnable.",
+                    board, unpulsed));
+            }
+            return pulsed;
+        }
+    }
+
+    /// <summary>The lines rig.yml's wiring gives one device on a Behavior board, none or more.</summary>
+    [Combinator]
+    [Description("The lines the board's wiring in rig.yml gives Device (such as ZapitTrigger), none or more, from the board's named entry (its AsyncSubject).")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class WiredLines
+    {
+        /// <summary>Gets or sets the device wired to the lines.</summary>
+        [Description("The device on the lines, as wiring names it, such as ZapitTrigger.")]
+        public string Device { get; set; } = "ZapitTrigger";
+
+        /// <summary>The lines of each board entry.</summary>
+        public IObservable<DigitalOutputs> Process(IObservable<OpenRigs.Core.NamedDevice<BehaviorBoard>> source)
+        {
+            return source.Select(board => Find(board.Settings, Device));
+        }
+
+        /// <summary>The lines <paramref name="entry"/>'s wiring gives <paramref name="device"/>.</summary>
+        public static DigitalOutputs Find(BehaviorBoard entry, string device)
+        {
+            var lines = default(DigitalOutputs);
+            if (entry.Wiring == null) return lines;
+            foreach (var property in typeof(BoardWiring).GetProperties().Where(p => p.PropertyType == typeof(WiredLine)))
+            {
+                var line = (WiredLine)property.GetValue(entry.Wiring);
+                DigitalOutputs output;
+                if (line != null && line.Device == device && Enum.TryParse(property.Name, out output)) lines |= output;
+            }
+            return lines;
         }
     }
 }

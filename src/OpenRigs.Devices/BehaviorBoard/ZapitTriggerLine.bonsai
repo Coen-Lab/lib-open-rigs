@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The Behavior board line rig.yml's wiring gives the ZapitTrigger (Board), for a rig with Zapit: publishes it as the AsyncSubject ZapitTriggerLine, which Zapit's trials hold high. Never pulsed (PulseOutputs leaves it out); the board piece clears it when the workflow stops. Stops the workflow at start unless exactly one line on Board has the ZapitTrigger and it is DO1, DO2 or DO3.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Board" Description="The Behavior board the Zapit trigger is wired to, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="RigFile" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:WiredOutput">
+          <dev:RigFile>UNMAPPED</dev:RigFile>
+          <dev:Board />
+          <dev:Device>ZapitTrigger</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>ZapitTriggerLine</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="4" Label="Source3" />
+      <Edge From="1" To="4" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source2" />
+      <Edge From="4" To="5" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

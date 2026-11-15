@@ -52,7 +52,7 @@ namespace OpenRigs.Devices
         /// <summary>Writes OutputClear for the lines on a port nobody holds; true if it was written.</summary>
         public static bool Clear(string portName, DigitalOutputs outputs)
         {
-            if (string.IsNullOrEmpty(portName)) return false;
+            if (string.IsNullOrEmpty(portName) || outputs == default(DigitalOutputs)) return false;
             var message = OutputClear.FromPayload(MessageType.Write, outputs).MessageBytes;
             for (var attempt = 1; attempt <= OpenAttempts; attempt++)
             {

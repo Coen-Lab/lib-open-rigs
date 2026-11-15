@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:p1="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
@@ -7,6 +7,7 @@
                  xmlns:p3="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:sys="clr-namespace:System;assembly=mscorlib"
                  xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The running wheel on a Behavior board's encoder port 2, for a rig with a wheel: once the board (Board) sends its first message, enables the encoder on port 2 in position mode and zeroes it, in that order, then publishes the distance run, in cm, on WheelDistanceSubjectName from the encoder's counts, the board's rig.yml runningWheel.countsPerRev and runningWheel.wheelDiameterMm.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="p1:CreateMessage">
@@ -46,13 +47,13 @@
         <Combinator xsi:type="rx:Concat" />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="CommandsSubjectName" Description="The name of the Subject that carries command messages for a specific behavior device" Category="Subjects" />
+        <Property Name="Name" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the board's command subject." Category="Subjects" />
       </Expression>
       <Expression xsi:type="MulticastSubject">
         <Name>BehaviorCommands</Name>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="EventsSubjectName" Description="The name of the Subject that carries event messages from a specific behavior device" Category="Subjects" />
+        <Property Name="Name" DisplayName="BoardDataSubjectName" Description="Board.Data: the board's message subject." Category="Subjects" />
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>BehaviorEvents</Name>
@@ -84,9 +85,11 @@
         <p3:Expression>it &gt; 32768.0 ? it - 65536.0 : (it &lt; -32768.0 ? it + 65536.0 : it)</p3:Expression>
       </Expression>
       <Expression xsi:type="rx:Accumulate" />
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="CountsPerRev" />
-        <Property Name="WheelDiameterMm" />
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="CountsPerRev" Selector="Settings.RunningWheel.CountsPerRev" />
+          <Property Name="WheelDiameterMm" Selector="Settings.RunningWheel.WheelDiameterMm" />
+        </PropertyMappings>
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>TicksToCentimeters</Name>
@@ -146,6 +149,12 @@
       <Expression xsi:type="rx:PublishSubject">
         <Name>WheelDistanceCm</Name>
       </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="Board" Description="The Behavior board the wheel's encoder is on, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -170,6 +179,8 @@
       <Edge From="19" To="20" Label="Source2" />
       <Edge From="20" To="22" Label="Source1" />
       <Edge From="21" To="22" Label="Source2" />
+      <Edge From="23" To="24" Label="Source1" />
+      <Edge From="24" To="19" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

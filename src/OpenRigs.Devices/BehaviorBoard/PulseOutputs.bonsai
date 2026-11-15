@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A Behavior board's pulsed output lines (Board), for a rig with reward valves: pulse-enables the lines rig.yml's pulseController.outputPulseEnable names, without the ZapitTrigger's line (PulseEnabledLines), and fires a pulse on a line from TriggerPulse (its DO line, 1 to 3, at the line's set width) or TriggerCalibratedPulse (its line and width). Stops the workflow at start if a line wiring gives a RewardValve is not pulse-enabled, as a reward would then open the valve and leave it open.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Board" Description="The Behavior board whose lines are pulsed, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PulseEnabledLines">
+          <dev:Board />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="OutputPulseEnable" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="BehaviorCommandsSubjectName" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the board's command subject." />
+        <Property Name="BehaviorEventsSubjectName" DisplayName="BoardDataSubjectName" Description="Board.Data: the board's message subject." />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.PulseController.bonsai">
+        <BehaviorCommandsSubjectName />
+        <OutputPulseEnable>DO1 DO2</OutputPulseEnable>
+        <PulseDO1>1</PulseDO1>
+        <PulseDO2>1</PulseDO2>
+        <PulseDO3>1</PulseDO3>
+        <BehaviorEventsSubjectName />
+        <TriggerPulseSubjectName>TriggerPulse</TriggerPulseSubjectName>
+        <TriggerCalibratedPulseSubjectName>TriggerCalibratedPulse</TriggerCalibratedPulseSubjectName>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="2" Label="Source2" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="5" Label="Source1" />
+      <Edge From="4" To="5" Label="Source2" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
