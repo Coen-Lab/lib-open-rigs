@@ -58,6 +58,7 @@ namespace OpenRigs.Devices.Tests
                 new ZapitReply { Command = ZapitCommandType.StartStimulus, Value = 2, LaserOn = 1 },
                 new ZapitReply { Command = ZapitCommandType.StartStimulus, Value = 3, LaserOn = 0 },
                 new ZapitReply { Command = ZapitCommandType.StartStimulus, Value = 3, LaserOn = 1, IsError = true },
+                new ZapitReply { Command = ZapitCommandType.IsStimConfigLoaded, Value = 3, LaserOn = 1 },
             })
             {
                 var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitTrial.CheckArmed(wrong, 7, 3, true));
