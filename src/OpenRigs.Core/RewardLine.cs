@@ -13,16 +13,6 @@ using YamlDotNet.RepresentationModel;
 
 namespace OpenRigs.Core
 {
-    /// <summary>What <see cref="LoadRewardLine"/> does when the line's calibration file is not there.</summary>
-    public enum MissingCalibration
-    {
-        /// <summary>Stop the workflow, naming the file.</summary>
-        Refuse,
-
-        /// <summary>Load the line uncalibrated: every reward on it plans no pulses and says why.</summary>
-        DeliverNothing,
-    }
-
     /// <summary>One side's reward valve line, as rig.yml wires it, and its valve calibration.</summary>
     public class RewardLine
     {
@@ -35,39 +25,34 @@ namespace OpenRigs.Core
         /// <summary>Gets or sets the board's DO line, 1 to 3.</summary>
         public int Line { get; set; }
 
-        /// <summary>Gets or sets why the line is uncalibrated; null when it is calibrated.</summary>
-        public string Uncalibrated { get; set; }
-
         /// <summary>Gets or sets the full path of the calibration file.</summary>
         public string CalibrationPath { get; set; }
 
-        /// <summary>Gets or sets the calibration file's text as read, for the experiment's copy; null when uncalibrated.</summary>
+        /// <summary>Gets or sets the calibration file's text as read, for the experiment's copy.</summary>
         public string CalibrationJson { get; set; }
 
-        /// <summary>Gets or sets the valve calibration; null when uncalibrated.</summary>
+        /// <summary>Gets or sets the valve calibration.</summary>
         public CalibrationCurve Calibration { get; set; }
-
-        /// <summary>Gets whether the line has a valve calibration.</summary>
-        public bool Calibrated { get { return Calibration != null; } }
 
         /// <summary>Gets or sets the most microlitres one reward on the line may ask for; PlanReward refuses more.</summary>
         public double MaxRewardUl { get; set; } = LoadRewardLine.DefaultMaxRewardUl;
 
-        /// <summary>Gets the off-to-on time between the pulses of one reward, in ms: the calibration's own; 0 when uncalibrated.</summary>
-        public int PulseGapMs { get { return Calibration != null ? Calibration.PulseGapMs : 0; } }
+        /// <summary>Gets the off-to-on time between the pulses of one reward, in ms: the calibration's own.</summary>
+        public int PulseGapMs { get { return Calibration.PulseGapMs; } }
     }
 
     /// <summary>
     /// Loads one side's reward line once, at start: the line rig.yml's wiring gives the side's
     /// RewardValve, which must be a CalibratedPulse in its board's pulseController.outputs, and that
-    /// line's valve calibration with its linearFit. Every refusal names the line and the reason.
+    /// line's valve calibration with its linearFit. Every reward is planned on that calibration, so a
+    /// line without one stops the workflow. Every refusal names the line and the reason.
     /// </summary>
     /// <remarks>
     /// rig.yml is read untyped, so the operator works with any workflow's rig model. The calibration
     /// file's path is the output entry's <c>artefact</c>, relative to <see cref="CalibrationDirectory"/>.
     /// </remarks>
     [DefaultProperty("Side")]
-    [Description("Loads one side's reward line once, at start: the line rig.yml's wiring gives the side's RewardValve, its CalibratedPulse entry and that valve calibration's linearFit. Stops the workflow, naming the line and the reason, if the calibration is unreadable, has no linearFit, is from another machine, or the line is not a CalibratedPulse; a missing file refuses or, with DeliverNothing, loads the line uncalibrated. Carries MaxRewardUl, the most one reward may ask for, to PlanReward.")]
+    [Description("Loads one side's reward line once, at start: the line rig.yml's wiring gives the side's RewardValve, its CalibratedPulse entry and that valve calibration's linearFit. Stops the workflow, naming the line and the reason, if the calibration is missing or unreadable, has no linearFit, is from another machine, or the line is not a CalibratedPulse. Carries MaxRewardUl, the most one reward may ask for, to PlanReward.")]
     public class LoadRewardLine : Source<RewardLine>
     {
         /// <summary>The default <see cref="MaxRewardUl"/>, in ul.</summary>
@@ -91,10 +76,6 @@ namespace OpenRigs.Core
         [Description("The machine the calibration must have been measured on. Empty: this machine.")]
         public string MachineName { get; set; }
 
-        /// <summary>Gets or sets what to do when the calibration file is not there.</summary>
-        [Description("Refuse stops the workflow when the calibration file is not there; DeliverNothing loads the line uncalibrated, so its rewards deliver nothing.")]
-        public MissingCalibration MissingCalibration { get; set; }
-
         /// <summary>Gets or sets the most microlitres one reward may ask for.</summary>
         [Description("The most microlitres one reward may ask for, 20 by default; a larger request (30 typed for 3.0) stops the workflow instead of opening the valve for it.")]
         public double MaxRewardUl { get; set; } = DefaultMaxRewardUl;
@@ -105,11 +86,11 @@ namespace OpenRigs.Core
             return Observable.Defer(() => Observable.Return(Load(
                 RigFile, Side, CalibrationDirectory,
                 string.IsNullOrEmpty(MachineName) ? Environment.MachineName : MachineName,
-                MissingCalibration, MaxRewardUl)));
+                MaxRewardUl)));
         }
 
         /// <summary>Loads one side's reward line, or throws naming the line and the reason.</summary>
-        public static RewardLine Load(string rigFile, string side, string calibrationDirectory, string machineName, MissingCalibration missing, double maxRewardUl)
+        public static RewardLine Load(string rigFile, string side, string calibrationDirectory, string machineName, double maxRewardUl)
         {
             if (string.IsNullOrWhiteSpace(side)) throw new ArgumentException("LoadRewardLine needs a Side, as rig.yml's wiring names it, such as left.");
             if (!(maxRewardUl > 0) || double.IsInfinity(maxRewardUl))
@@ -169,13 +150,7 @@ namespace OpenRigs.Core
             line.CalibrationPath = Path.GetFullPath(Path.IsPathRooted(artefact) ? artefact : Path.Combine(directory, artefact));
             if (!File.Exists(line.CalibrationPath))
             {
-                var reason = where + " has no valve calibration: there is no " + line.CalibrationPath;
-                if (missing == MissingCalibration.DeliverNothing)
-                {
-                    line.Uncalibrated = reason + ", so its rewards deliver nothing.";
-                    return line;
-                }
-                throw new InvalidOperationException(reason + ". Calibrate the valve on this machine.");
+                throw new InvalidOperationException(where + " has no valve calibration: there is no " + line.CalibrationPath + ". Calibrate the valve on this machine.");
             }
 
             var refuse = where + "'s valve calibration " + line.CalibrationPath;
@@ -262,12 +237,11 @@ namespace OpenRigs.Core
 
     /// <summary>
     /// Plans each reward on its line: a volume in microlitres becomes equal pulses of one whole
-    /// width inside the calibration's range. An uncalibrated line, or a volume of 0 or less, plans
-    /// no pulses; a volume above the line's <see cref="RewardLine.MaxRewardUl"/>, or one that would
+    /// width inside the calibration's range. A volume of 0 or less plans no pulses; a volume above the line's <see cref="RewardLine.MaxRewardUl"/>, or one that would
     /// take more than 65535 pulses, stops the workflow.
     /// </summary>
     [Combinator]
-    [Description("Plans each reward, a (microlitres, RewardLine) pair: the fewest equal pulses inside the calibrated width range, width = (ul per pulse - intercept) / slope rounded to whole ms, raised to the shortest calibrated width (Clamped) when the volume per pulse is below it. DeliveredUl comes from the rounded width. An uncalibrated line, or 0 ul or less, plans no pulses; more than the line's MaxRewardUl stops the workflow.")]
+    [Description("Plans each reward, a (microlitres, RewardLine) pair: the fewest equal pulses inside the calibrated width range, width = (ul per pulse - intercept) / slope rounded to whole ms, raised to the shortest calibrated width (Clamped) when the volume per pulse is below it. DeliveredUl comes from the rounded width. 0 ul or less plans no pulses; more than the line's MaxRewardUl stops the workflow.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PlanReward
     {
@@ -288,7 +262,7 @@ namespace OpenRigs.Core
                     "without opening the valve. Check the reward size in the task's settings (30 typed for 3.0?), or raise DeliverReward's MaxRewardUl.",
                     requestedUl, line.Side, line.MaxRewardUl));
             }
-            if (!line.Calibrated || !(requestedUl > 0) || double.IsInfinity(requestedUl)) return plan;
+            if (!(requestedUl > 0) || double.IsInfinity(requestedUl)) return plan;
 
             var fit = line.Calibration.LinearFit;
             var largestUl = fit.Slope * fit.MaxX + fit.Intercept;

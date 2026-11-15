@@ -53,12 +53,12 @@
             </Expression>
             <Expression xsi:type="PropertyMapping">
               <PropertyMappings>
-                <Property Name="Path" />
+                <Property Name="FileName" />
               </PropertyMappings>
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="orl:BinaryLogWriter">
-                <orl:Path />
+                <orl:FileName />
               </Combinator>
             </Expression>
             <Expression xsi:type="WorkflowOutput" />

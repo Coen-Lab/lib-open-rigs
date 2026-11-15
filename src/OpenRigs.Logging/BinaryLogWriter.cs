@@ -31,19 +31,19 @@ namespace OpenRigs.Logging
         /// </summary>
         [Description("The name of the file to write. Its folder is created if needed.")]
         [Editor("Bonsai.Design.SaveFileNameEditor, Bonsai.Design", DesignTypes.UITypeEditor)]
-        public string Path { get; set; }
+        public string FileName { get; set; }
 
         /// <summary>
         /// Writes each byte array in the sequence to the file, in order.
         /// </summary>
         public override IObservable<byte[]> Process(IObservable<byte[]> source)
         {
-            var path = Path;
+            var path = FileName;
             return Observable.Create<byte[]>(observer =>
             {
                 if (string.IsNullOrEmpty(path))
                 {
-                    throw new InvalidOperationException("A valid path must be specified.");
+                    throw new InvalidOperationException("A valid file name must be specified.");
                 }
 
                 var pending = new BlockingCollection<byte[]>();

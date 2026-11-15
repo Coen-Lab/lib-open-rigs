@@ -59,9 +59,9 @@ namespace OpenRigs.Core.Tests
             return Path.Combine(folder, "rig.yml");
         }
 
-        RewardLine Load(string rig, string calibration, string side = "left", MissingCalibration missing = MissingCalibration.Refuse)
+        RewardLine Load(string rig, string calibration, string side = "left")
         {
-            return LoadRewardLine.Load(Write(rig, calibration), side, "", Machine, missing, LoadRewardLine.DefaultMaxRewardUl);
+            return LoadRewardLine.Load(Write(rig, calibration), side, "", Machine, LoadRewardLine.DefaultMaxRewardUl);
         }
 
         string Refusal(string rig, string calibration, string side = "left")
@@ -132,8 +132,6 @@ namespace OpenRigs.Core.Tests
             var line = Calibrated();
             Assert.AreEqual("BehaviorBoard-Main", line.Board);
             Assert.AreEqual(1, line.Line);
-            Assert.IsTrue(line.Calibrated);
-            Assert.IsNull(line.Uncalibrated);
             Assert.AreEqual(100, line.PulseGapMs);
             Assert.AreEqual(Fixture, line.CalibrationJson);
             Assert.AreEqual(Path.Combine(folder, "calibration", "valve-DO1.json"), line.CalibrationPath);
@@ -177,7 +175,7 @@ namespace OpenRigs.Core.Tests
         }
 
         [TestMethod]
-        public void NothingAskedOrAnUncalibratedLinePlansNoPulses()
+        public void NothingAskedPlansNoPulses()
         {
             foreach (var ul in new[] { 0.0, -1.0, double.NaN })
             {
@@ -185,13 +183,6 @@ namespace OpenRigs.Core.Tests
                 Assert.AreEqual(0, plan.Count);
                 Assert.AreEqual(0.0, plan.DeliveredUl);
             }
-            File.Delete(Path.Combine(folder, "calibration", "valve-DO1.json"));
-            var uncalibrated = Load(Rig, null, missing: MissingCalibration.DeliverNothing);
-            Assert.IsFalse(uncalibrated.Calibrated);
-            StringAssert.Contains(uncalibrated.Uncalibrated, "deliver nothing");
-            var none = PlanReward.Plan(uncalibrated, 2.0);
-            Assert.AreEqual(0, none.Count);
-            Assert.AreEqual(0.0, none.DeliveredUl);
         }
 
         [TestMethod]
@@ -231,9 +222,6 @@ namespace OpenRigs.Core.Tests
                 var ex = Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(line, ul));
                 StringAssert.Contains(ex.Message, "more than the 20 ul one reward may give");
             }
-            File.Delete(Path.Combine(folder, "calibration", "valve-DO1.json"));
-            var uncalibrated = Load(Rig, null, missing: MissingCalibration.DeliverNothing);
-            Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(uncalibrated, 30));
         }
 
         [TestMethod]
@@ -242,7 +230,7 @@ namespace OpenRigs.Core.Tests
             foreach (var max in new[] { 0.0, -1.0, double.NaN, double.PositiveInfinity })
             {
                 var ex = Assert.ThrowsException<ArgumentOutOfRangeException>(() =>
-                    LoadRewardLine.Load(Write(Rig, Fixture), "left", "", Machine, MissingCalibration.Refuse, max));
+                    LoadRewardLine.Load(Write(Rig, Fixture), "left", "", Machine, max));
                 StringAssert.Contains(ex.Message, "MaxRewardUl");
             }
         }
@@ -307,13 +295,6 @@ namespace OpenRigs.Core.Tests
             var notPulsed = Rig.Replace("DO1: {device", "DO0: {device");
             StringAssert.Contains(Refusal(notPulsed, Fixture), "is not a pulse line");
             StringAssert.Contains(Refusal("behaviorBoard: [", Fixture), "could not be read");
-        }
-
-        [TestMethod]
-        public void DeliverNothingAppliesOnlyToAMissingFile()
-        {
-            Assert.ThrowsException<InvalidOperationException>(() =>
-                Load(Rig, Edit(Fixture, f => f.Remove("linearFit")), missing: MissingCalibration.DeliverNothing));
         }
     }
 }

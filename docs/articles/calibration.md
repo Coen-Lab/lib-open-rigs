@@ -46,7 +46,7 @@ behaviorBoard:
         DO2: { discriminatorType: FixedPulse, pulseWidthMs: 40 }
         DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
 ```
- `LoadRewardLine` reads both once at start, untyped, so it works with any rig model: the side's `RewardValve` line, its `CalibratedPulse` entry and that file's `linearFit`. It refuses, naming the line and the reason, when the file is unreadable, has no `linearFit`, was measured on another machine, or the line is not a `CalibratedPulse`; a missing file refuses, or with `MissingCalibration` `DeliverNothing` loads the line uncalibrated so its rewards deliver nothing. How old a calibration may be is not the rig's to decide.
+ `LoadRewardLine` reads both once at start, untyped, so it works with any rig model: the side's `RewardValve` line, its `CalibratedPulse` entry and that file's `linearFit`. It refuses, naming the line and the reason, when the file is unreadable, has no `linearFit`, was measured on another machine, or the line is not a `CalibratedPulse`, and when the file is missing: every reward is planned on the valve's calibration, with no uncalibrated fallback. How old a calibration may be is not the rig's to decide.
 
 `PlanReward` turns each requested volume into pulses and never refuses: the fewest equal pulses inside the fit's range, each `round((ul per pulse - intercept) / slope)` ms, raised to `minX` and flagged `Clamped` when the volume per pulse is below the range. The delivered volume is reported from the rounded width. `FirePulses` then fires them at the file's `pulseGapMs`, the gap the calibration was measured at.
 
