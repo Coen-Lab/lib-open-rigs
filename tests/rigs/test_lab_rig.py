@@ -192,8 +192,16 @@ def test_speaker_channels_are_refused_as_the_workflow_refuses_them_at_start():
     with pytest.raises(ValidationError) as refused:
         LabRig.model_validate(rig)
     assert ("speaker 'right' channel 4 is not one of the audio device's 4 channels (0 to 3); speakers centre, left share channel 2: "
-            "each speaker needs its own; syncChannel 4 is not one of the audio device's 4 channels (0 to 3); penaltySoundChannel 3 "
-            "has no speaker on it") in str(refused.value)
+            "each speaker needs its own; syncChannel 4 is not one of the audio device's 4 channels (0 to 3); syncChannel 4 has speaker "
+            "right on it: the sync copy needs a channel of its own; penaltySoundChannel 3 has no speaker on it") in str(refused.value)
+
+
+def test_the_sync_channel_has_no_speaker_on_it():
+    # OpenRigs.Audio SpeakerSet.AddSyncCopy stopped the workflow at the first stimulus.
+    rig = copy.deepcopy(RIG)
+    rig["speakerArray"]["syncChannel"] = rig["speakerArray"]["speakers"]["centre"]["channel"]
+    with pytest.raises(ValidationError, match="has speaker centre on it: the sync copy needs a channel of its own"):
+        LabRig.model_validate(rig)
 
 
 def test_video_encoder_optional():

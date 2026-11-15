@@ -34,6 +34,9 @@ class EqualisedSpeakerArray(SpeakerArray):
                      for channel, names in sorted(by_channel.items()) if len(names) > 1]
         if self.sync_channel is not None and self.sync_channel >= count:
             problems.append(f"syncChannel {self.sync_channel} is not one of the audio device's {count} channels (0 to {count - 1})")
+        if self.sync_channel in by_channel:
+            # SpeakerSet.AddSyncCopy refuses it at the first stimulus.
+            problems.append(f"syncChannel {self.sync_channel} has speaker {', '.join(by_channel[self.sync_channel])} on it: the sync copy needs a channel of its own")
         if self.penalty_sound_channel not in by_channel:
             problems.append(f"penaltySoundChannel {self.penalty_sound_channel} has no speaker on it, and the penalty sound is never "
                             "played unequalised: set it to a speaker's channel")

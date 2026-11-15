@@ -29,7 +29,7 @@ speakerArray:
   penaltySoundChannel: 1     # the penalty sound's speaker: a speaker's channel
 ```
 
-`syncGain` is the sync copy's linear amplitude, not a sound level. Each speaker needs a filter: a calibration artefact with `taps` (symmetric), `sampleRate` and `machineName` (see [Calibration](../../articles/calibration.md)). A speaker is never played unequalised, so `penaltySoundChannel` must be a speaker's channel. Each speaker has a channel of its own, and every channel, `syncChannel` included, is below `channelCount`.
+`syncGain` is the sync copy's linear amplitude, not a sound level. Each speaker needs a filter: a calibration artefact with `taps` (symmetric), `sampleRate` and `machineName` (see [Calibration](../../articles/calibration.md)). A speaker is never played unequalised, so `penaltySoundChannel` must be a speaker's channel. Each speaker has a channel of its own, no speaker is on `syncChannel`, and every channel, `syncChannel` included, is below `channelCount`.
 
 ---
 
