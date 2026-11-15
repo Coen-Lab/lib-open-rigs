@@ -20,7 +20,7 @@ its frame goes into ffmpeg's stdin, and ffmpeg finishes the video after Bonsai h
 the rig agent's kill after a Stop it did not answer) can leave a camera's last video one frame ahead of its CSV: the
 frame in hand at the kill. Frames still queued at the kill reach neither the video nor the CSV. When the experiment's
 manifest.json says the run was killed (run.final false: its end-of-run write never came; or outcome running, or
-rig-sync's killed), a camera's last video holding at most KILL_TOLERANCE_FRAMES more frames than its CSV is a note, not
+killed, which the overnight copy once wrote into version 2 manifests), a camera's last video holding at most KILL_TOLERANCE_FRAMES more frames than its CSV is a note, not
 a problem; so is the video before it, which a kill during an hour split's handover (up to 20 s) leaves the same way.
 Any other mismatch is a problem: a video short of its CSV, more frames than that, extra frames in an older video, or
 extra frames in a run that was not killed. A folder without a readable manifest is taken as not killed.
@@ -56,8 +56,8 @@ class VideoCheck:
 
 def run_killed(folder: Path) -> bool:
     """Whether the experiment's manifest.json says its run was killed: the end-of-run write never came (run.final
-    false), or the outcome is running (killed before any stop was written) or killed (rig-sync's word for a run that
-    never closed). False without a readable manifest."""
+    false), or the outcome is running (killed before any stop was written) or killed (the word the overnight copy once
+    wrote into a version 2 manifest for a run that never closed). False without a readable manifest."""
     try:
         run = json.loads((Path(folder) / "manifest.json").read_text(encoding="utf-8-sig"))["run"]
         return run.get("final") is False or run.get("outcome") in ("running", "killed")
