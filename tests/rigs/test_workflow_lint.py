@@ -39,6 +39,31 @@ def test_a_per_trial_multicast_into_a_publish_subject_is_found_and_a_block_s_beh
     assert lint.subjects_closed_by_a_nested_multicast(wf) == ["Trial"]
 
 
+LAYOUT = '<VisualizerLayout xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" />'
+SHIM = ("$repo = Split-Path -Parent $PSScriptRoot\r\n& uv sync --project $repo -q\r\n"
+        "& powershell -File (Join-Path $repo '.venv\\Lib\\site-packages\\open_rigs\\scripts\\setup-bonsai.ps1') -Environment $PSScriptRoot\r\n")
+
+
+def test_the_layout_is_copied_by_setup_itself_or_by_the_lab_s_one_copy_it_runs(tmp_path):
+    wf = workflow(tmp_path, "")
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "main.layout").write_text(LAYOUT, encoding="utf-8")
+    (tmp_path / ".bonsai").mkdir()
+    setup = tmp_path / ".bonsai" / "Setup.ps1"
+    setup.write_text(SHIM, encoding="utf-8")
+    assert lint.layout_problems(wf) == []
+    setup.write_text("& .\\Bonsai.exe --no-editor\r\n", encoding="utf-8")
+    assert lint.layout_problems(wf) == [".bonsai\\Setup.ps1 does not copy config\\main.layout"]
+
+
+def test_the_lab_s_bonsai_setup_keeps_the_workflow_s_nuget_config_and_restores():
+    text = lint.SETUP_BONSAI.read_text(encoding="utf-8-sig")
+    keep, expand, back = (text.index(s) for s in ('Move-Item -Path "NuGet.config" "temp.config"', "Expand-Archive",
+                                                   'Move-Item -Path "temp.config" "NuGet.config"'))
+    assert keep < expand < back
+    assert "releases/download/$version/Bonsai.zip" in text and text.rstrip().endswith("exit $restoreExit")
+
+
 AUD = 'xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio" xmlns:mix="clr-namespace:Bonsai.Mixer;assembly=Bonsai.Mixer" '
 
 

@@ -32,6 +32,9 @@ BLOCK_SUBJECTS = {
 }
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
 RIG_HARDWARE = "OpenRigs.Devices:RigHardware.bonsai"
+# The lab's Bonsai setup, one copy that each workflow's .bonsai\Setup.ps1 runs from the open-rigs it pins.
+SETUP_BONSAI = Path(__file__).parents[1] / "scripts" / "setup-bonsai.ps1"
+SETUP_BONSAI_RUN = "open_rigs\\scripts\\setup-bonsai.ps1"
 MANUAL_REWARD_DROP_UL = 2.5  # RewardLeft and RewardRight each give this, before and during a run (15 Nov 2026)
 
 
@@ -317,12 +320,16 @@ def undeclared_commands(wf: Workflow) -> list[str]:
 
 
 def layout_problems(wf: Workflow) -> list[str]:
-    """A tracked config\\main.layout, which .bonsai\\Setup.ps1 puts in place of a stale per-machine one."""
+    """A tracked config\\main.layout, which .bonsai\\Setup.ps1 puts in place of a stale per-machine one, itself or
+    through the lab's one copy of the setup (open_rigs\\scripts\\setup-bonsai.ps1, which it runs)."""
     problems = []
     layout = wf.repo / "config" / "main.layout"
     if not layout.is_file() or layout.read_text(encoding="utf-8").count("<VisualizerLayout") != 1:
         problems.append("config\\main.layout is not one VisualizerLayout")
-    if "..\\config\\main.layout" not in (wf.repo / ".bonsai" / "Setup.ps1").read_text(encoding="utf-8-sig"):
+    setup = (wf.repo / ".bonsai" / "Setup.ps1").read_text(encoding="utf-8-sig")
+    if SETUP_BONSAI_RUN in setup:
+        setup = SETUP_BONSAI.read_text(encoding="utf-8-sig")
+    if "..\\config\\main.layout" not in setup:
         problems.append(".bonsai\\Setup.ps1 does not copy config\\main.layout")
     return problems
 
