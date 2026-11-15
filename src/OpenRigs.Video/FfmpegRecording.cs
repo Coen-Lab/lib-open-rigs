@@ -303,7 +303,15 @@ namespace OpenRigs.Video
             // ffmpeg's output is read on threads of its own, not the thread pool's (Process's
             // BeginErrorReadLine), so its last words are in when it exits however busy the pool is.
             readers = new[] { ReadLines(started.StandardError), ReadLines(started.StandardOutput) };
-            lock (gate) process = started;
+            bool late;
+            lock (gate)
+            {
+                process = started;
+                late = deadlinePassed;
+            }
+            // A deadline that passed while ffmpeg was starting killed nothing: killed here, the frame's
+            // write fails rather than blocking for good on an ffmpeg nobody ends.
+            if (late) Kill();
             stdin = started.StandardInput.BaseStream;
             // Created once ffmpeg runs, so an ffmpeg that cannot start leaves no header-only CSV.
             try

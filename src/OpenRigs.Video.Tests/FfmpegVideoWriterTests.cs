@@ -263,7 +263,10 @@ namespace OpenRigs.Video.Tests
         }
 
         // CI (15 Nov 2026): on a loaded runner the kill came seconds late. The deadline and the
-        // read of ffmpeg's output must not wait for a thread-pool thread.
+        // read of ffmpeg's output must not wait for a thread-pool thread. "was killed" is the proof:
+        // a kill later than Finish's own limit (the stop timeout and a second) returns "did not
+        // finish" instead. The clock's bound is looser than that limit, as the test above's is: at
+        // the limit itself, a runner's stall of the test's own thread failed it (CI, 4.25 s).
         [TestMethod]
         public void AnFfmpegThatNeverFinishes_IsKilledOnTimeWhenTheThreadPoolIsBusy()
         {
@@ -276,8 +279,8 @@ namespace OpenRigs.Video.Tests
                 for (var j = 0; j < workers * 4; j++) ThreadPool.QueueUserWorkItem(_ => release.Wait());
                 var clock = Stopwatch.StartNew();
                 var problem = recording.Finish();
-                Assert.IsTrue(clock.Elapsed < TimeSpan.FromSeconds(2), "Finish waits about the stop timeout: " + clock.Elapsed);
                 StringAssert.Contains(problem, "was killed");
+                Assert.IsTrue(clock.Elapsed < TimeSpan.FromSeconds(3.5), "Finish waits about the stop timeout: " + clock.Elapsed);
             }
             finally { release.Set(); }
         }
