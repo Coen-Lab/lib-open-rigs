@@ -50,12 +50,20 @@ class Workflow:
 
     def __init__(self, repo: Path, file: str = "main.bonsai"):
         self.repo = Path(repo)
+        self.file = file
         self.text = (self.repo / "src" / file).read_text(encoding="utf-8-sig")
         self.root = ET.fromstring(self.text.encode("utf-8"))
 
     def named(self, name: str) -> ET.Element:
-        """The first node named `name`, at any depth."""
-        return next(e for e in self.root.iter(W + "Expression") if e.findtext(W + "Name") == name)
+        """The first node named `name`, at any depth; a ValueError naming it when there is none (not a bare StopIteration)."""
+        return _named(self.root, name, f"src\\{self.file}")
+
+
+def _named(root: ET.Element, name: str, where: str) -> ET.Element:
+    found = next((e for e in root.iter(W + "Expression") if e.findtext(W + "Name") == name), None)
+    if found is None:
+        raise ValueError(f"{where} has no node named {name}")
+    return found
 
 
 def kind(node: ET.Element) -> str:
@@ -173,7 +181,7 @@ def mixer_boot_delay_problems(root: ET.Element) -> list[str]:
     """The mixer starts no sooner than 3 s after Start, or rig.yml's longer bootDelaySeconds: a fault while the sound card
     boots can blue-screen the PC (deliberate; never remove or shorten it). `root` is OpenRigs.Audio's SpeakerMixer.bonsai,
     the one place the lab starts a mixer (lib-open-rigs tests it there)."""
-    group = next(e for e in root.iter(W + "Expression") if e.findtext(W + "Name") == "Mixer")
+    group = _named(root, "Mixer", "SpeakerMixer.bonsai")
     nodes, edges = scope(group)
     delays = [i for i, n in enumerate(nodes) if n.findtext(W + "Name") == "MixerBootDelay"]
     if len(delays) != 1:
@@ -269,7 +277,7 @@ def rig_hardware_problems(wf: Workflow) -> list[str]:
     if len(includes) != 1:
         return ["the workflow does not include RigHardware once"]
     problems = [f"the workflow has its own {what}" for what, found in (
-        ("Ready report", re.search(r"<orcl:Phase>Ready</orcl:Phase>", wf.text)),
+        ("Ready report", re.search(r"<\w+:Phase>Ready</\w+:Phase>", wf.text)),
         ("StartupWatchdog", ":StartupWatchdog\"" in wf.text),
         ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
     waits = includes[0].findtext(W + "ReadyWaitsFor")

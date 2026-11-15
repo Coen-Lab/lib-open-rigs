@@ -137,6 +137,21 @@ def test_a_workflow_with_the_mixer_makes_ready_wait_for_it_and_one_without_does_
         "on a workflow without SpeakerMixer"]
 
 
+def test_a_workflow_s_own_ready_report_is_found_under_any_prefix(tmp_path):
+    rig = f'<Expression xsi:type="IncludeWorkflow" Path="{lint.RIG_HARDWARE}" />'
+    own = '<Expression xsi:type="Combinator"><Combinator xmlns:p3="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control" xsi:type="p3:ReportPhase"><p3:Phase>Ready</p3:Phase></Combinator></Expression>'
+    assert lint.rig_hardware_problems(workflow(tmp_path, rig + own)) == ["the workflow has its own Ready report"]
+
+
+def test_a_node_not_in_the_workflow_is_named_not_a_bare_stop_iteration(tmp_path):
+    try:
+        workflow(tmp_path, "").named("TaskLogic")
+    except ValueError as error:
+        assert str(error) == r"src\main.bonsai has no node named TaskLogic"
+    else:
+        raise AssertionError("no error")
+
+
 def pulse_workflow(tmp_path: Path, nodes: str, edges: str) -> lint.Workflow:
     beh = ('xmlns:beh="clr-namespace:Bonsai.Harp.Behavior;assembly=Bonsai.Harp.Behavior" '
            'xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp" '

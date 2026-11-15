@@ -34,7 +34,7 @@ spouts were offered where the task records bothSpouts; the response rate is the 
 
 A file without a column the checks read (harpTime, outcomeTime and the rest of the core) is one problem,
 not checked further; without a Settings_Task file the checks that need the task are one problem. A trial row with an
-empty cell, text or NaN in a number column is a problem and its trial is not checked, except a NaN stimulusOnsetTime
+empty cell, text, an infinity or NaN in a number column is a problem and its trial is not checked, except a NaN stimulusOnsetTime
 (the stimulus never commanded), which is a NOTE, the trial left out of the response and interval times, and a NaN
 laserTriggerTime (no trigger), which is not checked. `summarise-experiment <experiment folder> ...` prints each summary,
 note and failed check, exiting 1 when a check fails.
@@ -209,8 +209,8 @@ def _true(text: Any) -> bool:
 # The columns summarise reads: of a trial row, and of an async row.
 TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "penaltySound", "penaltyTimeoutSeconds")
 ASYNC_NEEDS = (TIME_COLUMN, "Event", "Value")
-# A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an empty cell or
-# text is a problem and the row's checks are skipped.
+# A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an infinity, an
+# empty cell or text is a problem and the row's checks are skipped.
 TRIAL_NUMBERS = ("trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime",
                  "rewardSizeUl", "penaltyTimeoutSeconds", "quietWaitSeconds", "laserTriggerTime")
 NAN_ALLOWED = ("stimulusOnsetTime", "laserTriggerTime")
@@ -227,7 +227,7 @@ def _not_numbers(row: Dict[str, str]) -> List[str]:
         except (TypeError, ValueError):
             bad.append(f"{column} {row[column]!r}")
             continue
-        if math.isnan(value) and column not in NAN_ALLOWED:
+        if math.isinf(value) or (math.isnan(value) and column not in NAN_ALLOWED):
             bad.append(f"{column} {row[column]!r}")
     return bad
 
@@ -292,9 +292,12 @@ def _summarise(folder: Path) -> Summary:
     if trials and task is None:
         s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the penalty sound not checked")
     rewards = [e for e in events if e["Event"] == "RewardDelivered"]
-    s.delivered_ul = sum(float(e["Value"] or 0) for e in rewards)
     reward_times = []
     for e in rewards:
+        try:
+            s.delivered_ul += float(e["Value"] or 0)
+        except (TypeError, ValueError):
+            s.problems.append(f"BonsaiData_Async: a RewardDelivered row's Value {e['Value']!r} is not a number")
         try:
             reward_times.append(_f(e, TIME_COLUMN))
         except (TypeError, ValueError):

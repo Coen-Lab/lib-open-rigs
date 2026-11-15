@@ -29,15 +29,17 @@ class QuietWait(BaseSchema):
     lick_quiet_seconds: float = Field(
         default=0.0,
         ge=0,
+        allow_inf_nan=False,
         description="Quiet wait: Go needs this long with every spout released, in seconds, counted from the interval's start and restarted by every touch and release; a held contact (a paw or chin on a spout) holds Go until released, so licks for the last reward cannot carry into the next trial; 0: off. It lengthens the interval only when the mouse licks late in it (quietWaitSeconds)",
     )
     wheel_quiet_seconds: float = Field(
         default=0.0,
         ge=0,
+        allow_inf_nan=False,
         description="Quiet wait: Go needs this long with the wheel still, in seconds, counted from the interval's start: the wheel's distance (forward and back added) over the last wheelQuietSeconds must stay within wheelQuietCm; 0: off (with wheelQuietCm 0)",
     )
     wheel_quiet_cm: float = Field(
-        default=0.0, ge=0, description="The most the wheel may move, forward and back added, within the last wheelQuietSeconds before Go, in cm; 0: off (with wheelQuietSeconds 0)"
+        default=0.0, ge=0, allow_inf_nan=False, description="The most the wheel may move, forward and back added, within the last wheelQuietSeconds before Go, in cm; 0: off (with wheelQuietSeconds 0)"
     )
 
     @model_validator(mode="after")
@@ -90,6 +92,7 @@ class Optogenetics(BaseSchema):
         description="Probability that a trial after trialsBeforeLaser is a laser-on trial, shared equally by every condition in the conditions file; all other trials are laser-off trials, sent a condition with the laser off",
     )
     laser_to_stimulus_seconds: float = Field(
+        allow_inf_nan=False,
         description="Signed, in seconds: the trigger (the ZapitTrigger line) comes this long before the stimulus; 0 with it; negative after it. Go is the end of the interval less the lead, max(this, 0), once the stage's quiet waits hold, and the stimulus comes the lead after Go in every experiment, optogenetics on or off, so timing never reveals Zapit; the trigger only with optogenetics. Zapit is armed during the interval and adds no time. Refused above itiMinSeconds - 0.2 s (Zapit's reply margin); each task adds its own limits",
     )
     trials_before_laser: int = Field(

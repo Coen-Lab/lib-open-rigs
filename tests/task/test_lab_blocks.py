@@ -25,6 +25,19 @@ def test_quiet_wait_refuses_half_a_wheel_wait(seconds, cm):
         Stage(label="a", wheel_quiet_seconds=seconds, wheel_quiet_cm=cm)
 
 
+# A wait of inf never reaches Go and the run waits silently; a NaN lead passed check_lead_fits (every comparison false).
+@pytest.mark.parametrize("key", ["lickQuietSeconds", "wheelQuietSeconds"])
+def test_quiet_wait_refuses_an_endless_wait(key):
+    with pytest.raises(ValidationError, match="finite number"):
+        Stage.model_validate({"label": "a", key: float("inf"), "wheelQuietCm": 1})
+
+
+@pytest.mark.parametrize("lead", [float("nan"), float("-inf")])
+def test_optogenetics_refuses_a_lead_that_is_not_a_number(lead):
+    with pytest.raises(ValidationError, match="finite number"):
+        Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": lead})
+
+
 def test_optogenetics_needs_a_file_and_a_power_when_on():
     assert not Optogenetics.model_validate(OPTO).use_zapit
     with pytest.raises(ValidationError, match="zapit_config_path is empty"):

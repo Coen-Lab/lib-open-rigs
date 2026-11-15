@@ -136,6 +136,16 @@ def test_a_nan_or_empty_number_is_a_problem_not_a_pass_or_a_crash(tmp_path, monk
     assert stop.value.code == 1 and "PROBLEM row 2: outcomeTime ''" in capsys.readouterr().out
 
 
+def test_an_infinite_number_or_a_reward_value_that_is_not_one_is_a_problem_not_a_crash(tmp_path):
+    trials = _chain(3)
+    trials[0]["trialNumber"] = "inf"  # int(inf) raised OverflowError and stopped the command
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"] + [(5.0, "2,5")]
+    s = summarise(_experiment(tmp_path, trials, rewards))  # float("2,5") raised ValueError and stopped it
+    assert s.problems == ["BonsaiData_Async: a RewardDelivered row's Value '2,5' is not a number",
+                          "row 1: trialNumber 'inf' not a number, so the trial is not checked"]
+    assert s.delivered_ul == 4.0
+
+
 def test_no_trials_and_no_manifest(tmp_path):
     folder = _experiment(tmp_path, [], [])
     (folder / "manifest.json").unlink()
