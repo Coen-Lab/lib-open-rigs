@@ -30,7 +30,20 @@ def test_the_speaker_mixer_plays_no_sound_sent_while_it_boots():
     assert lint.mixer_replay_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
     direct = text.replace("<Name>MixerStimulusSounds</Name>", "<Name>StimulusSounds</Name>")
     assert lint.mixer_replay_problems(lint.ET.fromstring(direct.encode("utf-8"))) == [
-        "StimulusSounds reaches the mixer other than through the PublishSubject MixerStimulusSounds"]
+        "StimulusSounds reaches the mixer other than through the PublishSubject MixerStimulusSounds, fed by a CheckMixerStarted of StimulusSounds and Mixer"]
+
+
+def test_a_stimulus_or_penalty_sound_sent_while_the_mixer_boots_stops_the_workflow():
+    # The relay alone dropped it silently while the trial log recorded it as sent.
+    text = (ROOT / "src" / "OpenRigs.Audio" / "SpeakerMixer.bonsai").read_text(encoding="utf-8-sig")
+    unchecked = text.replace('<Edge From="36" To="39" Label="Source1" />', "").replace(
+        '<Edge From="39" To="37" Label="Source1" />', '<Edge From="36" To="37" Label="Source1" />')
+    assert unchecked != text
+    assert lint.mixer_replay_problems(lint.ET.fromstring(unchecked.encode("utf-8"))) == [
+        "PenaltySounds reaches the mixer other than through the PublishSubject MixerPenaltySounds, fed by a CheckMixerStarted of PenaltySounds and Mixer"]
+    misnamed = text.replace("<aud:Sound>StimulusSounds</aud:Sound>", "<aud:Sound>PenaltySounds</aud:Sound>")
+    assert lint.mixer_replay_problems(lint.ET.fromstring(misnamed.encode("utf-8"))) == [
+        "StimulusSounds reaches the mixer other than through the PublishSubject MixerStimulusSounds, fed by a CheckMixerStarted of StimulusSounds and Mixer"]
 
 
 def workflow(tmp_path: Path, nodes: str) -> lint.Workflow:

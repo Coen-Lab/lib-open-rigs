@@ -79,6 +79,40 @@ namespace OpenRigs.Audio
         }
     }
 
+    /// <summary>Stops the workflow on a sound sent before the mixer has started, which the mixer would not play.</summary>
+    [Combinator]
+    [Description("Passes on each sound once the mixer has started, and stops the workflow, naming Sound and the mixer's boot delay, on a sound sent before: the mixer would not play it while the trial log records it as sent. Input: (the sounds, the mixer). SpeakerMixer runs StimulusSounds and PenaltySounds through it.")]
+    [WorkflowElementCategory(ElementCategory.Combinator)]
+    public class CheckMixerStarted
+    {
+        /// <summary>The sound's subject, named in the error.</summary>
+        [Description("The sound's subject, named in the error, such as StimulusSounds.")]
+        public string Sound { get; set; }
+
+        /// <summary>Passes on each sound sent after the mixer's first value; stops on one sent before.</summary>
+        public IObservable<TSound> Process<TSound, TMixer>(IObservable<TSound> source, IObservable<TMixer> mixer)
+        {
+            return Observable.Create<TSound>(observer =>
+            {
+                var started = false;
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                var gate = new object();
+                var mixerSubscription = mixer.Take(1).Subscribe(_ => { lock (gate) started = true; }, observer.OnError);
+                var soundSubscription = source.Subscribe(sound =>
+                {
+                    bool ready;
+                    lock (gate) ready = started;
+                    if (ready) observer.OnNext(sound);
+                    else observer.OnError(new InvalidOperationException(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "A sound was sent on {0} {1:0.0} s after Start, before the speaker mixer started (3 s after Start, or rig.yml's " +
+                        "speakerArray.device.bootDelay if longer), so it would not play while the trial log records it as sent. " +
+                        "Press Go no sooner than that.", Sound, clock.Elapsed.TotalSeconds)));
+                }, observer.OnError, observer.OnCompleted);
+                return new System.Reactive.Disposables.CompositeDisposable(mixerSubscription, soundSubscription);
+            });
+        }
+    }
+
     /// <summary>Stops the workflow on a WAV file not at the audio device's rate.</summary>
     [Combinator]
     [Description("Stops the workflow if a WAV file the mixer plays is not at the audio device's rate: nothing converts it, so it would play at the wrong pitch and speed. Input: the device's sample rate; passed on.")]
