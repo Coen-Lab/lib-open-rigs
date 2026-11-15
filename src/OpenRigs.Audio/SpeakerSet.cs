@@ -73,11 +73,25 @@ namespace OpenRigs.Audio
         }
 
         /// <summary>
-        /// The mixer's buffer (ChannelCount rows) playing a sound (one row) on each of the channels, equalised for its
-        /// speaker (unless <paramref name="equalise"/> is false) and scaled by gain; every other channel silent. No
-        /// channels: every speaker's. With <paramref name="syncCopy"/>, the sound's sync copy too (<see cref="AddSyncCopy"/>).
+        /// The mixer's buffer (ChannelCount rows) playing a sound (one row) at a level in dBFS RMS (<see cref="SoundLevel"/>,
+        /// of the sound as given) on each of the channels, equalised for its speaker (unless <paramref name="equalise"/>
+        /// is false); every other channel silent. No channels: every speaker's. With <paramref name="syncCopy"/>, the
+        /// sound's sync copy too (<see cref="AddSyncCopy"/>). Stops, naming <paramref name="what"/>, when a peak reaches
+        /// <see cref="SoundLevel.PeakLimitDbfs"/> after equalisation.
         /// </summary>
-        public Mat Buffer(Mat sound, IEnumerable<int> channels, double gain, bool equalise = true, bool syncCopy = false)
+        public Mat Buffer(Mat sound, IEnumerable<int> channels, double levelDbfs, bool equalise = true, bool syncCopy = false, string what = null)
+        {
+            var buffer = Layout(sound, channels, SoundLevel.Gain(sound, levelDbfs), equalise, syncCopy);
+            SoundLevel.CheckPeak(buffer, what ?? "A sound at " + levelDbfs.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " dBFS RMS");
+            return buffer;
+        }
+
+        /// <summary>
+        /// The mixer's buffer as <see cref="Buffer"/> lays it out, scaled by a linear gain rather than set to a level: for
+        /// a sound equalised once at load, whose gain comes from its unequalised self (<see cref="SoundLevel.Gain"/>), and
+        /// whose peaks its caller checks (<see cref="SoundLevel.CheckPeak"/>).
+        /// </summary>
+        public Mat Layout(Mat sound, IEnumerable<int> channels, double gain, bool equalise = true, bool syncCopy = false)
         {
             if (sound.Rows != 1) throw new InvalidOperationException("A sound for the speakers must be one row (mono); it has " + sound.Rows + ".");
             var list = (channels ?? new int[0]).ToArray();

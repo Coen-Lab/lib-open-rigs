@@ -64,7 +64,7 @@ namespace OpenRigs.Audio.Tests
         public void ABufferPlaysOnlyOnItsChannelsEqualisedAndScaled()
         {
             var set = SpeakerSet.Load(Rig(), "TEST-RIG");
-            var buffer = set.Buffer(Row(0, 0, 4, 0, 0), new[] { 1 }, 0.5);
+            var buffer = set.Layout(Row(0, 0, 4, 0, 0), new[] { 1 }, 0.5);
             Assert.AreEqual(32, buffer.Rows);
             // An impulse through the [0.25, 0.5, 0.25] filter, centred (not delayed), at half gain.
             CollectionAssert.AreEqual(new float[] { 0, 0.5f, 1, 0.5f, 0 }, Values(buffer, 1));
@@ -75,7 +75,7 @@ namespace OpenRigs.Audio.Tests
         [TestMethod]
         public void NoChannelsMeansEverySpeakerAndNoOtherChannel()
         {
-            var buffer = SpeakerSet.Load(Rig(), "TEST-RIG").Buffer(Row(0, 4, 0), null, 1);
+            var buffer = SpeakerSet.Load(Rig(), "TEST-RIG").Layout(Row(0, 4, 0), null, 1);
             foreach (var channel in new[] { 0, 1, 2 }) CollectionAssert.AreEqual(new float[] { 1, 2, 1 }, Values(buffer, channel));
             foreach (var channel in Enumerable.Range(3, 29)) CollectionAssert.AreEqual(new float[3], Values(buffer, channel));
         }
@@ -83,25 +83,52 @@ namespace OpenRigs.Audio.Tests
         [TestMethod]
         public void ABackgroundIsPlayedAsItIsOnEverySpeaker()
         {
-            var buffer = SpeakerSet.Load(Rig(), "TEST-RIG").Buffer(Row(0, 4, 0), null, 0.5, equalise: false);
+            var buffer = SpeakerSet.Load(Rig(), "TEST-RIG").Layout(Row(0, 4, 0), null, 0.5, equalise: false);
             foreach (var channel in new[] { 0, 1, 2 }) CollectionAssert.AreEqual(new float[] { 0, 2, 0 }, Values(buffer, channel));
             CollectionAssert.AreEqual(new float[3], Values(buffer, 31));
         }
 
         [TestMethod]
-        public void ThePenaltySoundPlaysOnThePenaltyChannelAloneAtTheLabsLevel()
+        public void ThePenaltySoundPlaysOnThePenaltyChannelAloneAtTheTasksLevel()
         {
             var set = SpeakerSet.Load(Rig(taps: new[] { 0.0, 1.0, 0.0 }), "TEST-RIG");
-            var buffer = PenaltySound.Buffer(set, 2.0);
+            var buffer = PenaltySound.Buffer(set, -44.6);
             using (var tone = PenaltySound.Read(48000))
+            using (var row = buffer.GetRow(2))
             {
                 Assert.AreEqual(48000, buffer.Cols);  // one second at 48 kHz
-                var expected = Values(tone, 0).Select(v => (float)(v * PenaltySound.Level * 2.0)).ToArray();
-                var actual = Values(buffer, 2);
-                for (int i = 0; i < expected.Length; i += 997) Assert.AreEqual(expected[i], actual[i], 1e-6);
+                Assert.AreEqual(-44.6, SoundLevel.RmsDbfs(row), 1e-4);
+                // The level the tasks played it at until 15 Nov 2026 (half the file), so their task files keep it.
+                Assert.AreEqual(-44.6, 20 * Math.Log10(0.5) + SoundLevel.RmsDbfs(tone), 0.05);
             }
             Assert.AreEqual(0f, Values(buffer, 0).Max(Math.Abs));
             Assert.AreEqual(0f, Values(buffer, 31).Max(Math.Abs));
+        }
+
+        [TestMethod]
+        public void ASoundPlaysAtItsLevelInDbfsRmsOfTheSoundAsGiven()
+        {
+            var set = SpeakerSet.Load(Rig(), "TEST-RIG");
+            // A square wave of amplitude 0.5 is -6.02 dBFS RMS; at -20 it plays 10^(-1) / 0.5 = 0.2 times as loud.
+            var sound = Row(0.5f, -0.5f, 0.5f, -0.5f);
+            Assert.AreEqual(-6.0206, SoundLevel.RmsDbfs(sound), 1e-4);
+            var buffer = set.Buffer(sound, new[] { 1 }, -20, equalise: false);
+            CollectionAssert.AreEqual(new[] { 0.1f, -0.1f, 0.1f, -0.1f }, Values(buffer, 1).Select(v => (float)Math.Round(v, 6)).ToArray());
+            Assert.AreEqual(Math.Pow(10, -1) / 0.5, SoundLevel.Gain(sound, -20), 1e-12);
+        }
+
+        [TestMethod]
+        public void APeakAtTheLimitAfterEqualisationStops()
+        {
+            // One impulse in four samples is -6.02 dBFS RMS with its peak 6.02 dB above: at -5 dBFS RMS it peaks at +1 dBFS
+            // as it is, and at -5 dBFS through the [0.25, 0.5, 0.25] filter, which halves it.
+            var set = SpeakerSet.Load(Rig(), "TEST-RIG");
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => set.Buffer(Row(0, 0, 1, 0), new[] { 1 }, -5, equalise: false, what: "The test tone"));
+            StringAssert.Contains(ex.Message, "The test tone peaks at 1.02 dBFS on channel 1 after equalisation, at or above the lab's -1 dBFS limit: lower its levelDbfs by more than 2.02 dB.");
+            var equalised = set.Buffer(Row(0, 0, 1, 0), new[] { 1 }, -5);
+            Assert.AreEqual(-5, 20 * Math.Log10(Values(equalised, 1).Max()), 1e-4);
+            Assert.ThrowsException<InvalidOperationException>(() => set.Buffer(Row(0, 0, 0, 0), new[] { 1 }, -30));  // silent: no level
+            Assert.ThrowsException<InvalidOperationException>(() => set.Buffer(Row(0, 0, 1, 0), new[] { 1 }, 0));  // above the limit
         }
 
         [TestMethod]
@@ -138,10 +165,10 @@ namespace OpenRigs.Audio.Tests
         public void TheSyncCopyIsSyncGainOnTheSyncChannelForTheSoundsLength()
         {
             var set = SpeakerSet.Load(Rig(extra: "  syncChannel: 31\n  syncGain: 0.3\n  penaltySoundChannel: 2\n"), "TEST-RIG");
-            var buffer = set.Buffer(Row(0, 1, 0, -1), new[] { 1 }, 1, false, true);
+            var buffer = set.Layout(Row(0, 1, 0, -1), new[] { 1 }, 1, false, true);
             CollectionAssert.AreEqual(new[] { 0.3f, 0.3f, 0.3f, 0.3f }, Values(buffer, 31));
             CollectionAssert.AreEqual(new[] { 0f, 1f, 0f, -1f }, Values(buffer, 1));
-            CollectionAssert.AreEqual(new[] { 0f, 0f, 0f, 0f }, Values(set.Buffer(Row(0, 1, 0, -1), new[] { 1 }, 1, false), 31));
+            CollectionAssert.AreEqual(new[] { 0f, 0f, 0f, 0f }, Values(set.Layout(Row(0, 1, 0, -1), new[] { 1 }, 1, false), 31));
             Assert.AreEqual(SpeakerSet.DefaultSyncGain, SpeakerSet.Load(Rig(), "TEST-RIG").SyncGain);
         }
 
@@ -149,7 +176,7 @@ namespace OpenRigs.Audio.Tests
         public void ASyncCopyNeedsASyncChannel()
         {
             var set = SpeakerSet.Load(Rig(extra: "  penaltySoundChannel: 2\n"), "TEST-RIG");
-            var error = Assert.ThrowsException<InvalidOperationException>(() => set.Buffer(Row(1), new[] { 1 }, 1, false, true));
+            var error = Assert.ThrowsException<InvalidOperationException>(() => set.Layout(Row(1), new[] { 1 }, 1, false, true));
             StringAssert.Contains(error.Message, "no syncChannel");
         }
 
@@ -157,7 +184,7 @@ namespace OpenRigs.Audio.Tests
         public void ThePenaltySoundNeedsAPenaltyChannel()
         {
             var set = SpeakerSet.Load(Rig(extra: "  syncChannel: 31\n"), "TEST-RIG");
-            var ex = Assert.ThrowsException<InvalidOperationException>(() => PenaltySound.Buffer(set, 1));
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => PenaltySound.Buffer(set, -30));
             StringAssert.Contains(ex.Message, "no penaltySoundChannel");
         }
 

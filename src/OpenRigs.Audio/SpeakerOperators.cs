@@ -27,7 +27,7 @@ namespace OpenRigs.Audio
 
     /// <summary>Lays a sound out as the mixer's buffer on chosen speakers, each equalised (<see cref="SpeakerSet.Buffer"/>).</summary>
     [Combinator]
-    [Description("The mixer's buffer for a sound (one row): on each of Channels (empty: every rig.yml speaker), equalised for that speaker with its filter, times Gain; every other channel silent. Input: (the speakers, a sound) or (the speakers, a list of sounds), each sound laid out the same way.")]
+    [Description("The mixer's buffer for a sound (one row) at LevelDbfs: on each of Channels (empty: every rig.yml speaker), equalised for that speaker with its filter; every other channel silent. Stops the workflow when a peak reaches -1 dBFS after equalisation. Input: (the speakers, a sound) or (the speakers, a list of sounds), each sound laid out the same way, each at the level.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class SpeakerBuffer
     {
@@ -35,9 +35,9 @@ namespace OpenRigs.Audio
         [Description("The mixer channels to play on. Empty: every speaker in rig.yml.")]
         public int[] Channels { get; set; }
 
-        /// <summary>The gain on every channel.</summary>
-        [Description("The gain on every channel, 1 for the sound as it is.")]
-        public double Gain { get; set; } = 1;
+        /// <summary>The sound's level in dBFS RMS (SoundLevel): map it from the task file.</summary>
+        [Description("The sound's level in dBFS RMS, the RMS of the sound over its whole length as given (before equalisation): map it from the task file's levelDbfs. The lab's stimulus default, -30, until mapped.")]
+        public double LevelDbfs { get; set; } = SoundLevel.StimulusDbfs;
 
         /// <summary>Whether each channel's copy is equalised for its speaker.</summary>
         [Description("Whether each channel's copy is equalised for its speaker with its filter (a stimulus); false plays the sound as it is on each (a background noise).")]
@@ -50,30 +50,32 @@ namespace OpenRigs.Audio
         /// <summary>One sound's buffer.</summary>
         public IObservable<Mat> Process(IObservable<Tuple<SpeakerSet, Mat>> source)
         {
-            return source.Select(input => input.Item1.Buffer(input.Item2, Channels, Gain, Equalise, SyncCopy));
+            return source.Select(input => input.Item1.Buffer(input.Item2, Channels, LevelDbfs, Equalise, SyncCopy));
         }
 
         /// <summary>Each sound's buffer, in order.</summary>
         public IObservable<IList<Mat>> Process(IObservable<Tuple<SpeakerSet, IList<Mat>>> source)
         {
-            return source.Select(input => (IList<Mat>)input.Item2.Select(sound => input.Item1.Buffer(sound, Channels, Gain, Equalise, SyncCopy)).ToList());
+            return source.Select(input => (IList<Mat>)input.Item2.Select((sound, i) => input.Item1.Buffer(
+                sound, Channels, LevelDbfs, Equalise, SyncCopy, "Sound " + i + " of " + input.Item2.Count + " at " +
+                LevelDbfs.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " dBFS RMS")).ToList());
         }
     }
 
     /// <summary>The lab's penalty sound as the mixer's buffer (<see cref="PenaltySound.Buffer"/>).</summary>
     [Combinator]
-    [Description("The lab's penalty sound (OpenRigs.Audio's penalty_tone.wav, the same in every task) as the mixer's buffer: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at PenaltySound.Level times Gain (the task's penalty.sound.gain). Input: the speakers.")]
+    [Description("The lab's penalty sound (OpenRigs.Audio's penalty_tone.wav, the same in every task) as the mixer's buffer: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at LevelDbfs (the task's penalty.sound.levelDbfs). Stops the workflow when its peak reaches -1 dBFS after equalisation. Input: the speakers.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PenaltySoundBuffer
     {
-        /// <summary>The task's gain on the penalty sound.</summary>
-        [Description("The task's gain on the penalty sound (penalty.sound.gain), 1 for the lab's level.")]
-        public double Gain { get; set; } = 1;
+        /// <summary>The penalty sound's level in dBFS RMS: map it from the task file.</summary>
+        [Description("The penalty sound's level in dBFS RMS (the task's penalty.sound.levelDbfs). The lab's default, -30, until mapped.")]
+        public double LevelDbfs { get; set; } = SoundLevel.PenaltyDbfs;
 
         /// <summary>The buffer for each input.</summary>
         public IObservable<Mat> Process(IObservable<SpeakerSet> source)
         {
-            return source.Select(speakers => PenaltySound.Buffer(speakers, Gain));
+            return source.Select(speakers => PenaltySound.Buffer(speakers, LevelDbfs));
         }
     }
 

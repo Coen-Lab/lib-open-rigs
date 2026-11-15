@@ -117,11 +117,54 @@ class Optogenetics(BaseSchema):
             )
 
 
+# The lab's sound levels, in dBFS RMS: the RMS of a sound over its whole length as the task gives it (before the
+# speaker's equalisation), against full scale (OpenRigs.Audio SoundLevel, the same numbers). Defaults only: each
+# task file states its own; they become dB SPL once the speakers are calibrated for loudness.
+STIMULUS_LEVEL_DBFS = -30.0
+PENALTY_LEVEL_DBFS = -30.0
+REWARD_TONE_LEVEL_DBFS = -36.0
+BACKGROUND_LEVEL_DBFS = -50.0
+PEAK_LIMIT_DBFS = -1.0  # every buffer's peak stays under this after equalisation, checked when the task file is read at Go
+QUIETEST_LEVEL_DBFS = -120.0
+
+
+def level_dbfs(default: float, sound: str):
+    """A sound's levelDbfs field, with its lab default."""
+    return Field(
+        default=default,
+        ge=QUIETEST_LEVEL_DBFS,
+        le=PEAK_LIMIT_DBFS,
+        description=f"{sound}'s level in dBFS RMS: the RMS of the sound over its whole length as the task gives it, before the speaker's "
+        f"equalisation, against full scale (a full-scale sine is -3). The lab's default {default:g}. The workflow stops when the task file is read "
+        f"at Go if any peak would reach {PEAK_LIMIT_DBFS:g} dBFS after equalisation",
+    )
+
+
+class StimulusSound(BaseSchema):
+    """A task's stimulus sounds, each played at levelDbfs (OpenRigs.Audio SpeakerBuffer or SpeakerSet.Buffer)."""
+
+    level_dbfs: float = level_dbfs(STIMULUS_LEVEL_DBFS, "Each stimulus sound")
+
+
+class RewardTone(BaseSchema):
+    """A task's reward tone, played at levelDbfs."""
+
+    level_dbfs: float = level_dbfs(REWARD_TONE_LEVEL_DBFS, "The reward tone")
+
+
+class BackgroundNoise(BaseSchema):
+    """The background noise, one level for the experiment: looped on every speaker unequalised, faded in over 2 s once
+    the task file is read at Go (OpenRigs.Audio SpeakerMixer)."""
+
+    enabled: bool = Field(default=True, description="Whether the background noise plays")
+    level_dbfs: float = level_dbfs(BACKGROUND_LEVEL_DBFS, "The background noise")
+
+
 class PenaltySound(BaseSchema):
     """The lab's penalty sound (OpenRigs.Audio PenaltySoundBuffer, the same in every task), on rig.yml's speakerArray.penaltySoundChannel alone, equalised for that speaker."""
 
     enabled: bool = Field(default=True, description="Whether the penalty sound plays with every timeout")
-    gain: float = Field(default=1.0, ge=0, description="Gain on the lab's penalty sound, 1 for its level")
+    level_dbfs: float = level_dbfs(PENALTY_LEVEL_DBFS, "The penalty sound")
 
 
 class Penalty(BaseSchema):

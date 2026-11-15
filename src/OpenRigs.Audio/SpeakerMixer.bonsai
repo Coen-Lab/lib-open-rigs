@@ -1,0 +1,230 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:mix="clr-namespace:Bonsai.Mixer;assembly=Bonsai.Mixer"
+                 xmlns:cvn="clr-namespace:OpenCV.Net;assembly=OpenCV.Net"
+                 xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A rig's speakers and their mixer, for every workflow that plays sounds. Loads rig.yml's speakers and their filters once at Start (LoadSpeakers, from RigFile) into the AsyncSubject Speakers, and starts the mixer on rig.yml's speakerArray.device (from RigConfigs) no sooner than 3 s after Start, or rig.yml's longer bootDelay: deliberate, as a fault while the sound card boots can blue-screen the PC, so never remove or shorten it. It plays four sounds over each other, each a mixer buffer already at its level (SpeakerBuffer, PenaltySoundBuffer, SpeakerSet.Buffer: every level in dBFS RMS, from the task file, each buffer carrying its own), multicast into the BehaviorSubject it declares for it: StimulusSounds (each trial's stimulus), RewardToneSounds, PenaltySounds and BackgroundNoise (one buffer, looped, faded in over 2 s when it comes). A workflow sends only what it plays. Needs RigFile and RigConfigs (OpenRigs.Devices RigHardware and the lab rig model) and Bonsai.Mixer in the workflow's environment.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="aud:LoadSpeakers">
+          <aud:MachineName />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>1</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>Speakers</Name>
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Mixer</Name>
+        <Description>The speaker mixer, started at least 3 s after Start (rig.yml's speakerArray.device.bootDelay may lengthen it, never shorten it).</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="GroupWorkflow">
+              <Name>MixerDevice</Name>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="mix:CreateMixerContext">
+                      <mix:HostApi>Windows WDM-KS</mix:HostApi>
+                      <mix:DeviceName>UNMAPPED</mix:DeviceName>
+                      <mix:SampleRate>48000</mix:SampleRate>
+                      <mix:ChannelCount xsi:nil="true" />
+                      <mix:SuggestedLatency>0.002</mix:SuggestedLatency>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="mix:StartMixer" />
+                  </Expression>
+                  <Expression xsi:type="rx:BehaviorSubject">
+                    <Name>Mixer</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>RigConfigs</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="HostApi" Selector="SpeakerArray.Device.HostApi" />
+                      <Property Name="DeviceName" Selector="SpeakerArray.Device.DeviceName" />
+                      <Property Name="SampleRate" Selector="SpeakerArray.Device.SampleRate" />
+                      <Property Name="SuggestedLatency" Selector="SpeakerArray.Device.SuggestedLatency" />
+                    </PropertyMappings>
+                  </Expression>
+                </Nodes>
+                <Edges>
+                  <Edge From="0" To="1" Label="Source1" />
+                  <Edge From="1" To="2" Label="Source1" />
+                  <Edge From="3" To="4" Label="Source1" />
+                  <Edge From="4" To="0" Label="Source1" />
+                </Edges>
+              </Workflow>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>RigConfigs</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Name>BootDelay</scr:Name>
+              <scr:Description>rig.yml's bootDelay, never under 3 s: a fault while the sound card boots can blue-screen the PC.</scr:Description>
+              <scr:Expression>TimeSpan.FromSeconds(Math.Max(3.0, SpeakerArray.Device.BootDelay))</scr:Expression>
+            </Expression>
+            <Expression xsi:type="PropertyMapping">
+              <PropertyMappings>
+                <Property Name="DueTime" />
+              </PropertyMappings>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Name>MixerBootDelay</Name>
+              <Description>Deliberate: the mixer starts at least 3 s after Start. Never remove or shorten it.</Description>
+              <Combinator xsi:type="rx:DelaySubscription">
+                <rx:DueTime>PT3S</rx:DueTime>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="2" To="3" Label="Source1" />
+            <Edge From="0" To="4" Label="Source1" />
+            <Edge From="3" To="4" Label="Source2" />
+            <Edge From="4" To="5" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="cvn:Mat">
+        <rx:Name>StimulusSounds</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="cvn:Mat">
+        <rx:Name>RewardToneSounds</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="cvn:Mat">
+        <rx:Name>PenaltySounds</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="cvn:Mat">
+        <rx:Name>BackgroundNoise</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StimulusSounds</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Mixer</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="mix:CreateSource">
+          <mix:Looping>false</mix:Looping>
+          <mix:Playing>true</mix:Playing>
+          <mix:Gain>1</mix:Gain>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="mix:AppendBuffer" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardToneSounds</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Mixer</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="mix:CreateSource">
+          <mix:Looping>false</mix:Looping>
+          <mix:Playing>true</mix:Playing>
+          <mix:Gain>1</mix:Gain>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="mix:AppendBuffer" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PenaltySounds</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Mixer</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="mix:CreateSource">
+          <mix:Looping>false</mix:Looping>
+          <mix:Playing>true</mix:Playing>
+          <mix:Gain>1</mix:Gain>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="mix:AppendBuffer" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Mixer</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="mix:CreateSource">
+          <mix:Looping>true</mix:Looping>
+          <mix:Playing>true</mix:Playing>
+          <mix:Gain>0</mix:Gain>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>BackgroundSource</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BackgroundNoise</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BackgroundSource</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="mix:AppendBuffer" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BackgroundNoise</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BackgroundSource</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Item2</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Name>BackgroundFadeIn</Name>
+        <Description>The background noise's source starts silent and fades in to its buffer's level over 2 s once the buffer comes.</Description>
+        <Combinator xsi:type="mix:SetGain">
+          <mix:Gain>1</mix:Gain>
+          <mix:Duration>2</mix:Duration>
+        </Combinator>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="9" To="12" Label="Source1" />
+      <Edge From="11" To="12" Label="Source2" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="13" To="16" Label="Source1" />
+      <Edge From="15" To="16" Label="Source2" />
+      <Edge From="18" To="19" Label="Source1" />
+      <Edge From="17" To="20" Label="Source1" />
+      <Edge From="19" To="20" Label="Source2" />
+      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="22" To="23" Label="Source1" />
+      <Edge From="24" To="26" Label="Source1" />
+      <Edge From="25" To="26" Label="Source2" />
+      <Edge From="27" To="29" Label="Source1" />
+      <Edge From="28" To="29" Label="Source2" />
+      <Edge From="29" To="30" Label="Source1" />
+      <Edge From="30" To="31" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

@@ -81,12 +81,6 @@ namespace OpenRigs.Audio
     /// <summary>The lab's penalty sound, the same in every task: one second of white noise filtered to about 4 to 21 kHz, at 48 kHz.</summary>
     public static class PenaltySound
     {
-        /// <summary>
-        /// The share of full scale it plays at before the task's gain: the level the lab's tasks have played it at since 14 Nov 2026
-        /// (production's ConvertScale 0.5).
-        /// </summary>
-        public const double Level = 0.5;
-
         /// <summary>The penalty sound, one row in -1 to 1, at the device's rate (48 kHz; any other stops).</summary>
         public static Mat Read(int sampleRate)
         {
@@ -96,8 +90,8 @@ namespace OpenRigs.Audio
             }
         }
 
-        /// <summary>The mixer's buffer for the penalty sound: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at Level times the task's gain.</summary>
-        public static Mat Buffer(SpeakerSet speakers, double gain)
+        /// <summary>The mixer's buffer for the penalty sound: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at the task's level in dBFS RMS.</summary>
+        public static Mat Buffer(SpeakerSet speakers, double levelDbfs)
         {
             if (!speakers.PenaltySoundChannel.HasValue)
             {
@@ -105,7 +99,8 @@ namespace OpenRigs.Audio
             }
             using (var sound = Read(speakers.SampleRate))
             {
-                return speakers.Buffer(sound, new[] { speakers.PenaltySoundChannel.Value }, Level * gain);
+                return speakers.Buffer(sound, new[] { speakers.PenaltySoundChannel.Value }, levelDbfs, what: "The penalty sound at " +
+                    levelDbfs.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " dBFS RMS");
             }
         }
     }

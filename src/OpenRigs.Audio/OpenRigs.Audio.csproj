@@ -1,14 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>A rig's speakers: rig.yml's speakerArray and their filters, sounds equalised for each speaker, and the lab's penalty sound.</Description>
+    <Description>A rig's speakers: rig.yml's speakerArray and their filters, the shared speaker mixer, sounds at their levels in dBFS RMS equalised for each speaker, and the lab's penalty sound.</Description>
     <PackageTags>$(PackageTags) Audio</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.4</Version>
+    <Version>0.1.1-coen-lab.5</Version>
   </PropertyGroup>
 
+  <!-- SpeakerMixer.bonsai uses Bonsai.Mixer, which every workflow that plays sound has in its own Bonsai.config. -->
   <ItemGroup>
     <EmbeddedResource Include="penalty_tone.wav" LogicalName="OpenRigs.Audio.penalty_tone.wav" />
+    <EmbeddedResource Include="**\*.bonsai" />
   </ItemGroup>
 
   <ItemGroup>

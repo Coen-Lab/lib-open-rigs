@@ -24,8 +24,14 @@ WALL_CLOCK = ("rx:Timer", "rx:Delay", "rx:DelaySubscription", "rx:Throttle", "rx
               "rx:Timestamp", "gl:Timer", "gl:Delay")
 PER_ELEMENT = {"rx:SelectMany", "rx:CreateObservable", "rx:Concat", "rx:Switch"}
 # The subjects a lab block declares for the workflow, and their kind: a multicast into them is not seen in the workflow's XML.
-BLOCK_SUBJECTS = {"OpenRigs.Devices:Zapit.ConnectZapit.bonsai": {"ZapitCommands": "rx:BehaviorSubject"}}
+SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
+SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
+BLOCK_SUBJECTS = {
+    "OpenRigs.Devices:Zapit.ConnectZapit.bonsai": {"ZapitCommands": "rx:BehaviorSubject"},
+    SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
+}
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
+RIG_HARDWARE = "OpenRigs.Devices:RigHardware.bonsai"
 MANUAL_REWARD_DROP_UL = 2.5  # RewardLeft and RewardRight each give this, before and during a run (15 Nov 2026)
 
 
@@ -150,10 +156,12 @@ def startup_watchdog_readers(wf: Workflow) -> int:
                if kind(n).endswith(":StartupWatchdog") for a, _, _ in edges if a == i)
 
 
-def mixer_boot_delay_problems(wf: Workflow) -> list[str]:
+def mixer_boot_delay_problems(root: ET.Element) -> list[str]:
     """The mixer starts no sooner than 3 s after Start, or rig.yml's longer bootDelay: a fault while the sound card
-    boots can blue-screen the PC (deliberate; never remove or shorten it)."""
-    nodes, edges = scope(wf.named("Mixer"))
+    boots can blue-screen the PC (deliberate; never remove or shorten it). `root` is OpenRigs.Audio's SpeakerMixer.bonsai,
+    the one place the lab starts a mixer (lib-open-rigs tests it there)."""
+    group = next(e for e in root.iter(W + "Expression") if e.findtext(W + "Name") == "Mixer")
+    nodes, edges = scope(group)
     delays = [i for i, n in enumerate(nodes) if n.findtext(W + "Name") == "MixerBootDelay"]
     if len(delays) != 1:
         return ["the Mixer group has no MixerBootDelay"]
@@ -164,8 +172,52 @@ def mixer_boot_delay_problems(wf: Workflow) -> list[str]:
     expressions = [nodes[a].findtext(SCRIPT + "Expression") for a in upstream(edges, delays[0])]
     if "TimeSpan.FromSeconds(Math.Max(3.0, SpeakerArray.Device.BootDelay))" not in expressions:
         problems.append("MixerBootDelay's DueTime is not max(3 s, speakerArray.device.bootDelay)")
+    if [a for a, b, label in edges if b == delays[0] and label == "Source1"] != [i for i, n in enumerate(nodes) if n.findtext(W + "Name") == "MixerDevice"]:
+        problems.append("MixerBootDelay does not delay MixerDevice, the mixer's start")
     return problems
 
+
+def speaker_mixer_problems(wf: Workflow) -> list[str]:
+    """Every sound plays through OpenRigs.Audio's SpeakerMixer, included once, which loads the speakers and starts the
+    mixer no sooner than 3 s after Start: the workflow starts no mixer, makes no source and loads no speakers itself."""
+    problems = [] if wf.text.count(f'Path="{SPEAKER_MIXER}"') == 1 else ["the workflow does not include OpenRigs.Audio's SpeakerMixer once"]
+    prefixes = [p for p, ns in re.findall(r'xmlns:(\w+)="clr-namespace:([\w.]+);', wf.text) if ns == "Bonsai.Mixer"]
+    problems += [f"the workflow uses Bonsai.Mixer's {op} itself" for p in prefixes for op in sorted(set(re.findall(r'xsi:type="' + p + r':(\w+)"', wf.text)))]
+    if ":LoadSpeakers" in wf.text:
+        problems.append("the workflow loads the speakers itself (SpeakerMixer's Speakers)")
+    if "MixerBootDelay" in wf.text:
+        problems.append("the workflow names its own MixerBootDelay")
+    return problems
+
+
+def sound_level_problems(wf: Workflow) -> list[str]:
+    """Every sound is played at a level from the task file (levelDbfs, in dBFS RMS): each SpeakerBuffer and
+    PenaltySoundBuffer has LevelDbfs mapped from a TaskParameters ...LevelDbfs selector, and nothing scales a sound
+    itself (no ConvertScale, Rescale or Gain of a sound): no task computes levels."""
+    problems = []
+    for nodes, edges in _scopes(wf.root):
+        for i, node in enumerate(nodes):
+            if kind(node) not in ("aud:SpeakerBuffer", "aud:PenaltySoundBuffer"):
+                continue
+            mapped = [nodes[a] for a, b, _ in edges if b == i and nodes[a].get(XSI) in ("InputMapping", "PropertyMapping")]
+            names = [p.get("Name") for m in mapped for p in m.iter(W + "Property")]
+            selectors = [nodes[a].findtext(W + "Selector") or "" for a in upstream(edges, i)]
+            if "LevelDbfs" not in names or not any(s.startswith("TaskParameters.") and s.endswith("LevelDbfs") for s in selectors):
+                problems.append(f"{node.findtext(W + 'Name') or kind(node)} is not given LevelDbfs from the task file's levelDbfs")
+    problems += [f"the workflow scales a sound itself ({op})" for op in ("dsp:ConvertScale", "dsp:Rescale") if f'"{op}"' in wf.text]
+    if re.search(r"<aud:Gain>|Property Name=\"Gain\"", wf.text):
+        problems.append("a sound's Gain is set in the workflow")
+    return problems
+
+
+def rig_hardware_problems(wf: Workflow) -> list[str]:
+    """RigHardware reports Ready, starts the cameras and holds the startup watchdog: the workflow repeats none of it."""
+    problems = [] if wf.text.count(f'Path="{RIG_HARDWARE}"') == 1 else ["the workflow does not include RigHardware once"]
+    problems += [f"the workflow has its own {what}" for what, found in (
+        ("Ready report", re.search(r"<orcl:Phase>Ready</orcl:Phase>", wf.text)),
+        ("StartupWatchdog", ":StartupWatchdog\"" in wf.text),
+        ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
+    return problems
 
 def zapit_include_problems(wf: Workflow) -> list[str]:
     """Zapit is lib-open-rigs' Zapit.ConnectZapit, given the task's conditions file in an optogenetics experiment, and
@@ -204,26 +256,25 @@ def manual_reward_problems(wf: Workflow) -> list[str]:
 
 
 def penalty_sound_problems(wf: Workflow) -> list[str]:
-    """The penalty sound is OpenRigs.Audio's PenaltySoundBuffer, made once the task file's penalty.sound.gain is in
-    (Zip with Speakers, InputMapping Gain from Item1), never at the default gain from the speakers alone."""
+    """The penalty sound is OpenRigs.Audio's PenaltySoundBuffer, made once the task file's penalty.sound.levelDbfs is in
+    (Zip with Speakers, InputMapping LevelDbfs from Item1), never at the default level from the speakers alone."""
     for nodes, edges in _scopes(wf.root):
         buffers = [i for i, n in enumerate(nodes) if kind(n) == "aud:PenaltySoundBuffer"]
         if not buffers:
             continue
         mapping = [a for a, b, _ in edges if b == buffers[0]]
         if len(mapping) != 1 or nodes[mapping[0]].get(XSI) != "InputMapping" or \
-                [(p.get("Name"), p.get("Selector")) for p in nodes[mapping[0]].iter(W + "Property")] != [("Gain", "Item1")]:
-            return ["PenaltySoundBuffer is not fed by an InputMapping of Gain from Item1"]
+                [(p.get("Name"), p.get("Selector")) for p in nodes[mapping[0]].iter(W + "Property")] != [("LevelDbfs", "Item1")]:
+            return ["PenaltySoundBuffer is not fed by an InputMapping of LevelDbfs from Item1"]
         zips = [a for a, b, _ in edges if b == mapping[0]]
         inputs = [nodes[a] for a in upstream(edges, zips[0])] if zips and kind(nodes[zips[0]]) == "rx:Zip" else []
         problems = []
-        if not any("TaskParameters.Penalty.Sound.Gain" in (n.findtext(W + "Selector") or "") for n in inputs):
-            problems.append("the penalty sound's gain is not the task file's penalty.sound.gain")
+        if not any("TaskParameters.Penalty.Sound.LevelDbfs" in (n.findtext(W + "Selector") or "") for n in inputs):
+            problems.append("the penalty sound's level is not the task file's penalty.sound.levelDbfs")
         if not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "Speakers" for n in inputs):
             problems.append("the penalty sound is not made from Speakers")
         return problems + (["the workflow reads its own penalty sound file"] if "Sound.Path" in wf.text else [])
     return ["no PenaltySoundBuffer"]
-
 
 def readme_missing_blocks(wf: Workflow) -> list[str]:
     """Every OpenRigs operator and include the workflow uses that its README's Shared Blocks table does not name."""
