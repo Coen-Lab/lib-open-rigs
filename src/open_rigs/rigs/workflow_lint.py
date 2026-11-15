@@ -472,7 +472,8 @@ def undeclared_commands(wf: Workflow) -> list[str]:
     ControlServer refuses an undeclared command, so it would never fire."""
     declared = set(re.findall(r"<Command>\s*<Name>(\w+)</Name>", wf.text))
     # From the tree: ET.tostring writes its own prefixes (ns2:Name), so a regex on <orcl:Name> found none.
-    handled = {c.findtext(CONTROL + "Name") for c in wf.named("Commands").iter(W + "Combinator") if c.get(XSI) == "orcl:OnCommand"} - {None}
+    names = (c.findtext(CONTROL + "Name") for c in wf.named("Commands").iter(W + "Combinator") if c.get(XSI) == "orcl:OnCommand")
+    handled = {n for n in names if n}
     if RIG_HARDWARE in wf.text:
         handled |= lick_spout_stage_commands(wf)
     return sorted(handled - declared)
