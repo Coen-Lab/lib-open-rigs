@@ -52,7 +52,7 @@ namespace OpenRigs.Audio.Tests
         }
 
         // SpeakerMixer's path for StimulusSounds, with a timer for the mixer and SubscribeWhen for AppendBuffer (which
-        // subscribes once the mixer starts), fed as coen-dome-decision-making feeds it: each trial a SelectMany whose
+        // subscribes once the mixer starts), fed as the dome decision-making task feeds it: each trial a SelectMany whose
         // Take(1) multicasts one sound into the BehaviorSubject, and completes.
         const string Workflow =
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<WorkflowBuilder Version=\"2.9.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" +

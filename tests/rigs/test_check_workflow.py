@@ -29,15 +29,16 @@ def lacks(id: str, version: str, found: str) -> str:
             "Run .bonsai\\Setup.ps1.")
 
 
+# The lab packages' versions are 0.1.1-<lab>-lab.N, here for no lab.
 @windows_only
 @pytest.mark.parametrize("wanted, folder, found", [
-    ("0.1.1-coen-lab.14", "OpenRigs.Core.0.1.1-coen-lab.14", None),
-    ("0.1.1-coen-lab.14", "OpenRigs.Core.0.1.1-coen-lab.13", "0.1.1-coen-lab.13"),
-    ("0.1.1-coen-lab.14", "OpenRigs.Core.0.1.1-coen-lab.140", "0.1.1-coen-lab.140"),
-    ("0.1.1-coen-lab.14", "OpenRigs.Core.Extra.0.1.1-coen-lab.14", "none"),
+    ("0.1.1-fork-lab.14", "OpenRigs.Core.0.1.1-fork-lab.14", None),
+    ("0.1.1-fork-lab.14", "OpenRigs.Core.0.1.1-fork-lab.13", "0.1.1-fork-lab.13"),
+    ("0.1.1-fork-lab.14", "OpenRigs.Core.0.1.1-fork-lab.140", "0.1.1-fork-lab.140"),
+    ("0.1.1-fork-lab.14", "OpenRigs.Core.Extra.0.1.1-fork-lab.14", "none"),
     ("1.0", "OpenRigs.Core.1.0.0", None),
     ("1.0.0", "OpenRigs.Core.1.0", None),
-    ("0.1.1-Coen-Lab.14", "OpenRigs.Core.0.1.1-coen-lab.14", None),
+    ("0.1.1-Fork-Lab.14", "OpenRigs.Core.0.1.1-fork-lab.14", None),
     ("2.10", "OpenRigs.Core.2.1", "2.1"),
     ("2.1", "OpenRigs.Core.2.10", "2.10"),
 ])
@@ -53,8 +54,8 @@ def test_a_package_is_found_only_at_the_version_bonsai_config_names(tmp_path, wa
 
 @windows_only
 def test_with_every_package_present_the_check_goes_on_to_the_build(tmp_path):
-    repo = environment(tmp_path, {"Bonsai.Core": "2.9.0", "openal.redist": "2.0.7", "OpenRigs.Core": "0.1.1-coen-lab.14"},
-                       ["Bonsai.Core.2.9.0", "openal.redist.2.0.7.0", "OpenRigs.Core.0.1.1-coen-lab.14"])
+    repo = environment(tmp_path, {"Bonsai.Core": "2.9.0", "openal.redist": "2.0.7", "OpenRigs.Core": "0.1.1-fork-lab.14"},
+                       ["Bonsai.Core.2.9.0", "openal.redist.2.0.7.0", "OpenRigs.Core.0.1.1-fork-lab.14"])
     run = check(repo)
     assert "lacks" not in run.stdout + run.stderr
     assert "1. Compiling src\\Extensions as C# 5..." in run.stdout
@@ -63,22 +64,22 @@ def test_with_every_package_present_the_check_goes_on_to_the_build(tmp_path):
 @windows_only
 def test_each_stale_package_is_one_line_naming_what_is_wanted_and_found_with_no_powershell_error(tmp_path):
     # A throw printed PowerShell's "At ... char" lines and never said which version was there.
-    repo = environment(tmp_path, {"Bonsai.Core": "2.9.0", "OpenRigs.Core": "0.1.1-coen-lab.14", "OpenRigs.Audio": "0.1.1-coen-lab.8"},
-                       ["Bonsai.Core.2.9.0", "OpenRigs.Core.0.1.1-coen-lab.9", "OpenRigs.Core.0.1.1-coen-lab.13"])
+    repo = environment(tmp_path, {"Bonsai.Core": "2.9.0", "OpenRigs.Core": "0.1.1-fork-lab.14", "OpenRigs.Audio": "0.1.1-fork-lab.8"},
+                       ["Bonsai.Core.2.9.0", "OpenRigs.Core.0.1.1-fork-lab.9", "OpenRigs.Core.0.1.1-fork-lab.13"])
     run = check(repo)
     assert run.returncode == 1
-    assert run.stdout.splitlines() == [lacks("OpenRigs.Core", "0.1.1-coen-lab.14", "0.1.1-coen-lab.13, 0.1.1-coen-lab.9"),
-                                       lacks("OpenRigs.Audio", "0.1.1-coen-lab.8", "none")]
+    assert run.stdout.splitlines() == [lacks("OpenRigs.Core", "0.1.1-fork-lab.14", "0.1.1-fork-lab.13, 0.1.1-fork-lab.9"),
+                                       lacks("OpenRigs.Audio", "0.1.1-fork-lab.8", "none")]
     assert run.stderr == ""
 
 
 @windows_only
 def test_an_assembly_bonsai_config_does_not_locate_comes_from_the_version_it_names(tmp_path):
-    # Sorted by name, coen-lab.9 came before coen-lab.14.
-    repo = environment(tmp_path, {"OpenRigs.Core": "0.1.1-coen-lab.14"},
-                       ["OpenRigs.Core.0.1.1-coen-lab.9", "OpenRigs.Core.0.1.1-coen-lab.14"])
+    # Sorted by name, fork-lab.9 came before fork-lab.14.
+    repo = environment(tmp_path, {"OpenRigs.Core": "0.1.1-fork-lab.14"},
+                       ["OpenRigs.Core.0.1.1-fork-lab.9", "OpenRigs.Core.0.1.1-fork-lab.14"])
     for version in ("9", "14"):
-        lib = repo / ".bonsai" / "Packages" / f"OpenRigs.Core.0.1.1-coen-lab.{version}" / "lib" / "net472"
+        lib = repo / ".bonsai" / "Packages" / f"OpenRigs.Core.0.1.1-fork-lab.{version}" / "lib" / "net472"
         lib.mkdir(parents=True)
         (lib / "OpenRigs.Core.dll").write_bytes(b"")
     command = (
@@ -89,4 +90,4 @@ def test_an_assembly_bonsai_config_does_not_locate_comes_from_the_version_it_nam
         "Find-PackageAssembly @(Get-Packages | Where-Object { $_.Folder } | ForEach-Object { $_.Folder }) 'OpenRigs.Core'")
     run = subprocess.run(POWERSHELL + ["-Command", command], capture_output=True, text=True, timeout=120)
     assert run.stderr == ""
-    assert run.stdout.strip() == str(repo / ".bonsai" / "Packages" / "OpenRigs.Core.0.1.1-coen-lab.14" / "lib" / "net472" / "OpenRigs.Core.dll")
+    assert run.stdout.strip() == str(repo / ".bonsai" / "Packages" / "OpenRigs.Core.0.1.1-fork-lab.14" / "lib" / "net472" / "OpenRigs.Core.dll")
