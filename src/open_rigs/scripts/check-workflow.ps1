@@ -182,7 +182,8 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
         $schema = @((Get-Content (Join-Path $Repo 'schemas\trial-columns.yml')) | Where-Object { $_ -match '^([A-Za-z]\w*):\s*$' } | ForEach-Object { $Matches[1] })
         if (($columns -join ',') -eq ($schema -join ',')) { "  ok    BonsaiData_Trial's $($columns.Count) columns are schemas\trial-columns.yml's, in its order" }
         else { "  FAIL  BonsaiData_Trial writes $($columns -join ','); schemas\trial-columns.yml lists $($schema -join ',')"; $failed++ }
-    } else { "  FAIL  src\Extensions has no TrialRow, the trial log's row"; $failed++ }
+    } elseif ((Get-Content (Join-Path $Repo 'src\main.bonsai') -Raw).Contains('OpenRigs.Logging:LogTrial.bonsai')) { "  FAIL  src\Extensions has no TrialRow, the trial log's row"; $failed++ }
+    else { "  ok    no trial log (the workflow includes no LogTrial)" }
     # config\main.layout's windows, on the nodes as the editor has them: Bonsai loads each group in topological
     # order, not file order, so a node fed from later in the file moves up and shifts the indices after it. A window
     # on the wrong node makes the editor offer to delete the layout, and --start waits. A visualizer type not in
@@ -227,8 +228,10 @@ if ($Step -eq 'Checks') {
     # Each task file as the workflow reads it at Go (the generated deserializer: no unknown key).
     $taskType = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq 'Extensions' } |
         ForEach-Object { $_.GetTypes() } | Where-Object { $_.IsPublic -and $_.Name -like '*TaskLogic' -and $_.Namespace -like '*Task' } | Select-Object -First 1
-    if (-not $taskType) { "  FAIL  src\Extensions has no generated <Name>Task.<Name>TaskLogic"; exit 1 }
-    foreach ($file in Get-ChildItem (Join-Path $Repo 'config') -Filter 'task*.yml') {
+    $taskFiles = @(Get-ChildItem (Join-Path $Repo 'config') -Filter 'task*.yml' -ErrorAction SilentlyContinue)
+    if (-not $taskType -and $taskFiles.Count) { "  FAIL  src\Extensions has no generated <Name>Task.<Name>TaskLogic"; exit 1 }
+    if (-not $taskFiles.Count) { "  ok    no task file (the workflow takes none)" }
+    foreach ($file in $taskFiles) {
         try {
             $d = (New-Object YamlDotNet.Serialization.DeserializerBuilder).Build()
             $c = $d.Deserialize((New-Object IO.StringReader ([IO.File]::ReadAllText($file.FullName))), $taskType)
@@ -238,7 +241,7 @@ if ($Step -eq 'Checks') {
     }
     $wf = Get-Content (Join-Path $Repo 'src\main.bonsai') -Raw
     if ($wf -match '<Property Name="TaskPath"') { "  ok    main.bonsai exposes TaskPath" }
-    else { "  FAIL  main.bonsai does not expose TaskPath"; $failed++ }
+    elseif ($taskFiles.Count) { "  FAIL  main.bonsai does not expose TaskPath"; $failed++ }
     $yaml = [IO.File]::ReadAllText((Write-FilledTemplate))
     $E = [Linq.Expressions.Expression]
     $wait = [System.Reactive.Linq.Observable].GetMethods() | Where-Object { $_.Name -eq 'Wait' -and $_.GetParameters().Count -eq 1 } | Select-Object -First 1
@@ -297,11 +300,14 @@ if ($LASTEXITCODE -ne 0) { $log | Where-Object { $_ -match 'error' } | Select-Ob
 "  ok"
 "2. tests\Extensions.Tests..."
 $tests = Join-Path $Repo 'tests\Extensions.Tests'
-& { $ErrorActionPreference = 'Continue'; & dotnet restore $tests -v q @sourceArgs 2>&1 | Out-Null }
-$log = & { $ErrorActionPreference = 'Continue'; & dotnet test $tests --no-restore -nologo 2>&1 | ForEach-Object { "$_" } }
-$testExit = $LASTEXITCODE
-$log | Where-Object { $_ -match 'Passed!|Failed|error' } | ForEach-Object { "  $_" }
-if ($testExit -ne 0) { "  FAILED"; $bad++ }
+if (-not (Test-Path $tests)) { "  ok    none (src\Extensions holds no task logic)" }
+else {
+    & { $ErrorActionPreference = 'Continue'; & dotnet restore $tests -v q @sourceArgs 2>&1 | Out-Null }
+    $log = & { $ErrorActionPreference = 'Continue'; & dotnet test $tests --no-restore -nologo 2>&1 | ForEach-Object { "$_" } }
+    $testExit = $LASTEXITCODE
+    $log | Where-Object { $_ -match 'Passed!|Failed|error' } | ForEach-Object { "  $_" }
+    if ($testExit -ne 0) { "  FAILED"; $bad++ }
+}
 "3. Building main.bonsai with Bonsai's builders, against the filled template..."
 # The camera pieces load SpinnakerNET, which needs the Spinnaker SDK's native Spinnaker_v140.dll on PATH. The SDK
 # is a login-gated download, so a GitHub runner has none and main.bonsai cannot be read there ("There is an error in
