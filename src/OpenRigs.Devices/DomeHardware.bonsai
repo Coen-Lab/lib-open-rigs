@@ -1,0 +1,93 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The domes' hardware (BLUE-OPTO-1 and -2, GREEN-DOME-1 and -2, which have the same devices and names in rig.yml), as device pieces: the configuration (ReadLabRig, ConfigRoot), the Ready gate (ReadyGate, ReadyWaitsFor), the clock (TimestampGeneratorGen3-Main), the Behavior board BehaviorBoard-Main with its pulsed reward lines, Zapit trigger line and running wheel (WheelDistanceCm), the lick detectors LicketySplit-Left and -Right (LickStateLeft, LickStateRight), the lick spout stage (StepperDriver-A and -B), and the cameras Camera-Face, Camera-Pupil, Camera-Body on the board's camera triggers. Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it. A task that plays sound includes OpenRigs.Audio's SpeakerMixer itself and adds MixerStarted to ReadyWaitsFor.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="ConfigRoot" Description="The root under which each machine has its own configuration directory, ConfigRoot\MachineName\rig.yml." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="ReadyWaitsFor" Description="The stages Ready waits for, comma separated: HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, and MixerStarted on a workflow that includes SpeakerMixer." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="SpoutStepSize" Description="Motor steps each spout nudge moves, read at each nudge." />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
+        <ReadyWaitsFor>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body</ReadyWaitsFor>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ClockFromTimestampGenerator.bonsai">
+        <Name>TimestampGeneratorGen3-Main</Name>
+        <CommandsSubjectName>TimestampGeneratorGen3-Main.Commands</CommandsSubjectName>
+        <DataSubjectName>TimestampGeneratorGen3-Main.Data</DataSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai">
+        <Name>BehaviorBoard-Main</Name>
+        <CommandsSubjectName>BehaviorBoard-Main.Commands</CommandsSubjectName>
+        <DataSubjectName>BehaviorBoard-Main.Data</DataSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.PulseOutputs.bonsai">
+        <Board>BehaviorBoard-Main</Board>
+        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+        <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ZapitTriggerLine.bonsai">
+        <Board>BehaviorBoard-Main</Board>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.RunningWheel.bonsai">
+        <Board>BehaviorBoard-Main</Board>
+        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+        <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
+        <WheelDistanceSubjectName>WheelDistanceCm</WheelDistanceSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LicketySplit.bonsai">
+        <Name>LicketySplit-Left</Name>
+        <CommandsSubjectName>LicketySplit-Left.Commands</CommandsSubjectName>
+        <DataSubjectName>LicketySplit-Left.Data</DataSubjectName>
+        <LickStateSubjectName>LickStateLeft</LickStateSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LicketySplit.bonsai">
+        <Name>LicketySplit-Right</Name>
+        <CommandsSubjectName>LicketySplit-Right.Commands</CommandsSubjectName>
+        <DataSubjectName>LicketySplit-Right.Data</DataSubjectName>
+        <LickStateSubjectName>LickStateRight</LickStateSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LickSpoutStage.bonsai">
+        <SpoutStepSize>150</SpoutStepSize>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SpinnakerCamera.bonsai">
+        <Name>Camera-Face</Name>
+        <Board>BehaviorBoard-Main</Board>
+        <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
+        <DataSubjectName>Camera-Face.Data</DataSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SpinnakerCamera.bonsai">
+        <Name>Camera-Pupil</Name>
+        <Board>BehaviorBoard-Main</Board>
+        <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
+        <DataSubjectName>Camera-Pupil.Data</DataSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SpinnakerCamera.bonsai">
+        <Name>Camera-Body</Name>
+        <Board>BehaviorBoard-Main</Board>
+        <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
+        <DataSubjectName>Camera-Body.Data</DataSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:CameraTriggers.bonsai">
+        <Board>BehaviorBoard-Main</Board>
+        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+        <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
+        <CamerasExpected>Camera-Face, Camera-Pupil, Camera-Body</CamerasExpected>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="3" Label="Source1" />
+      <Edge From="1" To="4" Label="Source1" />
+      <Edge From="2" To="12" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
