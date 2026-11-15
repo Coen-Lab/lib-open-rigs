@@ -10,7 +10,10 @@ Each check returns what breaks the rule (empty when it holds), so a failing test
 
 from __future__ import annotations
 
+import io
+import json
 import re
+import sys
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -29,15 +32,55 @@ PER_ELEMENT = {"rx:SelectMany", "rx:CreateObservable", "rx:Concat", "rx:Switch"}
 SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
 SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
-RIG_HARDWARE = "OpenRigs.Devices:RigHardware.bonsai"
+# The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
+DEVICES = "OpenRigs.Devices:"
+READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
+READY_GATE = DEVICES + "ReadyGate.bonsai"
+CLOCK_FROM_GENERATOR = DEVICES + "ClockFromTimestampGenerator.bonsai"
+CLOCK_FROM_BOARD = DEVICES + "BehaviorBoard.ClockFromBoard.bonsai"
+CLOCKS = (CLOCK_FROM_GENERATOR, CLOCK_FROM_BOARD)
+BOARD = DEVICES + "BehaviorBoard.BehaviorBoard.bonsai"
+LICKETY_SPLIT = DEVICES + "LicketySplit.bonsai"
+LICK_SPOUT_STAGE = DEVICES + "LickSpoutStage.bonsai"
+CAMERA = DEVICES + "SpinnakerCamera.bonsai"
+CAMERA_TRIGGERS = DEVICES + "CameraTriggers.bonsai"
+CAMERA_LIVE_CONTROLS = DEVICES + "CameraLiveControls.bonsai"
+# What each piece takes: Name, Board and Camera name a device; X.Commands / X.Data are the subject properties
+# (CommandsSubjectName, BoardDataSubjectName, ...) that must equal that device's name plus the suffix.
+PIECES = {
+    CLOCK_FROM_GENERATOR: ("Name", "Name.Commands", "Name.Data"),
+    CLOCK_FROM_BOARD: ("Board", "Board.Commands", "Board.Data"),
+    BOARD: ("Name", "Name.Commands", "Name.Data"),
+    DEVICES + "BehaviorBoard.PulseOutputs.bonsai": ("Board", "Board.Commands", "Board.Data"),
+    DEVICES + "BehaviorBoard.ZapitTriggerLine.bonsai": ("Board",),
+    DEVICES + "BehaviorBoard.RunningWheel.bonsai": ("Board", "Board.Commands", "Board.Data"),
+    LICKETY_SPLIT: ("Name", "Name.Commands", "Name.Data"),
+    LICK_SPOUT_STAGE: (),
+    CAMERA: ("Name", "Name.Data", "Board", "Board.Data"),
+    CAMERA_TRIGGERS: ("Board", "Board.Commands", "Board.Data"),
+    CAMERA_LIVE_CONTROLS: ("Camera", "Board"),
+}
+# The rig.yml group of each piece that is a device of its own, and the Harp WhoAmI of those that are Harp boards.
+DEVICE_GROUPS = {CLOCK_FROM_GENERATOR: "timestampGeneratorGen3", BOARD: "behaviorBoard", LICKETY_SPLIT: "licketySplit", CAMERA: "camera"}
+WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDriver": 1130, "licketySplit": 1400}
+LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage's C# drives drivers a and b
+# Lab includes read from the package (never from the workflow), found in OpenRigs.Devices.dll by the start of their
+# Description: a rig list holds only pieces, and is expanded in place.
+RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The domes' hardware"}
+SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage"}
+# lib-open-rigs' own source, when this module runs from it (its tests); a workflow's lint reads its package instead.
+LIB_SRC = Path(__file__).parents[2]
 BLOCK_SUBJECTS = {
     ZAPIT_INCLUDE: {"ZapitCommands": "rx:BehaviorSubject"},
     SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
-    RIG_HARDWARE: {"ReadyStages": "rx:ReplaySubject"},
+    READY_GATE: {"ReadyStages": "rx:ReplaySubject", "HarpClockSet": "rx:AsyncSubject", "Ready": "rx:AsyncSubject"},
+    LICK_SPOUT_STAGE: {"LickSpoutStage.Commands": "rx:PublishSubject", "LickSpoutStage.Homed": "rx:BehaviorSubject",
+                       "StepperDriver-A.Commands": "rx:BehaviorSubject", "StepperDriver-B.Commands": "rx:BehaviorSubject"},
+    CLOCK_FROM_GENERATOR: {"Timestamp": "rx:BehaviorSubject"},
+    CLOCK_FROM_BOARD: {"Timestamp": "rx:BehaviorSubject"},
 }
-# The stages RigHardware's Ready waits for (its ReadyWaitsFor), and on a workflow that includes SpeakerMixer.
-READY_STAGES = ("HarpClockSet", "SpoutsHomed")
-READY_STAGES_WITH_MIXER = READY_STAGES + ("MixerStarted",)
+# A piece's command subject is a BehaviorSubject, its data subject a PublishSubject (named by its properties).
+PIECE_SUBJECTS = {"CommandsSubjectName": "rx:BehaviorSubject", "DataSubjectName": "rx:PublishSubject"}
 # The PulseController's subject that fires a pulse of the line's set width (the DO line, 1 to 3, as an int).
 FIXED_WIDTH_PULSE = "TriggerPulse"
 # The lab's Bonsai setup, one copy that each workflow's .bonsai\Setup.ps1 runs from the open-rigs it pins.
@@ -159,21 +202,24 @@ def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
     workflow, by a lab block it includes, or inside that graph. Bonsai 2.9 passes a multicast source's completion to a
     PublishSubject or ReplaySubject, so the first trial's graph closes it for good (seen on a rig, 14 Nov 2026)."""
     declared: dict[str, str] = {}
+    pieces = hardware(wf)
     for path, subjects in BLOCK_SUBJECTS.items():
-        if f'Path="{path}"' in wf.text:
+        if f'Path="{path}"' in wf.text or any(p == path for p, _ in pieces):
             declared.update(subjects)
+    for _, props in pieces:
+        declared.update({props[p]: subject for p, subject in PIECE_SUBJECTS.items() if props.get(p)})
 
     def is_subject(n: ET.Element) -> bool:
         return (n.get(XSI) or "").startswith("rx:") and (n.get(XSI) or "").endswith("Subject")
 
     for n in wf.root.iter(W + "Expression"):
         if is_subject(n):
-            declared[n.findtext(RX + "Name", "")] = n.get(XSI, "")
+            declared[_name(n)] = n.get(XSI, "")
     found: list[str] = []
 
     def walk(workflow: ET.Element, nested: bool, local: set[str]) -> None:
         nodes = child(workflow, W + "Nodes")
-        local = local | {n.findtext(RX + "Name", "") for n in nodes if is_subject(n)}
+        local = local | {_name(n) for n in nodes if is_subject(n)}
         for n in nodes:
             if n.get(XSI) == "MulticastSubject" and nested:
                 name = n.findtext(W + "Name", "")
@@ -281,27 +327,6 @@ def sound_level_problems(wf: Workflow) -> list[str]:
     return problems
 
 
-def rig_hardware_problems(wf: Workflow) -> list[str]:
-    """RigHardware reports Ready, starts the cameras and holds the startup watchdog: the workflow repeats none of it.
-    On a workflow that includes SpeakerMixer, RigHardware's ReadyWaitsFor adds MixerStarted, so Ready (and Go) waits for
-    the mixer's boot; on one without, it is left at HarpClockSet, SpoutsHomed, as nothing would send MixerStarted."""
-    includes = [n for n in wf.root.iter(W + "Expression") if n.get("Path") == RIG_HARDWARE]
-    if len(includes) != 1:
-        return ["the workflow does not include RigHardware once"]
-    problems = [f"the workflow has its own {what}" for what, found in (
-        ("Ready report", re.search(r"<\w+:Phase>Ready</\w+:Phase>", wf.text)),
-        ("StartupWatchdog", ":StartupWatchdog\"" in wf.text),
-        ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
-    waits = includes[0].findtext(W + "ReadyWaitsFor")
-    given = tuple(s.strip() for s in waits.split(",") if s.strip()) if waits is not None else READY_STAGES
-    mixer = f'Path="{SPEAKER_MIXER}"' in wf.text
-    wanted = READY_STAGES_WITH_MIXER if mixer else READY_STAGES
-    if given != wanted:
-        problems.append(f"RigHardware's ReadyWaitsFor is {', '.join(given)}, not {', '.join(wanted)}, on a workflow "
-                        + ("that includes SpeakerMixer" if mixer else "without SpeakerMixer"))
-    return problems
-
-
 def _name(n: ET.Element) -> str:
     return n.findtext(W + "Name") or n.findtext(RX + "Name") or ""
 
@@ -310,49 +335,154 @@ def _value(n: ET.Element) -> str:
     return child(n, W + "Combinator").findtext(W + "Value") or ""
 
 
-def rig_ready_problems(root: ET.Element) -> list[str]:
-    """RigHardware reports Ready from its ReadyWatchdog alone, a StartupWatchdog that passes on once every stage its
-    ReadyWaitsFor names has come, over its own HarpClockSet and SpoutsHomed merged with ReadyStages, the ReplaySubject a
-    block that holds Ready multicasts its stage into (SpeakerMixer's MixerStarted). `root` is OpenRigs.Devices'
-    RigHardware.bonsai."""
-    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+def package_include(wf: Workflow, path: str) -> ET.Element:
+    """A lab include's workflow (`path` as an IncludeWorkflow names it, of those in SIGNATURES): from lib-open-rigs'
+    source when this module runs from it, else from the OpenRigs.Devices package Bonsai.config pins, in local_packages."""
+    package, resource = path.split(":")
+    source = LIB_SRC / package / resource.replace(".", "/", resource.count(".") - 1)
+    if source.is_file():
+        return ET.fromstring(source.read_text(encoding="utf-8-sig").encode("utf-8"))
+    config = (wf.repo / ".bonsai" / "Bonsai.config").read_text(encoding="utf-8-sig")
+    version = re.search(rf'<Package id="{re.escape(package)}" version="([^"]+)"', config)
+    if version is None:
+        raise ValueError(f".bonsai\\Bonsai.config does not pin {package}, which holds {resource}")
+    nupkg = wf.repo / "local_packages" / f"{package}.{version.group(1)}.nupkg"
+    with zipfile.ZipFile(nupkg) as z:
+        dll = z.read(next(n for n in z.namelist() if n.endswith(f"lib/net472/{package}.dll"))).decode("latin-1")
+    at = dll.find("<Description>" + SIGNATURES[path])
+    if at < 0:
+        raise ValueError(f"{nupkg.name} has no {resource} (no Description starting '{SIGNATURES[path]}')")
+    start, end = dll.rindex("<WorkflowBuilder", 0, at), dll.index("</WorkflowBuilder>", at) + len("</WorkflowBuilder>")
+    return ET.fromstring(dll[start:end].encode("latin-1"))
 
-    def sources(i: int) -> list[int]:
-        return [a for a, b, _ in edges if b == i]
 
-    ready = [i for i, n in enumerate(nodes) if _name(n) == "Ready" and kind(n) == "orcl:ReportPhase"]
-    watchdog = sources(ready[0]) if len(ready) == 1 else []
-    if not (len(watchdog) == 1 and _name(nodes[watchdog[0]]) == "ReadyWatchdog"
-            and kind(nodes[watchdog[0]]) == "core:StartupWatchdog"):
-        return ["Ready is not fed by ReadyWatchdog alone"]
+def _properties(node: ET.Element) -> dict[str, str]:
+    return {e.tag.removeprefix(W): e.text or "" for e in node if e.tag.startswith(W) and len(e) == 0}
+
+
+def hardware(wf: Workflow) -> list[tuple[str, dict[str, str]]]:
+    """Every core include and device piece the workflow includes (PIECES, READ_LAB_RIG, READY_GATE), in the
+    workflow's order, with the properties the workflow gives it; an included rig list (RIG_LISTS) is expanded in place,
+    its own settings overridden by those the workflow gives the rig list."""
+    known = set(PIECES) | {READ_LAB_RIG, READY_GATE}
+    found: list[tuple[str, dict[str, str]]] = []
+    for node in wf.root.iter(W + "Expression"):
+        path = node.get("Path") or ""
+        if path in known:
+            found.append((path, _properties(node)))
+        elif path in RIG_LISTS:
+            given = _properties(node)
+            nodes, edges = nodes_and_edges(child(package_include(wf, path), W + "Workflow"))
+            for j, inner in enumerate(nodes):
+                if inner.get("Path") in known:
+                    props = _properties(inner)
+                    for i, _, _ in (e for e in edges if e[1] == j and nodes[e[0]].get(XSI) == "ExternalizedMapping"):
+                        for p in nodes[i].iter(W + "Property"):
+                            outer = p.get("DisplayName") or p.get("Name")
+                            if outer in given:
+                                props[p.get("Name") or ""] = given[outer]
+                    found.append((inner.get("Path") or "", props))
+    return found
+
+
+def _stages(text: str | None) -> list[str]:
+    return [s.strip() for s in (text or "").split(",") if s.strip()]
+
+
+def required_devices(wf: Workflow) -> list[tuple[str, str]]:
+    """Each device the workflow drives, as (its name, its rig.yml group), in the workflow's order: the devices its
+    pieces name, and the lick spout stage's two stepper drivers."""
+    devices = []
+    for path, props in hardware(wf):
+        if path in DEVICE_GROUPS:
+            devices.append((props.get("Name", ""), DEVICE_GROUPS[path]))
+        elif path == LICK_SPOUT_STAGE:
+            devices += [(name, "stepperDriver") for name in LICK_SPOUT_DRIVERS]
+    return devices
+
+
+def hardware_problems(wf: Workflow) -> list[str]:
+    """The workflow's devices are the lab's pieces, put together so that any combination builds and runs: ReadLabRig
+    and ReadyGate once each, ReadyGate before every piece (a board's log waits for HarpClockSet, which ReadyGate
+    declares); exactly one clock; each piece's Name unique and its subject properties that Name's .Commands and .Data;
+    every Board a Behavior board piece and every Camera a camera piece; one CameraTriggers exactly when there is a
+    camera, expecting every camera; ReadyGate's ReadyWaitsFor exactly the stages the pieces announce (HarpClockSet,
+    SpoutsHomed for the lick spout stage, each camera's Name, MixerStarted for SpeakerMixer); and the workflow makes no
+    Ready report, StartCameras or announcement of its own."""
+    pieces = hardware(wf)
+    paths = [p for p, _ in pieces]
+    problems = [f"the workflow includes {p.split(':')[1].removesuffix('.bonsai')} {paths.count(p)} times, not once"
+                for p in (READ_LAB_RIG, READY_GATE) if paths.count(p) != 1]
+    clocks = [p for p in paths if p in CLOCKS]
+    if len(clocks) != 1:
+        problems.append(f"the workflow has {len(clocks)} clocks, not one (ClockFromTimestampGenerator or ClockFromBoard)")
+    if paths.count(LICK_SPOUT_STAGE) > 1:
+        problems.append("the workflow includes LickSpoutStage more than once")
+    gate = paths.index(READY_GATE) if READY_GATE in paths else len(paths)
+    problems += [f"{p.split(':')[1].removesuffix('.bonsai')} {props.get('Name') or props.get('Board') or ''}".rstrip()
+                 + " comes before ReadyGate" for p, props in pieces[:gate] if p in PIECES]
+    names = [props.get("Name", "") for p, props in pieces if "Name" in PIECES.get(p, ())]
+    problems += [f"two pieces are named {n}" for n in sorted({n for n in names if names.count(n) > 1})]
+    boards = {props.get("Name") for p, props in pieces if p == BOARD}
+    cameras = [props.get("Name", "") for p, props in pieces if p == CAMERA]
+    for p, props in pieces:
+        piece = p.split(":")[1].removesuffix(".bonsai").split(".")[-1]
+        for takes in PIECES.get(p, ()):
+            device, _, suffix = takes.partition(".")
+            if not suffix:
+                value = props.get(takes, "")
+                if not value:
+                    problems.append(f"{piece} has no {takes}")
+                elif takes == "Board" and value not in boards:
+                    problems.append(f"{piece}'s Board {value} is not a BehaviorBoard piece's Name")
+                elif takes == "Camera" and value not in cameras:
+                    problems.append(f"{piece}'s Camera {value} is not a SpinnakerCamera piece's Name")
+                continue
+            prop = ("" if device == "Name" else device) + suffix + "SubjectName"
+            want = props.get(device, "") + "." + suffix
+            if props.get(prop) != want:
+                problems.append(f"{piece} {props.get(device, '')}'s {prop} is {props.get(prop) or 'not set'}, not {want}")
+    triggers = [props for p, props in pieces if p == CAMERA_TRIGGERS]
+    if len(triggers) != (1 if cameras else 0):
+        problems.append(f"the workflow has {len(cameras)} camera(s) and {len(triggers)} CameraTriggers: one when there is a camera, else none")
+    elif triggers and set(_stages(triggers[0].get("CamerasExpected"))) != set(cameras):
+        problems.append(f"CameraTriggers' CamerasExpected is {triggers[0].get('CamerasExpected') or 'not set'}, not {', '.join(cameras)}")
+    announced = (["HarpClockSet"] if clocks else []) + (["SpoutsHomed"] if LICK_SPOUT_STAGE in paths else []) + cameras \
+        + (["MixerStarted"] if f'Path="{SPEAKER_MIXER}"' in wf.text else [])
+    waits = next((props.get("ReadyWaitsFor") for p, props in pieces if p == READY_GATE), None)
+    if READY_GATE in paths and set(_stages(waits)) != set(announced):
+        problems.append(f"ReadyGate's ReadyWaitsFor is {waits or 'not set'}, not {', '.join(announced)}")
+    problems += [f"the workflow has its own {what}" for what, found in (
+        ("Ready report", re.search(r"<\w+:Phase>Ready</\w+:Phase>", wf.text)),
+        ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
+    return problems + ready_announcer_problems(wf.root)
+
+
+def ready_announcer_problems(root: ET.Element) -> list[str]:
+    """Every multicast into ReadyStages is fed by an AnnounceStage alone: ReadyStages is a ReplaySubject, so an announcer
+    that completes (a Take(1)) closes it for every stage after (seen headless, 15 Nov 2026). `root` is a workflow or a
+    lab include."""
     problems = []
-    expected = child(nodes[watchdog[0]], W + "Combinator").findtext("{clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core}Expected")
-    if tuple(s.strip() for s in (expected or "").split(",")) != READY_STAGES:
-        problems.append(f"ReadyWatchdog's Expected is not {', '.join(READY_STAGES)} by default")
-    mapped = [p.get("DisplayName") for a in sources(watchdog[0]) if nodes[a].get(XSI) == "ExternalizedMapping"
-              for p in nodes[a].iter(W + "Property") if p.get("Name") == "Expected"]
-    if mapped != ["ReadyWaitsFor"]:
-        problems.append("ReadyWatchdog's Expected is not RigHardware's ReadyWaitsFor")
-    merge = [a for a in sources(watchdog[0]) if kind(nodes[a]) == "rx:Merge"]
-    stages = {(_name(nodes[a]) if nodes[a].get(XSI) == "SubscribeSubject" else _value(nodes[a]) if kind(nodes[a]) == "StringProperty" else "")
-              for a in (sources(merge[0]) if len(merge) == 1 else [])}
-    if stages != set(READY_STAGES) | {"ReadyStages"}:
-        problems.append("ReadyWatchdog does not watch HarpClockSet, SpoutsHomed and ReadyStages merged")
-    if not any(n.get(XSI) == "rx:ReplaySubject" and _name(n) == "ReadyStages" for n in nodes):
-        problems.append("RigHardware does not declare the ReplaySubject ReadyStages")
+    for nodes, edges in _scopes(root):
+        for i, node in enumerate(nodes):
+            if node.get(XSI) == "MulticastSubject" and _name(node) == "ReadyStages":
+                feeds = [nodes[a] for a, b, _ in edges if b == i]
+                if len(feeds) != 1 or kind(feeds[0]) != "core:AnnounceStage":
+                    problems.append("ReadyStages is fed other than by one AnnounceStage")
     return problems
 
 
 def mixer_ready_problems(root: ET.Element) -> list[str]:
-    """SpeakerMixer multicasts MixerStarted into RigHardware's ReadyStages once the mixer has started (its Mixer
-    subject's value), the stage Ready waits for on a workflow that plays sound. `root` is OpenRigs.Audio's
+    """SpeakerMixer announces MixerStarted (AnnounceStage) into ReadyGate's ReadyStages once the mixer has started (its
+    Mixer subject's value), the stage Ready waits for on a workflow that plays sound. `root` is OpenRigs.Audio's
     SpeakerMixer.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+    stage = "{clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core}Stage"
     for a, b, _ in edges:
         for c in [c for b2, c, _ in edges if b2 == b]:
             first, middle, last = nodes[a], nodes[b], nodes[c]
             if (first.get(XSI) == "SubscribeSubject" and _name(first) == "Mixer"
-                    and kind(middle) == "StringProperty" and _value(middle) == "MixerStarted"
+                    and kind(middle) == "core:AnnounceStage" and child(middle, W + "Combinator").findtext(stage) == "MixerStarted"
                     and last.get(XSI) == "MulticastSubject" and _name(last) == "ReadyStages"):
                 return []
     return ["SpeakerMixer does not multicast MixerStarted into ReadyStages once the mixer has started"]
@@ -458,23 +588,23 @@ def readme_missing_blocks(wf: Workflow) -> list[str]:
     return sorted(b for b in used if f"`{b}`" not in table)
 
 
+def _on_commands(root: ET.Element) -> set[str]:
+    # From the tree: ET.tostring writes its own prefixes (ns2:Name), so a regex on <orcl:Name> found none.
+    names = (c.findtext(CONTROL + "Name") for c in root.iter(W + "Combinator") if (c.get(XSI) or "").endswith(":OnCommand"))
+    return {n for n in names if n}
+
+
 def lick_spout_stage_commands(wf: Workflow) -> set[str]:
-    """The OnCommand names OpenRigs.Devices' HarpLickSpoutStage listens for, read from the package the workflow uses."""
-    nupkg = next((wf.repo / "local_packages").glob("OpenRigs.Devices.*.nupkg"))
-    with zipfile.ZipFile(nupkg) as z:
-        dll = z.read(next(n for n in z.namelist() if n.endswith("lib/net472/OpenRigs.Devices.dll"))).decode("latin-1")
-    start = dll.index("The two-driver lick spout stage")
-    return set(re.findall(r'OnCommand">\s*<\w+:Name>(\w+)<', dll[start:dll.index("</WorkflowBuilder>", start)]))
+    """The OnCommand names OpenRigs.Devices' LickSpoutStage listens for, read from the package the workflow uses."""
+    return _on_commands(package_include(wf, LICK_SPOUT_STAGE))
 
 
 def undeclared_commands(wf: Workflow) -> list[str]:
     """Every command the workflow or its lick spout stage handles that its ExperimentControl does not declare:
     ControlServer refuses an undeclared command, so it would never fire."""
     declared = set(re.findall(r"<Command>\s*<Name>(\w+)</Name>", wf.text))
-    # From the tree: ET.tostring writes its own prefixes (ns2:Name), so a regex on <orcl:Name> found none.
-    names = (c.findtext(CONTROL + "Name") for c in wf.named("Commands").iter(W + "Combinator") if c.get(XSI) == "orcl:OnCommand")
-    handled = {n for n in names if n}
-    if RIG_HARDWARE in wf.text:
+    handled = _on_commands(wf.named("Commands"))
+    if any(p == LICK_SPOUT_STAGE for p, _ in hardware(wf)):
         handled |= lick_spout_stage_commands(wf)
     return sorted(handled - declared)
 
@@ -507,13 +637,6 @@ def rng_seed_problems(wf: Workflow) -> list[str]:
     return []
 
 
-def camera_log_problems(wf: Workflow) -> list[str]:
-    """The cameras are logged by OpenRigs.Logging's LogCameras inside ExperimentLogs, which PathPrefix starts."""
-    logs = ET.tostring(wf.named("ExperimentLogs"), encoding="unicode")
-    problems = [] if logs.count('Path="OpenRigs.Logging:LogCameras.bonsai"') == 1 else ["ExperimentLogs does not include LogCameras once"]
-    return problems + (["the workflow logs a camera itself"] if "LogVideoFfmpeg.bonsai" in wf.text or "LogVideo.bonsai" in wf.text else [])
-
-
 # The blocks that write an experiment's files, and what each writes. A log's file is FormatFileName's
 # <LogName up to the first _>/<LogName>_<time>.<ext>, so the start of its path is known from its name.
 NAMED_LOGS = ("OpenRigs.Logging:LogData.bonsai", "OpenRigs.Logging:LogDataSchema.bonsai")  # the name is the node's LogName or Name
@@ -523,8 +646,8 @@ FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is
     "OpenRigs.Devices:Zapit.ZapitLogs.bonsai": [("BonsaiData_ZapitReplies", "Optogenetics"), ("Settings_ZapitConditions", "Optogenetics")],
 }
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
-               "OpenRigs.Logging:LogCameras.bonsai", "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai",
-               "OpenRigs.Logging:LogRawVideo.bonsai", "OpenRigs.Devices:HarpLogs.bonsai")  # a device's folder: ExpectedFiles' auto
+               "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
+               *DEVICE_GROUPS, LICK_SPOUT_STAGE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)
 NO_FILES = ("OpenRigs.Logging:LogController.bonsai", "OpenRigs.Logging:FormatFileName.bonsai")
 # Writers whose file the workflow's XML cannot name: a workflow logs through the blocks above instead.
 OTHER_WRITERS = {"CsvWriter", "MatrixWriter", "VideoWriter", "ImageWriter", "TextWriter", "BinaryWriter", "FileCapture",
@@ -586,3 +709,68 @@ def expected_files_problems(wf: Workflow) -> list[str]:
     if harp and "harp" not in entries:
         problems.append("the workflow has RecordHarpDevices but ExpectedFiles has no harp")
     return problems
+
+
+TEMPLATE = Path(__file__).parent / "rig-template.yml"
+
+
+def filled_rig(wf: Workflow, root: Path, machine: str) -> tuple[str, list[str], list[str]]:
+    """The lab's rig template filled in as a rig with exactly the workflow's devices (required_devices), for
+    check-workflow's build: (rig.yml's text, each Harp record RecordHarpDevices should make as "<Name> <port> <serial>
+    <WhoAmI>", each device folder and Harp record file ExperimentManifest should expect). A camera's entry is the
+    template's first camera's, and the board's DO0 trigger line names every camera (none: no DO0 line)."""
+    from ruamel.yaml import YAML
+
+    yaml = YAML()
+    rig = yaml.load(TEMPLATE.read_text(encoding="utf-8"))
+    devices = required_devices(wf)
+    rig["rootPath"], rig["rigId"] = str(root), "D1"
+    rig["projectionCalibration"] = {k: v.replace("CHANGE-ME", machine) for k, v in rig["projectionCalibration"].items()}
+    camera = dict(next(iter(rig["camera"].values())), serialNumber="1")
+    entry = {name: name.split("-", 1)[1][:1].lower() + name.split("-", 1)[1][1:] for name, _ in devices}
+    for group in ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera"):
+        wanted = [entry[name] for name, g in devices if g == group]
+        if not wanted:
+            del rig[group]
+        elif group == "camera":
+            rig[group] = {e: dict(camera) for e in wanted}
+        else:
+            for e in [e for e in rig[group] if e not in wanted]:
+                del rig[group][e]
+            missing = [e for e in wanted if e not in rig[group]]
+            if missing:
+                raise ValueError(f"the rig template has no {group} {', '.join(missing)}: add it to rig-template.yml")
+    cameras = [name for name, g in devices if g == "camera"]
+    for board in rig.get("behaviorBoard", {}).values():
+        if cameras:
+            board["wiring"]["DO0"]["targets"] = cameras
+        else:
+            del board["wiring"]["DO0"]
+    records, files = [], []
+    for n, (name, group) in enumerate(devices):
+        files.append(f"{name}/")
+        if group in WHO_AM_I:
+            settings = rig[group][entry[name]]
+            settings["usbSerial"] = f"SERIAL{n}"
+            records.append(f"{name} {settings['portName']} SERIAL{n} {WHO_AM_I[group]}")
+            files += [f"{name}/{name}_device.json", f"{name}/{name}.yml"]
+    out = io.StringIO()
+    yaml.dump(rig, out)
+    return out.getvalue(), sorted(records), files
+
+
+def main() -> None:
+    """check-workflow's step 3: `python -m open_rigs.rigs.workflow_lint <repo> <config root> <machine>` writes the
+    filled rig.yml at <config root>\\<machine>\\rig.yml and prints what the build should make, as JSON."""
+    repo, config_root, machine = sys.argv[1:4]
+    wf = Workflow(Path(repo))
+    problems = hardware_problems(wf)
+    text, records, files = filled_rig(wf, Path(config_root).parent, machine)
+    folder = Path(config_root) / machine
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "rig.yml").write_text(text, encoding="utf-8")
+    print(json.dumps({"problems": problems, "records": records, "files": files}))
+
+
+if __name__ == "__main__":
+    main()

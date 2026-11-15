@@ -14,7 +14,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="StringProperty">
-          <Value>C:\Coen-Lab-Local\RigConfigs</Value>
+          <Value />
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">

@@ -1,18 +1,26 @@
 import re
+import zipfile
 from pathlib import Path
 
+from ruamel.yaml import YAML
+
 from open_rigs.rigs import workflow_lint as lint
+from open_rigs.rigs.lab_rig import LabRig
 
 ROOT = Path(__file__).parents[2]
 HEAD = ('<WorkflowBuilder Version="2.9.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
         'xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core" xmlns="https://bonsai-rx.org/2018/workflow"><Workflow><Nodes>')
 
 
+def include(path: str, inner: str = "") -> str:
+    return f'<Expression xsi:type="IncludeWorkflow" Path="{path}">{inner}</Expression>'
+
+
 def test_the_block_subjects_are_what_each_block_declares():
     for path, subjects in lint.BLOCK_SUBJECTS.items():
         package, resource = path.split(":")
         text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
-        declared = dict((name, f"rx:{kind}") for kind, name in re.findall(r'xsi:type="rx:(\w+Subject)"[^>]*>\s*<rx:Name>(\w+)<', text))
+        declared = dict((name, f"rx:{kind}") for kind, name in re.findall(r'xsi:type="rx:(\w+Subject)"[^>]*>\s*<(?:rx:)?Name>([\w.-]+)<', text))
         assert {name: declared.get(name) for name in subjects} == subjects
 
 
@@ -107,40 +115,104 @@ def test_a_sound_needs_its_level_from_the_task_file_and_the_shared_mixer(tmp_pat
     assert lint.sound_level_problems(unmapped) == ["aud:SpeakerBuffer is not given LevelDbfs from the task file's levelDbfs"]
     assert lint.speaker_mixer_problems(unmapped) == ["the workflow uses Bonsai.Mixer's StartMixer itself"]
 
-def test_ready_waits_for_every_stage_in_ready_waits_for_and_the_mixer_sends_mixer_started():
-    rig_hardware = (ROOT / "src" / "OpenRigs.Devices" / "RigHardware.bonsai").read_text(encoding="utf-8-sig")
-    assert lint.rig_ready_problems(lint.ET.fromstring(rig_hardware.encode("utf-8"))) == []
-    zipped = rig_hardware.replace('<Edge From="120" To="122" Label="Source1" />', '<Edge From="119" To="122" Label="Source1" />')
-    assert zipped != rig_hardware
-    assert lint.rig_ready_problems(lint.ET.fromstring(zipped.encode("utf-8"))) == ["Ready is not fed by ReadyWatchdog alone"]
-    unwatched = rig_hardware.replace('<Edge From="121" To="119" Label="Source3" />', "")
-    assert lint.rig_ready_problems(lint.ET.fromstring(unwatched.encode("utf-8"))) == [
-        "ReadyWatchdog does not watch HarpClockSet, SpoutsHomed and ReadyStages merged"]
+def test_every_ready_stage_is_announced_by_an_announce_stage_and_the_mixer_sends_mixer_started():
+    for path in (ROOT / "src").glob("OpenRigs.*/**/*.bonsai"):
+        if not path.relative_to(ROOT / "src").parts[0].endswith(".Tests"):
+            assert lint.ready_announcer_problems(lint.ET.fromstring(path.read_text(encoding="utf-8-sig").encode("utf-8"))) == [], path
     mixer = (ROOT / "src" / "OpenRigs.Audio" / "SpeakerMixer.bonsai").read_text(encoding="utf-8-sig")
     assert lint.mixer_ready_problems(lint.ET.fromstring(mixer.encode("utf-8"))) == []
-    silent = mixer.replace("<Value>MixerStarted</Value>", "<Value>Mixer</Value>")
+    silent = mixer.replace("<core:Stage>MixerStarted</core:Stage>", "<core:Stage>Mixer</core:Stage>")
+    assert silent != mixer
     assert lint.mixer_ready_problems(lint.ET.fromstring(silent.encode("utf-8"))) == [
         "SpeakerMixer does not multicast MixerStarted into ReadyStages once the mixer has started"]
 
 
-def test_a_workflow_with_the_mixer_makes_ready_wait_for_it_and_one_without_does_not(tmp_path):
-    rig = f'<Expression xsi:type="IncludeWorkflow" Path="{lint.RIG_HARDWARE}">{{}}</Expression>'
-    mixer = f'<Expression xsi:type="IncludeWorkflow" Path="{lint.SPEAKER_MIXER}" />'
-    waits = "<ReadyWaitsFor>HarpClockSet, SpoutsHomed, MixerStarted</ReadyWaitsFor>"
-    assert lint.rig_hardware_problems(workflow(tmp_path / "a", rig.format(waits) + mixer)) == []
-    assert lint.rig_hardware_problems(workflow(tmp_path / "b", rig.format(""))) == []
-    assert lint.rig_hardware_problems(workflow(tmp_path / "c", rig.format("") + mixer)) == [
-        "RigHardware's ReadyWaitsFor is HarpClockSet, SpoutsHomed, not HarpClockSet, SpoutsHomed, MixerStarted, "
-        "on a workflow that includes SpeakerMixer"]
-    assert lint.rig_hardware_problems(workflow(tmp_path / "d", rig.format(waits))) == [
-        "RigHardware's ReadyWaitsFor is HarpClockSet, SpoutsHomed, MixerStarted, not HarpClockSet, SpoutsHomed, "
-        "on a workflow without SpeakerMixer"]
+def test_an_announcer_that_completes_is_refused():
+    taken = (ROOT / "src" / "OpenRigs.Core.Tests" / "ReadyStagesClosedByATake.bonsai").read_text(encoding="utf-8-sig")
+    assert "ReadyStages is fed other than by one AnnounceStage" in lint.ready_announcer_problems(lint.ET.fromstring(taken.encode("utf-8")))
+
+
+def piece(path: str, **props: str) -> str:
+    return include(path, "".join(f"<{k}>{v}</{k}>" for k, v in props.items()))
+
+
+def board_line(path: str) -> str:
+    return piece(path, Board="BehaviorBoard-Main", BoardCommandsSubjectName="BehaviorBoard-Main.Commands",
+                 BoardDataSubjectName="BehaviorBoard-Main.Data")
+
+
+def named(path: str, name: str) -> str:
+    return piece(path, Name=name, CommandsSubjectName=f"{name}.Commands", DataSubjectName=f"{name}.Data")
+
+
+def camera(name: str) -> str:
+    return piece(lint.CAMERA, Name=name, Board="BehaviorBoard-Main", BoardDataSubjectName="BehaviorBoard-Main.Data",
+                 DataSubjectName=f"{name}.Data")
+
+
+# The acceptance fixture: a rig no workflow has yet, a board clock, wheel and camera with DomeHardware's lick detectors
+# and spout stage, made of the lab's pieces with no hardware code of its own.
+MIXED = (include(lint.READ_LAB_RIG) + piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet, SpoutsHomed, Camera-Overhead")
+         + named(lint.BOARD, "BehaviorBoard-Main") + board_line(lint.CLOCK_FROM_BOARD)
+         + board_line(lint.DEVICES + "BehaviorBoard.RunningWheel.bonsai")
+         + named(lint.LICKETY_SPLIT, "LicketySplit-Left") + named(lint.LICKETY_SPLIT, "LicketySplit-Right")
+         + include(lint.LICK_SPOUT_STAGE) + camera("Camera-Overhead")
+         + piece(lint.CAMERA_TRIGGERS, Board="BehaviorBoard-Main", BoardCommandsSubjectName="BehaviorBoard-Main.Commands",
+                 BoardDataSubjectName="BehaviorBoard-Main.Data", CamerasExpected="Camera-Overhead"))
+
+
+def test_a_new_combination_of_the_lab_s_devices_needs_no_hardware_code(tmp_path):
+    wf = workflow(tmp_path, MIXED)
+    assert lint.hardware_problems(wf) == []
+    assert lint.required_devices(wf) == [
+        ("BehaviorBoard-Main", "behaviorBoard"), ("LicketySplit-Left", "licketySplit"), ("LicketySplit-Right", "licketySplit"),
+        ("StepperDriver-A", "stepperDriver"), ("StepperDriver-B", "stepperDriver"), ("Camera-Overhead", "camera")]
+    text, records, files = lint.filled_rig(wf, tmp_path, "RIG")
+    rig = YAML(typ="safe").load(text)
+    LabRig.model_validate(rig)
+    assert "timestampGeneratorGen3" not in rig and list(rig["camera"]) == ["overhead"] and list(rig["stepperDriver"]) == ["a", "b"]
+    assert rig["behaviorBoard"]["main"]["wiring"]["DO0"]["targets"] == ["Camera-Overhead"]
+    assert records == ["BehaviorBoard-Main COM1 SERIAL0 1216", "LicketySplit-Left COM5 SERIAL1 1400", "LicketySplit-Right COM6 SERIAL2 1400",
+                       "StepperDriver-A COM3 SERIAL3 1130", "StepperDriver-B COM4 SERIAL4 1130"]
+    assert "Camera-Overhead/" in files and "StepperDriver-B/StepperDriver-B.yml" in files and "Camera-Overhead/Camera-Overhead.yml" not in files
+
+
+def test_the_dome_rig_list_is_expanded_with_the_workflow_s_settings(tmp_path):
+    waits = "HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted"
+    rig_list = include(lint.DEVICES + "DomeHardware.bonsai", f"<ReadyWaitsFor>{waits}</ReadyWaitsFor>")
+    wf = workflow(tmp_path, rig_list + include(lint.SPEAKER_MIXER))
+    assert lint.hardware_problems(wf) == []
+    assert [name for name, _ in lint.required_devices(wf)] == [
+        "TimestampGeneratorGen3-Main", "BehaviorBoard-Main", "LicketySplit-Left", "LicketySplit-Right",
+        "StepperDriver-A", "StepperDriver-B", "Camera-Face", "Camera-Pupil", "Camera-Body"]
+    unwaited = workflow(tmp_path / "b", include(lint.DEVICES + "DomeHardware.bonsai") + include(lint.SPEAKER_MIXER))
+    assert lint.hardware_problems(unwaited) == [
+        "ReadyGate's ReadyWaitsFor is HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, not "
+        "HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted"]
+
+
+def test_a_broken_combination_is_named(tmp_path):
+    broken = (MIXED.replace("Camera-Overhead</CamerasExpected>", "Camera-Face</CamerasExpected>")
+              .replace("<DataSubjectName>LicketySplit-Right.Data<", "<DataSubjectName>LicketySplit-Left.Data<"))
+    gate = piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet, SpoutsHomed, Camera-Overhead")
+    late = broken.replace(gate, "") + gate + named(lint.CLOCK_FROM_GENERATOR, "TimestampGeneratorGen3-Main")
+    assert lint.hardware_problems(workflow(tmp_path, late)) == [
+        "the workflow has 2 clocks, not one (ClockFromTimestampGenerator or ClockFromBoard)",
+        "BehaviorBoard.BehaviorBoard BehaviorBoard-Main comes before ReadyGate",
+        "BehaviorBoard.ClockFromBoard BehaviorBoard-Main comes before ReadyGate",
+        "BehaviorBoard.RunningWheel BehaviorBoard-Main comes before ReadyGate",
+        "LicketySplit LicketySplit-Left comes before ReadyGate",
+        "LicketySplit LicketySplit-Right comes before ReadyGate",
+        "LickSpoutStage comes before ReadyGate",
+        "SpinnakerCamera Camera-Overhead comes before ReadyGate",
+        "CameraTriggers BehaviorBoard-Main comes before ReadyGate",
+        "LicketySplit LicketySplit-Right's DataSubjectName is LicketySplit-Left.Data, not LicketySplit-Right.Data",
+        "CameraTriggers' CamerasExpected is Camera-Face, not Camera-Overhead"]
 
 
 def test_a_workflow_s_own_ready_report_is_found_under_any_prefix(tmp_path):
-    rig = f'<Expression xsi:type="IncludeWorkflow" Path="{lint.RIG_HARDWARE}" />'
     own = '<Expression xsi:type="Combinator"><Combinator xmlns:p3="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control" xsi:type="p3:ReportPhase"><p3:Phase>Ready</p3:Phase></Combinator></Expression>'
-    assert lint.rig_hardware_problems(workflow(tmp_path, rig + own)) == ["the workflow has its own Ready report"]
+    assert lint.hardware_problems(workflow(tmp_path, MIXED + own)) == ["the workflow has its own Ready report"]
 
 
 def test_a_lab_type_is_found_under_the_prefix_a_bonsai_save_gives_it(tmp_path):
@@ -216,14 +288,10 @@ def manifest_node(expected: str) -> str:
     return f'<Expression xsi:type="mf:ExperimentManifest" {MF}><mf:ExpectedFiles>{expected}</mf:ExpectedFiles></Expression>'
 
 
-def include(path: str, inner: str = "") -> str:
-    return f'<Expression xsi:type="IncludeWorkflow" Path="{path}">{inner}</Expression>'
-
-
 LOGS = (include("OpenRigs.Logging:LogTrial.bonsai") + include("OpenRigs.Logging:LogAsync.bonsai")
         + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Rig</Name>")
         + include("OpenRigs.Logging:LogData.bonsai", "<LogName>BonsaiData_StimulusState</LogName>")
-        + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai") + include("OpenRigs.Devices:HarpLogs.bonsai")
+        + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai") + include("OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai")
         + '<Expression xsi:type="hd:RecordHarpDevices" xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices" />')
 EXPECTED = ("auto;harp;Settings/Settings_Rig_;BonsaiData/BonsaiData_Trial_;BonsaiData/BonsaiData_Async_;BonsaiData/BonsaiData_StimulusState_;"
             "BonsaiData/BonsaiData_ZapitReplies_?Optogenetics;Settings/Settings_ZapitConditions_?Optogenetics")
@@ -288,3 +356,20 @@ def test_the_rng_seed_event_is_fed_by_the_trial_start_subject_alone(tmp_path):
 
     assert lint.rng_seed_problems(logic("TrialStart")) == []
     assert lint.rng_seed_problems(logic("TrialGo")) == ["RngSeed is not fed by TrialStart alone"]
+
+
+def test_each_include_read_from_the_package_is_found_by_its_description(tmp_path, monkeypatch):
+    for path, signature in lint.SIGNATURES.items():
+        package, resource = path.split(":")
+        text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
+        assert f"<Description>{signature}" in text, path
+    # A workflow repo reads it from the OpenRigs.Devices package Bonsai.config pins, embedded in the DLL.
+    rig_list = (ROOT / "src" / "OpenRigs.Devices" / "DomeHardware.bonsai").read_bytes()
+    (tmp_path / ".bonsai").mkdir()
+    (tmp_path / ".bonsai" / "Bonsai.config").write_text('<Packages><Package id="OpenRigs.Devices" version="0.1.1-x.2" /></Packages>')
+    (tmp_path / "local_packages").mkdir()
+    with zipfile.ZipFile(tmp_path / "local_packages" / "OpenRigs.Devices.0.1.1-x.2.nupkg", "w") as z:
+        z.writestr("lib/net472/OpenRigs.Devices.dll", b"MZ\x00<WorkflowBuilder>other</WorkflowBuilder>\x00\x10" + rig_list + b"\x00\xff")
+    monkeypatch.setattr(lint, "LIB_SRC", tmp_path / "nowhere")
+    wf = workflow(tmp_path, include(lint.DEVICES + "DomeHardware.bonsai", "<ReadyWaitsFor>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body</ReadyWaitsFor>"))
+    assert len(lint.required_devices(wf)) == 9

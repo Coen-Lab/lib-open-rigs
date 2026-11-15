@@ -4,13 +4,13 @@ param(
     # Internal: the step this script runs in a fresh process of its own (assemblies stay loaded).
     [ValidateSet('', 'Build', 'Checks')][string]$Step = ''
 )
-# The lab's check of a workflow on RigHardware, one copy for every such workflow: each one's scripts\check-workflow.ps1
+# The lab's check of a workflow made of the lab's device pieces, one copy for every such workflow: each one's scripts\check-workflow.ps1
 # runs this, from the open-rigs it pins (.venv\Lib\site-packages\open_rigs\scripts), on itself. Without the rig and
 # without opening Bonsai: no window, no device.
 #   1. Compiles src\Extensions under C# 5, the language Bonsai compiles it with.
 #   2. Runs tests\Extensions.Tests.
 #   3. Builds src\main.bonsai with Bonsai's own expression builders, as Bonsai does at Start before it subscribes
-#      anything, against the lab's rig template (open_rigs\rigs\rig-template.yml) filled in as a rig's: every type,
+#      anything, against the lab's rig template (open_rigs\rigs\rig-template.yml) filled in as a rig with exactly the devices the workflow's pieces drive (workflow_lint.filled_rig), and the lint's hardware rules: every type,
 #      selector, include, subject and mapping; what RecordHarpDevices made from rig.yml, what ExperimentManifest
 #      expects, the trial row's columns against schemas\trial-columns.yml, and each window in config\main.layout.
 #      Skipped, and said, on a machine without the Spinnaker SDK (a CI runner).
@@ -78,20 +78,15 @@ function Initialize-Assemblies {
     foreach ($n in 'Bonsai.Core', 'Bonsai', 'Extensions', 'OpenRigs.Devices') { $null = [Reflection.Assembly]::LoadFrom($map[$n]) }
 }
 
-# The template filled in as a rig's, at <bin>\config\<MACHINE>\rig.yml, so the nodes that read
-# rig.yml when the workflow is built make what they make on a rig; this machine need not have one.
+# The template filled in as a rig with exactly the workflow's devices (workflow_lint.filled_rig, from its pieces), at
+# <bin>\config\<MACHINE>\rig.yml, so the nodes that read rig.yml when the workflow is built make what they make on such
+# a rig; this machine need not have one. Sets $script:plan: the Harp records and files the build should make.
 function Write-FilledTemplate {
-    $rigDir = Join-Path $bin "config\$([Environment]::MachineName)"
-    $null = New-Item -ItemType Directory -Path $rigDir -Force
-    $rigYml = Join-Path $rigDir 'rig.yml'
-    $text = [IO.File]::ReadAllText($template)
-    $serials = 'BG01WA0E', 'AQ03WH45', 'AQ03WRBG', 'AQ03WW0D', 'E664C856C360B937', 'E664C856C31F4637'
-    foreach ($s in $serials) { $text = ([regex]'usbSerial: CHANGE-ME').Replace($text, "usbSerial: $s", 1) }
-    $text = $text.Replace('rigId: XX', 'rigId: D1').Replace('serialNumber: "00000000"', "serialNumber: '1'").Replace('rootPath: CHANGE-ME', "rootPath: $bin").Replace('RigConfigs\CHANGE-ME\', "RigConfigs\$([Environment]::MachineName)\")
-    foreach ($left in 'CHANGE-ME', 'rigId: XX', 'serialNumber: "00000000"') {
-        if ($text.Contains($left)) { throw "check-workflow: the template still holds '$left' after filling; update Write-FilledTemplate." }
-    }
-    [IO.File]::WriteAllText($rigYml, $text)
+    $out = & { $ErrorActionPreference = 'Continue'; & uv run --project $Repo -q python -m open_rigs.rigs.workflow_lint $Repo (Join-Path $bin 'config') ([Environment]::MachineName) 2>&1 | ForEach-Object { "$_" } }
+    if ($LASTEXITCODE -ne 0) { throw "check-workflow: workflow_lint could not fill the rig template: $($out -join ' ')" }
+    $script:plan = ($out | Select-Object -Last 1) | ConvertFrom-Json
+    $rigYml = Join-Path $bin "config\$([Environment]::MachineName)\rig.yml"
+    if ([IO.File]::ReadAllText($rigYml).Contains('CHANGE-ME')) { throw "check-workflow: the filled template still holds CHANGE-ME; update workflow_lint.filled_rig." }
     return $rigYml
 }
 
@@ -158,22 +153,17 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
     $null = $objects.Visit($built)
     $records = @($objects.Found | Where-Object { $_.GetType().FullName -eq 'OpenRigs.HarpDevices.RecordHarpDevice' })
     $got = @($records | ForEach-Object { "$($_.Name) $($_.PortName) $($_.UsbSerial) $($_.ExpectedWhoAmI)" } | Sort-Object)
-    $want = @('BehaviorBoard-Main COM1 BG01WA0E 1216', 'LicketySplit-Left COM5 E664C856C360B937 1400', 'LicketySplit-Right COM6 E664C856C31F4637 1400', 'StepperDriver-A COM3 AQ03WRBG 1130', 'StepperDriver-B COM4 AQ03WW0D 1130', 'TimestampGeneratorGen3-Main COM2 AQ03WH45 1158')
-    if (($got -join '; ') -eq ($want -join '; ')) { "  ok    RecordHarpDevices records the Behavior board, the timestamp generator, both stepper drivers and both Lickety Splits from rig.yml" }
-    else { "  FAIL  RecordHarpDevices made: $($got -join '; ')"; $failed++ }
+    $want = @($script:plan.records | Sort-Object)
+    if (($got -join '; ') -eq ($want -join '; ')) { "  ok    RecordHarpDevices records the workflow's $($want.Count) Harp devices from rig.yml" }
+    else { "  FAIL  RecordHarpDevices made: $($got -join '; '); the workflow's pieces drive: $($want -join '; ')"; $failed++ }
     $dumps = @($objects.Found | Where-Object { $_.GetType().FullName -eq 'OpenRigs.HarpDevices.RequestRegisterDump' }).Count
-    if ($dumps -eq 6) { "  ok    ... and asks each for its dump on <Name>.Commands" } else { "  FAIL  $dumps dump request(s), not 6: is every board's command subject <Name>.Commands?"; $failed++ }
+    if ($dumps -eq $want.Count) { "  ok    ... and asks each for its dump on <Name>.Commands" } else { "  FAIL  $dumps dump request(s), not $($want.Count): is every board's command subject <Name>.Commands?"; $failed++ }
+    foreach ($p in $script:plan.problems) { "  FAIL  $p"; $failed++ }
     $recorder = @($objects.Found | Where-Object { $_.GetType().Name -eq 'ManifestRecorder' })
     $planField = if ($recorder.Count) { $recorder[0].GetType().GetFields([Reflection.BindingFlags]'Instance,NonPublic,Public') | Where-Object { $_.FieldType.Name -eq 'ExpectedPlan' } | Select-Object -First 1 }
     # The devices' folders and the Harp records, from rig.yml; each log's entry (ending _) is workflow_lint.expected_files_problems' to check.
     $expected = if ($planField) { @($planField.GetValue($recorder[0]).Entries | ForEach-Object { $_.Path } | Where-Object { -not $_.EndsWith('_') }) } else { @() }
-    $wantFiles = 'BehaviorBoard-Main/', 'TimestampGeneratorGen3-Main/', 'StepperDriver-A/', 'StepperDriver-B/', 'LicketySplit-Left/', 'LicketySplit-Right/', 'Camera-Face/', 'Camera-Pupil/', 'Camera-Body/',
-        'BehaviorBoard-Main/BehaviorBoard-Main_device.json', 'BehaviorBoard-Main/BehaviorBoard-Main.yml',
-        'TimestampGeneratorGen3-Main/TimestampGeneratorGen3-Main_device.json', 'TimestampGeneratorGen3-Main/TimestampGeneratorGen3-Main.yml',
-        'StepperDriver-A/StepperDriver-A_device.json', 'StepperDriver-A/StepperDriver-A.yml',
-        'StepperDriver-B/StepperDriver-B_device.json', 'StepperDriver-B/StepperDriver-B.yml',
-        'LicketySplit-Left/LicketySplit-Left_device.json', 'LicketySplit-Right/LicketySplit-Right_device.json',
-        'LicketySplit-Left/LicketySplit-Left.yml', 'LicketySplit-Right/LicketySplit-Right.yml'
+    $wantFiles = @($script:plan.files)
     $missing = @($wantFiles | Where-Object { $expected -notcontains $_ })
     $extra = @($expected | Where-Object { $wantFiles -notcontains $_ })
     # A condition (path?Subject) that is not a bool subject published before ExperimentManifest is expected always, with this note.
@@ -313,9 +303,9 @@ $testExit = $LASTEXITCODE
 $log | Where-Object { $_ -match 'Passed!|Failed|error' } | ForEach-Object { "  $_" }
 if ($testExit -ne 0) { "  FAILED"; $bad++ }
 "3. Building main.bonsai with Bonsai's builders, against the filled template..."
-# RigHardware's cameras load SpinnakerNET, which needs the Spinnaker SDK's native Spinnaker_v140.dll on PATH. The SDK
+# The camera pieces load SpinnakerNET, which needs the Spinnaker SDK's native Spinnaker_v140.dll on PATH. The SDK
 # is a login-gated download, so a GitHub runner has none and main.bonsai cannot be read there ("There is an error in
-# XML document" at RigHardware's first property; domes' CI, 15 Nov 2026). Skipped only then; every rig and lab
+# XML document" at the camera include's first property; CI, 15 Nov 2026). Skipped only then; every rig and lab
 # machine with the SDK runs it, as update-workflows.ps1 does before each push.
 $spinnaker = @($env:Path -split ';' | Where-Object { $_ -and (Test-Path (Join-Path $_ 'Spinnaker_v140.dll')) })
 if (-not $spinnaker.Count) { "  SKIPPED: no Spinnaker SDK (Spinnaker_v140.dll on PATH), so main.bonsai cannot be built here" }

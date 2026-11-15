@@ -36,9 +36,8 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "patches/README.md": 13,
     "src/OpenRigs.Control.Tests/Program.cs": 3,
     "src/OpenRigs.Control/ControlServer.cs": 3,
-    "src/OpenRigs.Control/ExperimentOperators.cs": 1,
     "src/OpenRigs.Control/OpenRigs.Control.csproj": 1,
-    "src/OpenRigs.Control/README.md": 8,
+    "src/OpenRigs.Control/README.md": 7,
     "src/OpenRigs.Audio/OpenRigs.Audio.csproj": 1,
     "src/OpenRigs.Core/OpenRigs.Core.csproj": 1,
     "src/OpenRigs.Devices/OpenRigs.Devices.csproj": 1,
@@ -62,7 +61,6 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "src/OpenRigs.Manifest/README.md": 9,
     "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj": 1,
     "src/OpenRigs.Video/OpenRigs.Video.csproj": 1,
-    "src/OpenRigs.Video/TriggeredSpinnaker.cs": 1,
     "src/OpenRigs.Video/UsbCamera.cs": 3,
     "src/OpenRigs.Vision/OpenRigs.Vision.csproj": 1,  # the lab's package version, as every lab package's
     "src/Shared/GroupNode.cs": 1,
