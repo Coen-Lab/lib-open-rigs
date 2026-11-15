@@ -118,17 +118,5 @@ namespace OpenRigs.Core.Tests
             Assert.AreEqual(1, readings.Count);
             Assert.AreEqual(1.5f, readings[0].Value);
         }
-
-        [TestMethod]
-        public void DescribeCalibrationCurve_ListsEachPoint()
-        {
-            var curve = new CalibrationCurve
-            {
-                XUnit = "ms",
-                YUnit = "ul",
-                Points = new List<CalibrationPoint> { new CalibrationPoint { X = 10, Y = 0.62 }, new CalibrationPoint { X = 20, Y = 1.19 } }
-            };
-            Assert.AreEqual("10 ms 0.620 ul, 20 ms 1.190 ul", new DescribeCalibrationCurve().Process(Observable.Return(curve)).Wait());
-        }
     }
 }

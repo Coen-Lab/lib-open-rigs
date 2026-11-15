@@ -185,13 +185,14 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Triggered Spinnaker cameras by name, such as face (Camera-Face), whose frame rate is the board's trigger0_frequency.
+        /// Triggered Spinnaker cameras by name, such as face (Camera-Face), each on the board trigger whose wiring line (device CameraTrigger, DO0 or DO1) names it in targets, at that trigger's frequency.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("camera")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="camera")]
-        [System.ComponentModel.DescriptionAttribute("Triggered Spinnaker cameras by name, such as face (Camera-Face), whose frame rate" +
-            " is the board\'s trigger0_frequency.")]
+        [System.ComponentModel.DescriptionAttribute("Triggered Spinnaker cameras by name, such as face (Camera-Face), each on the boar" +
+            "d trigger whose wiring line (device CameraTrigger, DO0 or DO1) names it in targe" +
+            "ts, at that trigger\'s frequency.")]
         public System.Collections.Generic.Dictionary<string, SpinnakerCamera> Camera
         {
             get
@@ -3070,8 +3071,6 @@ namespace OpenRigs.Devices.Rigs
     public partial class SpinnakerCamera
     {
     
-        private double _triggerFrequency;
-    
         private double _exposureTime;
     
         private string _serialNumber;
@@ -3088,18 +3087,15 @@ namespace OpenRigs.Devices.Rigs
     
         public SpinnakerCamera()
         {
-            _triggerFrequency = 50D;
             _exposureTime = 15000D;
             _serialNumber = "00000";
             _gain = 1D;
             _binning = 1;
             _discriminatorType = "SpinnakerCamera";
-            _pixelFormat = "Mono8";
         }
     
         protected SpinnakerCamera(SpinnakerCamera other)
         {
-            _triggerFrequency = other._triggerFrequency;
             _exposureTime = other._exposureTime;
             _serialNumber = other._serialNumber;
             _gain = other._gain;
@@ -3107,24 +3103,6 @@ namespace OpenRigs.Devices.Rigs
             _discriminatorType = other._discriminatorType;
             _liveView = other._liveView;
             _pixelFormat = other._pixelFormat;
-        }
-    
-        /// <summary>
-        /// The frequency at which the camera is triggered (in Hz).
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("triggerFrequency")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="triggerFrequency")]
-        [System.ComponentModel.DescriptionAttribute("The frequency at which the camera is triggered (in Hz).")]
-        public double TriggerFrequency
-        {
-            get
-            {
-                return _triggerFrequency;
-            }
-            set
-            {
-                _triggerFrequency = value;
-            }
         }
     
         /// <summary>
@@ -3233,13 +3211,14 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write: Mono8. Set each time the camera opens, so a format stored on the camera is never used. Mono8 when not set.
+        /// The pixel format the camera sends, a Spinnaker PixelFormat name the video logger can write: Mono8. Set each time the camera opens; left out, the camera keeps the format stored on it, as upstream's operator does. The lab's rig.yml files state it.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("pixelFormat")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="pixelFormat")]
-        [System.ComponentModel.DescriptionAttribute("The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can writ" +
-            "e: Mono8. Set each time the camera opens, so a format stored on the camera is ne" +
-            "ver used. Mono8 when not set.")]
+        [System.ComponentModel.DescriptionAttribute("The pixel format the camera sends, a Spinnaker PixelFormat name the video logger " +
+            "can write: Mono8. Set each time the camera opens; left out, the camera keeps the" +
+            " format stored on it, as upstream\'s operator does. The lab\'s rig.yml files state" +
+            " it.")]
         public string PixelFormat
         {
             get
@@ -3264,7 +3243,6 @@ namespace OpenRigs.Devices.Rigs
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
-            stringBuilder.Append("TriggerFrequency = " + _triggerFrequency + ", ");
             stringBuilder.Append("ExposureTime = " + _exposureTime + ", ");
             stringBuilder.Append("SerialNumber = " + _serialNumber + ", ");
             stringBuilder.Append("Gain = " + _gain + ", ");

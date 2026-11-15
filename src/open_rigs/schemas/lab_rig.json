@@ -789,7 +789,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/SpinnakerCamera"
           },
-          "description": "Triggered Spinnaker cameras by name, such as face (Camera-Face), whose frame rate is the board's trigger0_frequency.",
+          "description": "Triggered Spinnaker cameras by name, such as face (Camera-Face), each on the board trigger whose wiring line (device CameraTrigger, DO0 or DO1) names it in targets, at that trigger's frequency.",
           "title": "Camera",
           "type": "object"
         },
@@ -1164,13 +1164,6 @@
     },
     "SpinnakerCamera": {
       "properties": {
-        "triggerFrequency": {
-          "default": 50,
-          "description": "The frequency at which the camera is triggered (in Hz).",
-          "minimum": 1,
-          "title": "TriggerFrequency",
-          "type": "number"
-        },
         "exposureTime": {
           "default": 15000,
           "description": "The exposure time for the camera (in microseconds).",
@@ -1221,11 +1214,18 @@
           "title": "LiveView"
         },
         "pixelFormat": {
-          "const": "Mono8",
-          "default": "Mono8",
-          "description": "The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write: Mono8. Set each time the camera opens, so a format stored on the camera is never used. Mono8 when not set.",
-          "title": "PixelFormat",
-          "type": "string"
+          "anyOf": [
+            {
+              "const": "Mono8",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The pixel format the camera sends, a Spinnaker PixelFormat name the video logger can write: Mono8. Set each time the camera opens; left out, the camera keeps the format stored on it, as upstream's operator does. The lab's rig.yml files state it.",
+          "title": "PixelFormat"
         }
       },
       "title": "SpinnakerCamera",

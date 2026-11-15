@@ -26,6 +26,7 @@ from open_rigs.devices import CalibratedPulse, HarpTimestampGeneratorGen3, Licke
 
 REWARD_VALVE = "RewardValve"
 ZAPIT_TRIGGER = "ZapitTrigger"
+CAMERA_TRIGGER = "CameraTrigger"
 SIDES = ("left", "right")
 WHERE = "(lab rig model, open_rigs.rigs.lab_rig)"
 # The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, DeliverReward's MaxRewardUl).
@@ -54,7 +55,7 @@ class LabRig(Rig):
     )
     camera: Dict[str, SpinnakerCamera] = Field(
         default_factory=dict,
-        description="Triggered Spinnaker cameras by name, such as face (Camera-Face), whose frame rate is the board's trigger0_frequency.",
+        description="Triggered Spinnaker cameras by name, such as face (Camera-Face), each on the board trigger whose wiring line (device CameraTrigger, DO0 or DO1) names it in targets, at that trigger's frequency.",
     )
     projection_calibration: Optional[ProjectionCalibration] = Field(
         default=None, description="Mesh-map and gamma-LUT file paths for the projector's display."
@@ -148,19 +149,21 @@ class LabRig(Rig):
                 f"rig.yml has zapit, so a board's wiring needs its ZapitTrigger line, and none has one {WHERE}. "
                 f"Add it to behaviorBoard.{board}.wiring, as in `DO3: {{ device: ZapitTrigger }}`."
             )
+        # Each camera runs on the trigger whose wiring line names it (OpenRigs.Devices CameraTrigger, at Start).
+        triggers = Counter(
+            target for board in self.behavior_board.values() if board.wiring
+            for field, alias in _ALIASES.items()
+            if (line := getattr(board.wiring, field)) is not None and line.device == CAMERA_TRIGGER and alias in ("DO0", "DO1")
+            for target in (line.targets or []))
+        for entry in self.camera:
+            name = "Camera-" + entry[:1].upper() + entry[1:]
+            if triggers[name] != 1:
+                raise ValueError(
+                    f"camera {entry} is on {triggers[name]} CameraTrigger lines, and a camera needs exactly one {WHERE}. "
+                    f"Name {name} in the targets of the DO0 or DO1 line its trigger cable is on, as in "
+                    f"`DO0: {{ device: CameraTrigger, targets: [{name}] }}`."
+                )
         return self
-
-
-class BehaviourBoxRig(Rig):
-    """A behaviour box's choice of LabRig's parts: Behavior boards, cameras and the video encoder. A box's
-    workflow takes this, not LabRig, because the generated C# of the other parts needs packages a box's
-    Bonsai environment lacks (Harp.TimestampGeneratorGen3 0.1.1's TimerRate)."""
-
-    behavior_board: Dict[str, BehaviorBoard] = Field(
-        default_factory=dict, description=LabRig.model_fields["behavior_board"].description
-    )
-    camera: Dict[str, SpinnakerCamera] = Field(default_factory=dict, description=LabRig.model_fields["camera"].description)
-    video_encoder: Optional[VideoEncoder] = Field(default=None, description=LabRig.model_fields["video_encoder"].description)
 
 
 _ALIASES ={field: info.alias for field, info in BoardWiring.model_fields.items()}

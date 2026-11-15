@@ -7,6 +7,8 @@ from open_rigs.rigs.lab_rig import LabRig
 
 HARP = {"portName": "COM1", "usbSerial": "X"}
 STAGE = {"baseTransverse": 0, "leftRadial": 0, "rightRadial": 0, "leftElevation": 0, "rightElevation": 0}
+CAMERA_LINE = {"DO0": {"device": "CameraTrigger", "targets": ["Camera-Face", "Camera-Pupil", "Camera-Body"]}}
+
 RIG = {
     "rootPath": "C:\\Data",
     "behaviorBoard": {"main": {
@@ -17,6 +19,7 @@ RIG = {
             "DO3": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0},
         }},
         "wiring": {
+            **CAMERA_LINE,
             "DO1": {"device": "RewardValve", "side": "left"},
             "DO2": {"device": "RewardValve", "side": "right"},
             "DO3": {"device": "ZapitTrigger"},
@@ -39,7 +42,7 @@ RIG = {
 
 def rig_with(**wiring):
     rig = copy.deepcopy(RIG)
-    rig["behaviorBoard"]["main"]["wiring"] = wiring
+    rig["behaviorBoard"]["main"]["wiring"] = {**CAMERA_LINE, **wiring}
     return rig
 
 
@@ -84,17 +87,10 @@ def test_every_part_optional():
     # Each workflow takes the parts it drives: a rig.yml with none of them, or a box's two, is a rig.
     rig = LabRig.model_validate({"rootPath": "C:/Data"})
     assert (rig.behavior_board, rig.camera, rig.speaker_array, rig.zapit, rig.projection_calibration) == ({}, {}, None, None, None)
-    box = LabRig.model_validate({"rootPath": "C:/Data","behaviorBoard": {"main": HARP}, "camera": {"overhead": {"serialNumber": "1"}}})
-    assert box.behavior_board["main"].wiring is None and list(box.camera) == ["overhead"]
+    trigger = {"wiring": {"DO0": {"device": "CameraTrigger", "targets": ["Camera-Overhead"]}}}
+    box = LabRig.model_validate({"rootPath": "C:/Data", "behaviorBoard": {"main": {**HARP, **trigger}}, "camera": {"overhead": {"serialNumber": "1"}}})
+    assert list(box.camera) == ["overhead"] and list(box.behavior_board) == ["main"]
 
-
-def test_the_box_is_a_choice_of_the_lab_rig_s_parts():
-    from open_rigs.rigs.lab_rig import BehaviourBoxRig
-
-    box = BehaviourBoxRig.model_fields
-    assert set(box) < set(LabRig.model_fields) and {"behavior_board", "camera", "video_encoder"} <= set(box)
-    for name, info in box.items():
-        assert (info.annotation, info.description) == (LabRig.model_fields[name].annotation, LabRig.model_fields[name].description)
 
 
 def test_a_rig_built_by_field_name():
@@ -110,13 +106,13 @@ def test_a_rig_built_by_field_name():
 def test_one_valve_is_enough():
     rig = copy.deepcopy(RIG)
     del rig["zapit"]
-    rig["behaviorBoard"]["main"]["wiring"] = {"DO1": {"device": "RewardValve", "side": "left"}}
+    rig["behaviorBoard"]["main"]["wiring"] = {**CAMERA_LINE, "DO1": {"device": "RewardValve", "side": "left"}}
     LabRig.model_validate(rig)
 
 
 def test_zapit_needs_its_trigger_line():
     rig = copy.deepcopy(RIG)
-    rig["behaviorBoard"]["main"]["wiring"] = {"DO1": {"device": "RewardValve", "side": "left"}}
+    rig["behaviorBoard"]["main"]["wiring"] = {**CAMERA_LINE, "DO1": {"device": "RewardValve", "side": "left"}}
     with pytest.raises(ValidationError, match="rig.yml has zapit, so a board's wiring needs its ZapitTrigger line") as refused:
         LabRig.model_validate(rig)
     assert "`DO3: { device: ZapitTrigger }`" in str(refused.value)

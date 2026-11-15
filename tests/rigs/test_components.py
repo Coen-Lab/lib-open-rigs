@@ -9,7 +9,7 @@ from open_rigs.rigs.lab_rig import LabRig
 RIG = {
     "rootPath": "C:\\Data\\B1",
     "rigId": "B1",
-    "behaviorBoard": {"main": {"portName": "COM3", "usbSerial": "AB0M7PLB"}},
+    "behaviorBoard": {"main": {"portName": "COM3", "usbSerial": "AB0M7PLB", "wiring": {"DO0": {"device": "CameraTrigger", "targets": ["Camera-Overhead"]}}}},
     "camera": {"overhead": {"serialNumber": "12345"}},
 }
 
@@ -20,8 +20,8 @@ def test_named_entries():
     assert rig.camera["overhead"].live_view is None
 
 
-def test_pixel_format_mono8_unless_set():
-    assert LabRig.model_validate(RIG).camera["overhead"].pixel_format == "Mono8"
+def test_pixel_format_kept_by_the_camera_unless_set():
+    assert LabRig.model_validate(RIG).camera["overhead"].pixel_format is None
     rig = LabRig.model_validate({**RIG, "camera": {"overhead": {"serialNumber": "12345", "pixelFormat": "Mono8"}}})
     assert rig.camera["overhead"].pixel_format == "Mono8"
     # LogVideoFfmpeg writes 8-bit frames only (audit, 11 Nov 2026).
@@ -32,6 +32,18 @@ def test_pixel_format_mono8_unless_set():
 def test_no_version():
     assert "version" not in LabRig.model_fields
     assert "version" not in LabRig.model_validate(RIG).model_dump(by_alias=True)
+
+
+def test_each_camera_on_exactly_one_trigger_line():
+    def rig(wiring):
+        return {**RIG, "behaviorBoard": {"main": {"portName": "COM3", "usbSerial": "X", "wiring": wiring}}}
+
+    face = {"DO0": {"device": "CameraTrigger", "targets": ["Camera-Face"]}}
+    off_trigger = {"DO2": {"device": "CameraTrigger", "targets": ["Camera-Overhead"]}}
+    twice = {line: {"device": "CameraTrigger", "targets": ["Camera-Overhead"]} for line in ("DO0", "DO1")}
+    for wiring in ({}, face, off_trigger, twice):
+        with pytest.raises(ValidationError, match="camera overhead is on"):
+            LabRig.model_validate(rig(wiring))
 
 
 def test_usb_serial_required():
@@ -61,7 +73,9 @@ def test_wiring_by_channel_name():
 
 
 def test_wiring_optional_and_side_checked():
-    assert LabRig.model_validate(RIG).behavior_board["main"].wiring is None
+    no_camera = {key: value for key, value in RIG.items() if key != "camera"}
+    plain = {**no_camera, "behaviorBoard": {"main": {"portName": "COM3", "usbSerial": "X"}}}
+    assert LabRig.model_validate(plain).behavior_board["main"].wiring is None
     with pytest.raises(ValidationError):
         LabRig.model_validate({**RIG, "behaviorBoard": {"main": {
             "portName": "COM3", "usbSerial": "X", "wiring": {"DO1": {"device": "RewardValve", "side": "middle"}}}}})

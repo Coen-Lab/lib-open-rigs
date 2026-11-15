@@ -55,7 +55,7 @@ timestampGeneratorGen3:
     usbSerial: CHANGE-ME
     timerFrequency: Timer1000Hz
 
-# The lick spout stage's two Harp StepperDriver boards (HarpLickSpoutStage): board a drives the base
+# The lick spout stage's two Harp StepperDriver boards (OpenRigs.Devices LickSpoutStage): board a drives the base
 # transverse, left radial and right radial axes, board b the left and right elevations.
 stepperDriver:
   a:
@@ -77,23 +77,26 @@ licketySplit:
     channel0TriggerThreshold: 0
     channel0UntriggerThreshold: 0
 
-# Exactly three cameras, on the board's trigger 0 (RigHardware).
+# The cameras, each on the board trigger whose wiring line names it in targets (DO0 above).
 camera:
   face:
     serialNumber: "00000000"
     exposureTime: 19000    # microseconds
     gain: 0
     binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   pupil:
     serialNumber: "00000000"
     exposureTime: 19000    # microseconds
     gain: 20
     binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   body:
     serialNumber: "00000000"
     exposureTime: 19000    # microseconds
     gain: 0
     binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
 
 # Every camera's video is encoded on the rig's NVIDIA GPU (such as an RTX 5060); libx264, the
 # CPU encoder, when this section is left out.

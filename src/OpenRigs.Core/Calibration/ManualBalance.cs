@@ -237,25 +237,4 @@ namespace OpenRigs.Core.Calibration
             return source.Where(e => e.Reading.HasValue).Select(e => e.Reading.Value);
         }
     }
-
-    /// <summary>
-    /// One line summing up a calibration curve, such as "10 ms 0.62 ul, 20 ms 1.19 ul".
-    /// </summary>
-    [Combinator]
-    [Description("One line summing up a calibration curve's points, such as '10 ms 0.62 ul, 20 ms 1.19 ul'.")]
-    [WorkflowElementCategory(ElementCategory.Transform)]
-    public class DescribeCalibrationCurve
-    {
-        /// <summary>Sums up each curve.</summary>
-        public IObservable<string> Process(IObservable<CalibrationCurve> source)
-        {
-            return source.Select(Describe);
-        }
-
-        internal static string Describe(CalibrationCurve curve)
-        {
-            return string.Join(", ", curve.Points.Select(p => string.Format(
-                CultureInfo.InvariantCulture, "{0:0.##} {1} {2:0.000} {3}", p.X, curve.XUnit, p.Y, curve.YUnit)).ToArray());
-        }
-    }
 }
