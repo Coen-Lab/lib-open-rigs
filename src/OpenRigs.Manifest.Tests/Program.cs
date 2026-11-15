@@ -428,14 +428,14 @@ namespace OpenRigs.Manifest.Tests
                 Check("{SubjectId} names the subject's own file", mine.Count == 1 && ((string)mine[0][0].Value).EndsWith(@"Spouts\M7.csv") && mine[0][1].Key == "sha256", string.Join(" | ", mine.Select(f => string.Join(",", f.Select(p => p.Key + "=" + p.Value)))));
                 var nobody = ManifestWriter.ConfigFiles(@"Spouts\{SubjectId}.csv", root, null);
                 Check("... and with no SubjectId on the command line it is missing, saying why", nobody.Count == 1 && nobody[0].Any(p => p.Key == "missing") && ((string)nobody[0].First(p => p.Key == "why").Value).Contains("SubjectId"), "found");
-                // 0.1.1-coen-lab.21: the note names the file looked for, environment variables and {SubjectId} filled in, not the entry as typed.
-                Environment.SetEnvironmentVariable("OPENRIGS_TEST_MACHINE", "GREEN-DOME-2");
+                // A missing file's note names the file looked for, environment variables and {SubjectId} filled in, not the entry as typed.
+                Environment.SetEnvironmentVariable("OPENRIGS_TEST_MACHINE", "TEST-RIG-2");
                 var absent = ManifestWriter.ConfigFiles(@"%OPENRIGS_TEST_MACHINE%\calibration\{SubjectId}.csv", root, "test");
                 var absentNote = ManifestWriter.MissingNote(absent[0], @"%OPENRIGS_TEST_MACHINE%\calibration\{SubjectId}.csv", "test");
-                Check("a missing file's note names the path as looked for, variables and subject filled in", absentNote == "Config file not found at Start: " + Path.Combine(root, @"GREEN-DOME-2\calibration\test.csv") + ".", absentNote);
+                Check("a missing file's note names the path as looked for, variables and subject filled in", absentNote == "Config file not found at Start: " + Path.Combine(root, @"TEST-RIG-2\calibration\test.csv") + ".", absentNote);
                 var absentNobody = ManifestWriter.ConfigFiles(@"%OPENRIGS_TEST_MACHINE%\calibration\{SubjectId}.csv", root, null);
                 var absentNobodyNote = ManifestWriter.MissingNote(absentNobody[0], @"%OPENRIGS_TEST_MACHINE%\calibration\{SubjectId}.csv", null);
-                Check("... with no subject the variable is still expanded and the token left, saying so", absentNobodyNote == "Config file not found at Start: " + Path.Combine(root, @"GREEN-DOME-2\calibration\{SubjectId}.csv") + " ({SubjectId} not on the command line).", absentNobodyNote);
+                Check("... with no subject the variable is still expanded and the token left, saying so", absentNobodyNote == "Config file not found at Start: " + Path.Combine(root, @"TEST-RIG-2\calibration\{SubjectId}.csv") + " ({SubjectId} not on the command line).", absentNobodyNote);
                 Directory.CreateDirectory(Path.Combine(root, "Stimuli", "set"));
                 File.WriteAllText(Path.Combine(root, "Stimuli", "b.wav"), "b");
                 File.WriteAllText(Path.Combine(root, "Stimuli", "set", "a.wav"), "a");
