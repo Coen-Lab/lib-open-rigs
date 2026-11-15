@@ -122,7 +122,7 @@ namespace OpenRigs.Audio
         {
             if (!SyncChannel.HasValue)
             {
-                throw new InvalidOperationException("rig.yml's speakerArray has no syncChannel, the channel each stimulus's sync copy plays on. Add it (31 on every dome).");
+                throw new InvalidOperationException("rig.yml's speakerArray has no syncChannel, the channel each stimulus's sync copy plays on. Add it (such as 31).");
             }
             if (Speakers.Any(s => s.Channel == SyncChannel.Value))
             {

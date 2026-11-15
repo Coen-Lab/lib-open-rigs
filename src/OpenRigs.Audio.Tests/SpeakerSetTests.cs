@@ -178,6 +178,7 @@ namespace OpenRigs.Audio.Tests
             var set = SpeakerSet.Load(Rig(extra: "  penaltySoundChannel: 2\n"), "TEST-RIG");
             var error = Assert.ThrowsException<InvalidOperationException>(() => set.Layout(Row(1), new[] { 1 }, 1, false, true));
             StringAssert.Contains(error.Message, "no syncChannel");
+            StringAssert.Contains(error.Message, "Add it (such as 31).");
         }
 
         [TestMethod]
