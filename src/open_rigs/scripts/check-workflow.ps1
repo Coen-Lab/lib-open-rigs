@@ -13,6 +13,7 @@ param(
 #      anything, against the lab's rig template (open_rigs\rigs\rig-template.yml) filled in as a rig's: every type,
 #      selector, include, subject and mapping; what RecordHarpDevices made from rig.yml, what ExperimentManifest
 #      expects, the trial row's columns against schemas\trial-columns.yml, and each window in config\main.layout.
+#      Skipped, and said, on a machine without the Spinnaker SDK (a CI runner).
 #   4. Each config\task*.yml reads as the workflow reads it at Go, TaskPath is exposed, and every key in the
 #      template reaches the Settings_Rig JSON the experiment logs.
 # Needs the environment set up (.bonsai\Setup.ps1: .bonsai\Packages). Exit 0 when all pass.
@@ -307,10 +308,19 @@ $testExit = $LASTEXITCODE
 $log | Where-Object { $_ -match 'Passed!|Failed|error' } | ForEach-Object { "  $_" }
 if ($testExit -ne 0) { "  FAILED"; $bad++ }
 "3. Building main.bonsai with Bonsai's builders, against the filled template..."
-& { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Build 2>&1 | ForEach-Object { "$_" } }
-if ($LASTEXITCODE -ne 0) { "  FAILED"; $bad++ }
+# RigHardware's cameras load SpinnakerNET, which needs the Spinnaker SDK's native Spinnaker_v140.dll on PATH. The SDK
+# is a login-gated download, so a GitHub runner has none and main.bonsai cannot be read there ("There is an error in
+# XML document" at RigHardware's first property; domes' CI, 15 Nov 2026). Skipped only then; every rig and lab
+# machine with the SDK runs it, as update-workflows.ps1 does before each push.
+$spinnaker = @($env:Path -split ';' | Where-Object { $_ -and (Test-Path (Join-Path $_ 'Spinnaker_v140.dll')) })
+if (-not $spinnaker.Count) { "  SKIPPED: no Spinnaker SDK (Spinnaker_v140.dll on PATH), so main.bonsai cannot be built here" }
+else {
+    & { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Build 2>&1 | ForEach-Object { "$_" } }
+    if ($LASTEXITCODE -ne 0) { "  FAILED"; $bad++ }
+}
 "4. The task files, the launch properties and Settings_Rig..."
 & { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Checks 2>&1 | ForEach-Object { "$_" } }
 if ($LASTEXITCODE -ne 0) { "  FAILED"; $bad++ }
 if ($bad) { "check-workflow: $bad step(s) failed."; exit 1 }
-"check-workflow: all 4 steps passed."
+if (-not $spinnaker.Count) { "check-workflow: steps 1, 2 and 4 passed; step 3 skipped (no Spinnaker SDK)." }
+else { "check-workflow: all 4 steps passed." }
