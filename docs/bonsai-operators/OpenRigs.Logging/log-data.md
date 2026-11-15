@@ -10,7 +10,7 @@
 ![LogData](~/assets/workflows/logging/LogData.svg){data-bonsai="~/src/OpenRigs.Logging/LogData.bonsai"}
 :::
 
-The workflow takes a data stream as its `Source1` input, constructs the output path from `PathPrefix` + `LogName` + `Extension`, and writes rows in append mode. The `Selector` property controls which fields of the incoming type are written (defaults to `Seconds`, i.e. the Harp timestamp).
+The workflow takes a data stream as its `Source1` input, constructs the output path from `PathPrefix` + `LogName` + `Extension`, and writes rows in append mode. The `Selector` property controls which fields of the incoming type are written (defaults to `Seconds`, the Harp timestamp's member, which the file's header calls `harpTime`).
 
 ### Externalized properties
 
@@ -18,7 +18,7 @@ The workflow takes a data stream as its `Source1` input, constructs the output p
 |----------|---------|-------------|
 | `LogName` | - | Stem added after the path prefix (e.g. `_lick_spout`) |
 | `Extension` | `.csv` | File extension including the leading dot |
-| `Selector` | `Seconds` | Comma-separated list of member names to write as columns |
+| `Selector` | `Seconds` | Comma-separated list of member names to write as columns; `Seconds` is written as the `harpTime` column |
 | `AutoFlush` | `false` | Flush each row to disk as it is written (Logging 0.1.0-bbox.5 on). For slow logs only, such as trials and events: at a Harp log's rate it costs a disk write per row |
 | `PublishRows` | `false` | Publish each row written to `LoggedRows`, which OpenRigs.LiveView's `StreamDevices` streams as `logs` (0.1.0-bbox.5 on). For slow logs only, as `AutoFlush` |
 

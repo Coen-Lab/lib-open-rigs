@@ -15,7 +15,7 @@ ROOT = Path(__file__).parents[1]
 THIS_FILE = "tests/test_lab_free.py"
 
 LAB_ONLY = re.compile(
-    r"(?i:coen|app-rig-control|app-rig-setup|rig-control|rig-setup|K:\\|C:\\Github)"
+    r"(?i:coen|app-rig-control|app-rig-setup|rig[- ]control\b|rig[- ]setup\b|K:\\|C:\\Github)"
     r"|\b(?:Pip|Tom|Gerion|Nabbefeld|Childs|Ainiah|Masood|T[uü]rker|Jenkin|jkin2)\b"
 )
 
@@ -97,12 +97,12 @@ def test_listed_files_are_still_there():
 
 
 @pytest.mark.parametrize(
-    "line", [r"K:\config\machines", r"C:\Github\lib", "see app-rig-control", "Coen Lab", "asked Gerion", "Tom's rig"]
+    "line", [r"K:\config\machines", r"C:\Github\lib", "see app-rig-control", "as Rig Control shows", "in Rig Setup", "Coen Lab", "asked Gerion", "Tom's rig"]
 )
 def test_the_pattern_catches_lab_text(line):
     assert lab_text(line)
 
 
-@pytest.mark.parametrize("line", ["pip install", "Tomorrow", "atom", "a rig's config"])
+@pytest.mark.parametrize("line", ["pip install", "Tomorrow", "atom", "a rig's config", "the value the rig controls"])
 def test_the_pattern_passes_ordinary_text(line):
     assert not lab_text(line)
