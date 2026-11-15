@@ -46,7 +46,7 @@ behaviorBoard:
       trigger1Enabled: false    # camera trigger 1 shares the DO1 pin, a reward valve's
       trigger1Frequency: 50     # Hz, used only if trigger 1 is enabled
     runningWheel:
-      wheelDiameterMm: 75       # mm; the measured wheel on every dome (9 Nov 2026)
+      wheelDiameterMm: 75       # mm; the measured wheel (9 Nov 2026)
       countsPerRev: 4096
 
 timestampGeneratorGen3:
@@ -95,7 +95,7 @@ camera:
     gain: 0
     binning: 1
 
-# Every camera's video is encoded on the rig's NVIDIA GPU (RTX 5060 on every dome); libx264, the
+# Every camera's video is encoded on the rig's NVIDIA GPU (such as an RTX 5060); libx264, the
 # CPU encoder, when this section is left out.
 videoEncoder:
   codec: h264_nvenc

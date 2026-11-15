@@ -7,7 +7,7 @@
     "version": "0.1.1-coen-lab.15"
   },
   "rig": {
-    "machine": "GEEK-BBOX1",
+    "machine": "RIG-PC1",
     "user": "Coen lab",
     "os": "Microsoft Windows 10.0.26100"
   },
@@ -40,9 +40,9 @@
   "control": null,
   "config_files": [
     {
-      "path": "C:\\Coen-Lab-Local\\RigConfigs\\GEEK-BBOX1\\rig.yml",
+      "path": "C:\\Coen-Lab-Local\\RigConfigs\\RIG-PC1\\rig.yml",
       "missing": true,
-      "why": "Could not find file 'C:\\Coen-Lab-Local\\RigConfigs\\GEEK-BBOX1\\rig.yml'."
+      "why": "Could not find file 'C:\\Coen-Lab-Local\\RigConfigs\\RIG-PC1\\rig.yml'."
     }
   ],
   "trial_columns": null,
@@ -69,7 +69,7 @@
     }
   ],
   "notes": [
-    "Config file not found at Start: C:\\Coen-Lab-Local\\RigConfigs\\GEEK-BBOX1\\rig.yml.",
+    "Config file not found at Start: C:\\Coen-Lab-Local\\RigConfigs\\RIG-PC1\\rig.yml.",
     "No ExperimentControl running when the experiment folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it."
   ],
   "files": [

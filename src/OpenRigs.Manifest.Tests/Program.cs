@@ -56,7 +56,7 @@ namespace OpenRigs.Manifest.Tests
             Set(state, "Go", new ControlEvent
             {
                 Kind = ControlEventKind.Go, SubjectId = "TC002", SessionId = "003B1", Time = DateTime.UtcNow,
-                Parameters = new Dictionary<string, string> { { "RunLengthMins", "30" } }
+                Parameters = new Dictionary<string, string> { { "RunLengthMinutes", "30" } }
             });
             return state;
         }
@@ -185,13 +185,13 @@ namespace OpenRigs.Manifest.Tests
             Directory.CreateDirectory(folder);
 
             var writer = Object("package", "OpenRigs.Manifest", "version", "0.1.1-coen-lab.15");
-            var rig = Object("machine", "GEEK-BBOX1", "user", "Coen lab", "os", "Microsoft Windows 10.0.26100");
+            var rig = Object("machine", "RIG-PC1", "user", "Coen lab", "os", "Microsoft Windows 10.0.26100");
             var workflow = @"C:\Github\Coen-Lab\coen-behaviour-box\src\main.bonsai";
             Func<bool, JsonObject> source = dirty => Object("workflow", @"src\main.bonsai", "repo", "https://github.com/ucl-open/coen-behaviour-box.git",
                 "root", @"C:\Github\Coen-Lab\coen-behaviour-box", "branch", "main", "commit", "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
                 "dirty", dirty, "changed", dirty ? new List<object> { "src/main.bonsai" } : new List<object>(),
                 "diff_sha256", dirty ? "5d41402abc4b2a76b9719d911017c5925d41402abc4b2a76b9719d911017c592" : null, "bonsai", "2.9.0");
-            var rigYml = @"C:\Coen-Lab-Local\RigConfigs\GEEK-BBOX1\rig.yml";
+            var rigYml = @"C:\Coen-Lab-Local\RigConfigs\RIG-PC1\rig.yml";
             var start = new StartSnapshot
             {
                 Source = source(false),
@@ -235,7 +235,7 @@ namespace OpenRigs.Manifest.Tests
                 ManifestWriter.ExpectedSection(withCamera, files), new[] { "Camera-Overhead left no file" }, files);
             var openFiles = allFiles(false);
             records["stopped-not-final"] = ManifestWriter.Document(Utc("2026-11-12T10:31:10Z"), "coen-behaviour-box", writer, rig, session, start,
-                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, new KeyValuePair<string, string>("", "someone at AV-DOME-CONTROL (no Lab PIN)")),
+                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, new KeyValuePair<string, string>("", "someone at CONTROL-PC (no Lab PIN)")),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Stopped, null), false, started, Utc("2026-11-12T10:31:10Z"), null, "Stop from the window"),
                 ManifestWriter.ExpectedSection(plan, openFiles), none, openFiles);
             var bare = new StartSnapshot

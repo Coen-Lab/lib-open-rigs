@@ -94,7 +94,7 @@ namespace OpenRigs.Video
                         var frame = capture.QueryFrame();
                         if (frame == null)
                         {
-                            // A long exposure or its change can miss a frame (GREEN-DOME-1's USB
+                            // A long exposure or its change can miss a frame (a rig's USB
                             // camera at 1 s, 10 Nov 2026): unplugged only once none comes for longer.
                             if (since.Elapsed.TotalSeconds > NoFrameSeconds())
                                 throw new InvalidOperationException("The calibration camera stopped giving frames: was it unplugged?");
@@ -153,7 +153,7 @@ namespace OpenRigs.Video
         }
 
         // The vendor ids of cameras that belong to rigs and are never a calibration camera: FLIR
-        // (Spinnaker) and Basler (BLUE-OPTO's Zapit camera, which no rig.yml lists), as app-rig-control's
+        // (Spinnaker) and Basler (the Zapit camera, which no rig.yml lists), as app-rig-control's
         // still_camera.py has them.
         static readonly string[] RigVendors = { "vid_1e10", "vid_2676" };
 

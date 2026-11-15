@@ -46,7 +46,7 @@ namespace OpenRigs.Core
                 bool sourceDone = false, stopped = false;
                 // Notifications are queued under the gate and sent outside it, one thread at a time:
                 // whichever thread finds no one sending sends the queue; the others queue and return.
-                // Sending under the gate deadlocked a rig (BLUE-OPTO-2, 14 Nov 2026): the clock's thread,
+                // Sending under the gate deadlocked a rig (14 Nov 2026): the clock's thread,
                 // holding the clock subject's lock (Bonsai's BehaviorSubject ticks under it), waited for the
                 // gate, while a lick's thread held the gate and, ending the trial downstream, waited for the
                 // clock subject's lock to unsubscribe.

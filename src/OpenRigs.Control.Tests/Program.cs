@@ -52,7 +52,7 @@ namespace OpenRigs.Control.Tests
                 SessionId = "003B1",
                 Parameters = new Collection<Parameter>
                 {
-                    new Parameter { Name = "RunLengthMins", Value = "30", Minimum = 1, Maximum = 9999, WholeNumber = true },
+                    new Parameter { Name = "RunLengthMinutes", Value = "30", Minimum = 1, Maximum = 9999, WholeNumber = true },
                     new Parameter { Name = "RewardUl", Value = "2.5", Minimum = 0, Maximum = 10 },
                     new Parameter { Name = "Note", Value = "" },
                 },
@@ -76,8 +76,8 @@ namespace OpenRigs.Control.Tests
                 var earlyFinished = Catch(() => new ReportPhase { Phase = ExperimentPhase.Finished }.Process(Observable.Return(1)).Wait());
                 Check("Recording or Finished before Go is refused, and the phase stays", early is InvalidOperationException && earlyFinished is InvalidOperationException && earlyFinished.Message.Contains("Finished before Go") && state.Phase == ExperimentPhase.Starting,
                     (early == null ? "Recording taken" : early.Message) + " / " + (earlyFinished == null ? "Finished taken" : earlyFinished.Message) + " / " + state.Phase);
-                Check("a whole number in range is taken", Ok(Ask(socket, new { cmd = "set", name = "RunLengthMins", value = "45" })), "refused");
-                var half = Ask(socket, new { cmd = "set", name = "RunLengthMins", value = "2.5" });
+                Check("a whole number in range is taken", Ok(Ask(socket, new { cmd = "set", name = "RunLengthMinutes", value = "45" })), "refused");
+                var half = Ask(socket, new { cmd = "set", name = "RunLengthMinutes", value = "2.5" });
                 Check("a fraction for a whole-number parameter is refused, with the range", !Ok(half) && ((string)half["why"]).Contains("whole number from 1 to 9999"), half.ToString());
                 Check("a number above the maximum is refused", !Ok(Ask(socket, new { cmd = "set", name = "RewardUl", value = "11" })), "taken");
                 Check("NaN is refused for a parameter with limits", !Ok(Ask(socket, new { cmd = "set", name = "RewardUl", value = "NaN" })), "taken");
@@ -89,12 +89,12 @@ namespace OpenRigs.Control.Tests
                 Thread.Sleep(200);
                 ControlEvent[] sets;
                 lock (events) sets = events.ToArray();
-                var lengths = new OnParameterSet { Name = "RunLengthMins" }.Process(sets.ToObservable()).ToList().Wait();
+                var lengths = new OnParameterSet { Name = "RunLengthMinutes" }.Process(sets.ToObservable()).ToList().Wait();
                 Check("each accepted set is an event, and only accepted ones", sets.Length == 2 && sets.All(e => e.Kind == ControlEventKind.Set), string.Join("; ", sets.Select(e => e.ToString())));
                 Check("OnParameterSet passes the named parameter's new values", lengths.SequenceEqual(new[] { "45" }), string.Join(",", lengths));
                 Check("OnGo drops sets", !new OnGo().Process(sets.ToObservable()).ToList().Wait().Any(), "passed one");
                 new ParameterDefault { Name = "RewardUl" }.Process(Observable.Return(3.5)).Wait();
-                new ParameterDefault { Name = "RunLengthMins" }.Process(Observable.Return(60)).Wait();
+                new ParameterDefault { Name = "RunLengthMinutes" }.Process(Observable.Return(60)).Wait();
                 var defaults = Ask(socket, new { cmd = "status" })["parameters"];
                 Check("ParameterDefault sets a parameter no controller has set, shown in status", (string)defaults[1]["value"] == "3.5", defaults.ToString());
                 Check("... but leaves one a controller set", (string)defaults[0]["value"] == "45", defaults.ToString());
@@ -102,7 +102,7 @@ namespace OpenRigs.Control.Tests
                 var over = Ask(socket, new { cmd = "set", name = "RewardUl", value = "6" });
                 Check("ParameterMaximum lowers the limit a set is checked against", !Ok(over) && ((string)over["why"]).Contains("from 0 to 5"), over.ToString());
                 var unknown = Catch(() => new ParameterDefault { Name = "Nope" }.Process(Observable.Return(1)).Wait());
-                Check("ParameterDefault of an undeclared parameter stops, naming the declared ones", unknown is ArgumentException && unknown.Message.Contains("RunLengthMins, RewardUl, Note"), unknown == null ? "no error" : unknown.Message);
+                Check("ParameterDefault of an undeclared parameter stops, naming the declared ones", unknown is ArgumentException && unknown.Message.Contains("RunLengthMinutes, RewardUl, Note"), unknown == null ? "no error" : unknown.Message);
 
                 Console.WriteLine("Go:");
                 Check("Go is refused before Ready", !Ok(Ask(socket, new { cmd = "go" })), "taken");
@@ -129,14 +129,14 @@ namespace OpenRigs.Control.Tests
                 Thread.Sleep(200);
                 ControlEvent go;
                 lock (events) go = events.Find(e => e.Kind == ControlEventKind.Go);
-                Check("the Go event carries the parameters as they stood", go != null && go.Parameters["RunLengthMins"] == "45" && go.Parameters["Note"] == "left eye shut", go == null ? "no Go event" : go.ToString());
+                Check("the Go event carries the parameters as they stood", go != null && go.Parameters["RunLengthMinutes"] == "45" && go.Parameters["Note"] == "left eye shut", go == null ? "no Go event" : go.ToString());
                 Check("ControlState.Go is that event", state.Go == go, "differs");
                 var settings = ExperimentSettings.Settings(go, state, new JObject { ["workflow"] = "src/main.bonsai", ["commit"] = "abc123" });
                 Check("ExperimentSettings has the subject, session, rig and workflow", (string)settings["subject_id"] == "TC002" && (string)settings["session_id"] == "003B1" && (string)settings["rig"] == Environment.MachineName && (string)settings["workflow"] == "src/main.bonsai" && (string)settings["commit"] == "abc123", settings.ToString());
                 Check("... who launched it and sent Go, and when", (string)settings["launched_by"]["id"] == "PipC" && (string)settings["go_by"]["name"] == "Jo Bloggs" && ((string)settings["go"]).EndsWith("Z"), settings.ToString());
-                Check("... and every parameter at Go, in order", string.Join(",", ((JObject)settings["parameters"]).Properties().Select(p => p.Name + "=" + p.Value)) == "RunLengthMins=45,RewardUl=2,Note=left eye shut,Blank=", settings["parameters"].ToString());
+                Check("... and every parameter at Go, in order", string.Join(",", ((JObject)settings["parameters"]).Properties().Select(p => p.Name + "=" + p.Value)) == "RunLengthMinutes=45,RewardUl=2,Note=left eye shut,Blank=", settings["parameters"].ToString());
                 var written = new ExperimentSettings().Process(new[] { go }.ToObservable()).ToList().Wait();
-                Check("ExperimentSettings gives one JSON text for the Go event, with the repository read at Start", written.Count == 1 && JObject.Parse(written[0])["parameters"]["RunLengthMins"].ToString() == "45" && JObject.Parse(written[0]).Property("commit") != null, string.Join(" | ", written));
+                Check("ExperimentSettings gives one JSON text for the Go event, with the repository read at Start", written.Count == 1 && JObject.Parse(written[0])["parameters"]["RunLengthMinutes"].ToString() == "45" && JObject.Parse(written[0]).Property("commit") != null, string.Join(" | ", written));
 
                 Console.WriteLine("Commands and status:");
                 state.SetPhase(ExperimentPhase.Recording);

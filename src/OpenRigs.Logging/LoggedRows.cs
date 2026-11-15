@@ -43,7 +43,7 @@ namespace OpenRigs.Logging
     /// </summary>
     /// <remarks>
     /// A live view needs an experiment's trials as they happen, and the rows are written deep in a
-    /// workflow (av-dome's LogTrial sits inside a SelectMany, whose subjects nothing at the top
+    /// workflow (a task's LogTrial can sit inside a SelectMany, whose subjects nothing at the top
     /// level can see). So the rows go through one place in the process instead of a subject: every
     /// CsvWriter with PublishRows on hands its rows here, and OpenRigs.LiveView's StreamDevices,
     /// last in the workflow, streams them without the workflow wiring anything. One Bonsai runs one

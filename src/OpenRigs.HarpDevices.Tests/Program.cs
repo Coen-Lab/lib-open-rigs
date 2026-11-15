@@ -46,7 +46,7 @@ namespace OpenRigs.HarpDevices.Tests
             return HarpMessage.FromByte(address, MessageType.Read, value);
         }
 
-        // What GEEK-BBOX1's Behavior board reported on 2 Nov 2026: WhoAmI 1216, hardware 1.2,
+        // What a rig's Behavior board reported on 2 Nov 2026: WhoAmI 1216, hardware 1.2,
         // core 1.11, firmware 3.1, Harp serial unset (65535), and no unique id (core before 1.12).
         static IEnumerable<HarpMessage> Board(int whoAmI)
         {
@@ -80,7 +80,7 @@ namespace OpenRigs.HarpDevices.Tests
             };
         }
 
-        // The dump as GEEK-BBOX1's board sent it on 2 Nov 2026 (ses-909's .bin): each core register
+        // The dump as a rig's board sent it on 2 Nov 2026 (ses-909's .bin): each core register
         // followed by the device's own at 32 on, so the device name, Harp serial and unique id
         // come after FirmwareVersionLow (7). Here with a unique id, as a core from 1.12 has.
         static IEnumerable<HarpMessage> Interleaved(int whoAmI)

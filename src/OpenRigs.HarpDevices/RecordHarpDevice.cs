@@ -264,7 +264,7 @@ namespace OpenRigs.HarpDevices
             return (end >= 0 ? text.Substring(0, end) : text).Trim();
         }
 
-        // Register 16 is the 16-byte unique id from Harp core 1.12; older cores (GEEK-BBOX1's board, 1.11) have none.
+        // Register 16 is the 16-byte unique id from Harp core 1.12; older cores (such as a Behavior board on 1.11) have none.
         const int UidAddress = 16;
 
         static string Uid(Dictionary<int, HarpMessage> registers)

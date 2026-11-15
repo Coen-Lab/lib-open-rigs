@@ -52,7 +52,7 @@ namespace OpenRigs.Audio.Tests
         }
 
         // SpeakerMixer's path for StimulusSounds, with a timer for the mixer and SubscribeWhen for AppendBuffer (which
-        // subscribes once the mixer starts), fed as the dome decision-making task feeds it: each trial a SelectMany whose
+        // subscribes once the mixer starts), fed as a two-choice task feeds it: each trial a SelectMany whose
         // Take(1) multicasts one sound into the BehaviorSubject, and completes.
         const string Workflow =
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<WorkflowBuilder Version=\"2.9.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" +
@@ -106,7 +106,7 @@ namespace OpenRigs.Audio.Tests
         [TestMethod]
         public void EachTrialsSoundFromASelectManyTakeReachesTheMixerAfterTrialOne()
         {
-            // A PublishSubject fed straight by the per-trial multicast would close at trial 1 (BLUE-OPTO-2).
+            // A PublishSubject fed straight by the per-trial multicast would close at trial 1 (seen on a rig).
             var result = Run("PT0.2S", "PT0.4S", 4, 10);
             Assert.IsNull(result.Item2, result.Item2 == null ? null : result.Item2.Message);
             CollectionAssert.AreEqual(new long[] { 0, 1, 2, 3 }, result.Item1);

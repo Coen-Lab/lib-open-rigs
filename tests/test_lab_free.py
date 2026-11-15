@@ -17,6 +17,7 @@ THIS_FILE = "tests/test_lab_free.py"
 LAB_ONLY = re.compile(
     r"(?i:coen|app-rig-control|app-rig-setup|rig[- ]control\b|rig[- ]setup\b|K:\\|C:\\Github)"
     r"|\b(?:Pip|Tom|Gerion|Nabbefeld|Childs|Ainiah|Masood|T[uü]rker|Jenkin|jkin2)\b"
+    r"|\b[A-Z]+-(?:OPTO|DOME|BBOX)\b|\bBBOX-?\d|(?i:\bdome\b)"
 )
 
 NAMED_THE_LAB_BEFORE_THE_RULE = {
@@ -97,12 +98,19 @@ def test_listed_files_are_still_there():
 
 
 @pytest.mark.parametrize(
-    "line", [r"K:\config\machines", r"C:\Github\lib", "see app-rig-control", "as Rig Control shows", "in Rig Setup", "Coen Lab", "asked Gerion", "Tom's rig"]
+    "line",
+    [
+        r"K:\config\machines", r"C:\Github\lib", "see app-rig-control", "as Rig Control shows", "in Rig Setup", "Coen Lab",
+        "asked Gerion", "Tom's rig", "on BLUE-OPTO-2", "GREEN-DOME-1's camera", "GEEK-BBOX1", "BBOX-1's board", "every dome",
+        "the Dome task", "av-dome's",
+    ],
 )
 def test_the_pattern_catches_lab_text(line):
     assert lab_text(line)
 
 
-@pytest.mark.parametrize("line", ["pip install", "Tomorrow", "atom", "a rig's config", "the value the rig controls"])
+@pytest.mark.parametrize(
+    "line", ["pip install", "Tomorrow", "atom", "a rig's config", "the value the rig controls", "OPTO = {", "domestic", "0.1.0-bbox.5"]
+)
 def test_the_pattern_passes_ordinary_text(line):
     assert not lab_text(line)

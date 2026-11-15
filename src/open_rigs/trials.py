@@ -6,7 +6,7 @@
 LogTrial writes the log hourly (`BonsaiData\\BonsaiData_Trial_<hour>.csv`, split at the Harp clock's
 hour); this joins the files in name order, converts each column to its type (int, double, bool or string; an
 empty cell is None, "NaN" a float NaN) and, with `decode`, replaces a coded column's number with its
-name (`values`, such as av-dome's trialType). Columns the workflow's file does not list are kept as
+name (`values`, such as a task's trialType). Columns the workflow's file does not list are kept as
 written, as text. Nothing on disk is changed: recorded data is never rewritten.
 
 What each column means comes from the experiment itself: `manifest.json`'s `trial_columns`, which

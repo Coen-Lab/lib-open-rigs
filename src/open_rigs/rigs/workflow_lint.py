@@ -132,7 +132,7 @@ def finite_async_event_senders(wf: Workflow) -> tuple[int, list[str]]:
 def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
     """Each MulticastSubject inside a per-element nested graph whose subject is not a BehaviorSubject declared in the
     workflow, by a lab block it includes, or inside that graph. Bonsai 2.9 passes a multicast source's completion to a
-    PublishSubject or ReplaySubject, so the first trial's graph closes it for good (BLUE-OPTO-2, 14 Nov 2026)."""
+    PublishSubject or ReplaySubject, so the first trial's graph closes it for good (seen on a rig, 14 Nov 2026)."""
     declared: dict[str, str] = {}
     for path, subjects in BLOCK_SUBJECTS.items():
         if f'Path="{path}"' in wf.text:
@@ -165,7 +165,7 @@ def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
 
 def startup_watchdog_readers(wf: Workflow) -> int:
     """How many nodes read a StartupWatchdog's output: it completes once every stage has come and never emits, so a
-    node fed by it never sees a value (GREEN-DOME-2, 14 Nov 2026: Ready never came)."""
+    node fed by it never sees a value (seen on a rig, 14 Nov 2026: Ready never came)."""
     return sum(1 for nodes, edges in _scopes(wf.root) for i, n in enumerate(nodes)
                if kind(n).endswith(":StartupWatchdog") for a, _, _ in edges if a == i)
 

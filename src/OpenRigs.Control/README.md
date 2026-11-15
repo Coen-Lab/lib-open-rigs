@@ -36,11 +36,11 @@ One JSON object per request on a ZeroMQ REQ/REP pair, one per reply: `{"ok": tru
 
 ## Parameter Limits
 
-A declared parameter may carry `Minimum`, `Maximum` and `WholeNumber`, and a `set` outside them is refused with the reason ("RunLengthMins must be a whole number from 1 to 9999; '2.5' is not"). Without limits any text is taken, and a workflow that parses the value at Go stops there instead: before 0.1.0-local.4, `set RunLengthMins "x"` was accepted and Go then stopped coen-behaviour-box with a FormatException.
+A declared parameter may carry `Minimum`, `Maximum` and `WholeNumber`, and a `set` outside them is refused with the reason ("RunLengthMinutes must be a whole number from 1 to 9999; '2.5' is not"). Without limits any text is taken, and a workflow that parses the value at Go stops there instead: before 0.1.0-local.4, `set RunLengthMinutes "x"` was accepted and Go then stopped coen-behaviour-box with a FormatException.
 
 ```xml
 <Parameter>
-  <Name>RunLengthMins</Name>
+  <Name>RunLengthMinutes</Name>
   <Value>30</Value>
   <Description>How long to record, in whole minutes (1 to 9999).</Description>
   <Minimum>1</Minimum>
