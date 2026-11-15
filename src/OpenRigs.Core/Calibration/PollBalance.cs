@@ -26,16 +26,19 @@ namespace OpenRigs.Core
         {
             if (settings == null) throw new ArgumentNullException("settings");
             var boot = TimeSpan.FromSeconds(Math.Max(0, settings.BootDelayS));
-            var firstPrint = boot + TimeSpan.FromSeconds(Math.Max(0, settings.TareDelayS));
+            var settle = TimeSpan.FromSeconds(Math.Max(0, settings.TareDelayS));
             var period = TimeSpan.FromSeconds(settings.PrintPeriodS > 0 ? settings.PrintPeriodS : 0.5);
+            var noTare = string.IsNullOrEmpty(settings.TareCommand);
 
-            var tare = string.IsNullOrEmpty(settings.TareCommand)
+            // The prints' schedule starts once the tare is sent (Concat), not on a second timer
+            // from the start: two timers on a busy thread pool could send a print first.
+            var tare = noTare
                 ? Observable.Empty<string>()
                 : Observable.Timer(boot).Select(_ => settings.TareCommand);
             var print = string.IsNullOrEmpty(settings.PrintCommand)
                 ? Observable.Empty<string>()
-                : Observable.Timer(firstPrint, period).Select(_ => settings.PrintCommand);
-            return tare.Merge(print);
+                : Observable.Timer(noTare ? boot + settle : settle, period).Select(_ => settings.PrintCommand);
+            return tare.Concat(print);
         }
     }
 }

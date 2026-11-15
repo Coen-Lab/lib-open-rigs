@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Core.Calibration;
 
@@ -63,6 +64,21 @@ namespace OpenRigs.Core.Tests
             var settings = new SerialBalance { BootDelayS = 0.02, TareDelayS = 0.03, PrintPeriodS = 0.02, TareCommand = "T", PrintCommand = "IP" };
             var commands = PollBalance.Commands(settings).Take(4).ToList().Timeout(TimeSpan.FromSeconds(5)).Wait();
             CollectionAssert.AreEqual(new[] { "T", "IP", "IP", "IP" }, commands.ToArray());
+        }
+
+        [TestMethod]
+        public void TheTareStaysFirstWhenTheThreadPoolIsBusy()
+        {
+            // CI (15 Nov 2026): on a loaded runner a print was sent before the tare.
+            int workers, io;
+            System.Threading.ThreadPool.GetMinThreads(out workers, out io);
+            for (var i = 0; i < 10; i++)
+            {
+                var settings = new SerialBalance { BootDelayS = 0.02, TareDelayS = 0.03, PrintPeriodS = 0.02, TareCommand = "T", PrintCommand = "IP" };
+                var commands = PollBalance.Commands(settings).Take(2).ToList().Timeout(TimeSpan.FromSeconds(5)).ToTask();
+                for (var j = 0; j < workers * 2; j++) System.Threading.ThreadPool.QueueUserWorkItem(_ => System.Threading.Thread.Sleep(80));
+                CollectionAssert.AreEqual(new[] { "T", "IP" }, commands.Result.ToArray());
+            }
         }
 
         [TestMethod]
