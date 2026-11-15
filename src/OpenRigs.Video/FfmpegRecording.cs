@@ -89,6 +89,9 @@ namespace OpenRigs.Video
         /// <summary>The ffmpeg process's id once it has started; for tests.</summary>
         internal int? FfmpegProcessId { get { lock (gate) return process?.Id; } }
 
+        /// <summary>For tests: runs on the writer's thread once ffmpeg has started, before it is handed over.</summary>
+        internal Action? Started { get; set; }
+
         /// <summary>ffmpeg's exit code once it has exited; null before, or if it never started or was killed and did not report.</summary>
         public int? ExitCode { get { lock (gate) return exitCode; } }
 
@@ -303,6 +306,7 @@ namespace OpenRigs.Video
             // ffmpeg's output is read on threads of its own, not the thread pool's (Process's
             // BeginErrorReadLine), so its last words are in when it exits however busy the pool is.
             readers = new[] { ReadLines(started.StandardError), ReadLines(started.StandardOutput) };
+            Started?.Invoke();
             bool late;
             lock (gate)
             {

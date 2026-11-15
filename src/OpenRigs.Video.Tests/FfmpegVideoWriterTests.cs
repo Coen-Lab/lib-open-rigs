@@ -12,7 +12,7 @@ using OpenCV.Net;
 
 namespace OpenRigs.Video.Tests
 {
-    /// <summary>FfmpegVideoWriter with real ffmpeg.exe (libx264, so no GPU is needed); skipped where ffmpeg.exe is not on PATH.</summary>
+    /// <summary>FfmpegVideoWriter with real ffmpeg.exe (libx264, so no GPU is needed); skipped where ffmpeg.exe is not on PATH, except on CI.</summary>
     [TestClass]
     public class FfmpegVideoWriterTests
     {
@@ -42,6 +42,8 @@ namespace OpenRigs.Video.Tests
 
         void RequireFfmpeg()
         {
+            // CI's Windows test job installs ffmpeg (.github\workflows\OpenRigs.yml), so these tests never skip there.
+            if (ffmpeg == null && Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true") Assert.Fail("ffmpeg.exe is not on CI's PATH.");
             if (ffmpeg == null) Assert.Inconclusive("ffmpeg.exe is not on PATH.");
         }
 
@@ -283,6 +285,42 @@ namespace OpenRigs.Video.Tests
                 Assert.IsTrue(clock.Elapsed < TimeSpan.FromSeconds(3.5), "Finish waits about the stop timeout: " + clock.Elapsed);
             }
             finally { release.Set(); }
+        }
+
+        // A stop deadline that passes while ffmpeg is starting (held at its start by the test) found no
+        // process to kill: ffmpeg is killed as it is handed over, or the frame's write blocks for good.
+        [TestMethod]
+        public void ADeadlineThatPassesWhileFfmpegStarts_KillsItAtTheHandover()
+        {
+            var recording = Stuck(capacity: 5, stopTimeout: TimeSpan.FromSeconds(2));
+            var started = new ManualResetEventSlim();
+            var handOver = new ManualResetEventSlim();
+            recording.Started = () => { started.Set(); handOver.Wait(); };
+            var frames = Frames(2);
+            recording.Add(frames[0]);
+            try
+            {
+                Assert.IsTrue(started.Wait(TimeSpan.FromSeconds(30)), "ffmpeg never started");
+                recording.End();
+                // Add reports the recording's failure, once the deadline has set it, ahead of its end.
+                var passed = Stopwatch.StartNew();
+                string said;
+                do
+                {
+                    Thread.Sleep(50);
+                    said = Assert.ThrowsException<InvalidOperationException>(() => recording.Add(frames[1])).Message;
+                }
+                while (!said.Contains("was killed") && passed.Elapsed < TimeSpan.FromSeconds(30));
+                StringAssert.Contains(said, "was killed", "the deadline never passed");
+                handOver.Set();
+                StringAssert.Contains(recording.Finish(), "was killed");
+            }
+            finally
+            {
+                handOver.Set();
+                var id = recording.FfmpegProcessId;
+                if (id != null) try { Process.GetProcessById(id.Value).Kill(); } catch (ArgumentException) { } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
+            }
         }
 
         [TestMethod]
