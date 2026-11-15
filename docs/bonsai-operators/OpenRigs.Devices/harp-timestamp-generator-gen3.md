@@ -18,26 +18,17 @@ The Harp Timestamp Generator Gen3 (`who_am_i = 1158`) is a hardware clock synchr
 
 ### Configuration example
 
-In your `rig.py`:
-
-```python
-from open_rigs.devices import HarpTimestampGeneratorGen3, TimerFrequency
-
-class Rig(...):
-    ...
-    timestamp_generator: HarpTimestampGeneratorGen3 = HarpTimestampGeneratorGen3(
-        port_name="COM3",
-        timer_frequency=TimerFrequency.Timer1000Hz,
-    )
-```
-
-Or as YAML:
+In `rig.yml`, under `timestampGeneratorGen3`, one entry per generator (`main` is `TimestampGeneratorGen3-Main`), read by the lab rig model (`open_rigs.rigs.lab_rig.LabRig`):
 
 ```yaml
-timestamp_generator:
-  port_name: COM3
-  timer_frequency: Timer1000Hz
+timestampGeneratorGen3:
+  main:
+    portName: COM3
+    usbSerial: CHANGE-ME
+    timerFrequency: Timer1000Hz
 ```
+
+In Python it is `LabRig(timestamp_generator_gen3={"main": HarpTimestampGeneratorGen3(port_name="COM3", timer_frequency=TimerFrequency.Timer1000Hz)})`.
 
 ---
 

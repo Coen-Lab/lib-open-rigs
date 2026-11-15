@@ -1,5 +1,7 @@
 # Adding a New Hardware Module
 
+> **Lab workflows differ.** This page teaches the generic open-rigs template, where a project has its own rig model in `rig.py` and its own `examples\rig.py`. A lab workflow has neither: every lab rig is `open_rigs.rigs.lab_rig.LabRig`, read from the machine's `rig.yml` (camelCase keys such as `behaviorBoard`, `timestampGeneratorGen3`, `licketySplit` and `camera`, each device kind a group of named entries; `open_rigs\rigs\rig-template.yml` is the whole file), and its devices are the pieces in [Building Blocks](../articles/building-blocks.md). A new lab device is a new part of `LabRig`, not a field of a project's rig.
+
 This tutorial walks through adding a new hardware module to a open-rigs experiment. Modules will typically be built locally inside your experiment repository first, then migrated to the shared `acquisition` package once they are tested and stable. This tutorial covers the local build only — migration to `acquisition` will be covered in a separate guide.
 
 A hardware module has two complementary parts:

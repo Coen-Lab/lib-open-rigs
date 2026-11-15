@@ -69,6 +69,7 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `3e19a06`, `bef49d0` | Devices (.20), Logging (.14), Python | `Zapit.ConnectForTask`, `BehaviorBoard.ManualRewards`, `LogLabExperiment` and `LogControlEvents`, what every task did the same way, each one include, linted | Lab-only |
 | `1f9fbff` | Manifest (.22) | `ExperimentManifest`'s `{RigFiles}`, the default `ConfigFiles`: `rig.yml` under the launch's `ConfigRoot`, every file it names, and the mouse's spout positions on a rig with a spout stage | Lab-only |
 | `a31806e`, `d580fe1` | Logging (.14), Core (.18), Video (.16), Python | Descriptions (a speaker's filter required, LogDataSchema's experiment folder); flaky tests (WeighStable, ffmpeg's report after a kill, LogDataSchema unbuffered) | Lab-only |
+| `03d38fa` | Devices (.21), Python | `DomeHardware` holds the speakers (`SpeakerMixer`) and the projector (`ProjectorDisplay`, `DisplayDevice` exposed): every task on these rigs has background noise and a screen. Its `ReadyGate` waits for `MixerStarted` and `ReadyWaitsFor` is no longer exposed; `workflow_lint` finds `SpeakerMixer` and `ProjectorDisplay` inside a rig list and refuses a second of either | Lab-only |
 
 OpenRigs.yml's publish job also pushes each green build's packages, versioned `0.0.0-ciN`, to Coen-Lab's GitHub Packages feed. No workflow installs from that feed: workflows install the `-coen-lab.N` builds in this repository's `local_packages\`, which app-rig-setup's `workflows\update-workflows.ps1` copies into each one.
 

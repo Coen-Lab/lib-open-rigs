@@ -1,5 +1,7 @@
 # Project Structure
 
+> **Lab workflows differ.** This page describes the generic open-rigs template, where a project has its own rig model (`rig.py`). A lab workflow has no `rig.py`: every lab rig is `open_rigs.rigs.lab_rig.LabRig`, read from the machine's `rig.yml`, and its devices are the pieces in [Building Blocks](building-blocks.md).
+
 When you run the copier template you are asked for three inputs:
 
 | Input | Example | Description |

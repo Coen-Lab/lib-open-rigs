@@ -1,5 +1,7 @@
 # Experiment Schemas
 
+> **Lab workflows differ.** This page teaches the generic open-rigs template, where a project has its own rig model in `rig.py` and its own `examples\rig.py`. A lab workflow has neither: every lab rig is `open_rigs.rigs.lab_rig.LabRig`, read from the machine's `rig.yml` (camelCase keys such as `behaviorBoard`, `timestampGeneratorGen3`, `licketySplit` and `camera`, each device kind a group of named entries; `open_rigs\rigs\rig-template.yml` is the whole file), and its devices are the pieces in [Building Blocks](../../articles/building-blocks.md). A new lab device is a new part of `LabRig`, not a field of a project's rig.
+
 ### Approach
 Under the open-rigs framework, we aim to have clear separation between our experiment **parameters** and **implementation**.
 

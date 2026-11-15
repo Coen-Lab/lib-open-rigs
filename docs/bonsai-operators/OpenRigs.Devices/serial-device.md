@@ -20,7 +20,7 @@ Device-specific schemas (Arduino, lick spout stage, etc.) extend `SerialDevice` 
 
 ### Configuration example
 
-In your `rig.py`:
+`SerialDevice` is not a part of the lab rig model (`open_rigs.rigs.lab_rig.LabRig`), so a lab `rig.yml` with a `serialDevice` or similar key is refused. A project that needs one adds it to its own rig model, as the [hardware module tutorial](../../tutorials/hardware-modules.md) does, or a lab device takes it as a new part of `LabRig` (see [Building Blocks](../../articles/building-blocks.md)):
 
 ```python
 from open_rigs.devices import SerialDevice

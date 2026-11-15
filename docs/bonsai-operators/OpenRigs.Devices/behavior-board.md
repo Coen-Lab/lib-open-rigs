@@ -23,38 +23,35 @@ Sub-modules:
 
 ### Configuration example
 
-In your `rig.py`:
+In `rig.yml`, under `behaviorBoard`, one entry per board: the entry's name is the piece's (`main` is `BehaviorBoard-Main`). The lab rig model, `open_rigs.rigs.lab_rig.LabRig`, reads it; a key it lacks is refused.
 
-```python
-from open_rigs.devices import (
-    BehaviorBoard,
-    CalibratedPulse,
-    CameraTriggerController,
-    FixedPulse,
-    PulseController,
-    PulseOutput,
-    PulseOutputs,
-    RunningWheel,
-)
-
-class Rig(...):
-    ...
-    behavior_board: BehaviorBoard = BehaviorBoard(
-        port_name="COM5",
-        pulse_controller=PulseController(
-            outputs=PulseOutputs(
-                DO1=PulseOutput(CalibratedPulse(artefact="calibration/valve-DO1.json")),
-                DO2=PulseOutput(CalibratedPulse(artefact="calibration/valve-DO2.json")),
-                DO3=PulseOutput(FixedPulse(pulse_width_ms=5)),
-            ),
-        ),
-        camera_trigger_controller=CameraTriggerController(
-            trigger0_frequency=50,
-            trigger1_frequency=50,
-        ),
-        running_wheel=RunningWheel(counts_per_rev=1024, wheel_diameter_mm=200),
-    )
+```yaml
+behaviorBoard:
+  main:
+    portName: COM5
+    usbSerial: AB0M7PLB
+    pulseController:
+      outputPulseEnable: "DO1, DO2"
+      outputs:
+        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
+        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
+    wiring:
+      DO0: { device: CameraTrigger, targets: [Camera-Face] }
+      DO1: { device: RewardValve, side: left }
+      DO2: { device: RewardValve, side: right }
+      DO3: { device: ZapitTrigger }
+    cameraTriggerController:
+      trigger0Enabled: true
+      trigger0Frequency: 50
+      trigger1Enabled: false
+      trigger1Frequency: 50
+    runningWheel:
+      wheelDiameterMm: 75
+      countsPerRev: 4096
 ```
+
+In Python the same board is `LabRig(behavior_board={"main": BehaviorBoard(port_name="COM5", ...)})`; `rig-template.yml` (`open_rigs\rigs`) is the whole file with every part.
 
 ---
 

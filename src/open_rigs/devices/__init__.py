@@ -22,7 +22,6 @@ from open_rigs.devices.lick_spout_stage import (
     StepperPositions,
     MotorAddress,
     StageAxisMapping,
-    HarpLickSpoutStage,
 )
 from open_rigs.devices.harp import (
     HarpDevice,
@@ -54,7 +53,6 @@ __all__ = [
     "SerialBalance",
     "LicketySplit",
     "LickSpoutStageDriver",
-    "HarpLickSpoutStage",
     "HarpDevice",
     "HarpClockSynchronizer",
     "HarpTimestampGeneratorGen3",

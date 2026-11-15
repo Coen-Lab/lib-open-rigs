@@ -16,28 +16,23 @@ The LicketySplit (`who_am_i = 1400`) is a Harp lick detector. It samples one or 
 
 ### Configuration example
 
-In your `rig.py`:
-
-```python
-from open_rigs.devices import LicketySplit
-
-class Rig(...):
-    ...
-    lick_detector: LicketySplit = LicketySplit(
-        port_name="COM7",
-        channel0_trigger_threshold=1200,
-        channel0_untrigger_threshold=900,
-    )
-```
-
-Or as YAML:
+In `rig.yml`, under `licketySplit`, one entry per detector (`left` is `LicketySplit-Left`), read by the lab rig model (`open_rigs.rigs.lab_rig.LabRig`):
 
 ```yaml
-lick_detector:
-  port_name: COM7
-  channel0_trigger_threshold: 1200
-  channel0_untrigger_threshold: 900
+licketySplit:
+  left:
+    portName: COM5
+    usbSerial: CHANGE-ME
+    channel0TriggerThreshold: 1200
+    channel0UntriggerThreshold: 900
+  right:
+    portName: COM6
+    usbSerial: CHANGE-ME
+    channel0TriggerThreshold: 1200
+    channel0UntriggerThreshold: 900
 ```
+
+In Python it is `LabRig(lickety_split={"left": LicketySplit(port_name="COM5", ...)})`.
 
 ---
 
