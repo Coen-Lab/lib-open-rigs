@@ -142,8 +142,8 @@ namespace OpenRigs.Core.Tests
         {
             // The fixture: 0.055 ul/ms - 0.1 ul, 20 to 60 ms. 2 ul: (2 + 0.1) / 0.055 = 38.2 -> 38 ms, 1.99 ul.
             var plan = PlanReward.Plan(Calibrated(), 2.0);
-            Assert.AreEqual(1, plan.Count);
-            Assert.AreEqual(38, plan.WidthMs);
+            Assert.AreEqual(1, plan.Pulses);
+            Assert.AreEqual(38, plan.PulseWidthMs);
             Assert.AreEqual(1.99, plan.DeliveredUl, 1e-9);
             Assert.AreEqual(1, plan.Line);
             Assert.AreEqual(100, plan.PulseGapMs);
@@ -155,12 +155,12 @@ namespace OpenRigs.Core.Tests
         {
             // At most 3.2 ul a pulse: 6.4 ul is two pulses at 60 ms, a little more is three.
             var two = PlanReward.Plan(Calibrated(), 6.4);
-            Assert.AreEqual(2, two.Count);
-            Assert.AreEqual(60, two.WidthMs);
+            Assert.AreEqual(2, two.Pulses);
+            Assert.AreEqual(60, two.PulseWidthMs);
             Assert.AreEqual(6.4, two.DeliveredUl, 1e-9);
             var three = PlanReward.Plan(Calibrated(), 6.5);
-            Assert.AreEqual(3, three.Count);
-            Assert.AreEqual(41, three.WidthMs);  // (6.5 / 3 + 0.1) / 0.055 = 41.2
+            Assert.AreEqual(3, three.Pulses);
+            Assert.AreEqual(41, three.PulseWidthMs);  // (6.5 / 3 + 0.1) / 0.055 = 41.2
             Assert.AreEqual(3 * (0.055 * 41 - 0.1), three.DeliveredUl, 1e-9);
         }
 
@@ -168,8 +168,8 @@ namespace OpenRigs.Core.Tests
         public void AVolumeBelowTheRangeIsRaisedToTheShortestWidthAndSaysSo()
         {
             var plan = PlanReward.Plan(Calibrated(), 0.5);
-            Assert.AreEqual(1, plan.Count);
-            Assert.AreEqual(20, plan.WidthMs);
+            Assert.AreEqual(1, plan.Pulses);
+            Assert.AreEqual(20, plan.PulseWidthMs);
             Assert.IsTrue(plan.Clamped);
             Assert.AreEqual(1.0, plan.DeliveredUl, 1e-9);
         }
@@ -180,7 +180,7 @@ namespace OpenRigs.Core.Tests
             foreach (var ul in new[] { 0.0, -1.0 })
             {
                 var plan = PlanReward.Plan(Calibrated(), ul);
-                Assert.AreEqual(0, plan.Count);
+                Assert.AreEqual(0, plan.Pulses);
                 Assert.AreEqual(0.0, plan.DeliveredUl);
             }
         }
@@ -195,8 +195,8 @@ namespace OpenRigs.Core.Tests
             var mapped = System.Reactive.Linq.Observable.Do(plans, plan =>
             {
                 fire.Line = plan.Line;
-                fire.WidthMs = plan.WidthMs;
-                fire.Count = plan.Count;
+                fire.PulseWidthMs = plan.PulseWidthMs;
+                fire.Pulses = plan.Pulses;
                 fire.PulseGapMs = plan.PulseGapMs;
             });
             double now = 0;
@@ -216,7 +216,7 @@ namespace OpenRigs.Core.Tests
         {
             var line = Calibrated();
             Assert.AreEqual(20, line.MaxRewardUl);
-            Assert.AreEqual(7, PlanReward.Plan(line, 20).Count);  // the maximum itself is planned
+            Assert.AreEqual(7, PlanReward.Plan(line, 20).Pulses);  // the maximum itself is planned
             foreach (var ul in new[] { 30.0, 1e12 })
             {
                 var ex = Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(line, ul));

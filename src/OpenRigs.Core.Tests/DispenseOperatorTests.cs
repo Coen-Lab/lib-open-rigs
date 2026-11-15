@@ -85,7 +85,7 @@ namespace OpenRigs.Core.Tests
             var weigh = new WeighStable { SettleWindow = 2, TimeoutSeconds = 10 };
 
             Func<int, int, int, IObservable<double>> fireThenWeigh = (width, count, gap) => Observable.Defer(() =>
-                weigh.Process(new FirePulses { WidthMs = width, Count = count, PulseGapMs = gap }
+                weigh.Process(new FirePulses { PulseWidthMs = width, Pulses = count, PulseGapMs = gap }
                     .Process(Observable.Return(0), clock).Do(requests.OnNext), readings));
 
             using (requests.Subscribe(request => grams[0] += (0.1 + 0.05 * request.Item2) / 1000.0))

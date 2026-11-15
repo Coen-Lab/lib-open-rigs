@@ -49,7 +49,7 @@ namespace OpenRigs.Devices.Tests
             var fire = nodes.FindIndex(n => type(nodes.IndexOf(n)) == "core:FirePulses");
             var input = edges.Single(e => e.To == fire && e.Label == "Source1").From;
             Assert.AreEqual("InputMapping", type(input));
-            CollectionAssert.AreEquivalent(new[] { "Line", "WidthMs", "Count", "PulseGapMs" },
+            CollectionAssert.AreEquivalent(new[] { "Line", "PulseWidthMs", "Pulses", "PulseGapMs" },
                 nodes[input].Descendants(Bonsai + "Property").Select(p => (string)p.Attribute("Name")).ToArray());
             Assert.AreEqual("core:PlanReward", type(edges.Single(e => e.To == input).From));
         }

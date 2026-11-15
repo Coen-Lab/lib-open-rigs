@@ -96,7 +96,7 @@ namespace OpenRigs.Core.Calibration
         struct Burst
         {
             public string Name;
-            public int Count;
+            public int Pulses;
             public int PulseWidthMs;
             public int Gap;
         }
@@ -121,14 +121,14 @@ namespace OpenRigs.Core.Calibration
                 };
                 Func<string> dueText = () => index == 0
                     ? string.Format("Weigh Now: the baseline, the container's weight {0}.",
-                        bursts[0].Count > 0 ? "after " + bursts[0].Count + " priming pulses" : "before any pulse")
-                    : string.Format("Weigh Now: {0}, after {1} pulses of {2} ms.", bursts[index].Name, bursts[index].Count, bursts[index].PulseWidthMs);
+                        bursts[0].Pulses > 0 ? "after " + bursts[0].Pulses + " priming pulses" : "before any pulse")
+                    : string.Format("Weigh Now: {0}, after {1} pulses of {2} ms.", bursts[index].Name, bursts[index].Pulses, bursts[index].PulseWidthMs);
                 Action land = () =>
                 {
                     // FirePulses completes once its last pulse has closed, so the drop has landed
                     // before the weighing starts; a little after that, the person is asked.
                     var burst = bursts[index];
-                    var wait = TimeSpan.FromMilliseconds(burst.Count > 0 ? burst.PulseWidthMs + burst.Gap + 250 : 250);
+                    var wait = TimeSpan.FromMilliseconds(burst.Pulses > 0 ? burst.PulseWidthMs + burst.Gap + 250 : 250);
                     timer.Disposable = Observable.Timer(wait).Subscribe(_ =>
                     {
                         lock (gate)
@@ -151,7 +151,7 @@ namespace OpenRigs.Core.Calibration
                         bursts.Add(new Burst
                         {
                             Name = "priming",
-                            Count = p.PrimingPulses,
+                            Pulses = p.PrimingPulses,
                             PulseWidthMs = p.PrimingPulseWidthMs ?? p.Samples.Max(s => s.PulseWidthMs),
                             Gap = gap
                         });
@@ -160,7 +160,7 @@ namespace OpenRigs.Core.Calibration
                             bursts.Add(new Burst
                             {
                                 Name = string.Format("sample {0} of {1}", i + 1, p.Samples.Count),
-                                Count = p.Samples[i].Repeats,
+                                Pulses = p.Samples[i].Repeats,
                                 PulseWidthMs = p.Samples[i].PulseWidthMs,
                                 Gap = p.Samples[i].PulseGapMs
                             });
@@ -169,7 +169,7 @@ namespace OpenRigs.Core.Calibration
                         index = fired = 0;
                         due = false;
                         note = "";
-                        if (bursts[0].Count > 0) say("Priming the line: wait.");
+                        if (bursts[0].Pulses > 0) say("Priming the line: wait.");
                         else land();
                     }
                 }, observer.OnError));
@@ -180,8 +180,8 @@ namespace OpenRigs.Core.Calibration
                         if (pulse == null || bursts == null || due || index >= bursts.Count) return;
                         fired++;
                         var burst = bursts[index];
-                        say(string.Format("Firing {0}: pulse {1} of {2}, {3} ms. Wait.", burst.Name, fired, burst.Count, burst.PulseWidthMs));
-                        if (fired >= burst.Count) land();
+                        say(string.Format("Firing {0}: pulse {1} of {2}, {3} ms. Wait.", burst.Name, fired, burst.Pulses, burst.PulseWidthMs));
+                        if (fired >= burst.Pulses) land();
                     }
                 }, observer.OnError));
                 subscriptions.Add(typed.Subscribe(text =>

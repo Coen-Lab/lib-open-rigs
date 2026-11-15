@@ -7,7 +7,7 @@
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Delivers each reward, a (side, microlitres) pair with the side as rig.yml's wiring names it (left, right): plans it (PlanReward), publishes the plan on RewardDelivered and fires its pulses through TriggerCalibratedPulse with one FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, so a reward that comes while one fires starts pulseGapMs after its last pulse closes; outputs the pulses. Loads both sides' reward lines once at start (RewardLineLeft, RewardLineRight) from rig.yml's wiring and their valve calibrations (LoadRewardLine), so a line with no calibration stops the workflow at start; a reward above MaxRewardUl (20 ul by default) stops the workflow. Writes each plan as a RewardDelivered row of BonsaiData_Async (AsyncEvents; Value the microlitres delivered, Detail starting with the side) and each calibrated line's file into the experiment as ValveCalibrationDO&lt;n&gt; (LogDataSchema). Place it after the logging that declares AsyncEvents and PathPrefix.</Description>
+  <Description>Delivers each reward, a (side, microlitres) pair with the side as rig.yml's wiring names it (left, right): plans it (PlanReward), publishes the plan on RewardDelivered and fires its pulses through TriggerCalibratedPulse with one FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, so a reward that comes while one fires starts pulseGapMs after its last pulse closes; outputs the pulses. Loads both sides' reward lines once at start (RewardLineLeft, RewardLineRight) from rig.yml's wiring and their valve calibrations (LoadRewardLine), so a line with no calibration stops the workflow at start; a reward above MaxRewardUl (20 ul by default), or one that is not a number or infinite, stops the workflow. Writes each plan as a RewardDelivered row of BonsaiData_Async (AsyncEvents; Value the microlitres delivered, Detail starting with the side) and each calibrated line's file into the experiment as ValveCalibrationDO&lt;n&gt; (LogDataSchema). Place it after the logging that declares AsyncEvents and PathPrefix.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -64,8 +64,8 @@
       <Expression xsi:type="InputMapping">
         <PropertyMappings>
           <Property Name="Line" Selector="Line" />
-          <Property Name="WidthMs" Selector="WidthMs" />
-          <Property Name="Count" Selector="Count" />
+          <Property Name="PulseWidthMs" Selector="PulseWidthMs" />
+          <Property Name="Pulses" Selector="Pulses" />
           <Property Name="PulseGapMs" Selector="PulseGapMs" />
         </PropertyMappings>
       </Expression>
@@ -75,8 +75,8 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="core:FirePulses">
           <core:Line>1</core:Line>
-          <core:WidthMs>1</core:WidthMs>
-          <core:Count>0</core:Count>
+          <core:PulseWidthMs>1</core:PulseWidthMs>
+          <core:Pulses>0</core:Pulses>
           <core:PulseGapMs>0</core:PulseGapMs>
         </Combinator>
       </Expression>
@@ -88,7 +88,7 @@
         <Name>RewardDelivered</Name>
       </Expression>
       <Expression xsi:type="scr:ExpressionTransform">
-        <scr:Expression>new("RewardDelivered" as Event, RewardLine.Side + " DO" + Line.ToString() + " requested=" + RequestedUl.ToString() + " pulses=" + Count.ToString() + " width=" + WidthMs.ToString() + " gap=" + PulseGapMs.ToString() + " clamped=" + Clamped.ToString() + " file=" + RewardLine.CalibrationPath as Detail, DeliveredUl as Value)</scr:Expression>
+        <scr:Expression>new("RewardDelivered" as Event, RewardLine.Side + " DO" + Line.ToString() + " requested=" + RequestedUl.ToString() + " pulses=" + Pulses.ToString() + " pulseWidthMs=" + PulseWidthMs.ToString() + " pulseGapMs=" + PulseGapMs.ToString() + " clamped=" + Clamped.ToString() + " file=" + RewardLine.CalibrationPath as Detail, DeliveredUl as Value)</scr:Expression>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orl:CreateAsyncEvent">

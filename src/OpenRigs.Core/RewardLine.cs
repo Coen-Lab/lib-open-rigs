@@ -214,10 +214,10 @@ namespace OpenRigs.Core
         public double RequestedUl { get; set; }
 
         /// <summary>Gets or sets the number of pulses.</summary>
-        public int Count { get; set; }
+        public int Pulses { get; set; }
 
         /// <summary>Gets or sets the width of each pulse, in milliseconds.</summary>
-        public int WidthMs { get; set; }
+        public int PulseWidthMs { get; set; }
 
         /// <summary>Gets or sets the volume each pulse delivers at that width, in microlitres.</summary>
         public double VolumePerPulseUl { get; set; }
@@ -226,7 +226,7 @@ namespace OpenRigs.Core
         public bool Clamped { get; set; }
 
         /// <summary>Gets the volume the pulses deliver, in microlitres.</summary>
-        public double DeliveredUl { get { return Count * VolumePerPulseUl; } }
+        public double DeliveredUl { get { return Pulses * VolumePerPulseUl; } }
 
         /// <summary>Gets the board's DO line, 1 to 3.</summary>
         public int Line { get { return RewardLine.Line; } }
@@ -281,11 +281,11 @@ namespace OpenRigs.Core
                     "the valve calibration's linearFit gives too little per pulse. Calibrate the valve again.",
                     requestedUl, line.Side, count, largestUl, ushort.MaxValue));
             }
-            plan.Count = Math.Max(1, (int)count);
-            var width = (int)Math.Round((requestedUl / plan.Count - fit.Intercept) / fit.Slope, MidpointRounding.AwayFromZero);
+            plan.Pulses = Math.Max(1, (int)count);
+            var width = (int)Math.Round((requestedUl / plan.Pulses - fit.Intercept) / fit.Slope, MidpointRounding.AwayFromZero);
             plan.Clamped = width < fit.MinX;
-            plan.WidthMs = Math.Min(fit.MaxX, Math.Max(fit.MinX, width));
-            plan.VolumePerPulseUl = fit.Slope * plan.WidthMs + fit.Intercept;
+            plan.PulseWidthMs = Math.Min(fit.MaxX, Math.Max(fit.MinX, width));
+            plan.VolumePerPulseUl = fit.Slope * plan.PulseWidthMs + fit.Intercept;
             return plan;
         }
     }

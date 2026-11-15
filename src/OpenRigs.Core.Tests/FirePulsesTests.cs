@@ -47,7 +47,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void FiresEachPulseTheGapAfterThePreviousOneCloses()
         {
-            using (var run = new Run(new FirePulses { Line = 2, WidthMs = 30, Count = 3, PulseGapMs = 100 }))
+            using (var run = new Run(new FirePulses { Line = 2, PulseWidthMs = 30, Pulses = 3, PulseGapMs = 100 }))
             {
                 run.Tick(10.0);
                 run.Input.OnNext(0);
@@ -62,7 +62,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void ATrainThatArrivesWhileOneFiresWaitsForIt()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 10, Count = 2, PulseGapMs = 40 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 10, Pulses = 2, PulseGapMs = 40 }))
             {
                 run.Tick(0);
                 run.Input.OnNext(0);
@@ -76,7 +76,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void AnInputBeforeAnyTickFiresOnTheFirstTick()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 5, Count = 1 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 5, Pulses = 1 }))
             {
                 run.Input.OnNext(0);
                 Assert.AreEqual(0, run.Pulses.Count);
@@ -88,7 +88,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void CompletesOnlyOnceTheLastPulseHasClosed()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 20, Count = 1 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 20, Pulses = 1 }))
             {
                 run.Tick(1.0);
                 run.Input.OnNext(0);
@@ -103,7 +103,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void ACountOfZeroFiresNothing()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 20, Count = 0 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 20, Pulses = 0 }))
             {
                 run.Tick(1.0);
                 run.Input.OnNext(0);
@@ -116,7 +116,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void RefusesAClockThatGoesBackwardsWithPulsesToFire()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 20, Count = 3, PulseGapMs = 100 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 20, Pulses = 3, PulseGapMs = 100 }))
             {
                 run.Tick(5.0);
                 run.Input.OnNext(0);
@@ -130,7 +130,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void TakesAClockThatGoesBackwardsWhileIdleAsTheNewTime()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 20, Count = 2, PulseGapMs = 100 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 20, Pulses = 2, PulseGapMs = 100 }))
             {
                 run.Tick(5.0);
                 run.Input.OnNext(0);
@@ -148,7 +148,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void AClockThatGoesBackwardsJustAfterAPulseKeepsTheGap()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 20, Count = 1, PulseGapMs = 100 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 20, Pulses = 1, PulseGapMs = 100 }))
             {
                 run.Tick(5.0);
                 run.Input.OnNext(0);
@@ -164,7 +164,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void RefusesAClockThatEndsWithPulsesToFire()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 20, Count = 2, PulseGapMs = 100 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 20, Pulses = 2, PulseGapMs = 100 }))
             {
                 run.Tick(0);
                 run.Input.OnNext(0);
@@ -176,7 +176,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void RefusesAWidthItCannotFire()
         {
-            using (var run = new Run(new FirePulses { WidthMs = 0, Count = 1 }))
+            using (var run = new Run(new FirePulses { PulseWidthMs = 0, Pulses = 1 }))
             {
                 run.Tick(0);
                 run.Input.OnNext(0);
