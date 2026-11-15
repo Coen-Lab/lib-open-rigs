@@ -4,8 +4,9 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit for every workflow using it, from its input on: the input is the task's Zapit conditions file path, sent once when the experiment uses Zapit. Connects to rig.yml's zapit host and port (ZapitClient), sends every ZapitCommands value and publishes every reply on ZapitReplies (declared by the workflow), and asks IsStimConfigLoaded and GetNumConditions at once. Stops the workflow on any error reply or no conditions file loaded (CheckZapitReply), a number of conditions other than the file's or a ramp-down out of range (CheckZapitConditionCount), and for a real mouse on a rig without hardware triggering (RequireZapitHardwareTrigger, from rig.yml's zapit.hardwareTriggered and SubjectId). Declares ZapitCommands, a BehaviorSubject: a task multicasts each trial's StartStimulus into it from a graph per trial, and a PublishSubject would be closed by the first trial's graph completing. Needs RigConfigs, SubjectId and ZapitReplies from the workflow.</Description>
+  <Description>Zapit for every workflow using it, from its input on: the input is the task's Zapit conditions file path, sent once when the experiment uses Zapit. Connects to rig.yml's zapit host and port (ZapitClient), sends every ZapitCommands value and publishes every reply on ZapitReplies (declared by the workflow), and asks IsStimConfigLoaded and GetNumConditions at once. Stops the workflow on any error reply or no conditions file loaded (CheckZapitReply), a number of conditions other than the file's or a ramp-down out of range (CheckZapitConditionCount), and for a real mouse on a rig without hardware triggering (RequireZapitHardwareTrigger, from rig.yml's zapit.hardwareTriggered and SubjectId). Declares ZapitCommands, a BehaviorSubject: a task multicasts each trial's StartStimulus into it from a graph per trial, and a PublishSubject would be closed by the first trial's graph completing. Stops the workflow at start, saying so, if rig.yml has no zapit section. Needs RigConfigs, SubjectId and ZapitReplies from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -39,8 +40,8 @@
             </Expression>
             <Expression xsi:type="PropertyMapping">
               <PropertyMappings>
-                <Property Name="Host" Selector="Zapit.Host" />
-                <Property Name="Port" Selector="Zapit.Port" />
+                <Property Name="Host" Selector="Host" />
+                <Property Name="Port" Selector="Port" />
               </PropertyMappings>
             </Expression>
             <Expression xsi:type="Combinator">
@@ -92,11 +93,13 @@
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="zap:CheckZapitConditionCount" />
             </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>RigConfigs</Name>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="core:RequireValue">
+                <core:Message>rig.yml has no zapit section, which ConnectZapit needs: add one (host, port, hardwareTriggered) or take Zapit out of the experiment.</core:Message>
+              </Combinator>
             </Expression>
             <Expression xsi:type="MemberSelector">
-              <Selector>Zapit.HardwareTriggered</Selector>
+              <Selector>HardwareTriggered</Selector>
             </Expression>
             <Expression xsi:type="SubscribeSubject">
               <Name>SubjectId</Name>
@@ -107,6 +110,9 @@
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="zap:RequireZapitHardwareTrigger" />
             </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Zapit</Selector>
+            </Expression>
           </Nodes>
           <Edges>
             <Edge From="0" To="1" Label="Source1" />
@@ -114,7 +120,9 @@
             <Edge From="3" To="4" Label="Source1" />
             <Edge From="1" To="4" Label="Source2" />
             <Edge From="2" To="4" Label="Source3" />
-            <Edge From="5" To="6" Label="Source1" />
+            <Edge From="5" To="22" Label="Source1" />
+            <Edge From="22" To="17" Label="Source1" />
+            <Edge From="17" To="6" Label="Source1" />
             <Edge From="4" To="7" Label="Source1" />
             <Edge From="6" To="7" Label="Source2" />
             <Edge From="7" To="8" Label="Source1" />
