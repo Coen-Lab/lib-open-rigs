@@ -282,9 +282,12 @@ namespace OpenRigs.Devices.Tests
             {
                 workflow = XDocument.Load(stream);
             }
-            // The client sits inside the SelectMany, so nothing connects before the input says the experiment uses Zapit.
-            var top = workflow.Root.Element(bonsai + "Workflow").Element(bonsai + "Nodes").Elements().Select(e => (string)e.Attribute(xsi + "type")).ToList();
-            CollectionAssert.AreEqual(new[] { "WorkflowInput", "rx:SelectMany", "WorkflowOutput" }, top);
+            // The client sits inside the SelectMany, so nothing connects before the input says the experiment uses Zapit;
+            // ZapitCommands is declared beside it, a BehaviorSubject, so no per-trial multicast into it closes it.
+            var nodes = workflow.Root.Element(bonsai + "Workflow").Element(bonsai + "Nodes").Elements().ToList();
+            var top = nodes.Select(e => (string)e.Attribute(xsi + "type")).ToList();
+            CollectionAssert.AreEqual(new[] { "WorkflowInput", "rx:SelectMany", "WorkflowOutput", "rx:BehaviorSubject" }, top);
+            Assert.AreEqual("ZapitCommands", (string)nodes[3].Element(XNamespace.Get("clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core") + "Name"));
             var types = workflow.Descendants().Select(e => (string)e.Attribute(xsi + "type")).Where(t => t != null).ToList();
             foreach (var check in new[] { "zap:ZapitClient", "zap:CheckZapitReply", "zap:CheckZapitConditionCount", "zap:RequireZapitHardwareTrigger" })
             {
