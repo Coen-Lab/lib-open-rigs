@@ -135,6 +135,25 @@ namespace OpenRigs.Audio.Tests
         }
 
         [TestMethod]
+        public void TheSyncCopyIsSyncGainOnTheSyncChannelForTheSoundsLength()
+        {
+            var set = SpeakerSet.Load(Rig(extra: "  syncChannel: 31\n  syncGain: 0.3\n  penaltySoundChannel: 2\n"), "TEST-RIG");
+            var buffer = set.Buffer(Row(0, 1, 0, -1), new[] { 1 }, 1, false, true);
+            CollectionAssert.AreEqual(new[] { 0.3f, 0.3f, 0.3f, 0.3f }, Values(buffer, 31));
+            CollectionAssert.AreEqual(new[] { 0f, 1f, 0f, -1f }, Values(buffer, 1));
+            CollectionAssert.AreEqual(new[] { 0f, 0f, 0f, 0f }, Values(set.Buffer(Row(0, 1, 0, -1), new[] { 1 }, 1, false), 31));
+            Assert.AreEqual(SpeakerSet.DefaultSyncGain, SpeakerSet.Load(Rig(), "TEST-RIG").SyncGain);
+        }
+
+        [TestMethod]
+        public void ASyncCopyNeedsASyncChannel()
+        {
+            var set = SpeakerSet.Load(Rig(extra: "  penaltySoundChannel: 2\n"), "TEST-RIG");
+            var error = Assert.ThrowsException<InvalidOperationException>(() => set.Buffer(Row(1), new[] { 1 }, 1, false, true));
+            StringAssert.Contains(error.Message, "no syncChannel");
+        }
+
+        [TestMethod]
         public void ThePenaltySoundNeedsAPenaltyChannel()
         {
             var set = SpeakerSet.Load(Rig(extra: "  syncChannel: 31\n"), "TEST-RIG");

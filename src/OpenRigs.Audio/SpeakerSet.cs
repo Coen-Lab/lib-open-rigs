@@ -34,6 +34,9 @@ namespace OpenRigs.Audio
     /// </summary>
     public class SpeakerSet
     {
+        /// <summary>The sync copy's level when rig.yml gives no syncGain (open_rigs.components.audio's default).</summary>
+        public const double DefaultSyncGain = 0.2;
+
         /// <summary>The audio device's rate, in Hz (speakerArray.device.sampleRate).</summary>
         public int SampleRate { get; private set; }
 
@@ -42,6 +45,9 @@ namespace OpenRigs.Audio
 
         /// <summary>The channel a stimulus's sync copy plays on (speakerArray.syncChannel), or null.</summary>
         public int? SyncChannel { get; private set; }
+
+        /// <summary>The sync copy's level on <see cref="SyncChannel"/> (speakerArray.syncGain, 0.2 when left out).</summary>
+        public double SyncGain { get; private set; }
 
         /// <summary>The channel the penalty sound plays on (speakerArray.penaltySoundChannel), or null.</summary>
         public int? PenaltySoundChannel { get; private set; }
@@ -69,9 +75,9 @@ namespace OpenRigs.Audio
         /// <summary>
         /// The mixer's buffer (ChannelCount rows) playing a sound (one row) on each of the channels, equalised for its
         /// speaker (unless <paramref name="equalise"/> is false) and scaled by gain; every other channel silent. No
-        /// channels: every speaker's.
+        /// channels: every speaker's. With <paramref name="syncCopy"/>, the sound's sync copy too (<see cref="AddSyncCopy"/>).
         /// </summary>
-        public Mat Buffer(Mat sound, IEnumerable<int> channels, double gain, bool equalise = true)
+        public Mat Buffer(Mat sound, IEnumerable<int> channels, double gain, bool equalise = true, bool syncCopy = false)
         {
             if (sound.Rows != 1) throw new InvalidOperationException("A sound for the speakers must be one row (mono); it has " + sound.Rows + ".");
             var list = (channels ?? new int[0]).ToArray();
@@ -89,7 +95,29 @@ namespace OpenRigs.Audio
                     CV.ConvertScale(equalised, row, gain, 0);
                 }
             }
+            if (syncCopy) AddSyncCopy(buffer);
             return buffer;
+        }
+
+        /// <summary>
+        /// Writes a buffer's sync copy, the lab's mark of when a sound plays for alignment with acquisition: syncGain on
+        /// syncChannel for the whole buffer, so the channel is high exactly while the sound plays. Stops on a rig.yml
+        /// with no syncChannel, or one a speaker is on.
+        /// </summary>
+        public void AddSyncCopy(Mat buffer)
+        {
+            if (!SyncChannel.HasValue)
+            {
+                throw new InvalidOperationException("rig.yml's speakerArray has no syncChannel, the channel each stimulus's sync copy plays on. Add it (31 on every dome).");
+            }
+            if (Speakers.Any(s => s.Channel == SyncChannel.Value))
+            {
+                throw new InvalidOperationException("rig.yml's syncChannel " + SyncChannel.Value + " has a speaker on it; the sync copy needs a channel of its own.");
+            }
+            using (var row = buffer.GetRow(SyncChannel.Value))
+            {
+                row.Set(Scalar.All(SyncGain));
+            }
         }
 
         static Mat ToFloat(Mat sound)
@@ -154,6 +182,7 @@ namespace OpenRigs.Audio
                 SampleRate = Integer(Child(device, "sampleRate"), "speakerArray.device.sampleRate", path),
                 ChannelCount = Integer(Child(device, "channelCount"), "speakerArray.device.channelCount", path),
                 SyncChannel = OptionalInteger(Child(array, "syncChannel")),
+                SyncGain = Child(array, "syncGain") == null ? DefaultSyncGain : Number(Child(array, "syncGain")),
                 PenaltySoundChannel = OptionalInteger(Child(array, "penaltySoundChannel")),
             };
             var problems = new List<string>();

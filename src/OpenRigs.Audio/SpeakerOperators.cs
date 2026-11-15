@@ -43,16 +43,20 @@ namespace OpenRigs.Audio
         [Description("Whether each channel's copy is equalised for its speaker with its filter (a stimulus); false plays the sound as it is on each (a background noise).")]
         public bool Equalise { get; set; } = true;
 
+        /// <summary>Gets or sets whether each buffer carries the sound's sync copy on rig.yml's syncChannel.</summary>
+        [Description("Whether each buffer also carries the sound's sync copy: rig.yml's syncGain on its syncChannel for the sound's length, for alignment with acquisition (a stimulus). Stops the workflow on a rig.yml with no syncChannel.")]
+        public bool SyncCopy { get; set; }
+
         /// <summary>One sound's buffer.</summary>
         public IObservable<Mat> Process(IObservable<Tuple<SpeakerSet, Mat>> source)
         {
-            return source.Select(input => input.Item1.Buffer(input.Item2, Channels, Gain, Equalise));
+            return source.Select(input => input.Item1.Buffer(input.Item2, Channels, Gain, Equalise, SyncCopy));
         }
 
         /// <summary>Each sound's buffer, in order.</summary>
         public IObservable<IList<Mat>> Process(IObservable<Tuple<SpeakerSet, IList<Mat>>> source)
         {
-            return source.Select(input => (IList<Mat>)input.Item2.Select(sound => input.Item1.Buffer(sound, Channels, Gain, Equalise)).ToList());
+            return source.Select(input => (IList<Mat>)input.Item2.Select(sound => input.Item1.Buffer(sound, Channels, Gain, Equalise, SyncCopy)).ToList());
         }
     }
 

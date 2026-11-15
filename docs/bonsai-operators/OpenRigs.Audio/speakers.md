@@ -22,7 +22,8 @@ speakerArray:
       position: {azimuth: 90.0, elevation: 15.0, radius: 1.0}
       channel: 1
       filter: calibration/speaker-right.json
-  syncChannel: 31          # optional: a task's sync copy
+  syncChannel: 31          # the sync copy's channel, needed by SyncCopy
+  syncGain: 0.2            # the sync copy's level (0.2 when left out)
   penaltySoundChannel: 1     # the penalty sound's speaker: a speaker's channel
 ```
 
@@ -35,11 +36,11 @@ Each speaker needs a filter: a calibration artefact with `taps` (symmetric), `sa
 | Operator | Input | Output | What it does |
 |---|---|---|---|
 | `LoadSpeakers` | the path of this machine's `rig.yml` (RigHardware's `RigFile` subject) | `SpeakerSet` | Loads every speaker, its channel and its filter, once. Stops the workflow, naming every problem, on a speaker without a filter, or a filter missing, without taps, not symmetric, for another rate or measured on another machine (`MachineName`, empty for this one); and on a speaker or `syncChannel` outside the device's channels, two speakers on one channel, or an `penaltySoundChannel` with no speaker on it. Keep its output in an `AsyncSubject`, such as `Speakers`. |
-| `SpeakerBuffer` | `(SpeakerSet, Mat)` or `(SpeakerSet, IList<Mat>)` | `Mat` or `IList<Mat>` | The mixer's buffer for a sound of one row: on each of `Channels` (empty: every speaker in `rig.yml`), equalised for that speaker (`Equalise`, true for a stimulus, false for a background noise), times `Gain`; every other channel silent. A list gives one buffer per sound, such as a table of tones. |
+| `SpeakerBuffer` | `(SpeakerSet, Mat)` or `(SpeakerSet, IList<Mat>)` | `Mat` or `IList<Mat>` | The mixer's buffer for a sound of one row: on each of `Channels` (empty: every speaker in `rig.yml`), equalised for that speaker (`Equalise`, true for a stimulus, false for a background noise), times `Gain`; every other channel silent. `SyncCopy` (a stimulus) adds the sound's sync copy: `syncGain` on `syncChannel` for the sound's whole length, so acquisition sees exactly when it plays; it stops the workflow on a `rig.yml` with no `syncChannel`. A list gives one buffer per sound, such as a table of tones. |
 | `PenaltySoundBuffer` | `SpeakerSet` | `Mat` | The lab's penalty sound (`penalty_tone.wav`, embedded in the package) on `rig.yml`'s `penaltySoundChannel` alone, equalised for that speaker, at `PenaltySound.Level` (0.5) times `Gain`. Map `Gain` from the task's `penalty.sound.gain`, and make the buffer once at load, not at each error. |
 | `CheckWaveRate` | the mixer's sample rate | the rate | Stops the workflow if a WAV file the mixer plays (`FileName`, relative to `src`) is at another rate: nothing converts it, so it would play at the wrong pitch and speed. |
 
-`SpeakerSet` (C#) has the speakers (`Speakers`, each with `Name`, `Channel`, `AzimuthDeg`, `ElevationDeg`), `SpeakerChannels`, `SampleRate`, `ChannelCount`, `SyncChannel`, `PenaltySoundChannel`, `Equalise(sound, channel)` and `Buffer(sound, channels, gain, equalise)`, for a task's own C# such as a stimulus set equalised once at load. `Wave.Read(path, sampleRate)` reads a mono 16-bit PCM WAV as a float row, refusing another rate.
+`SpeakerSet` (C#) has the speakers (`Speakers`, each with `Name`, `Channel`, `AzimuthDeg`, `ElevationDeg`), `SpeakerChannels`, `SampleRate`, `ChannelCount`, `SyncChannel`, `SyncGain`, `PenaltySoundChannel`, `Equalise(sound, channel)`, `Buffer(sound, channels, gain, equalise, syncCopy)` and `AddSyncCopy(buffer)`, for a task's own C# such as a stimulus set equalised once at load. `Wave.Read(path, sampleRate)` reads a mono 16-bit PCM WAV as a float row, refusing another rate.
 
 ---
 
