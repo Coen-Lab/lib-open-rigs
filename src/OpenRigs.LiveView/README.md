@@ -4,11 +4,11 @@ One node, `StreamDevices`, that streams every device a rig has to the live view,
 
 ## What It Does
 
-When the workflow is built, `StreamDevices` reads `<ConfigRoot>\<MACHINE-NAME>\rig.yml`. Every device entry there (`kind:` then `instance:`, such as `camera: box:`) has a name, `<Kind>-<Instance>` (`Camera-Box`, `BehaviorBoard-Main`). If the workflow publishes a subject called `<Kind>-<Instance>.Data` before this node, and the kind has a recipe, the device is streamed:
+When the workflow is built, `StreamDevices` reads `<ConfigRoot>\<MACHINE-NAME>\rig.yml`. Every device entry there (`kind:` then `instance:`, such as `camera: overhead:`) has a name, `<Kind>-<Instance>` (`Camera-Overhead`, `BehaviorBoard-Main`). If the workflow publishes a subject called `<Kind>-<Instance>.Data` before this node, and the kind has a recipe, the device is streamed:
 
 | Kind in rig.yml | Stream | Default | From the data |
 |-----------------|--------|---------|---------------|
-| `camera` | `Camera-Box.video` on the video port | 5 frames/s, 320 x 240, JPEG | the first `IplImage` in it, found by type (`Value.Image` for a frame paired with its trigger) |
+| `camera` | `Camera-Overhead.video` on the video port | 5 frames/s, 320 x 240, JPEG | the first `IplImage` in it, found by type (`Value.Image` for a frame paired with its trigger) |
 | `behaviorBoard` | `BehaviorBoard-Main.encoder` on the data port | 10/s | the raw encoder count from `AnalogData` (a `HarpMessage` stream) |
 | `behaviorBoard` | `BehaviorBoard-Main.channels` on the data port | every change; analog inputs 100/s | every channel of the board, for app-rig-control's Board tab (0.1.1-coen-lab.6 on) |
 | `licketySplit` | `LicketySplit-Left.channels` on the data port | every change | `LickState`, shaped as the board's channels (0.1.1-coen-lab.9 on) |

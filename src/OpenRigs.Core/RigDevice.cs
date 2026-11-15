@@ -10,14 +10,14 @@ namespace OpenRigs.Core
 {
     /// <summary>
     /// Takes one device's settings out of one kind's rig.yml entries by the device's name in the data,
-    /// Kind-Instance: Camera-Box is the <c>box</c> entry under <c>camera</c>. The input is that kind's
+    /// Kind-Instance: Camera-Overhead is the <c>overhead</c> entry under <c>camera</c>. The input is that kind's
     /// entries (a <c>MemberSelector</c> on the workflow's rig configuration), so one operator serves
     /// every kind and every rig model. A name rig.yml does not have, or a malformed or unset name,
     /// stops the workflow at start, naming the entries rig.yml has.
     /// </summary>
     [Combinator]
     [DefaultProperty("Name")]
-    [Description("Takes one device's settings from one kind's rig.yml entries (the input) by its name, Kind-Instance: Camera-Box is camera: box:. Outputs the name with the settings, for naming the device's files. Stops the workflow at start, naming the entries rig.yml has, if it has none by that name or the name is unset.")]
+    [Description("Takes one device's settings from one kind's rig.yml entries (the input) by its name, Kind-Instance: Camera-Overhead is camera: overhead:. Outputs the name with the settings, for naming the device's files. Stops the workflow at start, naming the entries rig.yml has, if it has none by that name or the name is unset.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class RigDevice
     {
@@ -47,7 +47,7 @@ namespace OpenRigs.Core
             if (parts.Length != 2 || !NamePart.IsMatch(parts[0]) || !NamePart.IsMatch(parts[1]))
             {
                 throw new ArgumentException(string.Format(
-                    "RigDevice's Name is '{0}'; set it to Kind-Instance, each part starting with a capital and holding only letters and digits, such as Camera-Box.",
+                    "RigDevice's Name is '{0}'; set it to Kind-Instance, each part starting with a capital and holding only letters and digits, such as Camera-Overhead.",
                     name));
             }
 
@@ -80,8 +80,8 @@ namespace OpenRigs.Core
             Settings = settings;
         }
 
-        /// <summary>Gets the device's name in the data, such as Camera-Box.</summary>
-        [Description("The device's name in the data, such as Camera-Box: its folder and the start of its files' names.")]
+        /// <summary>Gets the device's name in the data, such as Camera-Overhead.</summary>
+        [Description("The device's name in the data, such as Camera-Overhead: its folder and the start of its files' names.")]
         public string Name { get; private set; }
 
         /// <summary>Gets the device's entry in rig.yml.</summary>

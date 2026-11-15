@@ -86,13 +86,13 @@
       "found": 1
     },
     {
-      "path": "Camera-Box/",
-      "why": "rig.yml camera: box:, published as Camera-Box",
+      "path": "Camera-Overhead/",
+      "why": "rig.yml camera: overhead:, published as Camera-Overhead",
       "found": 0
     }
   ],
   "notes": [
-    "Camera-Box left no file"
+    "Camera-Overhead left no file"
   ],
   "files": [
     {

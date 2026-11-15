@@ -15,7 +15,7 @@ namespace OpenRigs.LiveView
     {
         public string Kind;      // the key in rig.yml, e.g. camera
         public string Template;  // Templates\<Template>.xml
-        public string Stream;    // after the device's name: Camera-Box.video
+        public string Stream;    // after the device's name: Camera-Overhead.video
         public double Rate;      // messages per second
         public int Width;        // video only
         public int Height;

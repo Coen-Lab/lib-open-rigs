@@ -206,7 +206,7 @@ namespace OpenRigs.Manifest.Tests
             plan.Entries.Add(new ExpectedEntry { Path = "Settings/Settings_Experiment_", Why = "listed in ExpectedFiles" });
             var withCamera = new ExpectedPlan();
             withCamera.Entries.AddRange(plan.Entries);
-            withCamera.Entries.Add(new ExpectedEntry { Path = "Camera-Box/", Why = "rig.yml camera: box:, published as Camera-Box" });
+            withCamera.Entries.Add(new ExpectedEntry { Path = "Camera-Overhead/", Why = "rig.yml camera: overhead:, published as Camera-Overhead" });
             var device = ManifestWriter.FileEntry("BehaviorBoard-Main/BehaviorBoard-Main_device.json", 412, Utc("2026-11-12T10:15:03Z"), true);
             Func<bool, List<object>> allFiles = closed => new List<object>
             {
@@ -232,7 +232,7 @@ namespace OpenRigs.Manifest.Tests
             records["ended-early"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "coen-behaviour-box", writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.EndedEarly, RunEnd.EndedEarlyError), true, started, Utc("2026-11-12T10:20:00Z"), 12950, null),
-                ManifestWriter.ExpectedSection(withCamera, files), new[] { "Camera-Box left no file" }, files);
+                ManifestWriter.ExpectedSection(withCamera, files), new[] { "Camera-Overhead left no file" }, files);
             var openFiles = allFiles(false);
             records["stopped-not-final"] = ManifestWriter.Document(Utc("2026-11-12T10:31:10Z"), "coen-behaviour-box", writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, new KeyValuePair<string, string>("", "someone at AV-DOME-CONTROL (no Lab PIN)")),
@@ -624,10 +624,10 @@ namespace OpenRigs.Manifest.Tests
 
                 Console.WriteLine("Expected files:");
                 var rigYml = Path.Combine(root, "rig.yml");
-                File.WriteAllText(rigYml, "behaviorBoard:\n  main:\n    portName: COM3\ncamera:\n  box:\n    serialNumber: '1'\n  face:\n    serialNumber: '2'\nrootPath: C:\\data\n");
-                var plan = ExpectedPlan.Create("auto;events.csv;Camera-*/", rigYml, n => n == "BehaviorBoard-Main.Data" || n == "Camera-Box" ? typeof(object) : null);
+                File.WriteAllText(rigYml, "behaviorBoard:\n  main:\n    portName: COM3\ncamera:\n  overhead:\n    serialNumber: '1'\n  face:\n    serialNumber: '2'\nrootPath: C:\\data\n");
+                var plan = ExpectedPlan.Create("auto;events.csv;Camera-*/", rigYml, n => n == "BehaviorBoard-Main.Data" || n == "Camera-Overhead" ? typeof(object) : null);
                 var paths = string.Join(", ", plan.Entries.Select(e => e.Path));
-                Check("auto expects each published device's folder, and a listed file", paths == "BehaviorBoard-Main/, Camera-Box/, events.csv", paths);
+                Check("auto expects each published device's folder, and a listed file", paths == "BehaviorBoard-Main/, Camera-Overhead/, events.csv", paths);
                 Check("a device in rig.yml the workflow does not publish is noted, not expected", plan.Notes.Any(n => n.StartsWith("Camera-Face")), string.Join(" | ", plan.Notes));
                 Check("a wildcard entry is noted, not expected", plan.Notes.Any(n => n.Contains("Camera-*/")) && !paths.Contains("*"), string.Join(" | ", plan.Notes));
                 var outside = ExpectedPlan.Create(@".\RigSchema\x.json;/abs.json;C:\data\x.json;../up.json;a/../b.json", null, n => null);
@@ -639,9 +639,9 @@ namespace OpenRigs.Manifest.Tests
                 // uses (a portName: null is none), and the register map is expected only when a loaded package decodes the kind.
                 var harpYml = Path.Combine(root, "harp-rig.yml");
                 File.WriteAllText(harpYml, "behaviorBoard:\n  main:\n    portName: COM3\n  idle:\n    portName: null\n" +
-                    "soundCard:\n  main:\n    portName: COM4\nclockSynchronizer:\n  sync:\n    portName: COM5\ncamera:\n  box:\n    serialNumber: '1'\n");
+                    "soundCard:\n  main:\n    portName: COM4\nclockSynchronizer:\n  sync:\n    portName: COM5\ncamera:\n  overhead:\n    serialNumber: '1'\n");
                 var harpMessage = typeof(Bonsai.Harp.HarpMessage);
-                Func<string, Type> harpPublished = n => n.EndsWith(".Data") && !n.StartsWith("Camera") ? harpMessage : n == "Camera-Box" || n == "Camera-Box.Data" ? typeof(object) : null;
+                Func<string, Type> harpPublished = n => n.EndsWith(".Data") && !n.StartsWith("Camera") ? harpMessage : n == "Camera-Overhead" || n == "Camera-Overhead.Data" ? typeof(object) : null;
                 var unloaded = ExpectedPlan.Create("harp", harpYml, harpPublished);
                 var unloadedPaths = string.Join(", ", unloaded.Entries.Select(e => e.Path));
                 Check("harp expects each Harp device's record, and no register map no loaded package decodes", unloadedPaths == "BehaviorBoard-Main/BehaviorBoard-Main_device.json, SoundCard-Main/SoundCard-Main_device.json, ClockSynchronizer-Sync/ClockSynchronizer-Sync_device.json", unloadedPaths);
@@ -650,7 +650,7 @@ namespace OpenRigs.Manifest.Tests
                 Console.WriteLine("        loaded " + LoadBehavior());
                 var harp = ExpectedPlan.Create("auto;harp", harpYml, harpPublished);
                 var harpPaths = string.Join(", ", harp.Entries.Where(e => e.Path.StartsWith("BehaviorBoard") || e.Path.StartsWith("Camera")).Select(e => e.Path));
-                Check("with Harp.Behavior loaded, the behaviorBoard's register map is expected too", harpPaths == "BehaviorBoard-Main/, BehaviorBoard-Idle/, Camera-Box/, BehaviorBoard-Main/BehaviorBoard-Main_device.json, BehaviorBoard-Main/BehaviorBoard-Main.yml", harpPaths);
+                Check("with Harp.Behavior loaded, the behaviorBoard's register map is expected too", harpPaths == "BehaviorBoard-Main/, BehaviorBoard-Idle/, Camera-Overhead/, BehaviorBoard-Main/BehaviorBoard-Main_device.json, BehaviorBoard-Main/BehaviorBoard-Main.yml", harpPaths);
                 Check("... and still not a clockSynchronizer's", harp.Entries.All(e => e.Path != "ClockSynchronizer-Sync/ClockSynchronizer-Sync.yml"), "expected");
                 Check("... which do not count as the device's data", ExpectedPlan.Matches(harp.Entries[0], new[] { "BehaviorBoard-Main/BehaviorBoard-Main_device.json", "BehaviorBoard-Main/BehaviorBoard-Main.yml" }, harp.Entries) == 0, "counted");
                 var notHarp = ExpectedPlan.Create("harp", rigYml, n => n == "BehaviorBoard-Main.Data" ? typeof(object) : null);
@@ -660,13 +660,13 @@ namespace OpenRigs.Manifest.Tests
                 Check("no rig.yml expects nothing, and says so", none.Entries.Count == 0 && none.Notes.Any(n => n.StartsWith("No rig.yml at") && n.EndsWith("so no device's files are expected.")), string.Join(" | ", none.Notes));
                 // L2-L1: one empty instance hid its whole kind, without a word.
                 var emptyYml = Path.Combine(root, "empty-rig.yml");
-                File.WriteAllText(emptyYml, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  box:\n    serialNumber: '1'\n" +
+                File.WriteAllText(emptyYml, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  overhead:\n    serialNumber: '1'\n" +
                     "speakerArray:\n  device: { bootDelay: 3 }\n  syncChannel: 7\n");
                 var empty = ExpectedPlan.Create("auto", emptyYml, n => typeof(object));
                 Check("an empty entry beside a board is noted, naming it, and settings with a value (speakerArray) are not",
                     empty.Notes.Count(n => n.Contains("has no settings")) == 1
                     && empty.Notes.Contains("The rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none of its files is expected.")
-                    && string.Join(", ", empty.Entries.Select(e => e.Path)) == "Camera-Box/", string.Join(" | ", empty.Notes));
+                    && string.Join(", ", empty.Entries.Select(e => e.Path)) == "Camera-Overhead/", string.Join(" | ", empty.Notes));
                 // L1-L1: auto;harp, as every lab workflow sets, wrote the note twice.
                 var autoHarp = ExpectedPlan.Create("auto;harp", emptyYml, n => typeof(object));
                 Check("auto;harp writes each note once", autoHarp.Notes.Count(n => n.Contains("has no settings")) == 1 && autoHarp.Notes.Distinct().Count() == autoHarp.Notes.Count, string.Join(" | ", autoHarp.Notes));

@@ -15,7 +15,7 @@ namespace OpenRigs.Logging { public class LoggedRows { } }
 // hardware: exit 0 when every check passes. dotnet run --project src\OpenRigs.LiveView.Tests
 namespace OpenRigs.LiveView.Tests
 {
-    // A camera's frame paired with its trigger, as coen-behaviour-box publishes Camera-Box.Data.
+    // A camera's frame paired with its trigger, as coen-behaviour-box publishes Camera-Overhead.Data.
     public class Paired { public Frame Value { get; set; } public long Trigger { get; set; } }
     public class Frame { public OpenCV.Net.IplImage Image { get; set; } }
 
@@ -44,18 +44,18 @@ namespace OpenRigs.LiveView.Tests
             {
                 Console.WriteLine("Devices from rig.yml:");
                 var rig = "behaviorBoard:\n  main:\n    portName: COM3\n    pulseController: null\n" +
-                          "camera:\n  box:\n    serialNumber: '1'\n    liveView:\n      rate: 10\n      width: 160\n" +
+                          "camera:\n  overhead:\n    serialNumber: '1'\n    liveView:\n      rate: 10\n      width: 160\n" +
                           "  face:\n    serialNumber: '2'\n  side:\n    serialNumber: '3'\n    liveView:\n      enabled: false\n" +
                           "lickometer:\n  left:\n    portName: COM4\n" +
                           "rootPath: C:\\data\nversion: 0.0.0\n";
                 var plan = Plan(root, rig, name =>
                     name == "PathPrefix" ? typeof(string)
                     : name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage)
-                    : name == "Camera-Box.Data" ? typeof(Paired)
+                    : name == "Camera-Overhead.Data" ? typeof(Paired)
                     : name == "Lickometer-Left.Data" ? typeof(object)
                     : null);
                 var streamed = string.Join(", ", plan.Streamed.Select(d => d.Stream));
-                Check("each published device with a recipe is streamed", streamed == "BehaviorBoard-Main.encoder, Camera-Box.video", streamed);
+                Check("each published device with a recipe is streamed", streamed == "BehaviorBoard-Main.encoder, Camera-Overhead.video", streamed);
                 var board = plan.Streamed.FirstOrDefault(d => d.Name == "BehaviorBoard-Main");
                 var boardStreams = board == null ? "" : string.Join(", ", board.Streams);
                 Check("a board streams its encoder and, as a second stream, its channels", boardStreams == "BehaviorBoard-Main.encoder, BehaviorBoard-Main.channels", boardStreams);
@@ -63,11 +63,11 @@ namespace OpenRigs.LiveView.Tests
                 Check("the board's template gets its channels stream and a 100/s analog interval",
                     values != null && values["Channels"] == "BehaviorBoard-Main.channels" && values["AnalogInterval"] == "PT0.01S",
                     values == null ? "not streamed" : values["Channels"] + " " + values["AnalogInterval"]);
-                var cameraValues = plan.Streamed.First(d => d.Name == "Camera-Box").TemplateValues();
-                Check("a camera has no channels stream", cameraValues["Channels"] == "" && plan.Streamed.First(d => d.Name == "Camera-Box").Streams.Count() == 1, cameraValues["Channels"]);
-                var box = plan.Streamed.FirstOrDefault(d => d.Name == "Camera-Box");
-                Check("a camera's image is found by type, in a frame paired with its trigger", box != null && box.ImagePath == "Value.Image", box == null ? "not streamed" : box.ImagePath);
-                Check("rig.yml's liveView rate and width are taken, the height kept", box != null && box.Rate == 10 && box.Width == 160 && box.Height == 240, box == null ? "" : box.ToString());
+                var cameraValues = plan.Streamed.First(d => d.Name == "Camera-Overhead").TemplateValues();
+                Check("a camera has no channels stream", cameraValues["Channels"] == "" && plan.Streamed.First(d => d.Name == "Camera-Overhead").Streams.Count() == 1, cameraValues["Channels"]);
+                var overhead = plan.Streamed.FirstOrDefault(d => d.Name == "Camera-Overhead");
+                Check("a camera's image is found by type, in a frame paired with its trigger", overhead != null && overhead.ImagePath == "Value.Image", overhead == null ? "not streamed" : overhead.ImagePath);
+                Check("rig.yml's liveView rate and width are taken, the height kept", overhead != null && overhead.Rate == 10 && overhead.Width == 160 && overhead.Height == 240, overhead == null ? "" : overhead.ToString());
                 Check("a device the workflow does not publish is skipped, saying so", plan.Skipped.Any(s => s.StartsWith("Camera-Face: the workflow publishes no Camera-Face.Data")), string.Join(" | ", plan.Skipped));
                 Check("liveView enabled false is skipped", plan.Skipped.Any(s => s.StartsWith("Camera-Side: liveView enabled is false")), string.Join(" | ", plan.Skipped));
                 Check("a kind with no recipe is skipped", plan.Skipped.Any(s => s.StartsWith("Lickometer-Left: no live-view recipe")), string.Join(" | ", plan.Skipped));
@@ -82,11 +82,11 @@ namespace OpenRigs.LiveView.Tests
                     olderLogging.Signature(5556, 5558) != LiveViewPlan.Create(root, name => name == "PathPrefix" ? typeof(string) : null).Signature(5556, 5558), "same signature");
 
                 Console.WriteLine("Bad settings:");
-                var bad = Plan(root, "camera:\n  box:\n    liveView:\n      rate: fast\n      width: 100.5\n      colour: red\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                var bad = Plan(root, "camera:\n  overhead:\n    liveView:\n      rate: fast\n      width: 100.5\n      colour: red\n", name => name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 var camera = bad.Streamed.Single();
                 Check("a bad rate or width is noted and the default kept", camera.Rate == 5 && camera.Width == 320 && bad.Notes.Count(n => n.Contains("rate 'fast'") || n.Contains("width '100.5'")) == 2, string.Join(" | ", bad.Notes));
                 Check("an unknown liveView setting is noted", bad.Notes.Any(n => n.Contains("no setting 'colour'")), string.Join(" | ", bad.Notes));
-                var nulls = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: null\n      rate: null\n      width: ~\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                var nulls = Plan(root, "camera:\n  overhead:\n    liveView:\n      enabled: null\n      rate: null\n      width: ~\n", name => name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 Check("a liveView setting left null keeps its default, unnoted", nulls.Streamed.Single().Rate == 5 && !nulls.Notes.Any(), string.Join(" | ", nulls.Notes));
                 Check("data that is the image itself is streamed as it is", camera.ImagePath == "it", camera.ImagePath);
                 var wrong = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n", name => name == "BehaviorBoard-Main.Data" ? typeof(string) : null);
@@ -110,14 +110,14 @@ namespace OpenRigs.LiveView.Tests
                 var notHarp = Plan(root, "licketySplit:\n  left:\n    portName: COM15\n", name => name == "LicketySplit-Left.Data" ? typeof(string) : null);
                 Check("a Lickety Split whose data is not HarpMessage is skipped", notHarp.Skipped.Any(s => s.Contains("is not HarpMessage")), string.Join(" | ", notHarp.Skipped));
                 // L2-L1: one empty instance hid its whole kind, without a word.
-                var empty = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  box:\n    serialNumber: '1'\n",
-                    name => name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage) : name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                var empty = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  overhead:\n    serialNumber: '1'\n",
+                    name => name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage) : name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 Check("an empty entry beside a board is noted, naming it, and its kind is not streamed",
                     empty.Notes.Any(n => n == "the rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none is streamed")
-                    && string.Join(", ", empty.Streamed.Select(d => d.Name)) == "Camera-Box", string.Join(" | ", empty.Notes));
+                    && string.Join(", ", empty.Streamed.Select(d => d.Name)) == "Camera-Overhead", string.Join(" | ", empty.Notes));
                 // L2-L5: an entry under a device kind that is not a set of settings is named whatever it holds.
-                var spares = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n  spare: none\ncamera:\n  box:\n    serialNumber: '1'\n  off: off\n  list: []\n",
-                    name => name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage) : name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                var spares = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n  spare: none\ncamera:\n  overhead:\n    serialNumber: '1'\n  off: off\n  list: []\n",
+                    name => name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage) : name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 Check("a device kind's entry holding none, off or [] is named, with what it holds",
                     spares.Notes.Contains("the rig.yml entry behaviorBoard: spare: none has no settings, so every behaviorBoard is passed over and none is streamed")
                     && spares.Notes.Contains("the rig.yml entries camera: off: off, camera: list: [] have no settings, so every camera is passed over and none is streamed"), string.Join(" | ", spares.Notes));
@@ -126,15 +126,15 @@ namespace OpenRigs.LiveView.Tests
                 // L2-L3: enabled in YamlDotNet's words, as the workflow's own rig model reads it.
                 foreach (var word in new[] { "false", "False", "n", "No", "off", "OFF" })
                 {
-                    var disabled = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: " + word + "\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                    var disabled = Plan(root, "camera:\n  overhead:\n    liveView:\n      enabled: " + word + "\n", name => name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                     Check("liveView enabled " + word + " is not streamed, unnoted", !disabled.Streamed.Any() && !disabled.Notes.Any(), string.Join(" | ", disabled.Notes));
                 }
                 foreach (var word in new[] { "true", "TRUE", "y", "Yes", "on", "On" })
                 {
-                    var enabled = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: " + word + "\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                    var enabled = Plan(root, "camera:\n  overhead:\n    liveView:\n      enabled: " + word + "\n", name => name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                     Check("liveView enabled " + word + " is streamed, unnoted", enabled.Streamed.Count == 1 && !enabled.Notes.Any(), string.Join(" | ", enabled.Notes));
                 }
-                var maybe = Plan(root, "camera:\n  box:\n    liveView:\n      enabled: maybe\n", name => name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                var maybe = Plan(root, "camera:\n  overhead:\n    liveView:\n      enabled: maybe\n", name => name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 Check("liveView enabled maybe is noted and streamed", maybe.Streamed.Count == 1 && maybe.Notes.Any(n => n.Contains("enabled 'maybe'")), string.Join(" | ", maybe.Notes));
                 var none = LiveViewPlan.Create(Path.Combine(root, "nowhere"), name => null);
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
@@ -146,10 +146,10 @@ namespace OpenRigs.LiveView.Tests
                 Check("a published Camera-Temporary.Data is streamed by the camera recipe, with no rig.yml",
                     extra != null && extra.Name == "Camera-Temporary" && extra.Rate == 5 && extra.ImagePath == "it", extra == null ? string.Join(" | ", also.Skipped) : extra.ToString());
                 Check("a temporary device not published is not mentioned", !none.Skipped.Any(s => s.Contains("Temporary")), string.Join(" | ", none.Skipped));
-                var withRig = Plan(root, "camera:\n  box:\n    serialNumber: '1'\n",
-                    name => name == "Camera-Temporary.Data" || name == "Camera-Box.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                var withRig = Plan(root, "camera:\n  overhead:\n    serialNumber: '1'\n",
+                    name => name == "Camera-Temporary.Data" || name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 var both = string.Join(", ", withRig.Streamed.Select(d => d.Stream));
-                Check("a temporary camera streams beside rig.yml's", both == "Camera-Temporary.video, Camera-Box.video", both);
+                Check("a temporary camera streams beside rig.yml's", both == "Camera-Temporary.video, Camera-Overhead.video", both);
                 Check("a temporary device changes the plan's signature", also.Signature(5556, 5558) != none.Signature(5556, 5558), "same signature");
 
                 Console.WriteLine("Board channels:");

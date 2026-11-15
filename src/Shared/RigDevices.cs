@@ -15,7 +15,7 @@ namespace OpenRigs.Shared
         /// <summary>The instance's key, such as box.</summary>
         public string Instance;
 
-        /// <summary>The device's name, Camera-Box: the subject its data is published as is Camera-Box.Data.</summary>
+        /// <summary>The device's name, Camera-Overhead: the subject its data is published as is Camera-Overhead.Data.</summary>
         public string Name;
 
         /// <summary>The instance's settings.</summary>

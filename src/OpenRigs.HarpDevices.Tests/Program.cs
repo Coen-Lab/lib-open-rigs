@@ -352,12 +352,12 @@ namespace OpenRigs.HarpDevices.Tests
                     "licketySplit:\n  left:\n    portName: COM4\n    usbSerial: E664C856C3913E37\n" +
                     "soundCard:\n  main:\n    portName: COM6\n" +
                     "stepperDriver:\n  a:\n    portName: COM8\n    usbSerial: X\n    wiring:\n      Motor1: { device: Radial, side: left }\n" +
-                    "camera:\n  box:\n    serialNumber: '1'\n" +
+                    "camera:\n  overhead:\n    serialNumber: '1'\n" +
                     "speakerArray:\n  device: { bootDelay: 3 }\n  syncChannel: 7\n  unusedChannels: null\nrootPath: C:\\data\n");
                 Func<string, Type> published = n =>
                     n == "PathPrefix" ? typeof(string)
                     : n == "BehaviorBoard-Main.Data" || n == "BehaviorBoard-Main.Commands" || n == "LicketySplit-Left.Data" || n == "SoundCard-Main.Data" || n == "BehaviorBoard-Idle.Data" || n == "StepperDriver-A.Data" ? typeof(HarpMessage)
-                    : n == "Camera-Box.Data" ? typeof(object) : null;
+                    : n == "Camera-Overhead.Data" ? typeof(object) : null;
                 var plan = HarpDevicePlan.Create(config, published);
                 var main = plan.Recorded.FirstOrDefault(d => d.Name == "BehaviorBoard-Main");
                 Check("records each serial device the workflow publishes as HarpMessage", string.Join(",", plan.Recorded.Select(d => d.Name)) == "BehaviorBoard-Main,LicketySplit-Left,SoundCard-Main,StepperDriver-A", string.Join(",", plan.Recorded.Select(d => d.Name)));
@@ -393,7 +393,7 @@ namespace OpenRigs.HarpDevices.Tests
                 var soundCard = plan.Recorded.FirstOrDefault(d => d.Name == "SoundCard-Main");
                 Check("a kind with no known WhoAmI is recorded unchecked, and noted", soundCard != null && soundCard.ExpectedWhoAmI == 0 && !soundCard.HasCommands && plan.Notes.Any(n => n.Contains("no WhoAmI is known for soundCard")), string.Join(" | ", plan.Notes));
                 Check("a device the workflow does not publish is noted", plan.Notes.Any(n => n.StartsWith("BehaviorBoard-Spare")), string.Join(" | ", plan.Notes));
-                Check("a camera is not a serial device and is passed over", !plan.Notes.Any(n => n.StartsWith("Camera-Box")), string.Join(" | ", plan.Notes));
+                Check("a camera is not a serial device and is passed over", !plan.Notes.Any(n => n.StartsWith("Camera-Overhead")), string.Join(" | ", plan.Notes));
                 // H1/M1: the same rule as OpenRigs.Manifest's (src\Shared\HarpRig.cs), whose tests hold the same entry.
                 Check("... as is a portName: null, though its data is HarpMessage", !plan.Recorded.Any(d => d.Name == "BehaviorBoard-Idle") && !plan.Notes.Any(n => n.StartsWith("BehaviorBoard-Idle")), string.Join(" | ", plan.Notes));
                 var wrongCommands = HarpDevicePlan.Create(config, n => n == "BehaviorBoard-Main.Commands" ? typeof(string) : published(n));
