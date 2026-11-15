@@ -124,7 +124,7 @@ STIMULUS_LEVEL_DBFS = -30.0
 PENALTY_LEVEL_DBFS = -30.0
 REWARD_TONE_LEVEL_DBFS = -36.0
 BACKGROUND_LEVEL_DBFS = -50.0
-PEAK_LIMIT_DBFS = -1.0  # every buffer's peak stays under this after equalisation, checked when the task file is read at Go
+PEAK_LIMIT_DBFS = -1.0  # every buffer's peak stays under this after equalisation, checked as the buffer is built
 QUIETEST_LEVEL_DBFS = -120.0
 
 
@@ -135,8 +135,9 @@ def level_dbfs(default: float, sound: str):
         ge=QUIETEST_LEVEL_DBFS,
         le=PEAK_LIMIT_DBFS,
         description=f"{sound}'s level in dBFS RMS: the RMS of the sound over its whole length as the task gives it, before the speaker's "
-        f"equalisation, against full scale (a full-scale sine is -3). The lab's default {default:g}. The workflow stops when the task file is read "
-        f"at Go if any peak would reach {PEAK_LIMIT_DBFS:g} dBFS after equalisation",
+        f"equalisation, against full scale (a full-scale sine is -3). The lab's default {default:g}. The workflow stops as the sound's buffer is "
+        f"built (at Go for a sound built once, at its trial for one built each trial) if any peak would reach {PEAK_LIMIT_DBFS:g} dBFS after "
+        f"equalisation",
     )
 
 

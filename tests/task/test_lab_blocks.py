@@ -65,6 +65,13 @@ def test_sound_levels_have_the_lab_defaults_in_dbfs_rms():
         StimulusSound(level_dbfs=-0.5)
 
 
+def test_a_level_s_help_says_its_peak_is_checked_as_its_buffer_is_built():
+    # A buffer built each trial is checked at that trial, not when the task file is read at Go.
+    help_text = StimulusSound.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]
+    assert "at its trial for one built each trial" in help_text
+    assert "when the task file is read" not in help_text
+
+
 def test_the_levels_are_open_rigs_audio_s():
     # OpenRigs.Audio SoundLevel plays every sound; one set of numbers.
     source = (Path(__file__).parents[2] / "src" / "OpenRigs.Audio" / "SoundLevel.cs").read_text(encoding="utf-8")
