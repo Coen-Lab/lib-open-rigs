@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The rig's clock from a Behavior board's own Harp clock, for a rig with no timestamp generator; a workflow has exactly one clock. The board is a BehaviorBoard piece, Board. Sets the board's clock to the PC's UTC time, again at each heartbeat until one agrees (SetHarpClock: a write is lost about one start in four), and publishes Timestamp (each heartbeat's time, in Harp seconds) and HarpClockSet (the first Timestamp within 2 s of UTC), announcing HarpClockSet into ReadyStages. HarpClockSet is declared by ReadyGate, which comes before every device: the board's own log waits for it, so a definition here, built from the board's messages, would depend on itself. Without it the board counts from power-on, and every Harp time and file name follows that count (1904). Stops the workflow, naming the board, if its clock is not set within 10 s or its heartbeats stop for 3 s.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="Board" Description="The Behavior board that keeps the rig's time, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="BoardDataSubjectName" Description="Board.Data: the subject the board's messages are published on." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:SetHarpClock">
+          <dev:Name />
+          <dev:ToleranceSeconds>2</dev:ToleranceSeconds>
+          <dev:TimeoutSeconds>10</dev:TimeoutSeconds>
+          <dev:GapSeconds>3</dev:GapSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the subject the board takes its commands from." />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="harp:FilterMessageType">
+          <harp:FilterType>Include</harp:FilterType>
+          <harp:MessageType>Event</harp:MessageType>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="harp:Parse">
+        <harp:Register xsi:type="harp:TimestampedTimestampSeconds" />
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Seconds</Selector>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:HarpClockSet">
+          <dev:ToleranceSeconds>2</dev:ToleranceSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>HarpClockSet</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage>HarpClockSet</core:Stage>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="3" Label="Source2" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="1" To="6" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="5" Label="Source1" />
+      <Edge From="4" To="5" Label="Source2" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
+      <Edge From="14" To="15" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
