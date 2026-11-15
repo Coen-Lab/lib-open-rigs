@@ -6,7 +6,7 @@
 
 ## Bonsai workflow
 
-The workflow is `LogVideo`'s with the writer swapped. It groups incoming frames by the hour (`GroupByTime` with `ChunkSize = 1`), and for each hour [FfmpegVideoWriter](xref:OpenRigs.Video.FfmpegVideoWriter) writes `<LogName>\<LogName>_<DateTime>.mkv` and `.csv` under the `PathPrefix` subject published by [LogController](log-controller.md). File names come from `FormatFileName`, as for every other log.
+The workflow is `LogVideo`'s with the writer swapped. It groups incoming frames by the hour (`GroupByTime` with `ChunkSize = 1`), and for each hour [FfmpegVideoWriter](xref:OpenRigs.Video.FfmpegVideoWriter) writes `<LogName>\<LogName>_<DateTime>.mkv` and `.csv` under the `PathPrefix` subject published by [LogController](log-controller.md). File names come from `FormatFileName`.
 
 To use it in place of `LogVideo`, change the include's path from `OpenRigs.Logging:LogVideo.bonsai` to `OpenRigs.Logging:LogVideoFfmpeg.bonsai` and keep its `LogName` and `FrameRate`. The input is the same: `Timestamped<VideoDataFrame>` from [Triggered Spinnaker](../OpenRigs.Devices/triggered-spinnaker.md). The workflow needs the OpenRigs.Video package, which a workflow with a Spinnaker camera already has.
 
