@@ -112,7 +112,7 @@ speakerArray:
     sampleRate: 48000       # Hz; the stimulus WAVs and speaker filters must be at this rate
     channelCount: 32
     suggestedLatency: 0.002 # s
-    bootDelay: 3.0          # s before the mixer starts: a fault while the sound card boots can blue-screen the PC
+    bootDelaySeconds: 3.0   # s before the mixer starts: a fault while the sound card boots can blue-screen the PC
   syncChannel: 31           # the sync copy of each stimulus (OpenRigs.Audio SyncCopy)
   syncGain: 0.2
   penaltySoundChannel: 2    # the penalty sound's channel

@@ -11,7 +11,7 @@ namespace OpenRigs.Core
     /// boot delay, then a print request every print period.
     /// </summary>
     [Combinator]
-    [Description("Produces the serial commands that drive a balance from its settings: the tare command after bootDelayS, then the print command every printPeriodS from bootDelayS plus tareDelayS on. An empty command is not sent. Send the output to the balance's serial commands subject, as OpenRigs.Devices:SerialBalance.bonsai does.")]
+    [Description("Produces the serial commands that drive a balance from its settings: the tare command after bootDelaySeconds, then the print command every printPeriodS from bootDelaySeconds plus tareDelayS on. An empty command is not sent. Send the output to the balance's serial commands subject, as OpenRigs.Devices:SerialBalance.bonsai does.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PollBalance
     {
@@ -25,7 +25,7 @@ namespace OpenRigs.Core
         public static IObservable<string> Commands(SerialBalance settings)
         {
             if (settings == null) throw new ArgumentNullException("settings");
-            var boot = TimeSpan.FromSeconds(Math.Max(0, settings.BootDelayS));
+            var boot = TimeSpan.FromSeconds(Math.Max(0, settings.BootDelaySeconds));
             var settle = TimeSpan.FromSeconds(Math.Max(0, settings.TareDelayS));
             var period = TimeSpan.FromSeconds(settings.PrintPeriodS > 0 ? settings.PrintPeriodS : 0.5);
             var noTare = string.IsNullOrEmpty(settings.TareCommand);

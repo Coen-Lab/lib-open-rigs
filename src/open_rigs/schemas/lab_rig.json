@@ -42,11 +42,11 @@
           "title": "SuggestedLatency",
           "type": "number"
         },
-        "bootDelay": {
+        "bootDelaySeconds": {
           "default": 3.0,
-          "description": "Delay before starting the mixer, in seconds. Guards against a driver fault on startup.",
+          "description": "Delay before starting the mixer, in seconds; the mixer never starts sooner than 3 s after Start, as a fault while the sound card boots can blue-screen the PC.",
           "minimum": 0,
-          "title": "BootDelay",
+          "title": "BootDelaySeconds",
           "type": "number"
         }
       },
@@ -1104,13 +1104,6 @@
           "minimum": -2147483648,
           "title": "Channel",
           "type": "integer"
-        },
-        "gain": {
-          "default": 1.0,
-          "description": "Gain correction applied to this speaker's channel.",
-          "minimum": 0,
-          "title": "Gain",
-          "type": "number"
         },
         "filter": {
           "anyOf": [

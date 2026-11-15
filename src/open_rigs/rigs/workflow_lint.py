@@ -171,7 +171,7 @@ def startup_watchdog_readers(wf: Workflow) -> int:
 
 
 def mixer_boot_delay_problems(root: ET.Element) -> list[str]:
-    """The mixer starts no sooner than 3 s after Start, or rig.yml's longer bootDelay: a fault while the sound card
+    """The mixer starts no sooner than 3 s after Start, or rig.yml's longer bootDelaySeconds: a fault while the sound card
     boots can blue-screen the PC (deliberate; never remove or shorten it). `root` is OpenRigs.Audio's SpeakerMixer.bonsai,
     the one place the lab starts a mixer (lib-open-rigs tests it there)."""
     group = next(e for e in root.iter(W + "Expression") if e.findtext(W + "Name") == "Mixer")
@@ -184,8 +184,8 @@ def mixer_boot_delay_problems(root: ET.Element) -> list[str]:
     if kind(delay) != "rx:DelaySubscription" or child(delay, W + "Combinator").findtext(RX + "DueTime") != "PT3S":
         problems.append("MixerBootDelay is not a DelaySubscription of PT3S")
     expressions = [nodes[a].findtext(SCRIPT + "Expression") for a in upstream(edges, delays[0])]
-    if "TimeSpan.FromSeconds(Math.Max(3.0, SpeakerArray.Device.BootDelay))" not in expressions:
-        problems.append("MixerBootDelay's DueTime is not max(3 s, speakerArray.device.bootDelay)")
+    if "TimeSpan.FromSeconds(Math.Max(3.0, SpeakerArray.Device.BootDelaySeconds))" not in expressions:
+        problems.append("MixerBootDelay's DueTime is not max(3 s, speakerArray.device.bootDelaySeconds)")
     if [a for a, b, label in edges if b == delays[0] and label == "Source1"] != [i for i, n in enumerate(nodes) if n.findtext(W + "Name") == "MixerDevice"]:
         problems.append("MixerBootDelay does not delay MixerDevice, the mixer's start")
     return problems

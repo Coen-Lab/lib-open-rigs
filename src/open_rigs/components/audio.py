@@ -25,9 +25,6 @@ class Speaker(BaseSchema):
 
     position: SphericalPosition = Field(description="Position of the speaker relative to the subject.")
     channel: data_types.Int = Field(ge=0, description="Mixer output channel driving this speaker.")
-    gain: data_types.Double = Field(
-        default=1.0, ge=0, description="Gain correction applied to this speaker's channel."
-    )
     filter: ArtefactPath | None = Field(
         default=None,
         examples=["calibration/speaker-left.json"],
@@ -58,10 +55,10 @@ class AudioDevice(BaseSchema):
     suggested_latency: data_types.Double = Field(
         default=0.002, gt=0, description="Suggested output latency, in seconds."
     )
-    boot_delay: data_types.Double = Field(
+    boot_delay_seconds: data_types.Double = Field(
         default=3.0,
         ge=0,
-        description="Delay before starting the mixer, in seconds. Guards against a driver fault on startup.",
+        description="Delay before starting the mixer, in seconds; the mixer never starts sooner than 3 s after Start, as a fault while the sound card boots can blue-screen the PC.",
     )
 
 

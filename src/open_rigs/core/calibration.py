@@ -100,11 +100,11 @@ class CalibrationCurve(Calibration):
 
 
 class DispenseSample(CalibrationSchema):
-    """One pulse width to measure: the valve fires `repeats` pulses of it and the gain is weighed once.
+    """One pulse width to measure: the valve fires `pulses` pulses of it and the gain is weighed once.
     """
 
     pulse_width_ms: data_types.UShort = Field(gt=0, description="The width of each pulse fired, in milliseconds.")
-    repeats: int = Field(default=10, ge=1, description="Pulses fired at this width before the gain is weighed.")
+    pulses: int = Field(default=10, ge=1, description="Pulses fired at this width before the gain is weighed.")
     pulse_gap_ms: data_types.UShort = Field(
         default=500, description="Off-to-on time between consecutive pulses, in milliseconds; long enough for the valve to seat."
     )

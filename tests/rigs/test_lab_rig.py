@@ -203,3 +203,10 @@ def test_the_lab_rig_template_validates_and_fits_the_committed_schema():
     assert rig.behavior_board["main"].wiring.do3.device == "ZapitTrigger"
     committed = json.loads((package / "schemas" / "lab_rig.json").read_text(encoding="utf-8"))
     assert committed == json.loads(json.dumps(build_schema()))
+
+
+def test_the_mixer_boot_delay_is_in_seconds_and_a_speaker_has_no_gain():
+    # A speaker's differences belong to its calibration (SpeakerSet never read a gain).
+    defs = LabRig.model_json_schema(by_alias=True)["$defs"]
+    assert "bootDelaySeconds" in defs["AudioDevice"]["properties"] and "bootDelay" not in defs["AudioDevice"]["properties"]
+    assert "gain" not in defs["Speaker"]["properties"]

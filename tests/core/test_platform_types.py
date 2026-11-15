@@ -68,7 +68,7 @@ def test_balance_port_is_a_placeholder_until_run_time():
 
 def test_dispense_calibration_round_trips_through_yaml(tmp_path):
     settings = DispenseCalibration(
-        procedure=DispenseProcedure(samples=[DispenseSample(pulse_width_ms=20, repeats=5), DispenseSample(pulse_width_ms=40)]),
+        procedure=DispenseProcedure(samples=[DispenseSample(pulse_width_ms=20, pulses=5), DispenseSample(pulse_width_ms=40)]),
         balance=SerialBalance(print_period_s=1.0),
     )
     path = tmp_path / "valve-calibration.yml"

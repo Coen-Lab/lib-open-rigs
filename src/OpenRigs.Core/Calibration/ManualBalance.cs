@@ -160,7 +160,7 @@ namespace OpenRigs.Core.Calibration
                             bursts.Add(new Burst
                             {
                                 Name = string.Format("sample {0} of {1}", i + 1, p.Samples.Count),
-                                Pulses = p.Samples[i].Repeats,
+                                Pulses = p.Samples[i].Pulses,
                                 PulseWidthMs = p.Samples[i].PulseWidthMs,
                                 Gap = p.Samples[i].PulseGapMs
                             });

@@ -363,7 +363,7 @@ namespace OpenRigs.Devices.Rigs
     
         private double _suggestedLatency;
     
-        private double _bootDelay;
+        private double _bootDelaySeconds;
     
         public AudioDevice()
         {
@@ -371,7 +371,7 @@ namespace OpenRigs.Devices.Rigs
             _sampleRate = 48000;
             _channelCount = 32;
             _suggestedLatency = 0.002D;
-            _bootDelay = 3D;
+            _bootDelaySeconds = 3D;
         }
     
         protected AudioDevice(AudioDevice other)
@@ -381,7 +381,7 @@ namespace OpenRigs.Devices.Rigs
             _sampleRate = other._sampleRate;
             _channelCount = other._channelCount;
             _suggestedLatency = other._suggestedLatency;
-            _bootDelay = other._bootDelay;
+            _bootDelaySeconds = other._bootDelaySeconds;
         }
     
         /// <summary>
@@ -475,21 +475,21 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Delay before starting the mixer, in seconds. Guards against a driver fault on startup.
+        /// Delay before starting the mixer, in seconds; the mixer never starts sooner than 3 s after Start, as a fault while the sound card boots can blue-screen the PC.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("bootDelay")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="bootDelay")]
-        [System.ComponentModel.DescriptionAttribute("Delay before starting the mixer, in seconds. Guards against a driver fault on sta" +
-            "rtup.")]
-        public double BootDelay
+        [Newtonsoft.Json.JsonPropertyAttribute("bootDelaySeconds")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="bootDelaySeconds")]
+        [System.ComponentModel.DescriptionAttribute("Delay before starting the mixer, in seconds; the mixer never starts sooner than 3" +
+            " s after Start, as a fault while the sound card boots can blue-screen the PC.")]
+        public double BootDelaySeconds
         {
             get
             {
-                return _bootDelay;
+                return _bootDelaySeconds;
             }
             set
             {
-                _bootDelay = value;
+                _bootDelaySeconds = value;
             }
         }
     
@@ -510,7 +510,7 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("SampleRate = " + _sampleRate + ", ");
             stringBuilder.Append("ChannelCount = " + _channelCount + ", ");
             stringBuilder.Append("SuggestedLatency = " + _suggestedLatency + ", ");
-            stringBuilder.Append("BootDelay = " + _bootDelay);
+            stringBuilder.Append("BootDelaySeconds = " + _bootDelaySeconds);
             return true;
         }
     
@@ -2846,21 +2846,17 @@ namespace OpenRigs.Devices.Rigs
     
         private int _channel;
     
-        private double _gain;
-    
         private string _filter;
     
         public Speaker()
         {
             _position = new SphericalPosition();
-            _gain = 1D;
         }
     
         protected Speaker(Speaker other)
         {
             _position = other._position;
             _channel = other._channel;
-            _gain = other._gain;
             _filter = other._filter;
         }
     
@@ -2902,24 +2898,6 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Gain correction applied to this speaker's channel.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("gain")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="gain")]
-        [System.ComponentModel.DescriptionAttribute("Gain correction applied to this speaker\'s channel.")]
-        public double Gain
-        {
-            get
-            {
-                return _gain;
-            }
-            set
-            {
-                _gain = value;
-            }
-        }
-    
-        /// <summary>
         /// Relative path of this speaker's SpeakerFilter artefact; none means the channel is not equalised.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("filter")]
@@ -2952,7 +2930,6 @@ namespace OpenRigs.Devices.Rigs
         {
             stringBuilder.Append("Position = " + _position + ", ");
             stringBuilder.Append("Channel = " + _channel + ", ");
-            stringBuilder.Append("Gain = " + _gain + ", ");
             stringBuilder.Append("Filter = " + _filter);
             return true;
         }

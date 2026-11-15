@@ -760,12 +760,12 @@ namespace OpenRigs.Core.Calibration
 
 
     /// <summary>
-    /// One pulse width to measure: the valve fires `repeats` pulses of it and the gain is weighed once.
+    /// One pulse width to measure: the valve fires `pulses` pulses of it and the gain is weighed once.
     ///    
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("One pulse width to measure: the valve fires `repeats` pulses of it and the gain i" +
-        "s weighed once.\n    ")]
+    [System.ComponentModel.DescriptionAttribute("One pulse width to measure: the valve fires `pulses` pulses of it and the gain is" +
+        " weighed once.\n    ")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class DispenseSample
@@ -773,20 +773,20 @@ namespace OpenRigs.Core.Calibration
     
         private int _pulseWidthMs;
     
-        private int _repeats;
+        private int _pulses;
     
         private int _pulseGapMs;
     
         public DispenseSample()
         {
-            _repeats = 10;
+            _pulses = 10;
             _pulseGapMs = 500;
         }
     
         protected DispenseSample(DispenseSample other)
         {
             _pulseWidthMs = other._pulseWidthMs;
-            _repeats = other._repeats;
+            _pulses = other._pulses;
             _pulseGapMs = other._pulseGapMs;
         }
     
@@ -811,18 +811,18 @@ namespace OpenRigs.Core.Calibration
         /// <summary>
         /// Pulses fired at this width before the gain is weighed.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("repeats")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="repeats")]
+        [Newtonsoft.Json.JsonPropertyAttribute("pulses")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="pulses")]
         [System.ComponentModel.DescriptionAttribute("Pulses fired at this width before the gain is weighed.")]
-        public int Repeats
+        public int Pulses
         {
             get
             {
-                return _repeats;
+                return _pulses;
             }
             set
             {
-                _repeats = value;
+                _pulses = value;
             }
         }
     
@@ -858,7 +858,7 @@ namespace OpenRigs.Core.Calibration
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
             stringBuilder.Append("PulseWidthMs = " + _pulseWidthMs + ", ");
-            stringBuilder.Append("Repeats = " + _repeats + ", ");
+            stringBuilder.Append("Pulses = " + _pulses + ", ");
             stringBuilder.Append("PulseGapMs = " + _pulseGapMs);
             return true;
         }
@@ -1271,7 +1271,7 @@ namespace OpenRigs.Core.Calibration
     
         private double _printPeriodS;
     
-        private double _bootDelayS;
+        private double _bootDelaySeconds;
     
         private double _tareDelayS;
     
@@ -1291,7 +1291,7 @@ namespace OpenRigs.Core.Calibration
             _tareCommand = "T";
             _printCommand = "IP";
             _printPeriodS = 0.5D;
-            _bootDelayS = 0.5D;
+            _bootDelaySeconds = 0.5D;
             _tareDelayS = 1.5D;
             _unitSuffix = "g";
             _unstableMarker = "?";
@@ -1308,7 +1308,7 @@ namespace OpenRigs.Core.Calibration
             _tareCommand = other._tareCommand;
             _printCommand = other._printCommand;
             _printPeriodS = other._printPeriodS;
-            _bootDelayS = other._bootDelayS;
+            _bootDelaySeconds = other._bootDelaySeconds;
             _tareDelayS = other._tareDelayS;
             _unitSuffix = other._unitSuffix;
             _unstableMarker = other._unstableMarker;
@@ -1462,18 +1462,18 @@ namespace OpenRigs.Core.Calibration
         /// <summary>
         /// Wait after opening the port before taring, in seconds.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("bootDelayS")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="bootDelayS")]
+        [Newtonsoft.Json.JsonPropertyAttribute("bootDelaySeconds")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="bootDelaySeconds")]
         [System.ComponentModel.DescriptionAttribute("Wait after opening the port before taring, in seconds.")]
-        public double BootDelayS
+        public double BootDelaySeconds
         {
             get
             {
-                return _bootDelayS;
+                return _bootDelaySeconds;
             }
             set
             {
-                _bootDelayS = value;
+                _bootDelaySeconds = value;
             }
         }
     
@@ -1570,7 +1570,7 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("TareCommand = " + _tareCommand + ", ");
             stringBuilder.Append("PrintCommand = " + _printCommand + ", ");
             stringBuilder.Append("PrintPeriodS = " + _printPeriodS + ", ");
-            stringBuilder.Append("BootDelayS = " + _bootDelayS + ", ");
+            stringBuilder.Append("BootDelaySeconds = " + _bootDelaySeconds + ", ");
             stringBuilder.Append("TareDelayS = " + _tareDelayS + ", ");
             stringBuilder.Append("UnitSuffix = " + _unitSuffix + ", ");
             stringBuilder.Append("UnstableMarker = " + _unstableMarker + ", ");

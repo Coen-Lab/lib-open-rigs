@@ -661,7 +661,7 @@ namespace OpenRigs.Manifest.Tests
                 // L2-L1: one empty instance hid its whole kind, without a word.
                 var emptyYml = Path.Combine(root, "empty-rig.yml");
                 File.WriteAllText(emptyYml, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  overhead:\n    serialNumber: '1'\n" +
-                    "speakerArray:\n  device: { bootDelay: 3 }\n  syncChannel: 7\n");
+                    "speakerArray:\n  device: { bootDelaySeconds: 3 }\n  syncChannel: 7\n");
                 var empty = ExpectedPlan.Create("auto", emptyYml, n => typeof(object));
                 Check("an empty entry beside a board is noted, naming it, and settings with a value (speakerArray) are not",
                     empty.Notes.Count(n => n.Contains("has no settings")) == 1

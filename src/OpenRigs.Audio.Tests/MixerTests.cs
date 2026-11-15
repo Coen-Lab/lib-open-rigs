@@ -30,7 +30,7 @@ namespace OpenRigs.Audio.Tests
             Assert.AreEqual(0, passed.Count);
             Assert.IsInstanceOfType(error, typeof(InvalidOperationException));
             StringAssert.Contains(error.Message, "sent on PenaltySounds");
-            StringAssert.Contains(error.Message, "before the speaker mixer started (3 s after Start, or rig.yml's speakerArray.device.bootDelay if longer)");
+            StringAssert.Contains(error.Message, "before the speaker mixer started (3 s after Start, or rig.yml's speakerArray.device.bootDelaySeconds if longer)");
         }
 
         [TestMethod]
@@ -121,7 +121,7 @@ namespace OpenRigs.Audio.Tests
             var error = result.Item2;
             while (error.InnerException != null) error = error.InnerException;
             StringAssert.Contains(error.Message, "sent on StimulusSounds");
-            StringAssert.Contains(error.Message, "speakerArray.device.bootDelay");
+            StringAssert.Contains(error.Message, "speakerArray.device.bootDelaySeconds");
         }
     }
 }

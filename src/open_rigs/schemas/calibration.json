@@ -147,7 +147,7 @@
             "tareCommand": "T",
             "printCommand": "IP",
             "printPeriodS": 0.5,
-            "bootDelayS": 0.5,
+            "bootDelaySeconds": 0.5,
             "tareDelayS": 1.5,
             "unitSuffix": "g",
             "unstableMarker": "?",
@@ -232,7 +232,7 @@
       "type": "object"
     },
     "DispenseSample": {
-      "description": "One pulse width to measure: the valve fires `repeats` pulses of it and the gain is weighed once.\n    ",
+      "description": "One pulse width to measure: the valve fires `pulses` pulses of it and the gain is weighed once.\n    ",
       "properties": {
         "pulseWidthMs": {
           "description": "The width of each pulse fired, in milliseconds.",
@@ -242,11 +242,11 @@
           "title": "PulseWidthMs",
           "type": "integer"
         },
-        "repeats": {
+        "pulses": {
           "default": 10,
           "description": "Pulses fired at this width before the gain is weighed.",
           "minimum": 1,
-          "title": "Repeats",
+          "title": "Pulses",
           "type": "integer"
         },
         "pulseGapMs": {
@@ -416,11 +416,11 @@
           "title": "PrintPeriodS",
           "type": "number"
         },
-        "bootDelayS": {
+        "bootDelaySeconds": {
           "default": 0.5,
           "description": "Wait after opening the port before taring, in seconds.",
           "minimum": 0,
-          "title": "BootDelayS",
+          "title": "BootDelaySeconds",
           "type": "number"
         },
         "tareDelayS": {

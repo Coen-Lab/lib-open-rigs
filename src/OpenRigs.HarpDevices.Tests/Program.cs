@@ -353,7 +353,7 @@ namespace OpenRigs.HarpDevices.Tests
                     "soundCard:\n  main:\n    portName: COM6\n" +
                     "stepperDriver:\n  a:\n    portName: COM8\n    usbSerial: X\n    wiring:\n      Motor1: { device: Radial, side: left }\n" +
                     "camera:\n  overhead:\n    serialNumber: '1'\n" +
-                    "speakerArray:\n  device: { bootDelay: 3 }\n  syncChannel: 7\n  unusedChannels: null\nrootPath: C:\\data\n");
+                    "speakerArray:\n  device: { bootDelaySeconds: 3 }\n  syncChannel: 7\n  unusedChannels: null\nrootPath: C:\\data\n");
                 Func<string, Type> published = n =>
                     n == "PathPrefix" ? typeof(string)
                     : n == "BehaviorBoard-Main.Data" || n == "BehaviorBoard-Main.Commands" || n == "LicketySplit-Left.Data" || n == "SoundCard-Main.Data" || n == "BehaviorBoard-Idle.Data" || n == "StepperDriver-A.Data" ? typeof(HarpMessage)

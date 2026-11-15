@@ -105,7 +105,7 @@ namespace OpenRigs.Audio
                     if (ready) observer.OnNext(sound);
                     else observer.OnError(new InvalidOperationException(string.Format(System.Globalization.CultureInfo.InvariantCulture,
                         "A sound was sent on {0} {1:0.0} s after Start, before the speaker mixer started (3 s after Start, or rig.yml's " +
-                        "speakerArray.device.bootDelay if longer), so it would not play while the trial log records it as sent. " +
+                        "speakerArray.device.bootDelaySeconds if longer), so it would not play while the trial log records it as sent. " +
                         "Press Go no sooner than that.", Sound, clock.Elapsed.TotalSeconds)));
                 }, observer.OnError, observer.OnCompleted);
                 return new System.Reactive.Disposables.CompositeDisposable(mixerSubscription, soundSubscription);
