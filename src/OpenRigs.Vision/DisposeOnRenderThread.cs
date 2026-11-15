@@ -16,7 +16,7 @@ namespace OpenRigs.Vision
     /// context there, and the access violation kills Bonsai before its logs are flushed.
     /// </summary>
     [Combinator]
-    [Description("Disposes the sequence it is given (a group holding the shader window and BonVision's render targets) on the shader window's render thread, where the GL context is current, and waits for it. Its elements are not passed on. If the window is not running, or the render thread does not answer within TimeoutSeconds, it disposes on the calling thread instead.")]
+    [Description("Disposes the sequence it is given (a group holding the shader window and BonVision's render targets) on the shader window's render thread, where the GL context is current, and waits for it. Its elements are not passed on. If the window is not running it disposes on the calling thread; if the render thread does not answer within TimeoutSeconds, on a background thread, so the stop cannot hang.")]
     [WorkflowElementCategory(ElementCategory.Sink)]
     public class DisposeOnRenderThread
     {
@@ -85,10 +85,15 @@ namespace OpenRigs.Vision
 
                             if (!done.Wait(timeout))
                             {
+                                // On a background thread, so a dispose that blocks cannot hang the workflow's stop.
                                 Console.Error.WriteLine(
-                                    "DisposeOnRenderThread: the render thread did not dispose within {0} s; disposing on thread {1} instead.",
-                                    TimeoutSeconds, Thread.CurrentThread.ManagedThreadId);
-                                inner.Dispose();
+                                    "DisposeOnRenderThread: the render thread did not dispose within {0} s; disposing on a background thread instead.",
+                                    TimeoutSeconds);
+                                ThreadPool.QueueUserWorkItem(_ =>
+                                {
+                                    try { inner.Dispose(); }
+                                    catch (Exception ex) { Console.Error.WriteLine("DisposeOnRenderThread: disposing failed: {0}", ex); }
+                                });
                             }
                         }
 

@@ -46,7 +46,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:ObserveOn">
-          <rx:Scheduler>NewThreadScheduler</rx:Scheduler>
+          <rx:Scheduler>TaskPoolScheduler</rx:Scheduler>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
@@ -60,7 +60,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:ObserveOn">
-          <rx:Scheduler>NewThreadScheduler</rx:Scheduler>
+          <rx:Scheduler>TaskPoolScheduler</rx:Scheduler>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">

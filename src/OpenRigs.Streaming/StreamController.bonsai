@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
@@ -67,7 +67,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:ObserveOn">
-          <rx:Scheduler>NewThreadScheduler</rx:Scheduler>
+          <rx:Scheduler>TaskPoolScheduler</rx:Scheduler>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
@@ -81,7 +81,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:ObserveOn">
-          <rx:Scheduler>NewThreadScheduler</rx:Scheduler>
+          <rx:Scheduler>TaskPoolScheduler</rx:Scheduler>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
