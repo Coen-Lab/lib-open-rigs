@@ -248,9 +248,14 @@ if ($Step -eq 'Checks') {
 
 if (-not (Test-Path (Join-Path $bonsaiDir 'Packages'))) { throw "No .bonsai\Packages in $Repo. Run .bonsai\Setup.ps1 first." }
 # Every package Bonsai.config names, at its version, in .bonsai\Packages: a Bonsai.config moved on since the last setup
-# otherwise fails the build only as "proxy for the unknown type".
-$stale = @(([xml](Get-Content (Join-Path $bonsaiDir 'Bonsai.config') -Raw)).PackageConfiguration.Packages.Package |
-    Where-Object { -not (Test-Path (Join-Path $bonsaiDir "Packages\$($_.id).$($_.version)")) } | ForEach-Object { "$($_.id) $($_.version)" })
+# otherwise fails the build only as "proxy for the unknown type". A folder keeps the package's own version, which
+# NuGet may have normalised in Bonsai.config (openal.redist.2.0.7.0 for 2.0.7), so trailing .0 parts are not compared.
+function Get-NormalVersion([string]$v) { $parts = $v -split '-', 2; ($parts[0] -replace '(\.0)+$', '') + $(if ($parts.Count -gt 1) { '-' + $parts[1] }) }
+$folders = @(Get-ChildItem (Join-Path $bonsaiDir 'Packages') -Directory | ForEach-Object { $_.Name.ToLowerInvariant() })
+$stale = @(([xml](Get-Content (Join-Path $bonsaiDir 'Bonsai.config') -Raw)).PackageConfiguration.Packages.Package | Where-Object {
+    $id = $_.id.ToLowerInvariant() + '.'; $want = Get-NormalVersion $_.version.ToLowerInvariant()
+    -not @($folders | Where-Object { $_.StartsWith($id) -and (Get-NormalVersion $_.Substring($id.Length)) -eq $want }).Count
+} | ForEach-Object { "$($_.id) $($_.version)" })
 if ($stale.Count) { throw ".bonsai\Packages lacks what Bonsai.config names: $($stale -join ', '). Run .bonsai\Setup.ps1." }
 if (-not (Test-Path $template)) { throw "No lab rig template at $template." }
 # NuGet sources: nuget.org, local_packages and every local folder .bonsai\NuGet.config lists, so a lab package new
