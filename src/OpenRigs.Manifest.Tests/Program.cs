@@ -428,6 +428,16 @@ namespace OpenRigs.Manifest.Tests
                 Check("{SubjectId} names the subject's own file", mine.Count == 1 && ((string)mine[0][0].Value).EndsWith(@"Spouts\M7.csv") && mine[0][1].Key == "sha256", string.Join(" | ", mine.Select(f => string.Join(",", f.Select(p => p.Key + "=" + p.Value)))));
                 var nobody = ManifestWriter.ConfigFiles(@"Spouts\{SubjectId}.csv", root, null);
                 Check("... and with no SubjectId on the command line it is missing, saying why", nobody.Count == 1 && nobody[0].Any(p => p.Key == "missing") && ((string)nobody[0].First(p => p.Key == "why").Value).Contains("SubjectId"), "found");
+                // {RigFiles}: rig.yml and every file it names, relative ones from its folder; the spout positions when the stage is there.
+                var tokenRig = Path.Combine(root, "RIG", "rig.yml");
+                Directory.CreateDirectory(Path.GetDirectoryName(tokenRig));
+                File.WriteAllText(tokenRig, "behaviorBoard:\n  main:\n    pulseController:\n      outputs:\n        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }\n" +
+                    "projectionCalibration:\n  meshMapPath: D:\\cal\\MeshMap.csv\nspeakerArray:\n  device: { deviceName: Speakers (XMOS xCORE-200 MC (UAC2.0)) }\n" +
+                    "  speakers:\n    left: { channel: 0, filter: calibration/speaker-left.json }\nlickSpoutDefaultPosition: { baseTransverse: 0 }\n");
+                var rigFiles = ManifestWriter.RigFiles(tokenRig);
+                var wantFiles = new[] { tokenRig, Path.Combine(root, @"RIG\calibration\valve-DO1.json"), @"D:\cal\MeshMap.csv", Path.Combine(root, @"RIG\calibration\speaker-left.json"), Path.Combine(root, @"RIG\calibration\LickSpoutPositions\{SubjectId}.csv") };
+                Check("{RigFiles} is rig.yml, every path it names and the spout positions", rigFiles.SequenceEqual(wantFiles), string.Join(" | ", rigFiles));
+                Check("... and an unreadable rig.yml alone", ManifestWriter.RigFiles(Path.Combine(root, "none.yml")).Count == 1, "more");
                 // A missing file's note names the file looked for, environment variables and {SubjectId} filled in, not the entry as typed.
                 Environment.SetEnvironmentVariable("OPENRIGS_TEST_MACHINE", "TEST-RIG-2");
                 var absent = ManifestWriter.ConfigFiles(@"%OPENRIGS_TEST_MACHINE%\calibration\{SubjectId}.csv", root, "test");
@@ -574,7 +584,7 @@ namespace OpenRigs.Manifest.Tests
                     var listed = string.Join(",", ManifestWriter.FilesSection(folder).Cast<JsonObject>().Select(f => (string)f.First(p => p.Key == "path").Value));
                     Check("FilesSection leaves out another writer's .tmp and the three record files", listed == "Board/Board.yml", listed);
                 }
-                Check("ConfigFiles defaults under the shared ConfigRoot", new ExperimentManifestSettings().ConfigFiles.StartsWith(RigDevices.DefaultConfigRoot + @"\"), new ExperimentManifestSettings().ConfigFiles);
+                Check("ConfigFiles defaults to {RigFiles}, rig.yml under the launch's ConfigRoot and every file it names", new ExperimentManifestSettings().ConfigFiles == ManifestWriter.RigFilesToken, new ExperimentManifestSettings().ConfigFiles);
 
                 Console.WriteLine("A write that fails:");
                 {

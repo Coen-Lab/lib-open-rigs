@@ -55,7 +55,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>Gets or sets the configuration files the workflow runs with, separated by ;.</summary>
-        [Description("The configuration files the workflow runs with, separated by ;. Each is read once at Start and recorded in the manifest with its sha256, so the manifest has them as loaded. Environment variables are expanded (%COMPUTERNAME%), and {SubjectId} is the launch's --property:SubjectId (a mouse's own file); a folder is every file in it; a relative path is from the workflow's repository. A missing file is noted, not an error.")]
+        [Description("The configuration files the workflow runs with, separated by ;. Each is read once at Start and recorded in the manifest with its sha256, so the manifest has them as loaded. Environment variables are expanded (%COMPUTERNAME%), and {SubjectId} is the launch's --property:SubjectId (a mouse's own file); a folder is every file in it; a relative path is from the workflow's repository; {RigFiles} (the default) is this machine's rig.yml under the launch's ConfigRoot and every file it names (calibrations, speaker filters, mesh map, gamma table) and, on a rig with a lick spout stage, the mouse's spout positions. A missing file is noted, not an error.")]
         public string ConfigFiles
         {
             get { return Settings.ConfigFiles; }
@@ -150,7 +150,7 @@ namespace OpenRigs.Manifest
         public string IngestScript { get; set; }
 
         /// <summary>Gets or sets ExperimentManifest's ConfigFiles.</summary>
-        public string ConfigFiles { get; set; } = RigDevices.DefaultConfigRoot + @"\%COMPUTERNAME%\rig.yml";
+        public string ConfigFiles { get; set; } = ManifestWriter.RigFilesToken;
 
         /// <summary>Gets or sets ExperimentManifest's ExpectedFiles.</summary>
         public string ExpectedFiles { get; set; } = ExpectedPlan.Auto;

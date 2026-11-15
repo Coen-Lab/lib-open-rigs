@@ -111,9 +111,51 @@ namespace OpenRigs.Manifest
             return "The launch set ConfigRoot to " + configRoot + ", but ConfigFiles read " + rigConfig + ": the rig.yml recorded may not be the one the workflow ran with. Set ConfigFiles to match.";
         }
 
+        /// <summary>
+        /// The ConfigFiles entry that stands for this machine's rig.yml (under the launch's ConfigRoot, else the lab's
+        /// default) and every file it names: each scalar in it that is a path (holding / or \ and ending in an
+        /// extension), relative ones from rig.yml's folder, such as valve calibrations, speaker filters, the mesh map
+        /// and the gamma table; and, on a rig with a lick spout stage (lickSpoutDefaultPosition), the mouse's spout
+        /// positions, calibration\LickSpoutPositions\{SubjectId}.csv.
+        /// </summary>
+        public const string RigFilesToken = "{RigFiles}";
+
         static IEnumerable<string> ConfigEntries(string configFiles)
         {
-            return (configFiles ?? "").Split(';').Select(e => e.Trim()).Where(e => e.Length > 0);
+            foreach (var entry in (configFiles ?? "").Split(';').Select(e => e.Trim()).Where(e => e.Length > 0))
+            {
+                if (entry != RigFilesToken) { yield return entry; continue; }
+                var launch = LaunchSection(Environment.GetCommandLineArgs());
+                foreach (var file in RigFiles(RigDevices.PathFor(LaunchProperty(launch, "ConfigRoot") ?? RigDevices.DefaultConfigRoot))) yield return file;
+            }
+        }
+
+        /// <summary>rig.yml and every file it names, as <see cref="RigFilesToken"/> expands to; just rig.yml if it cannot be read.</summary>
+        public static List<string> RigFiles(string rigYml)
+        {
+            var files = new List<string> { rigYml };
+            var folder = Path.GetDirectoryName(rigYml);
+            YamlDotNet.RepresentationModel.YamlStream yaml;
+            try
+            {
+                yaml = new YamlDotNet.RepresentationModel.YamlStream();
+                using (var reader = new StreamReader(rigYml)) yaml.Load(reader);
+            }
+            catch (Exception) { return files; }  // recorded as missing or unreadable by the rig.yml entry itself
+            var root = yaml.Documents.Count > 0 ? yaml.Documents[0].RootNode as YamlDotNet.RepresentationModel.YamlMappingNode : null;
+            if (root == null) return files;
+            foreach (var scalar in root.AllNodes.OfType<YamlDotNet.RepresentationModel.YamlScalarNode>())
+            {
+                var value = (scalar.Value ?? "").Trim();
+                if ((value.Contains('/') || value.Contains('\\')) && Path.GetExtension(value).Length > 1 && value.IndexOfAny(Path.GetInvalidPathChars()) < 0)
+                {
+                    var full = Path.GetFullPath(Path.IsPathRooted(value) ? value : Path.Combine(folder, value.Replace('/', '\\')));
+                    if (!files.Contains(full, StringComparer.OrdinalIgnoreCase)) files.Add(full);
+                }
+            }
+            if (root.Children.Keys.OfType<YamlDotNet.RepresentationModel.YamlScalarNode>().Any(k => k.Value == "lickSpoutDefaultPosition"))
+                files.Add(Path.Combine(folder, "calibration", "LickSpoutPositions", SubjectToken + ".csv"));
+            return files;
         }
 
         /// <summary>The first of ConfigFiles named rig.yml, its path resolved as at Start; null if none is.</summary>
