@@ -43,8 +43,8 @@ namespace OpenRigs.Audio
         /// <summary>The channel a stimulus's sync copy plays on (speakerArray.syncChannel), or null.</summary>
         public int? SyncChannel { get; private set; }
 
-        /// <summary>The channel the error sound plays on (speakerArray.errorSoundChannel), or null.</summary>
-        public int? ErrorSoundChannel { get; private set; }
+        /// <summary>The channel the penalty sound plays on (speakerArray.penaltySoundChannel), or null.</summary>
+        public int? PenaltySoundChannel { get; private set; }
 
         /// <summary>Every speaker, in rig.yml's order.</summary>
         public IList<Speaker> Speakers { get; private set; }
@@ -125,7 +125,7 @@ namespace OpenRigs.Audio
         /// rig.yml's speakerArray, each speaker's filter read relative to rig.yml's folder. Stops, naming every problem,
         /// on a speaker without a filter (RequireFilters), a filter missing, without taps,
         /// not symmetric, for another rate or measured on another machine; a speaker or syncChannel outside the
-        /// device's channels, two speakers on one channel, or an errorSoundChannel with no speaker on it.
+        /// device's channels, two speakers on one channel, or an penaltySoundChannel with no speaker on it.
         /// </summary>
         public static SpeakerSet Load(string rigFile, string machineName = null)
         {
@@ -154,7 +154,7 @@ namespace OpenRigs.Audio
                 SampleRate = Integer(Child(device, "sampleRate"), "speakerArray.device.sampleRate", path),
                 ChannelCount = Integer(Child(device, "channelCount"), "speakerArray.device.channelCount", path),
                 SyncChannel = OptionalInteger(Child(array, "syncChannel")),
-                ErrorSoundChannel = OptionalInteger(Child(array, "errorSoundChannel")),
+                PenaltySoundChannel = OptionalInteger(Child(array, "penaltySoundChannel")),
             };
             var problems = new List<string>();
             var loaded = new List<Speaker>();
@@ -225,9 +225,9 @@ namespace OpenRigs.Audio
             {
                 problems.Add("syncChannel " + set.SyncChannel + range);
             }
-            if (set.ErrorSoundChannel.HasValue && !read.Any(s => s.Channel == set.ErrorSoundChannel))
+            if (set.PenaltySoundChannel.HasValue && !read.Any(s => s.Channel == set.PenaltySoundChannel))
             {
-                problems.Add("errorSoundChannel " + set.ErrorSoundChannel + " has no speaker on it, and the error sound is never played unequalised: " +
+                problems.Add("penaltySoundChannel " + set.PenaltySoundChannel + " has no speaker on it, and the penalty sound is never played unequalised: " +
                              "set it to a speaker's channel (" + string.Join(", ", read.Select(s => s.Name + " " + s.Channel)) + ")");
             }
             if (problems.Count > 0) throw new InvalidOperationException("The speakers cannot be used: " + string.Join("; ", problems) + ".");

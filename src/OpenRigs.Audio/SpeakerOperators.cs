@@ -56,20 +56,20 @@ namespace OpenRigs.Audio
         }
     }
 
-    /// <summary>The lab's error sound as the mixer's buffer (<see cref="ErrorSound.Buffer"/>).</summary>
+    /// <summary>The lab's penalty sound as the mixer's buffer (<see cref="PenaltySound.Buffer"/>).</summary>
     [Combinator]
-    [Description("The lab's error sound (OpenRigs.Audio's error_tone.wav, the same in every task) as the mixer's buffer: on rig.yml's errorSoundChannel alone, equalised for that speaker, at ErrorSound.Level times Gain (the task's punishment.sound.gain). Input: the speakers.")]
+    [Description("The lab's penalty sound (OpenRigs.Audio's penalty_tone.wav, the same in every task) as the mixer's buffer: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at PenaltySound.Level times Gain (the task's penalty.sound.gain). Input: the speakers.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
-    public class ErrorSoundBuffer
+    public class PenaltySoundBuffer
     {
-        /// <summary>The task's gain on the error sound.</summary>
-        [Description("The task's gain on the error sound (punishment.sound.gain), 1 for the lab's level.")]
+        /// <summary>The task's gain on the penalty sound.</summary>
+        [Description("The task's gain on the penalty sound (penalty.sound.gain), 1 for the lab's level.")]
         public double Gain { get; set; } = 1;
 
         /// <summary>The buffer for each input.</summary>
         public IObservable<Mat> Process(IObservable<SpeakerSet> source)
         {
-            return source.Select(speakers => ErrorSound.Buffer(speakers, Gain));
+            return source.Select(speakers => PenaltySound.Buffer(speakers, Gain));
         }
     }
 

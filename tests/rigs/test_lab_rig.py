@@ -30,7 +30,7 @@ RIG = {
     "speakerArray": {
         "device": {"deviceName": "Speakers"},
         "speakers": {"centre": {"position": {"azimuth": 0, "elevation": 15}, "channel": 2, "filter": "calibration/speaker-centre.json"}},
-        "errorSoundChannel": 2,
+        "penaltySoundChannel": 2,
     },
     "lickSpoutDefaultPosition": STAGE,
     "zapit": {},
@@ -45,7 +45,7 @@ def rig_with(**wiring):
 
 def test_template_validates():
     rig = LabRig.model_validate(RIG)
-    assert rig.speaker_array.error_sound_channel == 2
+    assert rig.speaker_array.penalty_sound_channel == 2
     assert "triggerLine" not in LabRig.model_json_schema(by_alias=True)["$defs"]["ZapitServer"]["properties"]
 
 
@@ -166,10 +166,10 @@ def test_zapit_line_not_pulsed(pulsed, kept):
     assert f'`outputPulseEnable: "{kept}"`' in str(refused.value)
 
 
-def test_error_sound_channel_required():
+def test_penalty_sound_channel_required():
     rig = copy.deepcopy(RIG)
-    del rig["speakerArray"]["errorSoundChannel"]
-    with pytest.raises(ValidationError, match="errorSoundChannel"):
+    del rig["speakerArray"]["penaltySoundChannel"]
+    with pytest.raises(ValidationError, match="penaltySoundChannel"):
         LabRig.model_validate(rig)
 
 

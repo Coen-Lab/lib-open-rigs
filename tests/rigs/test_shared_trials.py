@@ -11,7 +11,7 @@ from open_rigs.rigs import trials as trials_module
 from open_rigs.rigs.trials import CORE_COLUMNS, shared_block_problems, shared_columns, summarise
 
 COLUMNS = ["harpTime", "trialNumber", "trialType", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds",
-           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "punishSound", "punishTimeoutSeconds",
+           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "penaltySound", "penaltyTimeoutSeconds",
            "autoRewarded"]
 
 
@@ -20,11 +20,11 @@ def _trial(n, start, iti, response, outcome="Correct", timeout=0.0, quiet=0.0, r
     end = onset + response
     return {"harpTime": end, "trialNumber": n, "trialType": "auditory", "outcome": outcome, "itiStartTime": start,
             "itiSeconds": iti, "quietWaitSeconds": quiet, "trialStartTime": onset - 0.1, "stimulusOnsetTime": onset,
-            "outcomeTime": end, "rewardSizeUl": reward, "punishSound": timeout > 0, "punishTimeoutSeconds": timeout,
+            "outcomeTime": end, "rewardSizeUl": reward, "penaltySound": timeout > 0, "penaltyTimeoutSeconds": timeout,
             "autoRewarded": auto}
 
 
-TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "punishment": {"timeoutSeconds": 4.0, "sound": {"enabled": True}}}
+TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "penalty": {"timeoutSeconds": 4.0, "sound": {"enabled": True}}}
 
 
 def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, columns=COLUMNS, task=TASK):
@@ -51,7 +51,7 @@ def _chain(n):
     for i in range(1, n + 1):
         t = _trial(i, start, 2.5, 3.0, outcome="Correct" if i % 2 else "Incorrect", timeout=0.0 if i % 2 else 4.0)
         trials.append(t)
-        start = t["outcomeTime"] + t["punishTimeoutSeconds"]
+        start = t["outcomeTime"] + t["penaltyTimeoutSeconds"]
     return trials
 
 
@@ -69,7 +69,7 @@ def test_a_consistent_experiment_has_no_problems(tmp_path):
 def test_a_task_without_quiet_waits_or_optogenetics_is_checked_by_the_core(tmp_path):
     trials = [{**t, "trialStartTime": t["stimulusOnsetTime"]} for t in _chain(4)]  # no lead without optogenetics
     rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
-    task = {"punishment": TASK["punishment"]}
+    task = {"penalty": TASK["penalty"]}
     s = summarise(_experiment(tmp_path, trials, rewards, columns=[c for c in COLUMNS if c != "quietWaitSeconds"], task=task))
     assert s.problems == [] and s.trials == 4
 
@@ -166,7 +166,7 @@ def test_each_block_sits_in_its_place_in_the_core():
     assert [name for name, _, _, _ in shared_columns(())] == core
     both = [name for name, _, _, _ in shared_columns(BOTH)]
     assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-4:] == [
-        "punishTimeoutSeconds", "laserCondition", "laserPowerMw", "laserTriggerTime"]
+        "penaltyTimeoutSeconds", "laserCondition", "laserPowerMw", "laserTriggerTime"]
     assert len(both) == 16 and len(core) == 12
 
 
@@ -194,19 +194,19 @@ def test_a_change_to_the_shared_block_is_named():
     assert shared_block_problems(reordered, BOTH)[0].startswith("the first 16 columns are")
 
 
-def test_go_the_outcomes_and_the_error_sound_are_checked_against_the_task(tmp_path):
+def test_go_the_outcomes_and_the_penalty_sound_are_checked_against_the_task(tmp_path):
     # A Go 5 s off, an outcome that is no outcome, a timeout without the sound and a sound without a timeout were
     # all passed before (audit, 14 Nov 2026).
     trials = _chain(4)
     trials[0]["trialStartTime"] -= 5
-    trials[1]["punishSound"] = False  # Incorrect, with a 4 s timeout, the task's sound on
+    trials[1]["penaltySound"] = False  # Incorrect, with a 4 s timeout, the task's sound on
     trials[2]["outcome"] = "Banana"
-    trials[2]["punishSound"] = True  # no timeout
+    trials[2]["penaltySound"] = True  # no timeout
     text = "\n".join(summarise(_experiment(tmp_path, trials, [])).problems)
     assert "trial 1: Go (trialStartTime) -5.0000 s from its interval's end less the lead (0.1 s) plus quietWaitSeconds" in text
-    assert "trial 2: a timeout without the error sound, but the task's punishment.sound is on" in text
+    assert "trial 2: a timeout without the penalty sound, but the task's penalty.sound is on" in text
     assert "trial 3: outcome 'Banana' is not one of Correct, Incorrect, NoResponse" in text
-    assert "trial 3: the error sound with no timeout, though the task's timeout is 4 s" in text
+    assert "trial 3: the penalty sound with no timeout, though the task's timeout is 4 s" in text
 
 
 def test_a_negative_quiet_wait_is_named(tmp_path):
@@ -229,7 +229,7 @@ def test_without_the_task_file_its_checks_are_one_problem(tmp_path):
     trials = _chain(2)
     rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
     s = summarise(_experiment(tmp_path, trials, rewards, task=None))
-    assert s.problems == ["no readable Settings/Settings_Task_*.json: Go, the laser trigger and the error sound not checked"]
+    assert s.problems == ["no readable Settings/Settings_Task_*.json: Go, the laser trigger and the penalty sound not checked"]
 
 
 def test_performance_is_rig_controls(tmp_path):

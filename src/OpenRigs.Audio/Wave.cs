@@ -78,8 +78,8 @@ namespace OpenRigs.Audio
         }
     }
 
-    /// <summary>The lab's error sound, the same in every task: one second of white noise filtered to about 4 to 21 kHz, at 48 kHz.</summary>
-    public static class ErrorSound
+    /// <summary>The lab's penalty sound, the same in every task: one second of white noise filtered to about 4 to 21 kHz, at 48 kHz.</summary>
+    public static class PenaltySound
     {
         /// <summary>
         /// The share of full scale it plays at before the task's gain: the level the lab's tasks have played it at since 14 Nov 2026
@@ -87,25 +87,25 @@ namespace OpenRigs.Audio
         /// </summary>
         public const double Level = 0.5;
 
-        /// <summary>The error sound, one row in -1 to 1, at the device's rate (48 kHz; any other stops).</summary>
+        /// <summary>The penalty sound, one row in -1 to 1, at the device's rate (48 kHz; any other stops).</summary>
         public static Mat Read(int sampleRate)
         {
-            using (var stream = typeof(ErrorSound).Assembly.GetManifestResourceStream("OpenRigs.Audio.error_tone.wav"))
+            using (var stream = typeof(PenaltySound).Assembly.GetManifestResourceStream("OpenRigs.Audio.penalty_tone.wav"))
             {
-                return Wave.Read(stream, "OpenRigs.Audio's error_tone.wav", sampleRate);
+                return Wave.Read(stream, "OpenRigs.Audio's penalty_tone.wav", sampleRate);
             }
         }
 
-        /// <summary>The mixer's buffer for the error sound: on rig.yml's errorSoundChannel alone, equalised for that speaker, at Level times the task's gain.</summary>
+        /// <summary>The mixer's buffer for the penalty sound: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at Level times the task's gain.</summary>
         public static Mat Buffer(SpeakerSet speakers, double gain)
         {
-            if (!speakers.ErrorSoundChannel.HasValue)
+            if (!speakers.PenaltySoundChannel.HasValue)
             {
-                throw new InvalidOperationException("rig.yml's speakerArray has no errorSoundChannel, the speaker the error sound plays on.");
+                throw new InvalidOperationException("rig.yml's speakerArray has no penaltySoundChannel, the speaker the penalty sound plays on.");
             }
             using (var sound = Read(speakers.SampleRate))
             {
-                return speakers.Buffer(sound, new[] { speakers.ErrorSoundChannel.Value }, Level * gain);
+                return speakers.Buffer(sound, new[] { speakers.PenaltySoundChannel.Value }, Level * gain);
             }
         }
     }

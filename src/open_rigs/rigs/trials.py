@@ -4,11 +4,11 @@ Every task's schemas/trial-columns.yml starts with the shared block, in order, w
 word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
 (QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, opto (OPTO_COLUMNS: laserCondition, laserPowerMw,
-laserTriggerTime) after punishTimeoutSeconds. trialType, outcome, rewardSizeUl and punishSound are in the core by
+laserTriggerTime) after penaltyTimeoutSeconds. trialType, outcome, rewardSizeUl and penaltySound are in the core by
 name, type and place, each described by its task. A task's own columns follow the block.
 
 summarise reads one experiment's BonsaiData/BonsaiData_Trial_*.csv, BonsaiData/BonsaiData_Async_*.csv (each
-RewardDelivered row, Value the microlitres delivered), Settings/Settings_Task_*.json (the lead and the punishment)
+RewardDelivered row, Value the microlitres delivered), Settings/Settings_Task_*.json (the lead and the penalty)
 and manifest.json (how the run ended), and checks the rows against each other and the task:
 
 - trial numbers run 1, 2, 3 ... with none missing, and each outcome is Correct, Incorrect or NoResponse;
@@ -17,8 +17,8 @@ and manifest.json (how the run ended), and checks the rows against each other an
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
 - each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
   within 2 ms;
-- each interval after the first started at the last trial's outcome plus its punishTimeoutSeconds, within 2 ms;
-- the error sound (punishSound) played on each trial with a timeout when the task's punishment.sound is enabled,
+- each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds, within 2 ms;
+- the penalty sound (penaltySound) played on each trial with a timeout when the task's penalty.sound is enabled,
   and on no trial without one when the task's timeout is above 0;
 - each rewarded trial (rewardSizeUl above 0, and Correct or autoRewarded) has a RewardDelivered row at its outcome.
 
@@ -64,7 +64,7 @@ CORE_COLUMNS: List[Column] = [
     ("outcome", "string", None, None),
     ("itiStartTime", "double", "s",
      "Harp time the inter-trial interval before this trial began: the last trial's outcomeTime plus its "
-     "punishTimeoutSeconds, exactly; on trial 1 the first Harp clock tick once the trials started."),
+     "penaltyTimeoutSeconds, exactly; on trial 1 the first Harp clock tick once the trials started."),
     ("itiSeconds", "double", "s",
      "The inter-trial interval drawn for this trial (every trial draws its own), uniformly between "
      "trialStructure.itiMinSeconds and itiMaxSeconds: from itiStartTime to this trial's stimulus with a quiet mouse, "
@@ -78,13 +78,13 @@ CORE_COLUMNS: List[Column] = [
      "or after trialStartTime plus the lead, in every experiment. The physical onset is in the hardware logs."),
     ("outcomeTime", "double", "s",
      "Harp time the workflow knew the outcome, the same time as harpTime, as its own column so that every moment of a "
-     "trial is named; the reward, the error sound and the timeout are timed from it. On a lick it is the Harp clock's "
+     "trial is named; the reward, the penalty sound and the timeout are timed from it. On a lick it is the Harp clock's "
      "latest tick when the workflow saw the lick, a few ms after it; each lick's own Harp time is in the lick "
      "detectors' logs."),
     ("rewardSizeUl", "double", "ul", None),
-    ("punishSound", "bool", None, None),
-    ("punishTimeoutSeconds", "double", "s",
-     "The timeout after this trial: the task's punishment.timeoutSeconds when the trial was punished, else 0. The next "
+    ("penaltySound", "bool", None, None),
+    ("penaltyTimeoutSeconds", "double", "s",
+     "The timeout after this trial: the task's penalty.timeoutSeconds when the trial was penalised, else 0. The next "
      "interval starts after it (itiStartTime)."),
 ]
 
@@ -112,7 +112,7 @@ OPTO_COLUMNS: List[Column] = [
 # Each opt-in block by the name a task gives it, with the core column it follows.
 BLOCKS: Dict[str, Tuple[str, List[Column]]] = {
     "quietWait": ("itiSeconds", QUIET_WAIT_COLUMNS),
-    "opto": ("punishTimeoutSeconds", OPTO_COLUMNS),
+    "opto": ("penaltyTimeoutSeconds", OPTO_COLUMNS),
 }
 
 TIME_COLUMN = "harpTime"
@@ -200,12 +200,12 @@ def _true(text: Any) -> bool:
 
 
 # The columns summarise reads: of a trial row, and of an async row.
-TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "punishSound", "punishTimeoutSeconds")
+TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "penaltySound", "penaltyTimeoutSeconds")
 ASYNC_NEEDS = (TIME_COLUMN, "Event", "Value")
 # A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an empty cell or
 # text is a problem and the row's checks are skipped.
 TRIAL_NUMBERS = ("trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime",
-                 "rewardSizeUl", "punishTimeoutSeconds", "quietWaitSeconds", "laserTriggerTime")
+                 "rewardSizeUl", "penaltyTimeoutSeconds", "quietWaitSeconds", "laserTriggerTime")
 NAN_ALLOWED = ("stimulusOnsetTime", "laserTriggerTime")
 
 
@@ -232,8 +232,8 @@ def _rewarded(row: Dict[str, str]) -> bool:
 @dataclass
 class _Task:
     laser_to_stimulus: float  # optogenetics.laserToStimulusSeconds: signed, the trigger before the stimulus
-    timeout_seconds: float  # punishment.timeoutSeconds
-    sound: bool  # punishment.sound.enabled
+    timeout_seconds: float  # penalty.timeoutSeconds
+    sound: bool  # penalty.sound.enabled
 
     @property
     def lead(self) -> float:
@@ -245,8 +245,8 @@ def _task(folder: Path) -> Optional[_Task]:
     for path in sorted(folder.glob("Settings/Settings_Task_*.json")):
         try:
             p = json.loads(path.read_text(encoding="utf-8-sig"))["taskParameters"]
-            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), float(p["punishment"]["timeoutSeconds"]),
-                         bool(p["punishment"]["sound"]["enabled"]))
+            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), float(p["penalty"]["timeoutSeconds"]),
+                         bool(p["penalty"]["sound"]["enabled"]))
         except (OSError, ValueError, KeyError, TypeError):
             return None
     return None
@@ -283,7 +283,7 @@ def _summarise(folder: Path) -> Summary:
                 sum(r["outcome"] != "NoResponse" for r in trials) / len(trials) if trials else float("nan"))
     task = _task(folder)
     if trials and task is None:
-        s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the error sound not checked")
+        s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the penalty sound not checked")
     rewards = [e for e in events if e["Event"] == "RewardDelivered"]
     s.delivered_ul = sum(float(e["Value"] or 0) for e in rewards)
     reward_times = []
@@ -327,15 +327,15 @@ def _summarise(folder: Path) -> Summary:
             if not math.isnan(trigger) and abs(trigger - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: laser trigger {trigger - due:+.4f} s from laserToStimulusSeconds "
                                   f"({task.laser_to_stimulus:g} s) before the stimulus was due")
-            sounded, timed_out = _true(row["punishSound"]), _f(row, "punishTimeoutSeconds") > 0
+            sounded, timed_out = _true(row["penaltySound"]), _f(row, "penaltyTimeoutSeconds") > 0
             if timed_out and sounded != task.sound:
-                s.problems.append(f"trial {number}: a timeout {'with' if sounded else 'without'} the error sound, but the "
-                                  f"task's punishment.sound is {'off' if sounded else 'on'}")
+                s.problems.append(f"trial {number}: a timeout {'with' if sounded else 'without'} the penalty sound, but the "
+                                  f"task's penalty.sound is {'off' if sounded else 'on'}")
             if not timed_out and sounded and task.timeout_seconds > 0:
-                s.problems.append(f"trial {number}: the error sound with no timeout, though the task's timeout is "
+                s.problems.append(f"trial {number}: the penalty sound with no timeout, though the task's timeout is "
                                   f"{task.timeout_seconds:g} s")
         if last is not None:
-            due = _f(last, "outcomeTime") + _f(last, "punishTimeoutSeconds")
+            due = _f(last, "outcomeTime") + _f(last, "penaltyTimeoutSeconds")
             if abs(_f(row, "itiStartTime") - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: interval started {_f(row, 'itiStartTime') - due:+.4f} s from the last "
                                   "outcome plus its timeout")

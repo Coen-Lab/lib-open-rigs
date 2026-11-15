@@ -10,7 +10,7 @@ namespace OpenRigs.Audio.Tests
     [TestClass]
     public class SpeakerSetTests
     {
-        static string Rig(string speakers = null, string extra = "  syncChannel: 31\n  errorSoundChannel: 2\n", double[] taps = null, string machine = "TEST-RIG")
+        static string Rig(string speakers = null, string extra = "  syncChannel: 31\n  penaltySoundChannel: 2\n", double[] taps = null, string machine = "TEST-RIG")
         {
             var folder = Path.Combine(Path.GetTempPath(), "audio-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path.Combine(folder, "calibration"));
@@ -56,7 +56,7 @@ namespace OpenRigs.Audio.Tests
             CollectionAssert.AreEqual(new[] { 0, 1, 2 }, set.SpeakerChannels);
             Assert.AreEqual(32, set.ChannelCount);
             Assert.AreEqual(31, set.SyncChannel);
-            Assert.AreEqual(2, set.ErrorSoundChannel);
+            Assert.AreEqual(2, set.PenaltySoundChannel);
             Assert.AreEqual(-90.0, set.Speakers[0].AzimuthDeg);
         }
 
@@ -89,14 +89,14 @@ namespace OpenRigs.Audio.Tests
         }
 
         [TestMethod]
-        public void TheErrorSoundPlaysOnTheErrorChannelAloneAtTheLabsLevel()
+        public void ThePenaltySoundPlaysOnThePenaltyChannelAloneAtTheLabsLevel()
         {
             var set = SpeakerSet.Load(Rig(taps: new[] { 0.0, 1.0, 0.0 }), "TEST-RIG");
-            var buffer = ErrorSound.Buffer(set, 2.0);
-            using (var tone = ErrorSound.Read(48000))
+            var buffer = PenaltySound.Buffer(set, 2.0);
+            using (var tone = PenaltySound.Read(48000))
             {
                 Assert.AreEqual(48000, buffer.Cols);  // one second at 48 kHz
-                var expected = Values(tone, 0).Select(v => (float)(v * ErrorSound.Level * 2.0)).ToArray();
+                var expected = Values(tone, 0).Select(v => (float)(v * PenaltySound.Level * 2.0)).ToArray();
                 var actual = Values(buffer, 2);
                 for (int i = 0; i < expected.Length; i += 997) Assert.AreEqual(expected[i], actual[i], 1e-6);
             }
@@ -122,30 +122,30 @@ namespace OpenRigs.Audio.Tests
             const string twoSpeakers =
                 "    left:\n      channel: 0\n      filter: calibration/speaker-left.json\n" +
                 "    right:\n      channel: 1\n      filter: calibration/speaker-right.json\n";
-            // speakers.md's old example: speakers on 0 and 1, the error sound on 2, where it would play unequalised.
+            // speakers.md's old example: speakers on 0 and 1, the penalty sound on 2, where it would play unequalised.
             var unheard = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(twoSpeakers), "TEST-RIG"));
-            StringAssert.Contains(unheard.Message, "errorSoundChannel 2 has no speaker on it, and the error sound is never played unequalised: set it to a speaker's channel (left 0, right 1)");
+            StringAssert.Contains(unheard.Message, "penaltySoundChannel 2 has no speaker on it, and the penalty sound is never played unequalised: set it to a speaker's channel (left 0, right 1)");
             var shared = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(
-                twoSpeakers.Replace("channel: 1", "channel: 0"), "  errorSoundChannel: 0\n"), "TEST-RIG"));
+                twoSpeakers.Replace("channel: 1", "channel: 0"), "  penaltySoundChannel: 0\n"), "TEST-RIG"));
             StringAssert.Contains(shared.Message, "speakers 'left', 'right' share channel 0: each speaker needs its own");
             var outside = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(
-                twoSpeakers.Replace("channel: 1", "channel: 32"), "  syncChannel: 40\n  errorSoundChannel: 0\n"), "TEST-RIG"));
+                twoSpeakers.Replace("channel: 1", "channel: 32"), "  syncChannel: 40\n  penaltySoundChannel: 0\n"), "TEST-RIG"));
             StringAssert.Contains(outside.Message, "speaker 'right' channel 32 is not one of the audio device's 32 channels (0 to 31, speakerArray.device.channelCount)");
             StringAssert.Contains(outside.Message, "syncChannel 40 is not one of the audio device's 32 channels");
         }
 
         [TestMethod]
-        public void TheErrorSoundNeedsAnErrorChannel()
+        public void ThePenaltySoundNeedsAPenaltyChannel()
         {
             var set = SpeakerSet.Load(Rig(extra: "  syncChannel: 31\n"), "TEST-RIG");
-            var ex = Assert.ThrowsException<InvalidOperationException>(() => ErrorSound.Buffer(set, 1));
-            StringAssert.Contains(ex.Message, "no errorSoundChannel");
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => PenaltySound.Buffer(set, 1));
+            StringAssert.Contains(ex.Message, "no penaltySoundChannel");
         }
 
         [TestMethod]
         public void AWaveAtAnotherRateIsRefused()
         {
-            var ex = Assert.ThrowsException<InvalidDataException>(() => ErrorSound.Read(44100));
+            var ex = Assert.ThrowsException<InvalidDataException>(() => PenaltySound.Read(44100));
             StringAssert.Contains(ex.Message, "is 48000 Hz, but the audio device runs at 44100 Hz");
         }
     }

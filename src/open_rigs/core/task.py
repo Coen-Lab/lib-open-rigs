@@ -17,7 +17,8 @@ class Task(BaseSchema):
 
 
 # The lab's task blocks, one model each so every task names and checks them alike. A task's own
-# model takes one by inheritance, which keeps its keys where they are in the task file.
+# model takes QuietWait or Optogenetics by inheritance, which keeps its keys where they are in the
+# task file, and Penalty as its penalty field.
 
 
 class QuietWait(BaseSchema):
@@ -102,3 +103,18 @@ class Optogenetics(BaseSchema):
         if self.laser_power_mw is not None and not math.isfinite(self.laser_power_mw):
             raise ValueError(f"laser_power_mw ({self.laser_power_mw}) must be a finite number of mW")
         return self
+
+
+class PenaltySound(BaseSchema):
+    """The lab's penalty sound (OpenRigs.Audio PenaltySoundBuffer, the same in every task), on rig.yml's speakerArray.penaltySoundChannel alone, equalised for that speaker."""
+
+    enabled: bool = Field(default=True, description="Whether the penalty sound plays with every timeout")
+    gain: float = Field(default=1.0, ge=0, description="Gain on the lab's penalty sound, 1 for its level")
+
+
+class Penalty(BaseSchema):
+    """What a wrong or missed trial costs: a timeout, and the penalty sound with it (the trial log's penaltySound and
+    penaltyTimeoutSeconds). Each task says which trials are penalised; timeoutSeconds has no lab default: each task file gives it."""
+
+    timeout_seconds: float = Field(ge=0, description="Timeout after a penalised trial, in seconds; the next interval starts after it")
+    sound: PenaltySound = Field(default=PenaltySound(), description="The penalty sound, with every timeout")

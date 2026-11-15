@@ -10,9 +10,9 @@ namespace OpenRigs.Manifest
     /// <summary>
     /// The workflow's trial columns file (TrialColumns, such as schemas\trial-columns.yml): what each
     /// BonsaiData_Trial column the workflow writes means, by name: type (int, double, bool or string),
-    /// and where they apply values (the strings it may hold, or a code: meaning map), unit, formerly
-    /// (names it was recorded under before, newest first) and description. Read once at Start and
-    /// copied into the manifest, so each experiment carries the meaning of its own trial log.
+    /// and where they apply values (the strings it may hold, or a code: meaning map), unit and
+    /// description. Read once at Start and copied into the manifest, so each experiment carries the
+    /// meaning of its own trial log.
     /// </summary>
     static class TrialColumns
     {

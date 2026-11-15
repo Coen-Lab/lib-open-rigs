@@ -1,4 +1,4 @@
-"""The lab's speaker array: every speaker played equalised, and a channel for the lab's one error sound."""
+"""The lab's speaker array: every speaker played equalised, and a channel for the lab's one penalty sound."""
 from pydantic import Field, model_validator
 
 from open_rigs.components.audio import SpeakerArray
@@ -6,7 +6,7 @@ from open_rigs.components.audio import SpeakerArray
 
 class EqualisedSpeakerArray(SpeakerArray):
     __doc__ = SpeakerArray.__doc__
-    error_sound_channel: int = Field(ge=0, description="Mixer output channel the error sound plays on.")
+    penalty_sound_channel: int = Field(ge=0, description="Mixer output channel the penalty sound plays on.")
 
     @model_validator(mode="after")
     def _every_speaker_filtered(self):

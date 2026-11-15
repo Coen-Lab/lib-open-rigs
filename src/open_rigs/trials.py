@@ -4,8 +4,7 @@
     rows = trials.read(r"...\\sub-<mouse>\\ses-<id>_<DateTime>")
 
 LogTrial writes the log hourly (`BonsaiData\\BonsaiData_Trial_<hour>.csv`, split at the Harp clock's
-hour); this joins the files in name order, renames each column recorded under an old name
-(`formerly`) to its current one, converts each column to its type (int, double, bool or string; an
+hour); this joins the files in name order, converts each column to its type (int, double, bool or string; an
 empty cell is None, "NaN" a float NaN) and, with `decode`, replaces a coded column's number with its
 name (`values`, such as av-dome's trialType). Columns the workflow's file does not list are kept as
 written, as text. Nothing on disk is changed: recorded data is never rewritten.
@@ -87,7 +86,7 @@ def _value(text: str, column: Optional[Dict[str, Any]], decode: bool) -> Any:
 
 
 def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, decode: bool = True) -> List[Dict[str, Any]]:
-    """Every row of the experiment's BonsaiData_Trial, in file order, as a dict by current column name.
+    """Every row of the experiment's BonsaiData_Trial, in file order, as a dict by column name.
     A file's last line without a newline (still being written) is left out. Raises ValueError naming
     the file, row and column of a cell that is not its column's type. An experiment with no trial log
     is no rows, without looking for its columns."""
@@ -96,7 +95,6 @@ def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, deco
     if not paths:
         return []
     table = columns(experiment, repo)
-    renamed = {old: name for name, entry in table.items() for old in entry.get("formerly") or []}
     rows: List[Dict[str, Any]] = []
     for path in paths:
         text = path.read_text(encoding="utf-8-sig")
@@ -105,7 +103,7 @@ def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, deco
         lines = [r for r in csv.reader(text.splitlines()) if r]
         if not lines:
             continue
-        header = [renamed.get(h, h) for h in lines[0]]
+        header = lines[0]
         for number, cells in enumerate(lines[1:], 2):
             row = {}
             for name, cell in zip(header, cells):

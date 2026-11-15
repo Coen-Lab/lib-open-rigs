@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from open_rigs.core.task import Optogenetics, QuietWait
+from open_rigs.core.task import Optogenetics, Penalty, QuietWait
 
 OPTO = {"laserOnProbability": 0.5, "laserToStimulusSeconds": 0.1, "trialsBeforeLaser": 0}
 
@@ -43,3 +43,10 @@ def test_optogenetics_schema_holds_the_same_rule():
     assert schema["if"]["properties"] == {"useZapit": {"const": True}}
     assert schema["then"]["required"] == ["laserPowerMw"]
     assert schema["then"]["properties"]["zapitConfigPath"] == {"minLength": 1}
+
+
+def test_penalty_sound_is_on_by_default_and_the_timeout_has_no_lab_default():
+    penalty = Penalty.model_validate({"timeoutSeconds": 2})
+    assert penalty.sound.enabled and penalty.sound.gain == 1
+    with pytest.raises(ValidationError, match="timeoutSeconds"):
+        Penalty.model_validate({})

@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>A rig's speakers: rig.yml's speakerArray and their filters, sounds equalised for each speaker, and the lab's error sound.</Description>
+    <Description>A rig's speakers: rig.yml's speakerArray and their filters, sounds equalised for each speaker, and the lab's penalty sound.</Description>
     <PackageTags>$(PackageTags) Audio</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.2</Version>
+    <Version>0.1.1-coen-lab.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="error_tone.wav" LogicalName="OpenRigs.Audio.error_tone.wav" />
+    <EmbeddedResource Include="penalty_tone.wav" LogicalName="OpenRigs.Audio.penalty_tone.wav" />
   </ItemGroup>
 
   <ItemGroup>

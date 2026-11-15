@@ -137,11 +137,11 @@ namespace OpenRigs.Manifest.Tests
             Console.WriteLine("Trial columns:");
             Check("a workflow with TrialColumns blank has trial_columns null", Field(blankManifest, "trial_columns") == "null", Field(blankManifest, "trial_columns"));
             var file = Path.Combine(root, "trial-columns.yml");
-            File.WriteAllText(file, "trialType:\n  type: int\n  values: {0: Visual, 1: Audio}\nitiSeconds:\n  type: double\n  unit: s\n  formerly: [itiDuration]\n");
+            File.WriteAllText(file, "trialType:\n  type: int\n  values: {0: Visual, 1: Audio}\nitiSeconds:\n  type: double\n  unit: s\n  description: The interval\n");
             string note;
             var read = Json.Serialize(TrialColumns.Read("trial-columns.yml", root, out note));
             Check("a file is copied with its hash, each column as written", note == null && Field(read, "columns.trialType.values.1") == "Audio"
-                && Field(read, "columns.itiSeconds.unit") == "s" && read.Contains("\"itiDuration\"") && Regex.IsMatch(Field(read, "sha256") ?? "", "^[0-9a-f]{64}$"), read);
+                && Field(read, "columns.itiSeconds.unit") == "s" && Field(read, "columns.itiSeconds.description") == "The interval" && Regex.IsMatch(Field(read, "sha256") ?? "", "^[0-9a-f]{64}$"), read);
             File.WriteAllText(file, "trialType:\n  type: integer\n");
             read = Json.Serialize(TrialColumns.Read(file, root, out note));
             Check("a column whose type is not int, double, bool or string is not copied, and noted", Field(read, "missing") == "true" && note != null && note.Contains("trialType"), read);

@@ -15,9 +15,9 @@ COLUMNS = {
     "trialNumber": {"type": "int"},
     "trialType": {"type": "int", "values": {"0": "Visual", "2": "AVCoherent", "4": "Neutral"}},
     "outcome": {"type": "string", "values": ["Correct", "Incorrect", "NoResponse"]},
-    "stimulusOnsetTime": {"type": "double", "unit": "s", "formerly": ["stimulusOnsetSeconds"]},
+    "stimulusOnsetTime": {"type": "double", "unit": "s"},
     "choiceTime": {"type": "double", "unit": "s"},
-    "bothSpouts": {"type": "bool", "formerly": ["BothSpouts"]},
+    "bothSpouts": {"type": "bool"},
 }
 
 YAML_TEXT = "trialNumber:\n  type: int\ntrialType:\n  type: int\n  values: {0: Visual, 1: Audio}\n"
@@ -32,12 +32,12 @@ def manifest(folder, **fields):
     write(folder, "manifest.json", json.dumps({"version": 2, **fields}))
 
 
-def test_hour_files_join_typed_with_old_names_and_codes(tmp_path):
+def test_hour_files_join_typed_with_codes(tmp_path):
     manifest(tmp_path, trial_columns={"path": "x", "sha256": "0", "columns": COLUMNS})
     data = tmp_path / "BonsaiData"
-    # The first hour recorded under old names; the second still being written (no newline).
+    # The second hour is still being written (no newline).
     write(data, "BonsaiData_Trial_2026-11-05T10-00-00.csv",
-          "Seconds,trialNumber,trialType,outcome,stimulusOnsetSeconds,BothSpouts,extra\n"
+          "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,bothSpouts,extra\n"
           "12.5,1,2,Correct,10.1,True,x\n")
     write(data, "BonsaiData_Trial_2026-11-05T11-00-00.csv",
           "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,bothSpouts\n"
