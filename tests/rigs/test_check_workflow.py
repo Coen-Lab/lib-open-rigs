@@ -1,4 +1,4 @@
-import shutil
+import sys
 import subprocess
 from pathlib import Path
 
@@ -11,7 +11,7 @@ CONFIG = ('<?xml version="1.0" encoding="utf-8"?><PackageConfiguration><Packages
           '</Packages></PackageConfiguration>')
 
 
-@pytest.mark.skipif(shutil.which("powershell") is None, reason="Windows PowerShell runs the check")
+@pytest.mark.skipif(sys.platform != "win32", reason="the check runs under Windows PowerShell")
 def test_a_package_bonsai_config_names_but_packages_lacks_stops_it_naming_setup(tmp_path):
     # A stale .bonsai\Packages once failed only as "proxy for the unknown type ..." deep in the build.
     (tmp_path / ".bonsai" / "Packages" / "Bonsai.Core.2.9.0").mkdir(parents=True)
