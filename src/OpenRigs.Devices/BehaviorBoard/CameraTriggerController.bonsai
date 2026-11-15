@@ -6,7 +6,7 @@
                  xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Drives the behavior board's camera trigger outputs. For each enabled trigger it writes the frequency at startup, starts the output when anything is sent to StartCameras and stops it on StopCameras. Trigger 0 shares the DO0 pin and trigger 1 the DO1 pin. A trigger that is not enabled is never written to or started, which leaves its pin free for a pulse output such as a reward valve. EnableTrigger1 is off by default. Timestamped trigger events for each camera are published on their own subjects.</Description>
+  <Description>Drives the behavior board's camera trigger outputs. For each enabled trigger it writes the frequency at startup, starts the output when anything is sent to StartCameras and stops it on StopCameras. Trigger 0 shares the DO0 pin and trigger 1 the DO1 pin. A trigger that is not enabled is never written to or started, which leaves its pin free for a pulse output such as a reward valve. EnableTrigger1 is off by default. The cameras take their trigger times from the board's Event messages themselves (SpinnakerCamera); the register dump's Read replies of Camera0Frame and Camera1Frame are not pulses.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -297,30 +297,6 @@
         <Combinator xsi:type="rx:SubscribeWhen" />
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
-      <Expression xsi:type="SubscribeSubject">
-        <Name>BehaviorEvents</Name>
-      </Expression>
-      <Expression xsi:type="beh:Parse">
-        <harp:Register xsi:type="beh:TimestampedCamera0Frame" />
-      </Expression>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="Camera0TriggerEventsSubjectName" Description="The name of the subject to which timestamped camera trigger events Trigger0 are published" Category="Subjects" />
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>Camera0TriggerEvents</Name>
-      </Expression>
-      <Expression xsi:type="SubscribeSubject">
-        <Name>BehaviorEvents</Name>
-      </Expression>
-      <Expression xsi:type="beh:Parse">
-        <harp:Register xsi:type="beh:TimestampedCamera1Frame" />
-      </Expression>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Name" DisplayName="Camera1TriggerEventsSubjectName" Description="The name of the subject to which timestamped camera trigger events Trigger1 are published" Category="Subjects" />
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>Camera1TriggerEvents</Name>
-      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -373,17 +349,9 @@
       <Edge From="45" To="46" Label="Source2" />
       <Edge From="46" To="50" Label="Source1" />
       <Edge From="47" To="48" Label="Source1" />
-      <Edge From="47" To="52" Label="Source1" />
-      <Edge From="47" To="56" Label="Source1" />
       <Edge From="48" To="49" Label="Source1" />
       <Edge From="49" To="50" Label="Source2" />
       <Edge From="50" To="51" Label="Source1" />
-      <Edge From="52" To="53" Label="Source1" />
-      <Edge From="53" To="55" Label="Source1" />
-      <Edge From="54" To="55" Label="Source2" />
-      <Edge From="56" To="57" Label="Source1" />
-      <Edge From="57" To="59" Label="Source1" />
-      <Edge From="58" To="59" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
