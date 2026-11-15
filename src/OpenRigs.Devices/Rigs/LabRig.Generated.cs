@@ -2899,12 +2899,13 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Relative path of this speaker's SpeakerFilter artefact; none means the channel is not equalised.
+        /// Path of this speaker's SpeakerFilter artefact, relative to rig.yml's folder. Every speaker plays equalised, so a speaker without one stops the workflow at Start (OpenRigs.Audio LoadSpeakers).
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("filter")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="filter")]
-        [System.ComponentModel.DescriptionAttribute("Relative path of this speaker\'s SpeakerFilter artefact; none means the channel is" +
-            " not equalised.")]
+        [System.ComponentModel.DescriptionAttribute("Path of this speaker\'s SpeakerFilter artefact, relative to rig.yml\'s folder. Ever" +
+            "y speaker plays equalised, so a speaker without one stops the workflow at Start " +
+            "(OpenRigs.Audio LoadSpeakers).")]
         public string Filter
         {
             get

@@ -4,7 +4,7 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:p1="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Writes serialized text, such as a configuration snapshot from SerializeToJson, to its own file in the session folder: Name\Name_date.json under PathPrefix. The write waits for both the text and the session path, so the file name is resolved before the file is opened.</Description>
+  <Description>Writes serialized text, such as a configuration snapshot from SerializeToJson, to its own file in the experiment folder: Name\Name_date.json under PathPrefix. The write waits for both the text and the experiment folder, so the file name is resolved before the file is opened.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -21,7 +21,7 @@
       </Expression>
       <Expression xsi:type="rx:SelectMany">
         <Name>WriteSchema</Name>
-        <Description>Runs once the text and the session path are both available. The file name is formatted and mapped onto the writer before the writer subscribes, which is when a file sink reads its path.</Description>
+        <Description>Runs once the text and the experiment folder are both available. The file name is formatted and mapped onto the writer before the writer subscribes, which is when a file sink reads its path.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="WorkflowInput">

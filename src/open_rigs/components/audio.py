@@ -28,7 +28,7 @@ class Speaker(BaseSchema):
     filter: ArtefactPath | None = Field(
         default=None,
         examples=["calibration/speaker-left.json"],
-        description="Relative path of this speaker's SpeakerFilter artefact; none means the channel is not equalised.",
+        description="Path of this speaker's SpeakerFilter artefact, relative to rig.yml's folder. Every speaker plays equalised, so a speaker without one stops the workflow at Start (OpenRigs.Audio LoadSpeakers).",
     )
 
 
