@@ -123,6 +123,11 @@ if ($Step -eq 'Build') {
                 foreach ($file in $b.ConfigFiles -split ';') { if ($file -match '^(.*)\\%COMPUTERNAME%\\rig\.yml$') { $script:roots.Add("ExperimentManifest.ConfigFiles=$($Matches[1])") } }
                 $b.ConfigFiles = $rigYml
             }
+            # An include's workflow is not loaded before the build: its ConfigRoot is the include's own property, kept as XML until then.
+            if ($b -is [Bonsai.Expressions.IncludeWorkflowBuilder]) {
+                $p = [ComponentModel.TypeDescriptor]::GetProperties($b)['ConfigRoot']
+                if ($p) { $v = $p.GetValue($b); if ($v -is [Xml.Linq.XElement]) { $v = $v.Value }; $script:roots.Add("$($b.Path)=$v") }
+            }
             if ($b -is [Bonsai.Expressions.IWorkflowExpressionBuilder] -and $b.Workflow) { Redirect-ConfigRoots $b.Workflow }
         }
     }
