@@ -230,6 +230,11 @@ def test_a_writer_whose_file_the_workflow_cannot_name_is_refused(tmp_path):
         "OpenRigs.Logging:LogData.bonsai has no LogName written in the workflow, so the file it writes cannot be named"]
 
 
+def test_a_combinator_with_no_type_is_read_not_crashed_on(tmp_path):
+    untyped = '<Expression xsi:type="Combinator"><Combinator /></Expression>'
+    assert lint.expected_files_problems(workflow(tmp_path, LOGS + untyped + manifest_node(EXPECTED))) == []
+
+
 def test_a_workflow_without_a_manifest_has_nothing_to_name(tmp_path):
     assert lint.expected_files_problems(workflow(tmp_path, LOGS)) == []
 

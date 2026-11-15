@@ -531,7 +531,7 @@ def expected_files_problems(wf: Workflow) -> list[str]:
     for node in wf.root.iter(W + "Expression"):
         kind, include = node.get(XSI) or "", node.get("Path") or ""
         inner = next((c for c in node if c.tag == W + "Combinator"), None)  # a Combinator node's type is its child's
-        local = (inner.get(XSI) if kind == "Combinator" and inner is not None else kind).split(":")[-1]
+        local = ((inner.get(XSI) or "") if kind == "Combinator" and inner is not None else kind).split(":")[-1]
         if include in NAMED_LOGS:
             name = next((c.text for c in node if c.tag in (W + "LogName", W + "Name") and c.text), None)
             if name is None:
