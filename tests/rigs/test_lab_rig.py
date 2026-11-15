@@ -180,6 +180,22 @@ def test_every_speaker_needs_a_filter():
         LabRig.model_validate(rig)
 
 
+def test_speaker_channels_are_refused_as_the_workflow_refuses_them_at_start():
+    # OpenRigs.Audio SpeakerSet.Load stopped the workflow at Start; the model said nothing.
+    rig = copy.deepcopy(RIG)
+    array = rig["speakerArray"]
+    array["device"]["channelCount"] = 4
+    array["speakers"]["left"] = {"position": {"azimuth": -90, "elevation": 15}, "channel": 2, "filter": "calibration/speaker-left.json"}
+    array["speakers"]["right"] = {"position": {"azimuth": 90, "elevation": 15}, "channel": 4, "filter": "calibration/speaker-right.json"}
+    array["syncChannel"] = 4
+    array["penaltySoundChannel"] = 3
+    with pytest.raises(ValidationError) as refused:
+        LabRig.model_validate(rig)
+    assert ("speaker 'right' channel 4 is not one of the audio device's 4 channels (0 to 3); speakers centre, left share channel 2: "
+            "each speaker needs its own; syncChannel 4 is not one of the audio device's 4 channels (0 to 3); penaltySoundChannel 3 "
+            "has no speaker on it") in str(refused.value)
+
+
 def test_video_encoder_optional():
     assert LabRig.model_validate(RIG).video_encoder is None
     assert LabRig.model_validate({**RIG, "videoEncoder": {"codec": "h264_nvenc"}}).video_encoder.codec == "h264_nvenc"
