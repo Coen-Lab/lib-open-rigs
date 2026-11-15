@@ -74,7 +74,8 @@ When open-rigs publishes a release in which every row of the table above is upst
 
 ## Proposed upstream
 
-- `TriggeredSpinnaker` `PixelFormat` (cffa26c, Video 0.1.1-coen-lab.7 and Devices .5; blank means Mono8 since Video .8, audit 11 Nov 2026): upstream's operator never sets the format, so a camera opens in whatever format it stored (one rig's were Mono16), and LogVideo writes 8-bit frames only. To offer to ucl-open as an issue with this diff (the table above lists it), made from the code against upstream `main` at `f313716` (regenerated 14 Nov 2026); not yet reported.
+- `TriggeredSpinnaker` `PixelFormat` (cffa26c, Video 0.1.1-coen-lab.7 and Devices .5; blank means Mono8 since Video .8, audit 11 Nov 2026): upstream's operator never sets the format, so a camera opens in whatever format it stored (one rig's were Mono16), and LogVideo writes 8-bit frames only. The diff below is made from the code against upstream `main` at `f313716` (regenerated 14 Nov 2026).
+- Upstream's branch `triggered-spinnaker` (to 12 Nov 2026, not on its `main` on 15 Nov 2026) takes the format (`518ca24`), the chunk copy inside the callback (`7a441c2`, ucl-open#67), the region reset after binning (`1d0b4a2`, ucl-open#66) and a start signal for the cameras (`6f81c6c`). Merged into this repository it conflicts in `TriggeredSpinnaker.cs`, `TriggeredSpinnaker.bonsai`, `VideoDataFrame.cs` and `docs/bonsai-operators/OpenRigs.Devices/behavior-board.md` (`git merge-tree`, 15 Nov 2026). Its blank `PixelFormat` keeps the camera's stored format, where the lab's is Mono8: a rig.yml without `pixelFormat` is still Mono8 (the lab rig model's default), but one that gives it blank or null would record a camera stored as Mono16 in Mono16 again.
 
 ```diff
 --- a/src/OpenRigs.Video/TriggeredSpinnaker.cs
