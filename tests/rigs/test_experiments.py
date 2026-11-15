@@ -43,10 +43,11 @@ def test_an_unreadable_or_manifest_only_experiment_and_a_silent_share_are_said(t
     experiment(tmp_path, "ses-003")  # no when.txt: unreadable
     experiment(tmp_path, "ses-004", manifest=True, data=False)
     unread: list[str] = []
-    assert find("GN012", [([tmp_path, Path(r"\\no-such-server-for-a-test\share")], read)], unread) == []
+    share = Path(r"\\no-such-server-for-a-test\share")  # its root, share\, on Windows; a plain name elsewhere (CI)
+    assert find("GN012", [([tmp_path, share], read)], unread) == []
     assert unread == [
         "ses-003 (Unreadable: FileNotFoundError)",
-        r"\\no-such-server-for-a-test\share\ (No Answer)",
+        f"{share} (No Answer)",
         "ses-004 (Only Its Manifest Is Left)",
     ]
 
