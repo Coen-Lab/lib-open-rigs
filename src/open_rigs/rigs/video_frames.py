@@ -15,16 +15,15 @@ leaves one saying what went wrong: frames dropped, ffmpeg failed or killed). Eac
 for frameId steps other than 1 (frames the camera or the writer lost); a CSV without a frame id column is a note. `check-videos <experiment folder> ...` prints
 each video, each note and each problem, exiting 1 when there is a problem.
 
-A killed run is the one exception to "as many frames as CSV rows". FfmpegVideoWriter flushes the CSV once a second, and
-ffmpeg finishes the video after Bonsai has gone, so a Bonsai killed (a crash, or the rig agent's kill after a Stop it did
-not answer) leaves a camera's last video up to a second of frames ahead of its CSV. When the experiment's manifest.json
-says the run was killed (run.final false: its end-of-run write never came; or outcome running, or rig-sync's killed),
-a camera's last video holding more frames than its CSV, by at most KILL_TOLERANCE_SECONDS of frames plus one, is a note,
-not a problem; so is the video before it, which a kill during an hour split's handover (up to 20 s) leaves the same way.
-The frame rate is the CSV's harpTime spacing, else an earlier CSV's of the same camera (a last CSV may hold under two
-rows), else the rig's camera trigger rate (Settings/Settings_Rig_*.json). Any other mismatch is a problem: a video short
-of its CSV, more frames than that, extra frames in an older video, extra frames in a run that was not killed, or no frame
-rate to be had. A folder without a readable manifest is taken as not killed.
+A killed run is the one exception to "as many frames as CSV rows". FfmpegVideoWriter flushes each CSV row just after
+its frame goes into ffmpeg's stdin, and ffmpeg finishes the video after Bonsai has gone, so a Bonsai killed (a crash, or
+the rig agent's kill after a Stop it did not answer) can leave a camera's last video one frame ahead of its CSV: the
+frame in hand at the kill. Frames still queued at the kill reach neither the video nor the CSV. When the experiment's
+manifest.json says the run was killed (run.final false: its end-of-run write never came; or outcome running, or
+rig-sync's killed), a camera's last video holding at most KILL_TOLERANCE_FRAMES more frames than its CSV is a note, not
+a problem; so is the video before it, which a kill during an hour split's handover (up to 20 s) leaves the same way.
+Any other mismatch is a problem: a video short of its CSV, more frames than that, extra frames in an older video, or
+extra frames in a run that was not killed. A folder without a readable manifest is taken as not killed.
 """
 
 from __future__ import annotations
@@ -32,20 +31,18 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import math
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from statistics import median
 from typing import List, Optional
 
 VIDEO_SUFFIXES = (".mkv", ".avi", ".mp4")
 # The frame counter's column: FfmpegVideoWriter's, LogVideo's (Bonsai member paths), then old behaviour-box CSVs'.
 FRAME_ID_COLUMNS = ("frameId", "ChunkData.FrameID", "Value.ChunkData.FrameID", "FrameID")
-# The CSV is flushed once a second, so a killed run's last video may hold up to this much more than its CSV.
-KILL_TOLERANCE_SECONDS = 1.0
+# Each CSV row is flushed just after its frame reaches ffmpeg, so a kill can leave one frame in the video without a row.
+KILL_TOLERANCE_FRAMES = 1
 
 
 @dataclass
@@ -66,42 +63,6 @@ def run_killed(folder: Path) -> bool:
         return run.get("final") is False or run.get("outcome") in ("running", "killed")
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return False
-
-
-def frame_rate(rows: List[dict]) -> Optional[float]:
-    """Frames a second from the median spacing of the CSV's harpTime; None when it cannot be read."""
-    try:
-        times = [float(r["harpTime"]) for r in rows]
-    except (KeyError, TypeError, ValueError):
-        return None
-    steps = [b - a for a, b in zip(times, times[1:]) if b > a]
-    return 1.0 / median(steps) if steps else None
-
-
-def camera_trigger_rate(folder: Path) -> Optional[float]:
-    """The cameras' trigger rate from the rig settings the workflow logged (Settings/Settings_Rig_*.json): the
-    trigger0Frequency of every Behavior board whose Trigger0 is enabled, when they agree; None otherwise."""
-    rates = set()
-
-    def walk(node: object) -> None:
-        if isinstance(node, dict):
-            if "trigger0Frequency" in node and node.get("trigger0Enabled", True) is not False:
-                rates.add(node["trigger0Frequency"])
-            for value in node.values():
-                walk(value)
-        elif isinstance(node, list):
-            for value in node:
-                walk(value)
-
-    for path in sorted(Path(folder).glob("Settings/Settings_Rig_*.json")):
-        try:
-            walk(json.loads(path.read_text(encoding="utf-8-sig")))
-        except (OSError, ValueError):
-            continue
-    if len(rates) != 1:
-        return None
-    (rate,) = rates
-    return float(rate) if isinstance(rate, (int, float)) and rate > 0 else None
 
 
 def avi_frames(path: Path) -> int:
@@ -159,12 +120,10 @@ def check_videos(folder: Path, ffprobe: Optional[str] = None, killed: Optional[b
     folder = Path(folder)
     ffprobe = ffprobe or shutil.which("ffprobe")
     killed = run_killed(folder) if killed is None else killed
-    trigger_rate = camera_trigger_rate(folder)
     checks: List[VideoCheck] = []
     for device in sorted(p for p in folder.iterdir() if p.is_dir()):
         videos = sorted(p for p in device.iterdir() if p.suffix.lower() in VIDEO_SUFFIXES and p.is_file())
         last_id: Optional[int] = None
-        fps: Optional[float] = None
         for video in videos:
             name = f"{device.name}/{video.name}"
             check = VideoCheck(video, None, None)
@@ -187,23 +146,17 @@ def check_videos(folder: Path, ffprobe: Optional[str] = None, killed: Optional[b
                 continue
             rows = _rows(table)
             check.rows = len(rows)
-            # A last CSV may hold under 2 rows (it is flushed once a second): then an earlier CSV's rate, else the trigger's.
-            fps = frame_rate(rows) or fps
-            rate = fps or trigger_rate
             unlisted = 0  # a killed run's frames in the video beyond its CSV, accepted as a note
             if check.frames is not None and check.frames != check.rows:
                 extra = check.frames - check.rows
                 # A killed run leaves the last video, and the one before it when the kill came during an hour split's
                 # handover, ahead of its CSV.
-                tolerance = None if rate is None else math.ceil(KILL_TOLERANCE_SECONDS * rate) + 1
-                if killed and video in videos[-2:] and extra > 0 and tolerance is not None and extra <= tolerance:
+                if killed and video in videos[-2:] and 0 < extra <= KILL_TOLERANCE_FRAMES:
                     check.notes.append(f"{name}: killed run: {extra} frames at the end have no CSV row")
                     unlisted = extra
                 else:
                     check.problems.append(f"{name}: holds {check.frames} frames, but {table.name} lists {check.rows}"
-                                          + (f" ({-extra} missing from the video)" if extra < 0 else "")
-                                          + (" (no frame rate from its CSVs or the rig's camera trigger, so a killed"
-                                             " run's tolerance cannot be applied)" if killed and extra > 0 and rate is None else ""))
+                                          + (f" ({-extra} missing from the video)" if extra < 0 else ""))
             column = next((c for c in FRAME_ID_COLUMNS if rows and c in rows[0]), None)
             if column is None:
                 if rows:

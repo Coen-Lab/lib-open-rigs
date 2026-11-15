@@ -152,37 +152,38 @@ def _exit_code(folder, monkeypatch):
     return stop.value.code
 
 
-def test_a_killed_run_s_last_second_of_unlisted_frames_is_a_note(tmp_path, monkeypatch, capsys):
-    # On the rig, 13 Nov 2026: Bonsai killed, 3,718 frames decoded and 3,700 CSV rows at 50 fps.
+def test_a_killed_run_s_last_unlisted_frame_is_a_note(tmp_path, monkeypatch, capsys):
+    # The frame in hand at the kill: in ffmpeg's stdin, its CSV row not yet flushed.
     _manifest(tmp_path)
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(118), rows=100)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(101), rows=100)
     (check,) = check_videos(tmp_path)
     assert check.problems == []
-    assert check.notes == ["Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 18 frames at the end have no CSV row"]
+    assert check.notes == ["Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 1 frames at the end have no CSV row"]
     assert _exit_code(tmp_path, monkeypatch) == 0
-    assert "NOTE Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 18 frames" in capsys.readouterr().out
+    assert "NOTE Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 1 frames" in capsys.readouterr().out
 
 
-def test_a_killed_run_with_more_than_a_second_of_unlisted_frames_is_a_problem(tmp_path, monkeypatch):
+def test_a_killed_run_with_two_unlisted_frames_is_a_problem(tmp_path, monkeypatch):
+    # Each row is flushed with its frame, so a second frame without one is rows lost, not the kill.
     _manifest(tmp_path, outcome="running")
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(300), rows=100)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(102), rows=100)
     (check,) = check_videos(tmp_path)
     assert check.notes == []
-    assert check.problems == ["Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: holds 300 frames, but "
+    assert check.problems == ["Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: holds 102 frames, but "
                               "Camera-Pupil_2026-11-14T10-00-00.csv lists 100"]
     assert _exit_code(tmp_path, monkeypatch) == 1
 
 
 def test_unlisted_frames_in_a_run_that_was_not_killed_are_a_problem(tmp_path, monkeypatch):
     _manifest(tmp_path, outcome="stopped", final=True)
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(118), rows=100)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(101), rows=100)
     (check,) = check_videos(tmp_path)
     assert check.notes == [] and len(check.problems) == 1
     assert _exit_code(tmp_path, monkeypatch) == 1
 
 
 def test_unlisted_frames_without_a_manifest_are_a_problem(tmp_path):
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(118), rows=100)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(101), rows=100)
     (check,) = check_videos(tmp_path)
     assert check.notes == [] and len(check.problems) == 1
 
@@ -201,58 +202,24 @@ def test_a_killed_run_s_video_before_the_last_with_unlisted_frames_is_a_note(tmp
     # A kill during an hour split's handover leaves the earlier file ahead of its CSV too; the next file's frameId
     # follows the unlisted frames, so that step is no loss.
     _manifest(tmp_path)
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(105), rows=100)
-    _camera(tmp_path, "2026-11-14T11-00-00", _avi(10), rows=10, first_id=105)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(101), rows=100)
+    _camera(tmp_path, "2026-11-14T11-00-00", _avi(10), rows=10, first_id=101)
     first, last = check_videos(tmp_path)
     assert first.problems == [] and first.notes == [
-        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 5 frames at the end have no CSV row"]
+        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 1 frames at the end have no CSV row"]
     assert last.notes == [] and last.problems == []
 
 
 def test_a_killed_run_s_older_video_with_unlisted_frames_is_a_problem(tmp_path):
     # Only the last two videos can be open at a kill; an older one was closed with its CSV.
     _manifest(tmp_path)
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(105), rows=100)
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(101), rows=100)
     _camera(tmp_path, "2026-11-14T11-00-00", _avi(10), rows=10, first_id=100)
     _camera(tmp_path, "2026-11-14T12-00-00", _avi(10), rows=10, first_id=110)
     first, second, third = check_videos(tmp_path)
     assert first.notes == [] and first.problems == [
-        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: holds 105 frames, but Camera-Pupil_2026-11-14T10-00-00.csv lists 100"]
+        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: holds 101 frames, but Camera-Pupil_2026-11-14T10-00-00.csv lists 100"]
     assert second.problems == third.problems == []
-
-
-def test_a_killed_run_s_last_csv_too_short_for_a_rate_takes_an_earlier_one(tmp_path):
-    # The CSV is flushed once a second, so a kill can leave the last one with a single row.
-    _manifest(tmp_path)
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(100), rows=100)
-    _camera(tmp_path, "2026-11-14T11-00-00", _avi(20), rows=1, first_id=100)
-    first, last = check_videos(tmp_path)
-    assert first.problems == last.problems == []
-    assert last.notes == ["Camera-Pupil/Camera-Pupil_2026-11-14T11-00-00.avi: killed run: 19 frames at the end have no CSV row"]
-
-
-def _rig_settings(folder, rate):
-    (folder / "Settings").mkdir()
-    rig = {"behaviorBoard": {"main": {"cameraTriggerController": {"trigger0Enabled": True, "trigger0Frequency": rate}}}}
-    (folder / "Settings" / "Settings_Rig_2026-11-14T10-00-00.json").write_text(json.dumps(rig))
-
-
-def test_a_killed_run_s_only_csv_too_short_for_a_rate_takes_the_rig_s_trigger_rate(tmp_path):
-    _manifest(tmp_path)
-    _rig_settings(tmp_path, 50)
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(20), rows=1)
-    (check,) = check_videos(tmp_path)
-    assert check.problems == [] and check.notes == [
-        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: killed run: 19 frames at the end have no CSV row"]
-
-
-def test_a_killed_run_without_any_frame_rate_is_a_problem_saying_so(tmp_path):
-    _manifest(tmp_path)
-    _camera(tmp_path, "2026-11-14T10-00-00", _avi(20), rows=1)
-    (check,) = check_videos(tmp_path)
-    assert check.notes == [] and check.problems == [
-        "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: holds 20 frames, but Camera-Pupil_2026-11-14T10-00-00.csv lists 1"
-        " (no frame rate from its CSVs or the rig's camera trigger, so a killed run's tolerance cannot be applied)"]
 
 
 def test_old_behaviour_box_frame_id_steps_are_problems(tmp_path):
