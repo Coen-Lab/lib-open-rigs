@@ -252,3 +252,46 @@ def test_videos_are_checked_when_asked(tmp_path):
     assert s.videos == ["Camera-Pupil/Camera-Pupil_2026-11-14T01-00-00.avi: 0 frames, CSV 1 rows"]
     assert s.problems == ["Camera-Pupil/Camera-Pupil_2026-11-14T01-00-00.avi: holds 0 frames, but Camera-Pupil_2026-11-14T01-00-00.csv lists 1 "
                           "(1 missing from the video)"]
+
+
+def _stimulus_state(folder, rows, columns=("harpTime", "trialNumber", "positionCm", "stimulusActive")):
+    with open(folder / "BonsaiData" / "BonsaiData_StimulusState_2026-11-14T01-00-00.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(columns)
+        w.writerows(rows)
+
+
+def test_a_run_stopped_mid_trial_reports_the_unfinished_trial_and_its_interval(tmp_path):
+    trials = _chain(1)
+    end = trials[0]["outcomeTime"]
+    folder = _experiment(tmp_path, trials, [(end, 2.0)], outcome="stopped")
+    _stimulus_state(folder, [[end - 1, 1, 0, True], [end + 1.0, 2, 0, False], [end + 2.19, 2, 0, True], [end + 2.24, 2, 1, True]])
+    s = summarise(folder)
+    assert s.unfinished == 2 and s.problems == [] and s.notes == []
+    assert [round(x, 6) for x in s.interval_seconds] == [2.19]
+    first = trials_module.describe(s).splitlines()[0]
+    assert first.endswith("stopped, 1 trials, 1 correct, and trial 2 unfinished at the stop")
+
+
+def test_stimulus_state_of_finished_trials_only_is_no_unfinished_trial(tmp_path):
+    trials = _chain(2)
+    folder = _experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)])
+    _stimulus_state(folder, [[t["stimulusOnsetTime"], t["trialNumber"], 0, True] for t in trials])
+    s = summarise(folder)
+    assert s.unfinished is None and s.problems == []
+    assert [round(x, 6) for x in s.interval_seconds] == [2.5]
+    assert "unfinished" not in trials_module.describe(s)
+
+
+def test_an_unfinished_trial_without_a_stimulus_yet_has_no_interval(tmp_path):
+    trials = _chain(1)
+    folder = _experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)], outcome="stopped")
+    _stimulus_state(folder, [[trials[0]["outcomeTime"] + 1, 2, 0, False]])
+    s = summarise(folder)
+    assert s.unfinished == 2 and s.interval_seconds == []
+
+
+def test_a_task_without_a_stimulus_state_log_has_no_unfinished_trial(tmp_path):
+    trials = _chain(1)
+    s = summarise(_experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)], outcome="stopped"))
+    assert s.unfinished is None and s.interval_seconds == [] and s.problems == []

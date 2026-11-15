@@ -66,7 +66,9 @@ def test_no_log_is_no_rows(tmp_path):
 
 
 def git(repo, *args):
-    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args], check=True, capture_output=True)
+    # No hooks: a machine whose global core.hooksPath asks a person to sign each commit hung this test (15 Nov 2026).
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t",
+                    "-c", f"core.hooksPath={repo / 'no-hooks'}", *args], check=True, capture_output=True)
 
 
 def test_an_older_experiment_reads_the_repo_at_its_commit(tmp_path):

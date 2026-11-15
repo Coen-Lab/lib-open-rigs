@@ -22,6 +22,12 @@ and manifest.json (how the run ended), and checks the rows against each other an
   and on no trial without one when the task's timeout is above 0;
 - each rewarded trial (rewardSizeUl above 0, and Correct or autoRewarded) has a RewardDelivered row at its outcome.
 
+These checks run on finished trials, the rows of BonsaiData_Trial. A run stopped mid-trial has no row for that trial, but
+a task that logs BonsaiData/BonsaiData_StimulusState_*.csv (harpTime, trialNumber, stimulusActive) shows it: rows for the
+trial after the last finished one are an unfinished trial, reported in the summary (never a problem), and the first of
+them with stimulusActive True is its stimulus onset, which gives the last outcome's interval to the next stimulus. A task
+without that log has no unfinished trial.
+
 A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
 Performance is Correct / (Correct + Incorrect), over the trials both
 spouts were offered where the task records bothSpouts; the response rate is the trials not NoResponse.
@@ -175,6 +181,7 @@ class Summary:
     problems: List[str] = field(default_factory=list)
     videos: List[str] = field(default_factory=list)  # each camera video's frames and CSV rows, when checked
     notes: List[str] = field(default_factory=list)  # accepted, not problems: a killed run's video frames with no CSV row
+    unfinished: Optional[int] = None  # the number of a trial the run stopped in (StimulusState rows, no Trial row), or None
 
 
 def _rows(folder: Path, pattern: str) -> List[Dict[str, str]]:
@@ -348,7 +355,42 @@ def _summarise(folder: Path) -> Summary:
                 nearest = min(reward_times, key=lambda t: abs(t - end), default=None)
                 s.problems.append(f"trial {number}: rewarded with rewardSizeUl {row['rewardSizeUl']} but no RewardDelivered at its outcome"
                                   + (f" (the nearest {(nearest - end) * 1000:+.0f} ms from it)" if nearest is not None else ""))
+    _unfinished(s, folder, trials, last)
     return s
+
+
+def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Optional[Dict[str, str]]) -> None:
+    """The trial after the last finished one, when StimulusState has rows for it: the run stopped in it. Its first
+    stimulusActive row is the stimulus the last outcome's interval ran to."""
+    rows = _rows(folder, "BonsaiData/BonsaiData_StimulusState*.csv")
+    if not rows or not trials:
+        return
+    if any(c not in rows[0] for c in ("harpTime", "trialNumber", "stimulusActive")):
+        s.problems.append("BonsaiData_StimulusState lacks harpTime, trialNumber or stimulusActive: the unfinished trial not looked for")
+        return
+    try:
+        cut = int(_f(trials[-1], "trialNumber")) + 1
+    except (TypeError, ValueError):
+        return
+    mine = []
+    for r in rows:
+        try:
+            if int(_f(r, "trialNumber")) == cut:
+                mine.append(r)
+        except (TypeError, ValueError):
+            continue
+    if not mine:
+        return
+    s.unfinished = cut
+    if last is None:
+        return
+    for r in mine:
+        try:
+            if _true(r["stimulusActive"]):
+                s.interval_seconds.append(_f(r, TIME_COLUMN) - _f(last, "outcomeTime"))
+                return
+        except (TypeError, ValueError):
+            continue
 
 
 def describe(s: Summary) -> str:
@@ -359,7 +401,8 @@ def describe(s: Summary) -> str:
     def percent(x: float) -> str:
         return "none" if math.isnan(x) else f"{x:.0%}"
 
-    lines = [f"{s.folder}: {s.outcome}, {s.trials} trials, {s.correct} correct",
+    cut = f", and trial {s.unfinished} unfinished at the stop" if s.unfinished is not None else ""
+    lines = [f"{s.folder}: {s.outcome}, {s.trials} trials, {s.correct} correct{cut}",
              f"  performance {percent(s.performance)} (Correct / (Correct + Incorrect), two-spout trials),"
              f" responded {percent(s.responded)}",
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",
