@@ -12,10 +12,10 @@
     "os": "Microsoft Windows 10.0.26100"
   },
   "session": {
-    "subject": "PCO1-01503",
+    "subject": "AM006",
     "id": "004B1",
     "started": "2026-11-12T10:15:02Z",
-    "folder": "C:\\Coen-Lab-Local\\Acquired-Data\\sub-PCO1-01503\\ses-004B1_2026-11-12T10-15-02"
+    "folder": "C:\\Coen-Lab-Local\\Acquired-Data\\sub-AM006\\ses-004B1_2026-11-12T10-15-02"
   },
   "source": {
     "workflow": "src\\main.bonsai",
@@ -32,19 +32,19 @@
     "arguments": [
       "C:\\Github\\Coen-Lab\\coen-behaviour-box\\src\\main.bonsai",
       "--no-editor",
-      "--property:SubjectId=PCO1-01503",
+      "--property:SubjectId=AM006",
       "--property:SessionId=004B1",
-      "--property:LaunchId=rig-PCO1-01503-004B1-20261112T101500Z"
+      "--property:LaunchId=rig-AM006-004B1-20261112T101500Z"
     ],
     "properties": {
-      "SubjectId": "PCO1-01503",
+      "SubjectId": "AM006",
       "SessionId": "004B1",
-      "LaunchId": "rig-PCO1-01503-004B1-20261112T101500Z"
+      "LaunchId": "rig-AM006-004B1-20261112T101500Z"
     }
   },
   "control": {
-    "launch_id": "rig-PCO1-01503-004B1-20261112T101500Z",
-    "subject_id": "PCO1-01503",
+    "launch_id": "rig-AM006-004B1-20261112T101500Z",
+    "subject_id": "AM006",
     "session_id": "004B1",
     "go": "2026-11-12T10:15:40Z",
     "launched_by": {

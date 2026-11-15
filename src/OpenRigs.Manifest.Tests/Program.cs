@@ -196,12 +196,12 @@ namespace OpenRigs.Manifest.Tests
             var start = new StartSnapshot
             {
                 Source = source(false),
-                Launch = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", workflow, "--no-editor", "--property:SubjectId=PCO1-01503", "--property:SessionId=004B1", "--property:LaunchId=rig-PCO1-01503-004B1-20261112T101500Z" }),
+                Launch = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", workflow, "--no-editor", "--property:SubjectId=AM006", "--property:SessionId=004B1", "--property:LaunchId=rig-AM006-004B1-20261112T101500Z" }),
                 ConfigFiles = new List<object> { Object("path", rigYml, "sha256", "9b1c0f5e2d7a4c8b6e3f1a0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b") },
             };
             var launchId = ManifestWriter.LaunchProperty(start.Launch, ManifestWriter.LaunchIdProperty);
             var tom = new KeyValuePair<string, string>("AnaB", "Ana B");
-            var session = ManifestWriter.SessionSection(@"D:\Data\sub-PCO1-01503\ses-004B1_2026-11-12T10-15-02");
+            var session = ManifestWriter.SessionSection(@"D:\Data\sub-AM006\ses-004B1_2026-11-12T10-15-02");
             var plan = new ExpectedPlan();
             plan.Entries.Add(new ExpectedEntry { Path = "BehaviorBoard-Main/", Why = "rig.yml behaviorBoard: main:, published as BehaviorBoard-Main" });
             plan.Entries.Add(new ExpectedEntry { Path = "Settings/Settings_Experiment_", Why = "listed in ExpectedFiles" });
@@ -227,27 +227,27 @@ namespace OpenRigs.Manifest.Tests
             var records = new Dictionary<string, JsonObject>();
             var runningFiles = new List<object> { device };
             records["running"] = ManifestWriter.Document(Utc("2026-11-12T10:15:03Z"), "example-task", writer, rig, session, start,
-                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", null, tom, null, null),
+                ManifestWriter.ControlSection(launchId, "AM006", "004B1", null, tom, null, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Running, null), false, Utc("2026-11-12T10:15:03Z"), null, null, null),
                 ManifestWriter.ExpectedSection(plan, runningFiles), none, runningFiles);
             var files = allFiles(true);
             records["completed"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
-                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
+                ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
                 ManifestWriter.ExpectedSection(plan, files), none, files);
             var laserFiles = allFiles(true);
             laserFiles.Add(ManifestWriter.FileEntry("Settings/Settings_Laser_2026-11-12T10-15-40.json", 640, Utc("2026-11-12T10:15:40Z"), true));
             records["optogenetics"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
-                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
+                ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
                 ManifestWriter.ExpectedSection(laserOn, laserFiles), none, laserFiles);
             records["ended-early"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
-                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
+                ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.EndedEarly, RunEnd.EndedEarlyError), true, started, Utc("2026-11-12T10:20:00Z"), 12950, null),
                 ManifestWriter.ExpectedSection(withCamera, files), new[] { "Camera-Overhead left no file" }, files);
             var openFiles = allFiles(false);
             records["stopped-not-final"] = ManifestWriter.Document(Utc("2026-11-12T10:31:10Z"), "example-task", writer, rig, session, start,
-                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, new KeyValuePair<string, string>("", "someone at CONTROL-PC (no Lab PIN)")),
+                ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, new KeyValuePair<string, string>("", "someone at CONTROL-PC (no Lab PIN)")),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Stopped, null), false, started, Utc("2026-11-12T10:31:10Z"), null, "Stop from the window"),
                 ManifestWriter.ExpectedSection(plan, openFiles), none, openFiles);
             var bare = new StartSnapshot
@@ -277,7 +277,7 @@ namespace OpenRigs.Manifest.Tests
             Check("version 4 has no status, completed or ingest, and a file no sha256 or expected", Field(completed, "version") == "4"
                 && topKeys == "version,created,ingest_script,writer,rig,session,source,launch,control,config_files,trial_columns,run,expected,notes,files"
                 && fileKeys == "path,size,mtime,closed", topKeys + " | " + fileKeys);
-            Check("control.launch_id is the LaunchId the controller passed", Field(completed, "control.launch_id") == "rig-PCO1-01503-004B1-20261112T101500Z", Field(completed, "control.launch_id"));
+            Check("control.launch_id is the LaunchId the controller passed", Field(completed, "control.launch_id") == "rig-AM006-004B1-20261112T101500Z", Field(completed, "control.launch_id"));
             Check("... and null when none was passed", ManifestWriter.ControlSection(null, "a", "b", null, null, null, null).First(p => p.Key == "launch_id").Value == null, "not null");
             Check("a blank ingest script is null, not left out", Field(Json.Serialize(records["no-controller"]), "ingest_script") == "null", "left out");
             ExperimentFolder(repo);
@@ -347,7 +347,7 @@ namespace OpenRigs.Manifest.Tests
             Check("it has names that are not one", notNames.Count >= 5, notNames.Count.ToString());
             foreach (var name in notNames)
             {
-                var folder = name.StartsWith("sub-", StringComparison.Ordinal) ? @"C:\Data\" + name : @"C:\Data\sub-PCO1-01503\" + name;
+                var folder = name.StartsWith("sub-", StringComparison.Ordinal) ? @"C:\Data\" + name : @"C:\Data\sub-AM006\" + name;
                 var read = Json.Serialize(ManifestWriter.SessionSection(folder));
                 Check(name + " is not an experiment folder's name", Field(read, "id") == "null" && Field(read, "subject") == "null" && Field(read, "started") == "null", read);
             }

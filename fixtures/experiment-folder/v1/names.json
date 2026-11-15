@@ -2,10 +2,10 @@
   "version": 1,
   "names": [
     {
-      "subject": "PCO1-01503",
+      "subject": "AM006",
       "session": "004B1",
       "started": "2026-11-12T10:15:02Z",
-      "folder": "sub-PCO1-01503/ses-004B1_2026-11-12T10-15-02"
+      "folder": "sub-AM006/ses-004B1_2026-11-12T10-15-02"
     },
     {
       "subject": "test",
@@ -33,12 +33,12 @@
       "why": "an underscore in the subject"
     },
     {
-      "subject": "PCO1-01503",
+      "subject": "AM006",
       "session": "004_B1",
       "why": "an underscore in the session"
     },
     {
-      "subject": "PCO1-01503",
+      "subject": "AM006",
       "session": "004B1.",
       "why": "the session ends in a dot"
     },
@@ -57,7 +57,7 @@
     "ses-004B1",
     "ses-004B1_date-2026-11-12T10-15-02",
     "ses-004B1_2026-11-12T10:15:02",
-    "sub-PCO1-01503",
+    "sub-AM006",
     "ses-_2026-11-12T10-15-02"
   ]
 }
