@@ -45,7 +45,7 @@ Every sound plays at a level, never a gain: `levelDbfs`, in dBFS RMS, the RMS of
 
 - loads the speakers once at Start (`RigFile` -> `LoadSpeakers` -> `Speakers`, an `AsyncSubject`);
 - starts the mixer on `rig.yml`'s `speakerArray.device` (from `RigConfigs`), never sooner than 3 s after Start, or `device.bootDelay` if longer: deliberate, as a fault while the sound card boots can blue-screen the PC, so never remove or shorten it;
-- plays four sounds over each other, one mixer source each, from the `BehaviorSubject` of `Mat` it declares for it: `StimulusSounds` (each trial's stimulus), `RewardToneSounds`, `PenaltySounds` and `BackgroundNoise` (one buffer, looped, faded in over 2 s when it comes). Each buffer already carries its level, so the mixer plays them at gain 1. A workflow multicasts only what it plays, from a per-trial graph if it likes (a `BehaviorSubject` is not closed by it).
+- plays four sounds over each other, one mixer source each, from the `BehaviorSubject` of `Mat` it declares for it: `StimulusSounds` (each trial's stimulus), `RewardToneSounds`, `PenaltySounds` and `BackgroundNoise` (one buffer, looped, faded in over 2 s when it comes). Each buffer already carries its level, so the mixer plays them at gain 1. The mixer reads `StimulusSounds`, `RewardToneSounds` and `PenaltySounds` through a `PublishSubject` each (`Mixer<name>`), so a sound sent before the mixer has started is not played, never played late; `BackgroundNoise` plays when the mixer starts. A workflow multicasts only what it plays, from a per-trial graph if it likes (a `BehaviorSubject` is not closed by it).
 
 It needs Bonsai.Mixer in the workflow's environment.
 

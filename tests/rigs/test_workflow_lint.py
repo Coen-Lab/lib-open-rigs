@@ -24,6 +24,15 @@ def test_the_speaker_mixer_starts_no_sooner_than_3_s_after_start():
     assert lint.mixer_boot_delay_problems(lint.ET.fromstring(shortened.encode("utf-8"))) == ["MixerBootDelay is not a DelaySubscription of PT3S"]
 
 
+def test_the_speaker_mixer_plays_no_sound_sent_while_it_boots():
+    # AppendBuffer subscribes only once the mixer starts: a BehaviorSubject would replay a buffer sent during the boot, late.
+    text = (ROOT / "src" / "OpenRigs.Audio" / "SpeakerMixer.bonsai").read_text(encoding="utf-8-sig")
+    assert lint.mixer_replay_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
+    direct = text.replace("<Name>MixerStimulusSounds</Name>", "<Name>StimulusSounds</Name>")
+    assert lint.mixer_replay_problems(lint.ET.fromstring(direct.encode("utf-8"))) == [
+        "StimulusSounds reaches the mixer other than through the PublishSubject MixerStimulusSounds"]
+
+
 def workflow(tmp_path: Path, nodes: str) -> lint.Workflow:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "main.bonsai").write_text(HEAD + nodes + "</Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")

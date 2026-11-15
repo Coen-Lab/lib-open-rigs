@@ -190,6 +190,33 @@ def mixer_boot_delay_problems(root: ET.Element) -> list[str]:
     return problems
 
 
+def mixer_replay_problems(root: ET.Element) -> list[str]:
+    """The mixer's AppendBuffer subscribes to a sound only once the mixer starts, after its boot delay, so a sound it
+    read from its BehaviorSubject would replay a buffer sent during the boot, late. StimulusSounds, RewardToneSounds and
+    PenaltySounds each reach their AppendBuffer through a PublishSubject (Mixer<name>) fed only by that BehaviorSubject,
+    which ignores a per-trial sender's completion; BackgroundNoise, looped, is read straight from its BehaviorSubject.
+    `root` is OpenRigs.Audio's SpeakerMixer.bonsai."""
+    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+
+    def name(n: ET.Element) -> str:
+        return n.findtext(W + "Name") or n.findtext(RX + "Name") or ""
+
+    def read_by_append_buffer(subject: str) -> bool:
+        return any(kind(nodes[b]) == "mix:AppendBuffer" and label == "Source1" and nodes[a].get(XSI) == "SubscribeSubject"
+                   and name(nodes[a]) == subject for a, b, label in edges)
+
+    problems = []
+    for sound in SPEAKER_MIXER_SOUNDS[:3]:
+        relays = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:PublishSubject" and name(n) == f"Mixer{sound}"]
+        feeds = [nodes[a] for r in relays for a, b, _ in edges if b == r]
+        if not (len(relays) == 1 and [(f.get(XSI), name(f)) for f in feeds] == [("SubscribeSubject", sound)]
+                and read_by_append_buffer(f"Mixer{sound}")):
+            problems.append(f"{sound} reaches the mixer other than through the PublishSubject Mixer{sound}")
+    if not read_by_append_buffer("BackgroundNoise"):
+        problems.append("BackgroundNoise is not read straight from its BehaviorSubject by the mixer")
+    return problems
+
+
 def speaker_mixer_problems(wf: Workflow) -> list[str]:
     """Every sound plays through OpenRigs.Audio's SpeakerMixer, included once, which loads the speakers and starts the
     mixer no sooner than 3 s after Start: the workflow starts no mixer, makes no source and loads no speakers itself."""
