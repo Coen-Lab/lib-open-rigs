@@ -78,7 +78,7 @@ namespace OpenRigs.Manifest
                 {
                     snapshot.ConfigFiles.Add(file);
                     var missing = file.FirstOrDefault(p => p.Key == "missing");
-                    if (missing.Key != null) snapshot.Notes.Add("Config file not found at Start: " + configured + (configured.Contains(SubjectToken) ? " (" + SubjectToken + " " + (subject ?? "not on the command line") + ")" : "") + ".");
+                    if (missing.Key != null) snapshot.Notes.Add(MissingNote(file, configured, subject));
                 }
             }
             string trialNote;
@@ -88,6 +88,15 @@ namespace OpenRigs.Manifest
             var note = ConfigRootNote(snapshot.Launch, RigConfigPath(configFiles));
             if (note != null) snapshot.Notes.Add(note);
             return snapshot;
+        }
+
+        /// <summary>The note for a ConfigFiles entry not found at Start: the path as looked for, with environment variables and {SubjectId} filled in.
+        /// It is the entry's own recorded path, so the note and the lookup share one resolution; with no subject to fill in, the token stays and the note says so.</summary>
+        public static string MissingNote(JsonObject file, string configured, string subject)
+        {
+            var path = (string)file.First(p => p.Key == "path").Value;
+            var unfilled = configured.Contains(SubjectToken) && string.IsNullOrEmpty(subject);
+            return "Config file not found at Start: " + path + (unfilled ? " (" + SubjectToken + " not on the command line)" : "") + ".";
         }
 
         // OpenRigs' RigConfig reads <ConfigRoot>\<MACHINE>\rig.yml, and ConfigRoot is a workflow
@@ -137,7 +146,7 @@ namespace OpenRigs.Manifest
                 if (string.IsNullOrEmpty(subject))
                 {
                     var none = new JsonObject();
-                    none.Add("path", configured);
+                    none.Add("path", ResolvePath(configured, baseFolder));
                     none.Add("missing", true);
                     none.Add("why", "no --property:SubjectId on the command line to name the subject's file");
                     return new List<JsonObject> { none };
