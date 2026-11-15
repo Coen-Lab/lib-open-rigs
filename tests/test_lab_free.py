@@ -53,7 +53,7 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "src/OpenRigs.LiveView/Templates/StreamController.xml": 1,
     "src/OpenRigs.Logging/CsvWriter.cs": 1,
     "src/OpenRigs.Logging/OpenRigs.Logging.csproj": 1,
-    "src/OpenRigs.Manifest.Tests/Program.cs": 26,
+    "src/OpenRigs.Manifest.Tests/Program.cs": 13,
     "src/OpenRigs.Manifest/ExpectedFiles.cs": 1,
     "src/OpenRigs.Manifest/FORMAT.md": 3,
     "src/OpenRigs.Manifest/ManifestRecorder.cs": 3,

@@ -63,7 +63,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>Gets or sets what the experiment must leave, separated by ;, or auto.</summary>
-        [Description("What the experiment must leave, separated by ;: a path in the experiment folder, a folder ending in /, or the start of a file's path ending in _ (Settings/Settings_Task_), met by any file whose path starts with it. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. The overnight copy (jacuzzi-ingest's ingest-rig) alarms on an entry that left no file. Blank: nothing expected.")]
+        [Description("What the experiment must leave, separated by ;: a path in the experiment folder, a folder ending in /, or the start of a file's path ending in _ (Settings/Settings_Task_), met by any file whose path starts with it. auto: a folder for each device in rig.yml (from ConfigFiles) whose subject the workflow publishes before this node, as <Kind>-<Instance> or <Kind>-<Instance>.Data, which is where OpenRigs.Logging logs it. harp: for each Harp device in rig.yml (a portName, <Kind>-<Instance>.Data published as HarpMessage), the <Name>_device.json and <Name>.yml OpenRigs.HarpDevices' RecordHarpDevices writes in that folder. path?Subject: required only while Subject, a bool subject published before this node, is true (Settings/Settings_Laser_?Optogenetics). The overnight copy (jacuzzi-ingest's ingest-rig) alarms on a required entry that left no file. Blank: nothing expected.")]
         public string ExpectedFiles
         {
             get { return Settings.ExpectedFiles; }
@@ -109,15 +109,32 @@ namespace OpenRigs.Manifest
                 throw new InvalidOperationException("ExperimentManifest needs " + PathSubject + " to be a string, the experiment folder's path; this workflow's is " + pathType + ".");
             }
             var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles), name => GroupNode.PublishedType(this, name));
+            // Each condition (path?Subject) is a bool subject published before this node; one that is not is required always, with a note.
+            var names = new List<string>();
+            var subjects = new List<Expression>();
+            foreach (var condition in expected.Conditions)
+            {
+                var subject = GroupNode.Subject(this, condition);
+                var type = subject == null ? null : GroupNode.ObservedType(subject.Type);
+                if (type != typeof(bool))
+                {
+                    expected.Unconditional(condition, subject == null ? "is not a subject published before ExperimentManifest" : "is a subject of " + type + ", not bool");
+                    continue;
+                }
+                names.Add(condition);
+                subjects.Add(Expression.Convert(subject, typeof(IObservable<bool>)));
+            }
+            var conditions = Expression.Call(typeof(ManifestRecorder).GetMethod(nameof(ManifestRecorder.Conditions)),
+                Expression.Constant(names.ToArray()), Expression.NewArrayInit(typeof(IObservable<bool>), subjects));
             var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, expected, TrialColumns));
             var observablePath = Expression.Convert(path, typeof(IObservable<string>));
             var run = arguments.FirstOrDefault();
             if (run == null)
             {
-                return Expression.Call(recorder, nameof(ManifestRecorder.Process), null, observablePath);
+                return Expression.Call(recorder, nameof(ManifestRecorder.Process), null, observablePath, conditions);
             }
             var runType = GroupNode.ObservedType(run.Type);
-            return Expression.Call(recorder, nameof(ManifestRecorder.Process), new[] { runType }, observablePath, run);
+            return Expression.Call(recorder, nameof(ManifestRecorder.Process), new[] { runType }, observablePath, conditions, run);
         }
 
     }

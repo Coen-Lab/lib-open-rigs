@@ -29,12 +29,12 @@ namespace OpenRigs.Manifest
 
     /// <summary>
     /// The manifest's contents and its writes, with no Rx, so a test can drive it on a temp
-    /// folder. The format is FORMAT.md beside this file, version 3.
+    /// folder. The format is FORMAT.md beside this file, version 4.
     /// </summary>
     class ManifestWriter
     {
         public const string FileName = "manifest.json";
-        public const int Version = 3;
+        public const int Version = 4;
 
         /// <summary>The experiment folder's three records, one writer each: this file, the overnight copy's and the server's. None is a file of the experiment.</summary>
         public static readonly string[] RecordFiles = { FileName, "sync.json", "ingest.json" };
@@ -207,11 +207,11 @@ namespace OpenRigs.Manifest
             var doc = Document(DateTime.UtcNow, ingestScript, WriterSection(), RigSection(), SessionSection(folder), start,
                 ControlSection(control, LaunchProperty(start.Launch, LaunchIdProperty)),
                 RunSection(end, final, started, ended, items, stopReason),
-                ExpectedSection(expected, files), expected.Notes.Concat(start.Notes.Cast<string>()), files);
+                ExpectedSection(expected, files), expected.Notes.Concat(expected.ConditionNotes()).Concat(start.Notes.Cast<string>()), files);
             WriteAtomically(manifestPath, Json.Serialize(doc));
         }
 
-        /// <summary>The manifest from what one write knows, reading no clock, machine or disk, so a test builds the fixtures in fixtures\manifest\v3\ from their inputs.</summary>
+        /// <summary>The manifest from what one write knows, reading no clock, machine or disk, so a test builds the fixtures in fixtures\manifest\v4\ from their inputs.</summary>
         public static JsonObject Document(DateTime created, string ingestScript, JsonObject writer, JsonObject rig, JsonObject session, StartSnapshot start,
             JsonObject control, JsonObject run, List<object> expected, IEnumerable<string> notes, List<object> files)
         {
@@ -249,7 +249,7 @@ namespace OpenRigs.Manifest
             return run;
         }
 
-        /// <summary>Each file or folder the experiment must leave, why, and how many files in the folder match it now.</summary>
+        /// <summary>Each file or folder the experiment must leave, why, its condition and whether it is required at this write, and how many files in the folder match it now.</summary>
         public static List<object> ExpectedSection(ExpectedPlan plan, List<object> files)
         {
             var paths = files.Cast<JsonObject>().Select(f => (string)f.First(p => p.Key == "path").Value).ToList();
@@ -259,6 +259,8 @@ namespace OpenRigs.Manifest
                 var item = new JsonObject();
                 item.Add("path", entry.Path);
                 item.Add("why", entry.Why);
+                item.Add("condition", entry.Condition);
+                item.Add("required", plan.Required(entry));
                 item.Add("found", (long)ExpectedPlan.Matches(entry, paths, plan.Entries));
                 section.Add(item);
             }

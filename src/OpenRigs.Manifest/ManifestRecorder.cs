@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
@@ -32,8 +34,39 @@ namespace OpenRigs.Manifest
         /// <returns>The manifest's path, once the first write is done.</returns>
         public IObservable<string> Process(IObservable<string> experimentPath)
         {
-            return Record<object>(experimentPath, null);
+            return Record<object>(experimentPath, NoConditions, null);
         }
+
+        /// <summary>No run input, with the values of the conditions ExpectedFiles names.</summary>
+        /// <param name="experimentPath">The experiment folder's path, from PathPrefix.</param>
+        /// <param name="conditions">Each condition's subject's values, by the condition's name.</param>
+        /// <returns>The manifest's path, once the first write is done.</returns>
+        public IObservable<string> Process(IObservable<string> experimentPath, IObservable<KeyValuePair<string, bool>> conditions)
+        {
+            return Record<object>(experimentPath, conditions, null);
+        }
+
+        /// <summary>The run, with the values of the conditions ExpectedFiles names.</summary>
+        /// <typeparam name="TRun">The type of the run's elements.</typeparam>
+        /// <param name="experimentPath">The experiment folder's path, from PathPrefix.</param>
+        /// <param name="conditions">Each condition's subject's values, by the condition's name.</param>
+        /// <param name="run">The run.</param>
+        /// <returns>The manifest's path, once the first write is done.</returns>
+        public IObservable<string> Process<TRun>(IObservable<string> experimentPath, IObservable<KeyValuePair<string, bool>> conditions, IObservable<TRun> run)
+        {
+            return Record(experimentPath, conditions, run);
+        }
+
+        /// <summary>The conditions' subjects as one sequence of (name, value), for Process.</summary>
+        /// <param name="names">Each condition's name, in the order of its subject.</param>
+        /// <param name="subjects">Each condition's bool subject.</param>
+        /// <returns>Every value any of them sends, with its condition's name.</returns>
+        public static IObservable<KeyValuePair<string, bool>> Conditions(string[] names, IObservable<bool>[] subjects)
+        {
+            return subjects.Select((subject, i) => subject.Select(value => new KeyValuePair<string, bool>(names[i], value))).Merge();
+        }
+
+        static readonly IObservable<KeyValuePair<string, bool>> NoConditions = Observable.Empty<KeyValuePair<string, bool>>();
 
         /// <summary>With the run: its completion is completed, its error the run's error, its elements run.items.</summary>
         /// <typeparam name="TRun">The type of the run's elements.</typeparam>
@@ -42,13 +75,15 @@ namespace OpenRigs.Manifest
         /// <returns>The manifest's path, once the first write is done.</returns>
         public IObservable<string> Process<TRun>(IObservable<string> experimentPath, IObservable<TRun> run)
         {
-            return Record(experimentPath, run);
+            return Record(experimentPath, NoConditions, run);
         }
 
-        IObservable<string> Record<TRun>(IObservable<string> experimentPath, IObservable<TRun> run)
+        IObservable<string> Record<TRun>(IObservable<string> experimentPath, IObservable<KeyValuePair<string, bool>> conditions, IObservable<TRun> run)
         {
             return Observable.Create<string>(observer =>
             {
+                // Each run starts with no condition known: a value from an earlier run is not this one's.
+                expected.ClearConditions();
                 // At Start: the launch, the workflow's commit and the config files, as they are now.
                 var writer = new ManifestWriter(ingestScript, ManifestWriter.Snapshot(configFiles, run != null, trialColumns), expected);
                 var gate = new object();
@@ -61,6 +96,8 @@ namespace OpenRigs.Manifest
                 RunEnd pending = null;
                 ControlExperiment control = null;
                 var subscriptions = new CompositeDisposable();
+                // Before the path, so a BehaviorSubject's value is in by the first write.
+                subscriptions.Add(conditions.Subscribe(c => expected.SetCondition(c.Key, c.Value), observer.OnError));
 
                 Action<RunEnd> finish = end =>
                 {

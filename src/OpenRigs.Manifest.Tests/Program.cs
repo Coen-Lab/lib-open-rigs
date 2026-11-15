@@ -173,7 +173,7 @@ namespace OpenRigs.Manifest.Tests
             return o;
         }
 
-        // The records' contract (claude-tools docs\architecture\records.md): fixtures\manifest\v3\*.json are what this
+        // The records' contract (claude-tools docs\architecture\records.md): fixtures\manifest\v4\*.json are what this
         // writer produces from these inputs, byte for byte. --write-fixtures writes them; otherwise each is compared.
         static void Fixtures(bool write)
         {
@@ -184,14 +184,15 @@ namespace OpenRigs.Manifest.Tests
             var folder = Path.Combine(repo, "fixtures", "manifest", "v" + ManifestWriter.Version);
             Directory.CreateDirectory(folder);
 
-            var writer = Object("package", "OpenRigs.Manifest", "version", "0.1.1-coen-lab.15");
-            var rig = Object("machine", "RIG-PC1", "user", "Coen lab", "os", "Microsoft Windows 10.0.26100");
-            var workflow = @"C:\Github\Coen-Lab\coen-behaviour-box\src\main.bonsai";
-            Func<bool, JsonObject> source = dirty => Object("workflow", @"src\main.bonsai", "repo", "https://github.com/ucl-open/coen-behaviour-box.git",
-                "root", @"C:\Github\Coen-Lab\coen-behaviour-box", "branch", "main", "commit", "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
+            // Since version 4 the inputs name no lab (tests\test_lab_free.py): an example task on an example rig.
+            var writer = Object("package", "OpenRigs.Manifest", "version", "0.1.1-example.1");
+            var rig = Object("machine", "RIG-PC1", "user", "Lab", "os", "Microsoft Windows 10.0.26100");
+            var workflow = @"D:\Rigs\example-task\src\main.bonsai";
+            Func<bool, JsonObject> source = dirty => Object("workflow", @"src\main.bonsai", "repo", "https://github.com/example/example-task.git",
+                "root", @"D:\Rigs\example-task", "branch", "main", "commit", "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
                 "dirty", dirty, "changed", dirty ? new List<object> { "src/main.bonsai" } : new List<object>(),
                 "diff_sha256", dirty ? "5d41402abc4b2a76b9719d911017c5925d41402abc4b2a76b9719d911017c592" : null, "bonsai", "2.9.0");
-            var rigYml = @"C:\Coen-Lab-Local\RigConfigs\RIG-PC1\rig.yml";
+            var rigYml = @"D:\RigConfigs\RIG-PC1\rig.yml";
             var start = new StartSnapshot
             {
                 Source = source(false),
@@ -199,14 +200,19 @@ namespace OpenRigs.Manifest.Tests
                 ConfigFiles = new List<object> { Object("path", rigYml, "sha256", "9b1c0f5e2d7a4c8b6e3f1a0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b") },
             };
             var launchId = ManifestWriter.LaunchProperty(start.Launch, ManifestWriter.LaunchIdProperty);
-            var tom = new KeyValuePair<string, string>("TomC", "Tom C");
-            var session = ManifestWriter.SessionSection(@"C:\Coen-Lab-Local\Acquired-Data\sub-PCO1-01503\ses-004B1_2026-11-12T10-15-02");
+            var tom = new KeyValuePair<string, string>("AnaB", "Ana B");
+            var session = ManifestWriter.SessionSection(@"D:\Data\sub-PCO1-01503\ses-004B1_2026-11-12T10-15-02");
             var plan = new ExpectedPlan();
             plan.Entries.Add(new ExpectedEntry { Path = "BehaviorBoard-Main/", Why = "rig.yml behaviorBoard: main:, published as BehaviorBoard-Main" });
             plan.Entries.Add(new ExpectedEntry { Path = "Settings/Settings_Experiment_", Why = "listed in ExpectedFiles" });
+            // Required only in an optogenetics experiment: its subject is false (or silent) in every fixture but optogenetics.
+            plan.Entries.Add(new ExpectedEntry { Path = "Settings/Settings_Laser_", Why = "listed in ExpectedFiles", Condition = "Optogenetics" });
             var withCamera = new ExpectedPlan();
             withCamera.Entries.AddRange(plan.Entries);
             withCamera.Entries.Add(new ExpectedEntry { Path = "Camera-Overhead/", Why = "rig.yml camera: overhead:, published as Camera-Overhead" });
+            var laserOn = new ExpectedPlan();
+            laserOn.Entries.AddRange(plan.Entries);
+            laserOn.SetCondition("Optogenetics", true);
             var device = ManifestWriter.FileEntry("BehaviorBoard-Main/BehaviorBoard-Main_device.json", 412, Utc("2026-11-12T10:15:03Z"), true);
             Func<bool, List<object>> allFiles = closed => new List<object>
             {
@@ -220,21 +226,27 @@ namespace OpenRigs.Manifest.Tests
 
             var records = new Dictionary<string, JsonObject>();
             var runningFiles = new List<object> { device };
-            records["running"] = ManifestWriter.Document(Utc("2026-11-12T10:15:03Z"), "coen-behaviour-box", writer, rig, session, start,
+            records["running"] = ManifestWriter.Document(Utc("2026-11-12T10:15:03Z"), "example-task", writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", null, tom, null, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Running, null), false, Utc("2026-11-12T10:15:03Z"), null, null, null),
                 ManifestWriter.ExpectedSection(plan, runningFiles), none, runningFiles);
             var files = allFiles(true);
-            records["completed"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "coen-behaviour-box", writer, rig, session, start,
+            records["completed"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
                 ManifestWriter.ExpectedSection(plan, files), none, files);
-            records["ended-early"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "coen-behaviour-box", writer, rig, session, start,
+            var laserFiles = allFiles(true);
+            laserFiles.Add(ManifestWriter.FileEntry("Settings/Settings_Laser_2026-11-12T10-15-40.json", 640, Utc("2026-11-12T10:15:40Z"), true));
+            records["optogenetics"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
+                ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
+                ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
+                ManifestWriter.ExpectedSection(laserOn, laserFiles), none, laserFiles);
+            records["ended-early"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.EndedEarly, RunEnd.EndedEarlyError), true, started, Utc("2026-11-12T10:20:00Z"), 12950, null),
                 ManifestWriter.ExpectedSection(withCamera, files), new[] { "Camera-Overhead left no file" }, files);
             var openFiles = allFiles(false);
-            records["stopped-not-final"] = ManifestWriter.Document(Utc("2026-11-12T10:31:10Z"), "coen-behaviour-box", writer, rig, session, start,
+            records["stopped-not-final"] = ManifestWriter.Document(Utc("2026-11-12T10:31:10Z"), "example-task", writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "PCO1-01503", "004B1", go, tom, tom, new KeyValuePair<string, string>("", "someone at CONTROL-PC (no Lab PIN)")),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Stopped, null), false, started, Utc("2026-11-12T10:31:10Z"), null, "Stop from the window"),
                 ManifestWriter.ExpectedSection(plan, openFiles), none, openFiles);
@@ -245,7 +257,7 @@ namespace OpenRigs.Manifest.Tests
                 ConfigFiles = new List<object> { Object("path", rigYml, "missing", true, "why", "Could not find file '" + rigYml + "'.") },
             };
             records["no-controller"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), null, writer, rig,
-                ManifestWriter.SessionSection(@"C:\Coen-Lab-Local\Acquired-Data\sub-test\ses-XXXXX_2026-11-12T10-15-02"), bare,
+                ManifestWriter.SessionSection(@"D:\Data\sub-test\ses-XXXXX_2026-11-12T10-15-02"), bare,
                 ManifestWriter.ControlSection(null, ManifestWriter.LaunchProperty(bare.Launch, ManifestWriter.LaunchIdProperty)),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
                 ManifestWriter.ExpectedSection(plan, files), new[] { "Config file not found at Start: " + rigYml + ".", ManifestWriter.NoControllerNote }, files);
@@ -262,7 +274,7 @@ namespace OpenRigs.Manifest.Tests
             var completed = Json.Serialize(records["completed"]);
             var topKeys = string.Join(",", records["completed"].Select(p => p.Key));
             var fileKeys = string.Join(",", ((JsonObject)((List<object>)records["completed"].First(p => p.Key == "files").Value)[0]).Select(p => p.Key));
-            Check("version 3 has no status, completed or ingest, and a file no sha256 or expected", Field(completed, "version") == "3"
+            Check("version 4 has no status, completed or ingest, and a file no sha256 or expected", Field(completed, "version") == "4"
                 && topKeys == "version,created,ingest_script,writer,rig,session,source,launch,control,config_files,trial_columns,run,expected,notes,files"
                 && fileKeys == "path,size,mtime,closed", topKeys + " | " + fileKeys);
             Check("control.launch_id is the LaunchId the controller passed", Field(completed, "control.launch_id") == "rig-PCO1-01503-004B1-20261112T101500Z", Field(completed, "control.launch_id"));
@@ -529,6 +541,22 @@ namespace OpenRigs.Manifest.Tests
                     Check("... and the end-of-run write is completed and final", Field(last, "run.outcome") == "completed" && Field(last, "run.final") == "true", Field(last, "run.outcome") + " " + Field(last, "run.final"));
                 }
                 {
+                    // Version 4: a condition's subject decides, at each write, whether its entry is required.
+                    var folder = Path.Combine(root, "sub-TC002", "ses-cond_2026-10-30T19-57-12");
+                    var path = new Subject<string>();
+                    var optogenetics = new BehaviorSubject<bool>(false);
+                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("Settings/Settings_Laser_?Optogenetics", null, n => null));
+                    var subscription = recorder.Process(path, ManifestRecorder.Conditions(new[] { "Optogenetics" }, new IObservable<bool>[] { optogenetics })).Subscribe(_ => { }, _ => { });
+                    path.OnNext(folder);
+                    var manifest = Path.Combine(folder, ManifestWriter.FileName);
+                    var off = File.ReadAllText(manifest);
+                    Check("a condition's subject false at the first write: the entry is not required", off.Contains("\"condition\": \"Optogenetics\",") && off.Contains("\"required\": false,") && Field(off, "version") == "4", off.Length.ToString());
+                    optogenetics.OnNext(true);
+                    subscription.Dispose();
+                    var on = File.ReadAllText(manifest);
+                    Check("... and true by the end-of-run write: it is", on.Contains("\"required\": true,") && !on.Contains("has sent no value"), on.Length.ToString());
+                }
+                {
                     // S3-L1 (Run 1): another writer's .tmp is not a file of the experiment.
                     var folder = Path.Combine(root, "tmpfiles");
                     Directory.CreateDirectory(Path.Combine(folder, "Board"));
@@ -670,6 +698,27 @@ namespace OpenRigs.Manifest.Tests
                 // L1-L1: auto;harp, as every lab workflow sets, wrote the note twice.
                 var autoHarp = ExpectedPlan.Create("auto;harp", emptyYml, n => typeof(object));
                 Check("auto;harp writes each note once", autoHarp.Notes.Count(n => n.Contains("has no settings")) == 1 && autoHarp.Notes.Distinct().Count() == autoHarp.Notes.Count, string.Join(" | ", autoHarp.Notes));
+                // Version 4: path?Subject is required only while the bool subject Subject is true.
+                var conditional = ExpectedPlan.Create("Settings/Settings_Rig_;Settings/Settings_Laser_?Optogenetics;BonsaiData/BonsaiData_Laser_?Optogenetics", null, n => null);
+                var laser = conditional.Entries[1];
+                Check("an entry with ?Subject keeps its path and names its condition", laser.Path == "Settings/Settings_Laser_" && laser.Condition == "Optogenetics" && conditional.Entries[0].Condition == null
+                    && string.Join(",", conditional.Conditions) == "Optogenetics", laser.Path + " ? " + laser.Condition);
+                Check("... and is not required before its subject sends a value, saying so", !conditional.Required(laser) && conditional.Required(conditional.Entries[0])
+                    && conditional.ConditionNotes().SequenceEqual(new[] { "Condition Optogenetics has sent no value, so Settings/Settings_Laser_, BonsaiData/BonsaiData_Laser_ not required." }), string.Join(" | ", conditional.ConditionNotes()));
+                conditional.SetCondition("Optogenetics", true);
+                Check("... is required while the subject's last value is true", conditional.Required(laser) && conditional.ConditionNotes().Count == 0, "not required");
+                conditional.SetCondition("Optogenetics", false);
+                Check("... and not once it is false", !conditional.Required(laser), "required");
+                conditional.ClearConditions();
+                Check("... and not after the values are cleared for a new run", !conditional.Required(laser), "required");
+                conditional.Unconditional("Optogenetics", "is not a subject published before ExperimentManifest");
+                Check("a condition the workflow does not publish as bool makes its entries required always, with a note", conditional.Required(laser) && laser.Condition == null
+                    && conditional.Notes.Contains("Condition Optogenetics is not a subject published before ExperimentManifest, so Settings/Settings_Laser_, BonsaiData/BonsaiData_Laser_ are expected always."), string.Join(" | ", conditional.Notes));
+                var badConditions = ExpectedPlan.Create("a.csv?;?Optogenetics;auto?Optogenetics;Camera-*/?Optogenetics", null, n => null);
+                Check("a condition with no subject, no path, on auto or on a wildcard is noted, not expected", badConditions.Entries.Count == 0 && badConditions.Notes.Count == 4
+                    && badConditions.Notes.All(n => n.EndsWith("then the name of a bool subject (Settings/Settings_Laser_?Optogenetics).")), string.Join(" | ", badConditions.Notes));
+                var section = ManifestWriter.ExpectedSection(ExpectedPlan.Create("Settings/Settings_Laser_?Optogenetics", null, n => null), new List<object>());
+                Check("each expected entry is path, why, condition, required, found", string.Join(",", ((JsonObject)section[0]).Select(p => p.Key)) == "path,why,condition,required,found", string.Join(",", ((JsonObject)section[0]).Select(p => p.Key)));
 
                 Console.WriteLine("ConfigRoot:");
                 var other = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", "--property:ConfigRoot=D:\\Test\\config" });

@@ -12,6 +12,8 @@ namespace OpenRigs.Manifest
     {
         public string Path;
         public string Why;
+        /// <summary>The bool subject the entry is required by (path?Subject), or null when it is always required.</summary>
+        public string Condition;
     }
 
     /// <summary>
@@ -39,7 +41,56 @@ namespace OpenRigs.Manifest
         public readonly List<ExpectedEntry> Entries = new List<ExpectedEntry>();
         public readonly List<string> Notes = new List<string>();
 
-        /// <param name="expectedFiles">ExpectedFiles: entries separated by ;, auto for the devices'.</param>
+        // Each condition's last value from its subject; absent until the subject has sent one.
+        readonly Dictionary<string, bool> conditionValues = new Dictionary<string, bool>(StringComparer.Ordinal);
+
+        /// <summary>The conditions the entries name, each once.</summary>
+        public List<string> Conditions
+        {
+            get { return Entries.Where(e => e.Condition != null).Select(e => e.Condition).Distinct(StringComparer.Ordinal).ToList(); }
+        }
+
+        public void ClearConditions()
+        {
+            lock (conditionValues) conditionValues.Clear();
+        }
+
+        public void SetCondition(string name, bool value)
+        {
+            lock (conditionValues) conditionValues[name] = value;
+        }
+
+        /// <summary>Whether the entry must leave a file now: always without a condition, else while its subject's last value is true.</summary>
+        public bool Required(ExpectedEntry entry)
+        {
+            if (entry.Condition == null) return true;
+            bool value;
+            lock (conditionValues) return conditionValues.TryGetValue(entry.Condition, out value) && value;
+        }
+
+        /// <summary>A condition the workflow does not publish as a bool subject: its entries are required always, which the overnight copy then holds them to.</summary>
+        public void Unconditional(string condition, string why)
+        {
+            var paths = Entries.Where(e => e.Condition == condition).Select(e => e.Path).ToList();
+            foreach (var entry in Entries.Where(e => e.Condition == condition)) entry.Condition = null;
+            Note("Condition " + condition + " " + why + ", so " + string.Join(", ", paths) + " " + (paths.Count == 1 ? "is" : "are") + " expected always.");
+        }
+
+        /// <summary>At each write: the conditions whose subject has sent no value yet, so their entries are not required.</summary>
+        public List<string> ConditionNotes()
+        {
+            var notes = new List<string>();
+            foreach (var condition in Conditions)
+            {
+                bool value;
+                bool known;
+                lock (conditionValues) known = conditionValues.TryGetValue(condition, out value);
+                if (!known) notes.Add("Condition " + condition + " has sent no value, so " + string.Join(", ", Entries.Where(e => e.Condition == condition).Select(e => e.Path)) + " not required.");
+            }
+            return notes;
+        }
+
+        /// <param name="expectedFiles">ExpectedFiles: entries separated by ;, auto for the devices'; path?Subject is required only while the bool subject Subject is true.</param>
         /// <param name="rigConfig">The rig.yml among ConfigFiles, its path resolved; null if there is none.</param>
         /// <param name="publishedType">The type a subject of this name is published as, or null.</param>
         public static ExpectedPlan Create(string expectedFiles, string rigConfig, Func<string, Type> publishedType)
@@ -51,13 +102,27 @@ namespace OpenRigs.Manifest
                 // The overnight copy (jacuzzi-ingest's ingest-rig) matches paths relative to the experiment folder, so ./ is dropped.
                 while (entry.StartsWith("./")) entry = entry.Substring(2);
                 if (entry.Length == 0) continue;
+                // path?Subject: required only while the bool subject is true (the workflow decides, the manifest records required).
+                string condition = null;
+                var mark = entry.LastIndexOf('?');
+                if (mark >= 0)
+                {
+                    condition = entry.Substring(mark + 1).Trim();
+                    entry = entry.Substring(0, mark).Trim();
+                    if (condition.Length == 0 || entry.Length == 0 || entry.IndexOfAny(new[] { '*', '?' }) >= 0
+                        || string.Equals(entry, Auto, StringComparison.OrdinalIgnoreCase) || string.Equals(entry, Harp, StringComparison.OrdinalIgnoreCase))
+                    {
+                        plan.Note("ExpectedFiles entry " + raw.Trim() + " is not expected: a condition is a path, ?, then the name of a bool subject (Settings/Settings_Laser_?Optogenetics).");
+                        continue;
+                    }
+                }
                 if (string.Equals(entry, Auto, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, false);
                 else if (string.Equals(entry, Harp, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, true);
                 // The overnight copy (jacuzzi-ingest's ingest-rig) matches a path or a folder, never a pattern: a wildcard would match nothing and hold the experiment back.
                 else if (entry.IndexOfAny(new[] { '*', '?' }) >= 0) plan.Note("ExpectedFiles entry " + entry + " is not expected: a wildcard is not a path. Name the folder (Camera-Overhead/) instead.");
                 else if (entry.StartsWith("/") || entry.Contains(":") || entry.Split('/').Contains(".."))
                     plan.Note("ExpectedFiles entry " + entry + " is not expected: it is not a path inside the experiment folder.");
-                else plan.Add(entry, "listed in ExpectedFiles");
+                else plan.Add(entry, "listed in ExpectedFiles", condition);
             }
             return plan;
         }
@@ -68,10 +133,10 @@ namespace OpenRigs.Manifest
             if (!Notes.Contains(note)) Notes.Add(note);
         }
 
-        void Add(string path, string why)
+        void Add(string path, string why, string condition = null)
         {
             if (Entries.Any(e => string.Equals(e.Path, path, StringComparison.OrdinalIgnoreCase))) return;
-            Entries.Add(new ExpectedEntry { Path = path, Why = why });
+            Entries.Add(new ExpectedEntry { Path = path, Why = why, Condition = condition });
         }
 
         // A folder for each device (auto), or each Harp device's record and register map (harp).
