@@ -198,6 +198,8 @@ jobs:
         run: |
           $zip = Join-Path $env:RUNNER_TEMP ffmpeg.zip
           Invoke-WebRequest https://github.com/GyanD/codexffmpeg/releases/download/8.0.1/ffmpeg-8.0.1-essentials_build.zip -OutFile $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($hash -ne 'E2AAEAA0FDBC397D4794828086424D4AAA2102CEF1FB6874F6FFD29C0B88B673') { throw "ffmpeg-8.0.1-essentials_build.zip has SHA256 $hash, not the pinned one" }
           Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP
           $bin = Join-Path $env:RUNNER_TEMP ffmpeg-8.0.1-essentials_build\bin
           if (-not (Test-Path (Join-Path $bin ffmpeg.exe))) { throw "ffmpeg.exe is not in $bin" }
