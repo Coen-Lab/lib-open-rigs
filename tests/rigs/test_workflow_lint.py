@@ -404,4 +404,10 @@ def test_the_shared_experiment_logs_are_the_lab_s_two_includes(tmp_path):
     assert lint.experiment_log_problems(workflow(tmp_path / "b", own)) == [
         "the workflow does not include LogLabExperiment once", "the workflow does not include LogControlEvents once",
         "the workflow includes LogController itself (LogLabExperiment does)", "the workflow logs Settings_Rig itself (LogLabExperiment does)"]
+    # LogLabExperiment is its own top-level node, before the hardware (every device's log waits for its PathPrefix).
+    gate = include(lint.READY_GATE)
+    assert lint.experiment_log_problems(workflow(tmp_path / "d", gate + both)) == ["LogLabExperiment comes after the hardware"]
+    grouped = f'<Expression xsi:type="GroupWorkflow"><Workflow><Nodes>{both}</Nodes><Edges /></Workflow></Expression>'
+    assert lint.experiment_log_problems(workflow(tmp_path / "e", grouped + gate)) == ["LogLabExperiment is not a top-level node of its own"]
+    assert lint.experiment_log_problems(workflow(tmp_path / "f", both + gate)) == []
     assert lint.expected_files_problems(workflow(tmp_path / "c", both + manifest_node("BonsaiData/BonsaiData_Async_;Settings/Settings_Rig_;Settings/Settings_Experiment_"))) == []

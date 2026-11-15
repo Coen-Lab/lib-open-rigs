@@ -88,7 +88,7 @@ These hold what every task does the same way, but stay in the task: their inputs
 | `Zapit.ConnectForTask` | `OpenRigs.Devices:Zapit.ConnectForTask.bonsai` | `TaskConfig`, `RigConfigs`, `SubjectId`, `ZapitReplies` | `Zapit.ConnectZapit` with the task file's `optogenetics.zapitConfigPath`, only when `optogenetics.useZapit` is true |
 | `Zapit.ZapitLogs` | `OpenRigs.Devices:Zapit.ZapitLogs.bonsai` | subjects `ZapitReplies`, `TaskConfig`, `Timestamp`, `PathPrefix` | `BonsaiData_ZapitReplies`, every reply from when it starts on the Harp clock, and `Settings_ZapitConditions`, the task's conditions file, in an optogenetics experiment. Place it in the experiment logs `PathPrefix` starts |
 
-The task keeps its trial log, its task file and its own logs, then `RecordHarpDevices` and `ExperimentManifest` last. `ExperimentManifest`'s `ConfigFiles` defaults to `{RigFiles}`: `rig.yml` under the launch's `ConfigRoot`, every path-like value in it, and the mouse's spout positions on a rig with `lickSpoutDefaultPosition`.
+`LogLabExperiment` is a top-level node of its own, after `ReadLabRig` and the node that publishes `RunSettings`, and before the hardware: every device's log waits for its `PathPrefix`, and Bonsai builds a subject's whole top-level node when a subscriber comes first, so inside a group that reads `Timestamp`, or after the pieces, it is defined in terms of itself (`experiment_log_problems`). The task keeps its trial log, its task file and its own logs, then `RecordHarpDevices` and `ExperimentManifest` last. `ExperimentManifest`'s `ConfigFiles` defaults to `{RigFiles}`: `rig.yml` under the launch's `ConfigRoot`, every path-like value in it, and the mouse's spout positions on a rig with `lickSpoutDefaultPosition`.
 
 ## Operators
 

@@ -535,6 +535,18 @@ def experiment_log_problems(wf: Workflow) -> list[str]:
                  if f'Path="OpenRigs.Logging:{name}.bonsai"' in wf.text]
     problems += [f"the workflow logs {name} itself (LogLabExperiment does)" for name in ("Settings_Rig", "Settings_Experiment")
                  if f"<Name>{name}</Name>" in wf.text]
+    # Every device's log waits for PathPrefix, and Bonsai builds a subject's whole top-level node when a subscriber comes
+    # first: LogLabExperiment inside a group with a Timestamp reader, or after the pieces, is defined in terms of itself.
+    top = nodes_and_edges(child(wf.root, W + "Workflow"))[0]
+    paths = [n.get("Path") for n in top]
+    log = f"OpenRigs.Logging:LogLabExperiment.bonsai"
+    if log in wf.text and log not in paths:
+        problems.append("LogLabExperiment is not a top-level node of its own")
+    elif log in paths:
+        first_piece = next((i for i, n in enumerate(top) for e in n.iter(W + "Expression")
+                            if e.get("Path") in set(PIECES) | set(RIG_LISTS) | {READY_GATE}), None)
+        if first_piece is not None and first_piece < paths.index(log):
+            problems.append("LogLabExperiment comes after the hardware")
     return problems
 
 
