@@ -32,6 +32,33 @@ namespace OpenRigs.Devices.Tests
             StringAssert.Contains(ex.Message, message);
         }
 
+        static Rigs.LabRig LabRig(string wiring)
+        {
+            return LabRigTests.Deserialize("behaviorBoard:\n  main:\n    portName: COM1\n    wiring:\n" + wiring);
+        }
+
+        [TestMethod]
+        public void FindsEveryLineWiredToTheDevice()
+        {
+            var rig = LabRig("      DO1: { device: RewardValve, side: left }\n      DO2: { device: RewardValve, side: right }\n      DO3: { device: ZapitTrigger }\n");
+            Assert.AreEqual(DigitalOutputs.DO1 | DigitalOutputs.DO2, WiredOutputs.Find(rig, "BehaviorBoard-Main", "RewardValve"));
+        }
+
+        [DataTestMethod]
+        [DataRow("      DO3: { device: ZapitTrigger }\n", "has no line with device RewardValve")]
+        [DataRow("      DO0: { device: RewardValve, side: left }\n", "puts a RewardValve on DO0")]
+        public void RefusesNoLineOrALineOffThePulseLines(string wiring, string message)
+        {
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => WiredOutputs.Find(LabRig(wiring), "BehaviorBoard-Main", "RewardValve"));
+            StringAssert.Contains(ex.Message, message);
+        }
+
+        [TestMethod]
+        public void RefusesABoardRigYmlLacks()
+        {
+            Assert.ThrowsException<System.Collections.Generic.KeyNotFoundException>(() => WiredOutputs.Find(LabRigTests.Deserialize("rootPath: x\n"), "BehaviorBoard-Main", "RewardValve"));
+        }
+
         [TestMethod]
         public void PulseLinesLoseTheHeldLine()
         {

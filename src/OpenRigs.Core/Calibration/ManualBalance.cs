@@ -89,7 +89,7 @@ namespace OpenRigs.Core.Calibration
     /// one is due is that burst's reading; one typed at any other time is refused, saying why.
     /// </summary>
     [Combinator]
-    [Description("A balance read by eye. Follows the procedure's bursts by the pulses fired (first input: the settings when the run starts; second: the (channel, size) pulse requests) and, once each burst has landed, asks for a weight in its Prompt: the baseline after priming, then each sample's. The next weight typed (third input: text in grams, such as 20.415 or 20.415 g) is that burst's reading. A weight typed when none is due, or text that is not a weight, is refused in the Prompt.")]
+    [Description("A balance read by eye. Follows the procedure's bursts by the pulses fired (first input: the settings when the run starts; second: the (channel, pulse width) pulse requests) and, once each burst has landed, asks for a weight in its Prompt: the baseline after priming, then each sample's. The next weight typed (third input: text in grams, such as 20.415 or 20.415 g) is that burst's reading. A weight typed when none is due, or text that is not a weight, is refused in the Prompt.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class ManualWeighing
     {
@@ -97,7 +97,7 @@ namespace OpenRigs.Core.Calibration
         {
             public string Name;
             public int Count;
-            public int Size;
+            public int PulseWidthMs;
             public int Gap;
         }
 
@@ -123,13 +123,13 @@ namespace OpenRigs.Core.Calibration
                 Func<string> dueText = () => index == 0
                     ? string.Format("Weigh Now: the baseline, the container's weight {0}.",
                         bursts[0].Count > 0 ? "after " + bursts[0].Count + " priming pulses" : "before any pulse")
-                    : string.Format("Weigh Now: {0}, after {1} pulses of {2} {3}.", bursts[index].Name, bursts[index].Count, bursts[index].Size, unit);
+                    : string.Format("Weigh Now: {0}, after {1} pulses of {2} {3}.", bursts[index].Name, bursts[index].Count, bursts[index].PulseWidthMs, unit);
                 Action land = () =>
                 {
                     // FirePulses completes once its last pulse has closed, so the drop has landed
                     // before the weighing starts; a little after that, the person is asked.
                     var burst = bursts[index];
-                    var wait = TimeSpan.FromMilliseconds(burst.Count > 0 ? burst.Size + burst.Gap + 250 : 250);
+                    var wait = TimeSpan.FromMilliseconds(burst.Count > 0 ? burst.PulseWidthMs + burst.Gap + 250 : 250);
                     timer.Disposable = Observable.Timer(wait).Subscribe(_ =>
                     {
                         lock (gate)
@@ -154,7 +154,7 @@ namespace OpenRigs.Core.Calibration
                         {
                             Name = "priming",
                             Count = p.PrimingPulses,
-                            Size = p.PrimingSize ?? p.Samples.Max(s => s.Size),
+                            PulseWidthMs = p.PrimingPulseWidthMs ?? p.Samples.Max(s => s.PulseWidthMs),
                             Gap = gap
                         });
                         for (int i = 0; i < p.Samples.Count; i++)
@@ -163,7 +163,7 @@ namespace OpenRigs.Core.Calibration
                             {
                                 Name = string.Format("sample {0} of {1}", i + 1, p.Samples.Count),
                                 Count = p.Samples[i].Repeats,
-                                Size = p.Samples[i].Size,
+                                PulseWidthMs = p.Samples[i].PulseWidthMs,
                                 Gap = p.Samples[i].PulseGapMs
                             });
                         }
@@ -182,7 +182,7 @@ namespace OpenRigs.Core.Calibration
                         if (pulse == null || bursts == null || due || index >= bursts.Count) return;
                         fired++;
                         var burst = bursts[index];
-                        say(string.Format("Firing {0}: pulse {1} of {2}, {3} {4}. Wait.", burst.Name, fired, burst.Count, burst.Size, unit));
+                        say(string.Format("Firing {0}: pulse {1} of {2}, {3} {4}. Wait.", burst.Name, fired, burst.Count, burst.PulseWidthMs, unit));
                         if (fired >= burst.Count) land();
                     }
                 }, observer.OnError));

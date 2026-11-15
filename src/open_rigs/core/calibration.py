@@ -100,32 +100,30 @@ class CalibrationCurve(Calibration):
 
 
 class DispenseSample(CalibrationSchema):
-    """One size to measure: the dispenser fires `repeats` times at it and the gain is weighed once.
+    """One pulse width to measure: the valve fires `repeats` pulses of it and the gain is weighed once.
     """
 
-    size: data_types.UShort = Field(
-        gt=0, description="The size to fire, in the procedure's x unit: milliseconds for a valve, steps for a pump."
-    )
-    repeats: int = Field(default=10, ge=1, description="Pulses fired at this size before the gain is weighed.")
+    pulse_width_ms: data_types.UShort = Field(gt=0, description="The width of each pulse fired, in milliseconds.")
+    repeats: int = Field(default=10, ge=1, description="Pulses fired at this width before the gain is weighed.")
     pulse_gap_ms: data_types.UShort = Field(
         default=500, description="Off-to-on time between consecutive pulses, in milliseconds; long enough for the valve to seat."
     )
 
 
 class DispenseProcedure(CalibrationSchema):
-    """Settings of the dispense calibration: fire known sizes, weigh the gain, write a CalibrationCurve.
+    """Settings of the dispense calibration: fire known pulse widths, weigh the gain, write a CalibrationCurve.
 
     Run by a calibration workflow; the fit is done afterwards in Python and written into the CalibrationCurve.
     """
 
-    samples: List[DispenseSample] = Field(min_length=2, description="Sizes to measure, each fired and weighed in turn.")
+    samples: List[DispenseSample] = Field(min_length=2, description="Pulse widths to measure, each fired and weighed in turn.")
     x_name: str = Field(default="pulse_width", description="Name of the quantity fired.")
-    x_unit: str = Field(default="ms", description="Unit of the sizes.")
+    x_unit: str = Field(default="ms", description="Unit of the quantity fired.")
     priming_pulses: int = Field(
         default=5, ge=0, description="Pulses fired before the baseline weighing to fill the line."
     )
-    priming_size: data_types.UShort | None = Field(
-        default=None, description="Size of the priming pulses; the largest sample size when unset."
+    priming_pulse_width_ms: data_types.UShort | None = Field(
+        default=None, description="Width of the priming pulses, in milliseconds; the largest sample's when unset."
     )
     density_g_per_ml: data_types.Double = Field(
         default=1.0, gt=0, description="Density used to turn the weighed grams into microlitres. Water = 1.0."

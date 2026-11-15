@@ -29,7 +29,7 @@ The calibration workflow replaces the file the rig reads on every run and keeps 
 
 ## Running a dispense calibration
 
-The experiment repository provides a workflow that wires its own hardware: for each sample it fires `repeats` pulses at one size with `FirePulses`, then waits with `WeighStable` for the balance to give `settleWindow` consecutive stable readings. Volume per pulse is the gain divided by the repeats and the density. Pick repeats so the gain per sample is at least fifty times the balance's last digit. The points, the gap and the fit go into the `CalibrationCurve`.
+The experiment repository provides a workflow that wires its own hardware: for each sample it fires `repeats` pulses of its `pulseWidthMs` with `FirePulses`, then waits with `WeighStable` for the balance to give `settleWindow` consecutive stable readings. Volume per pulse is the gain divided by the repeats and the density. Pick repeats so the gain per sample is at least fifty times the balance's last digit. The points, the gap and the fit go into the `CalibrationCurve`.
 
 ## The rig side
 

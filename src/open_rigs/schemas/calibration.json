@@ -164,10 +164,10 @@
       "type": "object"
     },
     "DispenseProcedure": {
-      "description": "Settings of the dispense calibration: fire known sizes, weigh the gain, write a CalibrationCurve.\n\nRun by a calibration workflow; the fit is done afterwards in Python and written into the CalibrationCurve.",
+      "description": "Settings of the dispense calibration: fire known pulse widths, weigh the gain, write a CalibrationCurve.\n\nRun by a calibration workflow; the fit is done afterwards in Python and written into the CalibrationCurve.",
       "properties": {
         "samples": {
-          "description": "Sizes to measure, each fired and weighed in turn.",
+          "description": "Pulse widths to measure, each fired and weighed in turn.",
           "items": {
             "$ref": "#/$defs/DispenseSample"
           },
@@ -183,7 +183,7 @@
         },
         "xUnit": {
           "default": "ms",
-          "description": "Unit of the sizes.",
+          "description": "Unit of the quantity fired.",
           "title": "XUnit",
           "type": "string"
         },
@@ -194,7 +194,7 @@
           "title": "PrimingPulses",
           "type": "integer"
         },
-        "primingSize": {
+        "primingPulseWidthMs": {
           "anyOf": [
             {
               "maximum": 65535,
@@ -206,8 +206,8 @@
             }
           ],
           "default": null,
-          "description": "Size of the priming pulses; the largest sample size when unset.",
-          "title": "PrimingSize"
+          "description": "Width of the priming pulses, in milliseconds; the largest sample's when unset.",
+          "title": "PrimingPulseWidthMs"
         },
         "densityGPerMl": {
           "default": 1.0,
@@ -238,19 +238,19 @@
       "type": "object"
     },
     "DispenseSample": {
-      "description": "One size to measure: the dispenser fires `repeats` times at it and the gain is weighed once.\n    ",
+      "description": "One pulse width to measure: the valve fires `repeats` pulses of it and the gain is weighed once.\n    ",
       "properties": {
-        "size": {
-          "description": "The size to fire, in the procedure's x unit: milliseconds for a valve, steps for a pump.",
+        "pulseWidthMs": {
+          "description": "The width of each pulse fired, in milliseconds.",
           "exclusiveMinimum": 0,
           "maximum": 65535,
           "minimum": 0,
-          "title": "Size",
+          "title": "PulseWidthMs",
           "type": "integer"
         },
         "repeats": {
           "default": 10,
-          "description": "Pulses fired at this size before the gain is weighed.",
+          "description": "Pulses fired at this width before the gain is weighed.",
           "minimum": 1,
           "title": "Repeats",
           "type": "integer"
@@ -265,7 +265,7 @@
         }
       },
       "required": [
-        "size"
+        "pulseWidthMs"
       ],
       "title": "DispenseSample",
       "type": "object"

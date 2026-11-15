@@ -56,8 +56,8 @@ def test_calibrated_pulse_names_only_its_artefact():
 
 
 def test_dispense_procedure_defaults():
-    procedure = DispenseProcedure(samples=[DispenseSample(size=20), DispenseSample(size=60)])
-    assert procedure.priming_size is None  # the procedure primes at the largest sample size
+    procedure = DispenseProcedure(samples=[DispenseSample(pulse_width_ms=20), DispenseSample(pulse_width_ms=60)])
+    assert procedure.priming_pulse_width_ms is None  # the procedure primes at the largest sample's width
     assert procedure.priming_pulses == 5
 
 
@@ -68,7 +68,7 @@ def test_balance_port_is_a_placeholder_until_run_time():
 
 def test_dispense_calibration_round_trips_through_yaml(tmp_path):
     settings = DispenseCalibration(
-        procedure=DispenseProcedure(samples=[DispenseSample(size=20, repeats=5), DispenseSample(size=40)]),
+        procedure=DispenseProcedure(samples=[DispenseSample(pulse_width_ms=20, repeats=5), DispenseSample(pulse_width_ms=40)]),
         balance=SerialBalance(print_period_s=1.0),
     )
     path = tmp_path / "valve-calibration.yml"

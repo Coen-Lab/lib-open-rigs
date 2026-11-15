@@ -12,7 +12,7 @@ namespace OpenRigs.Devices.Tests
     [TestClass]
     public class LabRigTests
     {
-        static LabRig Deserialize(string text)
+        internal static LabRig Deserialize(string text)
         {
             var process = typeof(DeserializeFromYaml).GetMethod("Process", BindingFlags.NonPublic | BindingFlags.Static).MakeGenericMethod(typeof(LabRig));
             return ((IObservable<LabRig>)process.Invoke(null, new object[] { Observable.Return(text) })).Wait();

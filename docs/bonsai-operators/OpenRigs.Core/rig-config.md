@@ -72,7 +72,7 @@ Three lines at the top of the workflow:
 2. `SubscribeSubject RigConfigDirectory`, then `ReadRigConfig`, then the generated `DeserializeFromYaml`, into an `AsyncSubject` named `RigConfig`.
 3. For each artefact: the relative path from `RigConfig`, zipped with `SubscribeSubject RigConfigDirectory`, into `ResolveRigFile`, then the consumer.
 
-The two subjects belong to the rig workflow, not the package, so each consumer subscribes to them itself.
+The two subjects belong to the rig workflow, not the package, so each consumer subscribes to them itself. For the lab rig model, `OpenRigs.Devices:ReadLabRig.bonsai` does steps 1 and 2 in one include, naming the model's subject `RigConfigs`.
 
 ---
 

@@ -11,9 +11,9 @@ namespace OpenRigs.Core.Tests
     [TestClass]
     public class DispenseOperatorTests
     {
-        static DispenseSample Sample(int size, int repeats = 4, int intervalMs = 2)
+        static DispenseSample Sample(int pulseWidthMs, int repeats = 4, int intervalMs = 2)
         {
-            return new DispenseSample { Size = size, Repeats = repeats, PulseGapMs = intervalMs };
+            return new DispenseSample { PulseWidthMs = pulseWidthMs, Repeats = repeats, PulseGapMs = intervalMs };
         }
 
         static IObservable<WeightMeasurement> Readings(double grams, bool stable = true, int periodMs = 5)
@@ -90,9 +90,9 @@ namespace OpenRigs.Core.Tests
             using (Observable.Interval(TimeSpan.FromMilliseconds(5)).Select(i => new WeightMeasurement(i, (float)grams[0], 1f)).Subscribe(readings))
             {
                 var weights = fireThenWeigh(60, procedure.PrimingPulses, 2)
-                    .Concat(procedure.Samples.Select(sample => fireThenWeigh(sample.Size, sample.Repeats, sample.PulseGapMs)).Concat());
+                    .Concat(procedure.Samples.Select(sample => fireThenWeigh(sample.PulseWidthMs, sample.Repeats, sample.PulseGapMs)).Concat());
                 var gains = weights.Publish(shared => shared.Skip(1).Zip(shared, (current, previous) => current - previous));
-                var points = gains.Zip(procedure.Samples.ToObservable(), (gain, sample) => Tuple.Create((double)sample.Size, gain / sample.Repeats / procedure.DensityGPerMl * 1000.0))
+                var points = gains.Zip(procedure.Samples.ToObservable(), (gain, sample) => Tuple.Create((double)sample.PulseWidthMs, gain / sample.Repeats / procedure.DensityGPerMl * 1000.0))
                     .ToList().Timeout(TimeSpan.FromSeconds(20)).Wait();
 
                 CollectionAssert.AreEqual(new[] { 20.0, 40.0, 60.0 }, points.Select(p => p.Item1).ToArray());

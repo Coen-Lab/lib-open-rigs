@@ -547,14 +547,14 @@ namespace OpenRigs.Core.Calibration
 
 
     /// <summary>
-    /// Settings of the dispense calibration: fire known sizes, weigh the gain, write a CalibrationCurve.
+    /// Settings of the dispense calibration: fire known pulse widths, weigh the gain, write a CalibrationCurve.
     ///
     ///Run by a calibration workflow; the fit is done afterwards in Python and written into the CalibrationCurve.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("Settings of the dispense calibration: fire known sizes, weigh the gain, write a C" +
-        "alibrationCurve.\n\nRun by a calibration workflow; the fit is done afterwards in P" +
-        "ython and written into the CalibrationCurve.")]
+    [System.ComponentModel.DescriptionAttribute("Settings of the dispense calibration: fire known pulse widths, weigh the gain, wr" +
+        "ite a CalibrationCurve.\n\nRun by a calibration workflow; the fit is done afterwar" +
+        "ds in Python and written into the CalibrationCurve.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class DispenseProcedure
@@ -568,7 +568,7 @@ namespace OpenRigs.Core.Calibration
     
         private int _primingPulses;
     
-        private int? _primingSize;
+        private int? _primingPulseWidthMs;
     
         private double _densityGPerMl;
     
@@ -593,19 +593,19 @@ namespace OpenRigs.Core.Calibration
             _xName = other._xName;
             _xUnit = other._xUnit;
             _primingPulses = other._primingPulses;
-            _primingSize = other._primingSize;
+            _primingPulseWidthMs = other._primingPulseWidthMs;
             _densityGPerMl = other._densityGPerMl;
             _settleWindow = other._settleWindow;
             _weighTimeoutS = other._weighTimeoutS;
         }
     
         /// <summary>
-        /// Sizes to measure, each fired and weighed in turn.
+        /// Pulse widths to measure, each fired and weighed in turn.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("samples", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="samples")]
-        [System.ComponentModel.DescriptionAttribute("Sizes to measure, each fired and weighed in turn.")]
+        [System.ComponentModel.DescriptionAttribute("Pulse widths to measure, each fired and weighed in turn.")]
         public System.Collections.Generic.List<DispenseSample> Samples
         {
             get
@@ -637,11 +637,11 @@ namespace OpenRigs.Core.Calibration
         }
     
         /// <summary>
-        /// Unit of the sizes.
+        /// Unit of the quantity fired.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("xUnit")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="xUnit")]
-        [System.ComponentModel.DescriptionAttribute("Unit of the sizes.")]
+        [System.ComponentModel.DescriptionAttribute("Unit of the quantity fired.")]
         public string XUnit
         {
             get
@@ -673,20 +673,20 @@ namespace OpenRigs.Core.Calibration
         }
     
         /// <summary>
-        /// Size of the priming pulses; the largest sample size when unset.
+        /// Width of the priming pulses, in milliseconds; the largest sample's when unset.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("primingSize")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="primingSize")]
-        [System.ComponentModel.DescriptionAttribute("Size of the priming pulses; the largest sample size when unset.")]
-        public int? PrimingSize
+        [Newtonsoft.Json.JsonPropertyAttribute("primingPulseWidthMs")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="primingPulseWidthMs")]
+        [System.ComponentModel.DescriptionAttribute("Width of the priming pulses, in milliseconds; the largest sample\'s when unset.")]
+        public int? PrimingPulseWidthMs
         {
             get
             {
-                return _primingSize;
+                return _primingPulseWidthMs;
             }
             set
             {
-                _primingSize = value;
+                _primingPulseWidthMs = value;
             }
         }
     
@@ -760,7 +760,7 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("XName = " + _xName + ", ");
             stringBuilder.Append("XUnit = " + _xUnit + ", ");
             stringBuilder.Append("PrimingPulses = " + _primingPulses + ", ");
-            stringBuilder.Append("PrimingSize = " + _primingSize + ", ");
+            stringBuilder.Append("PrimingPulseWidthMs = " + _primingPulseWidthMs + ", ");
             stringBuilder.Append("DensityGPerMl = " + _densityGPerMl + ", ");
             stringBuilder.Append("SettleWindow = " + _settleWindow + ", ");
             stringBuilder.Append("WeighTimeoutS = " + _weighTimeoutS);
@@ -783,18 +783,18 @@ namespace OpenRigs.Core.Calibration
 
 
     /// <summary>
-    /// One size to measure: the dispenser fires `repeats` times at it and the gain is weighed once.
+    /// One pulse width to measure: the valve fires `repeats` pulses of it and the gain is weighed once.
     ///    
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("One size to measure: the dispenser fires `repeats` times at it and the gain is we" +
-        "ighed once.\n    ")]
+    [System.ComponentModel.DescriptionAttribute("One pulse width to measure: the valve fires `repeats` pulses of it and the gain i" +
+        "s weighed once.\n    ")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class DispenseSample
     {
     
-        private int _size;
+        private int _pulseWidthMs;
     
         private int _repeats;
     
@@ -808,36 +808,35 @@ namespace OpenRigs.Core.Calibration
     
         protected DispenseSample(DispenseSample other)
         {
-            _size = other._size;
+            _pulseWidthMs = other._pulseWidthMs;
             _repeats = other._repeats;
             _pulseGapMs = other._pulseGapMs;
         }
     
         /// <summary>
-        /// The size to fire, in the procedure's x unit: milliseconds for a valve, steps for a pump.
+        /// The width of each pulse fired, in milliseconds.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("size", Required=Newtonsoft.Json.Required.Always)]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="size")]
-        [System.ComponentModel.DescriptionAttribute("The size to fire, in the procedure\'s x unit: milliseconds for a valve, steps for " +
-            "a pump.")]
-        public int Size
+        [Newtonsoft.Json.JsonPropertyAttribute("pulseWidthMs", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="pulseWidthMs")]
+        [System.ComponentModel.DescriptionAttribute("The width of each pulse fired, in milliseconds.")]
+        public int PulseWidthMs
         {
             get
             {
-                return _size;
+                return _pulseWidthMs;
             }
             set
             {
-                _size = value;
+                _pulseWidthMs = value;
             }
         }
     
         /// <summary>
-        /// Pulses fired at this size before the gain is weighed.
+        /// Pulses fired at this width before the gain is weighed.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("repeats")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="repeats")]
-        [System.ComponentModel.DescriptionAttribute("Pulses fired at this size before the gain is weighed.")]
+        [System.ComponentModel.DescriptionAttribute("Pulses fired at this width before the gain is weighed.")]
         public int Repeats
         {
             get
@@ -881,7 +880,7 @@ namespace OpenRigs.Core.Calibration
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
-            stringBuilder.Append("Size = " + _size + ", ");
+            stringBuilder.Append("PulseWidthMs = " + _pulseWidthMs + ", ");
             stringBuilder.Append("Repeats = " + _repeats + ", ");
             stringBuilder.Append("PulseGapMs = " + _pulseGapMs);
             return true;
