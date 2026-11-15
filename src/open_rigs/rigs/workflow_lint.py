@@ -489,3 +489,78 @@ def camera_log_problems(wf: Workflow) -> list[str]:
     logs = ET.tostring(wf.named("ExperimentLogs"), encoding="unicode")
     problems = [] if logs.count('Path="OpenRigs.Logging:LogCameras.bonsai"') == 1 else ["ExperimentLogs does not include LogCameras once"]
     return problems + (["the workflow logs a camera itself"] if "LogVideoFfmpeg.bonsai" in wf.text or "LogVideo.bonsai" in wf.text else [])
+
+
+# The blocks that write an experiment's files, and what each writes. A log's file is FormatFileName's
+# <LogName up to the first _>/<LogName>_<time>.<ext>, so the start of its path is known from its name.
+NAMED_LOGS = ("OpenRigs.Logging:LogData.bonsai", "OpenRigs.Logging:LogDataSchema.bonsai")  # the name is the node's LogName or Name
+FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is written, or None)]
+    "OpenRigs.Logging:LogTrial.bonsai": [("BonsaiData_Trial", None)],
+    "OpenRigs.Logging:LogAsync.bonsai": [("BonsaiData_Async", None)],
+    "OpenRigs.Devices:Zapit.ZapitLogs.bonsai": [("BonsaiData_ZapitReplies", "Optogenetics"), ("Settings_ZapitConditions", "Optogenetics")],
+}
+DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
+               "OpenRigs.Logging:LogCameras.bonsai", "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai",
+               "OpenRigs.Logging:LogRawVideo.bonsai", "OpenRigs.Devices:HarpLogs.bonsai")  # a device's folder: ExpectedFiles' auto
+NO_FILES = ("OpenRigs.Logging:LogController.bonsai", "OpenRigs.Logging:FormatFileName.bonsai")
+# Writers whose file the workflow's XML cannot name: a workflow logs through the blocks above instead.
+OTHER_WRITERS = {"CsvWriter", "MatrixWriter", "VideoWriter", "ImageWriter", "TextWriter", "BinaryWriter", "FileCapture",
+                 "MessageWriter", "ObjectWriter", "JsonWriter", "BinaryLogWriter", "FfmpegVideoWriter"}
+
+
+def log_prefix(name: str) -> str:
+    """The start of a log's path in the experiment folder, as FormatFileName makes it."""
+    return name.split("_", 1)[0] + "/" + name + "_"
+
+
+def expected_files_problems(wf: Workflow) -> list[str]:
+    """Every file the workflow writes is named in ExperimentManifest's ExpectedFiles, one entry per log
+    (the start of its path, not its folder: a folder is met by any one file in it), with the condition
+    its block writes it under (path?Subject); every named entry is a file the workflow writes; device
+    logs need auto and RecordHarpDevices needs harp. Empty without an ExperimentManifest."""
+    manifest = next((e for e in wf.root.iter(W + "Expression") if (e.get(XSI) or "").endswith(":ExperimentManifest")), None)
+    if manifest is None:
+        return []
+    raw = next((c.text or "" for c in manifest if c.tag.endswith("}ExpectedFiles")), "auto")
+    entries = {}
+    for item in (e.strip() for e in raw.split(";")):
+        if item:
+            path, _, condition = item.partition("?")
+            entries[path.strip()] = condition.strip() or None
+    writes, problems, devices, harp = {}, [], False, False
+    for node in wf.root.iter(W + "Expression"):
+        kind, include = node.get(XSI) or "", node.get("Path") or ""
+        inner = next((c for c in node if c.tag == W + "Combinator"), None)  # a Combinator node's type is its child's
+        local = (inner.get(XSI) if kind == "Combinator" and inner is not None else kind).split(":")[-1]
+        if include in NAMED_LOGS:
+            name = next((c.text for c in node if c.tag in (W + "LogName", W + "Name") and c.text), None)
+            if name is None:
+                problems.append(f"{include} has no LogName written in the workflow, so the file it writes cannot be named")
+            else:
+                writes[log_prefix(name)] = None
+        elif include in FIXED_LOGS:
+            writes.update({log_prefix(name): condition for name, condition in FIXED_LOGS[include]})
+        elif include in DEVICE_LOGS:
+            devices = True
+        elif local == "RecordHarpDevices":
+            harp = True
+        elif include.startswith("OpenRigs.Logging:") and include not in NO_FILES:
+            problems.append(f"{include} writes files this check does not know: add it to workflow_lint's writers")
+        elif local in OTHER_WRITERS:
+            problems.append(f"a {local} node writes a file the workflow's XML cannot name: log through OpenRigs.Logging's LogData")
+    for prefix, condition in writes.items():
+        entry = prefix + ("?" + condition if condition else "")
+        if prefix not in entries:
+            folder = prefix.split("/", 1)[0] + "/"
+            problems.append(f"{entry} is written but not in ExpectedFiles" + (f" (name it, not {folder})" if folder in entries else ""))
+        elif entries[prefix] != condition:
+            problems.append(f"ExpectedFiles names {prefix}" + (f"?{entries[prefix]}" if entries[prefix] else "") + f"; its block writes it as {entry}")
+    for path in entries:
+        if path in ("auto", "harp") or path in writes:
+            continue
+        problems.append(f"ExpectedFiles names {path}, which no node in the workflow writes" + (" (name each log instead)" if path.endswith("/") else ""))
+    if devices and "auto" not in entries:
+        problems.append("the workflow logs devices but ExpectedFiles has no auto")
+    if harp and "harp" not in entries:
+        problems.append("the workflow has RecordHarpDevices but ExpectedFiles has no harp")
+    return problems

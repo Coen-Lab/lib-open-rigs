@@ -174,3 +174,68 @@ def test_a_fixed_width_pulse_on_a_reward_valve_is_refused_and_a_calibrated_one_i
                + line.format(1) + send.format("TriggerValve"))
     assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "f", renamed, '<Edge From="1" To="2" Label="Source1" />'), valves) == [
         "TriggerValve fires a fixed-width pulse on DO1, a RewardValve"]
+
+
+MF = 'xmlns:mf="clr-namespace:OpenRigs.Manifest;assembly=OpenRigs.Manifest"'
+
+
+def manifest_node(expected: str) -> str:
+    return f'<Expression xsi:type="mf:ExperimentManifest" {MF}><mf:ExpectedFiles>{expected}</mf:ExpectedFiles></Expression>'
+
+
+def include(path: str, inner: str = "") -> str:
+    return f'<Expression xsi:type="IncludeWorkflow" Path="{path}">{inner}</Expression>'
+
+
+LOGS = (include("OpenRigs.Logging:LogTrial.bonsai") + include("OpenRigs.Logging:LogAsync.bonsai")
+        + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Rig</Name>")
+        + include("OpenRigs.Logging:LogData.bonsai", "<LogName>BonsaiData_StimulusState</LogName>")
+        + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai") + include("OpenRigs.Devices:HarpLogs.bonsai")
+        + '<Expression xsi:type="hd:RecordHarpDevices" xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices" />')
+EXPECTED = ("auto;harp;Settings/Settings_Rig_;BonsaiData/BonsaiData_Trial_;BonsaiData/BonsaiData_Async_;BonsaiData/BonsaiData_StimulusState_;"
+            "BonsaiData/BonsaiData_ZapitReplies_?Optogenetics;Settings/Settings_ZapitConditions_?Optogenetics")
+
+
+def test_every_file_a_workflow_writes_is_named_in_expected_files_with_its_condition(tmp_path):
+    assert lint.expected_files_problems(workflow(tmp_path, LOGS + manifest_node(EXPECTED))) == []
+
+
+def test_a_folder_entry_in_place_of_each_log_is_refused(tmp_path):
+    folder = EXPECTED.replace("BonsaiData/BonsaiData_Trial_;BonsaiData/BonsaiData_Async_;", "BonsaiData/;")
+    assert lint.expected_files_problems(workflow(tmp_path, LOGS + manifest_node(folder))) == [
+        "BonsaiData/BonsaiData_Trial_ is written but not in ExpectedFiles (name it, not BonsaiData/)",
+        "BonsaiData/BonsaiData_Async_ is written but not in ExpectedFiles (name it, not BonsaiData/)",
+        "ExpectedFiles names BonsaiData/, which no node in the workflow writes (name each log instead)"]
+
+
+def test_a_log_written_under_a_condition_must_be_named_with_it(tmp_path):
+    unconditional = EXPECTED.replace("Settings/Settings_ZapitConditions_?Optogenetics", "Settings/Settings_ZapitConditions_")
+    assert lint.expected_files_problems(workflow(tmp_path, LOGS + manifest_node(unconditional))) == [
+        "ExpectedFiles names Settings/Settings_ZapitConditions_; its block writes it as Settings/Settings_ZapitConditions_?Optogenetics"]
+
+
+def test_an_entry_no_node_writes_and_missing_auto_or_harp_are_refused(tmp_path):
+    stale = EXPECTED.replace("auto;harp;", "") + ";Settings/Settings_Old_"
+    assert lint.expected_files_problems(workflow(tmp_path, LOGS + manifest_node(stale))) == [
+        "ExpectedFiles names Settings/Settings_Old_, which no node in the workflow writes",
+        "the workflow logs devices but ExpectedFiles has no auto",
+        "the workflow has RecordHarpDevices but ExpectedFiles has no harp"]
+
+
+def test_a_writer_whose_file_the_workflow_cannot_name_is_refused(tmp_path):
+    writer = '<Expression xsi:type="Combinator"><Combinator xsi:type="io:CsvWriter" xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System" /></Expression>'
+    unnamed = include("OpenRigs.Logging:LogData.bonsai")
+    assert lint.expected_files_problems(workflow(tmp_path, LOGS + writer + unnamed + manifest_node(EXPECTED))) == [
+        "a CsvWriter node writes a file the workflow's XML cannot name: log through OpenRigs.Logging's LogData",
+        "OpenRigs.Logging:LogData.bonsai has no LogName written in the workflow, so the file it writes cannot be named"]
+
+
+def test_a_workflow_without_a_manifest_has_nothing_to_name(tmp_path):
+    assert lint.expected_files_problems(workflow(tmp_path, LOGS)) == []
+
+
+def test_the_fixed_logs_are_the_names_their_blocks_write():
+    for path, logs in lint.FIXED_LOGS.items():
+        package, resource = path.split(":")
+        text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
+        assert all(f">{name}<" in text for name, _ in logs), path
