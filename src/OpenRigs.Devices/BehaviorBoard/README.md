@@ -20,17 +20,14 @@ The [behavior board](https://github.com/harp-tech/device.behavior) is a highly c
 - **Clock sync input** and USB serial communication  
 For full hardware specs and configuration details, see the [official repository](https://github.com/harp-tech/device.behavior).
 
-### Input and Output `Subjects`
-| **Property Name**       | **Input/Output** | **Description**                                                           |
-|-------------------------|------------------|---------------------------------------------------------------------------|
-| `CommandsSubjectName`   | Input            | The name of the input subject that sends commands to the device.          |
-| `EventsSubjectName`     | Output           | The name of the subject that receives event messages from the device.     |
-### Configuration Parameters
-| **Property Name**       | **Input/Output** | **Description**                                                           |
-|-------------------------|------------------|---------------------------------------------------------------------------|
-| `PortName`              | Input            | Serial port used to communicate with the device (e.g., COM14).            |
-| `DumpRegisters`         | Input            | Whether to dump register values from the device at startup.               |
-| `Heartbeat`             | Input            | Whether to enable heartbeat messages from the device.                     |
+### Properties
+| **Property Name**       | **Description**                                                           |
+|-------------------------|---------------------------------------------------------------------------|
+| `Name`                  | The board's name, `BehaviorBoard-<Entry>`: its entry under `behaviorBoard` in rig.yml, its `AsyncSubject` and its log. The port comes from the entry's `portName`. |
+| `CommandsSubjectName`   | The subject that sends commands to the board, `<Name>.Commands`.          |
+| `DataSubjectName`       | The subject that receives the board's messages, `<Name>.Data`.            |
+
+The line pieces in this folder (`PulseOutputs`, `ZapitTriggerLine`, `RunningWheel`, `ClockFromBoard`) take the board's `Name` as `Board` and its two subjects as `BoardCommandsSubjectName` and `BoardDataSubjectName`.
 ## Dependencies
 ### Bonsai:
 

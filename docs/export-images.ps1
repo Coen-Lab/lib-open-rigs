@@ -41,8 +41,8 @@ function Render-Referenced-Workflows {
     foreach ($mdFile in Get-ChildItem -Path (Join-Path $PSScriptRoot 'bonsai-operators') -Filter '*.md' -Recurse -File) {
         $content = Get-Content $mdFile.FullName -Raw
         foreach ($m in [regex]::Matches($content, $pattern)) {
-            $svgRelPath    = $m.Groups[1].Value   # e.g. assets/workflows/devices/ArduinoLedDriver.svg
-            $bonsaiRelPath = $m.Groups[2].Value   # e.g. src/OpenRigs.Devices/ArduinoLedDriver.bonsai
+            $svgRelPath    = $m.Groups[1].Value   # e.g. assets/workflows/devices/LicketySplit.svg
+            $bonsaiRelPath = $m.Groups[2].Value   # e.g. src/OpenRigs.Devices/LicketySplit.bonsai
 
             $svgPath    = if ($OutputFolder) {
                 Join-Path $OutputFolder $svgRelPath

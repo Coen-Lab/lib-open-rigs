@@ -44,37 +44,16 @@ timestamp_generator:
 ## Bonsai workflow
 
 :::workflow
-![TimestampGeneratorGen3](~/assets/workflows/devices/TimestampGeneratorGen3.svg){data-bonsai="~/src/OpenRigs.Devices/TimestampGeneratorGen3.bonsai"}
+![ClockFromTimestampGenerator](~/assets/workflows/devices/ClockFromTimestampGenerator.svg){data-bonsai="~/src/OpenRigs.Devices/ClockFromTimestampGenerator.bonsai"}
 :::
 
-The workflow has three logical sections.
-
-### 1. Initialization sequence
-
-On startup the workflow synchronizes the PC clock to the Harp hardware clock (`SynchronizeTimestamp`), waits for that to complete (`Take(1)`), then sends a write command to configure the timer frequency after a 100 ms delay. `Concat` sequences these two messages so the timer is only configured after synchronization and we do not risk concurrent write messages clashing at the same time. The sequence ends in a `MulticastSubject` that pushes both messages into the commands subject described below, rather than into the `Device` node directly. Depending on how hardware is configured, timestamps before 100ms may be incorrect or at an incorrect frequency.
-
-### 2. Device, commands and event bus
-
-The `Device` node opens the serial connection to the Timestamp Generator. Its input is a `BehaviorSubject` of `HarpMessage` named `TimestampGeneratorCommands` (overridable via `CommandsSubjectName`), so any part of the workflow can send a command to the device with a `MulticastSubject` of that name. The initialization sequence uses the same route. The device emits all incoming Harp messages as an output stream, published to a named `PublishSubject` (`ClockSynchronizerEvents` by default, overridable via `EventsSubjectName`). A subscription to this subject allows access to these events elsewhere in the workflow.
-
-Three device properties are externalized so they can be set from the rig configuration: `PortName`, intended to be set from the configuration YAML, and `DumpRegisters` and `Heartbeat`, set in the workflow.
-
-### 3. Timestamps group
-
-The `Timestamps` nested workflow subscribes to the same events subject and derives two outputs:
-
-:::workflow
-![TimestampGeneratorGen3 Timestamps](~/workflows/TimestampGeneratorGen3_Timestamps.bonsai)
-:::
-
-- **`Heartbeats` subject** - the raw once-per-second `TimestampSeconds` event stream, useful for monitoring clock health and sychronization across devices.
-- **`Timebase` subject** - the running time since the workflow was started. The `Timer` register is parsed on every event; the first value is captured with `Take(1)` and held as the reference point. `WithLatestFrom` pairs each subsequent timer value with that reference, and `Subtract` computes the elapsed time since start. 
+`ClockFromTimestampGenerator` is the rig's clock from the generator, one of the two clocks a workflow can have (the other is the Behavior board's own, [`ClockFromBoard`](behavior-board.md#clockfromboard)); a workflow has exactly one. Its `Name` is `TimestampGeneratorGen3-<Entry>`, its entry under `timestampGeneratorGen3` in `rig.yml`. It opens the generator on its `portName` behind `<Name>.Data` and `<Name>.Commands` and logs it as `<Name>`. It sets the generator's clock to the PC's UTC time and re-sends the write at each heartbeat until one agrees within 2 s (`SetHarpClock`), and writes `rig.yml`'s `timerFrequency`. It publishes `Timestamp` (the generator's timer, in Harp seconds) and `HarpClockSet` (the first `Timestamp` within 2 s of UTC), and announces `HarpClockSet` into `ReadyStages`. `HarpClockSet` itself is declared by `ReadyGate`, which comes before every device, as each device's log waits for it. The workflow stops, naming the generator, if its clock is not set within 10 s or its heartbeats stop for 3 s.
 
 ---
 
 ## Using the timebase in other modules
 
-To stamp data from a non-Harp device with the hardware clock, subscribe to the `Timestamp` subject from the `Timestamps` group, pair it with your data stream using `WithLatestFrom`, then pass the result to `CreateTimestamped`:
+To stamp data from a non-Harp device with the hardware clock, subscribe to `Timestamp`, pair it with your data stream using `WithLatestFrom`, then pass the result to `CreateTimestamped`:
 
 > **Note:** Unlike native Harp devices, this timestamp is assigned in software when the event arrives on the PC, not in hardware at the moment of acquisition. It is therefore subject to PC scheduling jitter and USB latency. For applications requiring sub-millisecond timing accuracy, use a Harp device directly.
 

@@ -6,16 +6,12 @@ The Triggered Spinnaker is a Bonsai wrapper around a FLIR/Spinnaker SDK camera o
 
 ## .NET type
 
-Unlike the other devices in this section, `TriggeredSpinnaker` is implemented as a C# Bonsai operator and is fully covered by the API reference. See [OpenRigs.Video.TriggeredSpinnaker](xref:OpenRigs.Video.TriggeredSpinnaker) for the property list, frame output type, and method signatures.
-
-The `.bonsai` file in `src/OpenRigs.Devices/` is a thin reusable group around the operator, exposing the camera index and stream subject names as externalized properties so the same module can drive multiple cameras on the rig.
+`TriggeredSpinnaker` is a C# Bonsai operator, covered by the API reference: see [OpenRigs.Video.TriggeredSpinnaker](xref:OpenRigs.Video.TriggeredSpinnaker). Its `Name` identifies the camera: once the camera is streaming it announces `Name` to `CamerasOpen`, and `CameraLiveSetting` finds a running camera by it. A blank `PixelFormat` keeps the format stored on the camera, so a rig states it. Its triggered output pairs each frame with its trigger pulse's Harp time in order and leaves a dropped frame as a gap in `frameId`, the later times kept.
 
 ---
 
 ## Bonsai workflow
 
-:::workflow
-![TriggeredSpinnaker](~/assets/workflows-static/devices/TriggeredSpinnaker.svg){data-bonsai="~/assets/workflows-static/devices/TriggeredSpinnaker.bonsai"}
-:::
+`OpenRigs.Devices:SpinnakerCamera.bonsai` is the camera's device piece (see [Building Blocks](../../articles/building-blocks.md)). Its `Name` (`Camera-<Entry>`) picks the camera's entry under `camera` in `rig.yml` (`serialNumber`, `exposureTime`, `gain`, `binning`, `pixelFormat`). Its trigger is the Behavior board `Board`'s camera trigger whose `wiring` line (device `CameraTrigger`, DO0 or DO1) names it in `targets`; the workflow stops at Start, naming the camera, unless exactly one enabled trigger names it and its exposure fits the trigger period with 1 ms to spare (`CameraTrigger`). The board's `CameraTriggers` core include starts the triggers once every camera has announced itself, so no camera misses the first trigger. Frames are paired with the board's trigger Event messages only (`CameraTriggerPulses`) and published on `<Name>.Data`; the first frame announces `<Name>` into `ReadyStages`. No frame for 15 s stops the workflow, naming the camera (`GapWatchdog`). The piece logs its own video with `LogVideoFfmpeg` as `<Name>`, every frame from the first, at the trigger's frequency. `CameraLiveControls` adds a camera's exposure and gain as live experiment parameters.
 
-The workflow instantiates the `TriggeredSpinnaker` operator with the configured camera index, publishes the frame stream on a named subject, and forwards each frame's `VideoDataFrame` to downstream consumers (display, encoders, writers). Combine this module with a Behavior Board `CameraTriggerController` to produce a deterministic, Harp-timestamped video stream.
+The include needs the Spinnaker SDK to load, so it has no rendered image here.

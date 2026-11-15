@@ -64,13 +64,11 @@ class Rig(...):
 ![BehaviorBoard](~/assets/workflows/devices/BehaviorBoard/BehaviorBoard.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/BehaviorBoard.bonsai"}
 :::
 
-The top-level workflow opens the Harp serial connection, publishes the raw event stream on a named subject, and routes events into the nested sub-workflows below. Each sub-workflow exposes its own subject names so downstream nodes can subscribe to just the streams they need.
+`BehaviorBoard` is the board's device piece (see [Building Blocks](../../articles/building-blocks.md)): `Name` (`BehaviorBoard-<Entry>`) picks its entry under `behaviorBoard` in `rig.yml`, published as the `AsyncSubject` `<Name>`. It opens the board on its `portName` behind `<Name>.Data` and `<Name>.Commands` (a `BehaviorSubject`, so a per-trial graph that sends a command and completes leaves it open) and logs the board as `<Name>` once the experiment folder exists and the Harp clock is set. However the workflow stops, it clears the lines `wiring` gives a `ZapitTrigger` once the board has closed its port (`ClearOutputsOnStop`). The board's lines are driven by the line pieces below, each taking the board's `Name` as `Board`.
 
-## Sub-operators
+## Line pieces
 
-Sub-operators are nested workflows within the Behavior Board that interface with the device to configure and expose specific hardware functions. Each sub-operator subscribes to the shared event stream published by the top-level workflow and routes commands or data to its designated hardware module. They can be enabled or disabled independently via the Python schema, and each exposes its own named subjects so downstream nodes can subscribe to only the streams they need.
-
-### PulseController
+### PulseController and PulseOutputs
 
 :::workflow
 ![PulseController](~/assets/workflows/devices/BehaviorBoard/PulseController.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/PulseController.bonsai"}
@@ -85,13 +83,19 @@ Two trigger subjects, one per kind of line:
 
 Both subject names are externalized, so a rig can rename them to match its own.
 
+`PulseOutputs` (`BehaviorBoard.PulseOutputs.bonsai`) is the piece around it: it pulse-enables the lines `rig.yml`'s `outputPulseEnable` names without the ZapitTrigger's (`PulseEnabledLines`), and stops the workflow at Start if a line `wiring` gives a `RewardValve` is not pulse-enabled, as a reward would then open the valve and leave it open. `DeliverReward` and `ManualRewards` send rewards through it ([Building Blocks](../../articles/building-blocks.md#task-side-includes)).
+
+### ZapitTriggerLine
+
+`BehaviorBoard.ZapitTriggerLine.bonsai` publishes the line `wiring` gives the `ZapitTrigger` as the `AsyncSubject` `ZapitTriggerLine`, which Zapit's trials hold high. It is never pulsed, and the board piece clears it at stop. Stops the workflow at Start unless exactly one line on the board has the `ZapitTrigger` and it is DO1, DO2 or DO3.
+
 ### CameraTriggerController
 
 :::workflow
 ![CameraTriggerController](~/assets/workflows/devices/BehaviorBoard/CameraTriggerController.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/CameraTriggerController.bonsai"}
 :::
 
-Emits camera trigger pulses on `CameraOutput0` and `CameraOutput1` at the configured frequencies. Pair with a triggered camera module (such as [Triggered Spinnaker](triggered-spinnaker.md)) to align video to the Harp clock.
+Emits camera trigger pulses on `CameraOutput0` and `CameraOutput1` at the configured frequencies, started by `StartCameras`. The lab's `CameraTriggers` core include opens it with `rig.yml`'s `cameraTriggerController` and sends `StartCameras` once every camera has begun acquiring; each camera takes the trigger whose `CameraTrigger` wiring line names it (see [Triggered Spinnaker](triggered-spinnaker.md)).
 
 ### RunningWheel
 
@@ -99,12 +103,12 @@ Emits camera trigger pulses on `CameraOutput0` and `CameraOutput1` at the config
 ![RunningWheel](~/assets/workflows/devices/BehaviorBoard/RunningWheel.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/RunningWheel.bonsai"}
 :::
 
-Reads the rotary encoder and converts counts into wheel speed and distance using `counts_per_rev` and `wheel_diameter_mm` from the rig configuration.
+Once the board sends its first message, enables the encoder on port 2 in position mode and zeroes it, in that order, then publishes the distance run, in cm, on `WheelDistanceSubjectName`, from the board's `runningWheel.countsPerRev` and `runningWheel.wheelDiameterMm` in `rig.yml`.
 
-### Timestamps
+### ClockFromBoard
 
 :::workflow
-![Timestamps](~/assets/workflows/devices/BehaviorBoard/Timestamps.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/Timestamps.bonsai"}
+![ClockFromBoard](~/assets/workflows/devices/BehaviorBoard/ClockFromBoard.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/ClockFromBoard.bonsai"}
 :::
 
-Derives a hardware-clock timebase from the Behavior Board's event stream and publishes it on a named subject. Other modules can use `WithLatestFrom` against this subject to stamp their own data with the Harp clock, keeping all rig data on a single timebase.
+The rig's clock from the board's own Harp clock, for a rig with no timestamp generator; a workflow has exactly one clock. Sets the board's clock to the PC's UTC time and re-sends the write at each heartbeat until one agrees (`SetHarpClock`: a write is lost about one start in four), publishes `Timestamp` (each heartbeat's time) and `HarpClockSet`, and announces `HarpClockSet` into `ReadyStages`. Without it the board counts from power-on, and every Harp time and file name follows that count (1904). Stops the workflow, naming the board, if its clock is not set within 10 s or its heartbeats stop for 3 s.

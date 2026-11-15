@@ -42,7 +42,7 @@ videoEncoder:
   ffmpegPath: D:\Tools\ffmpeg\bin\ffmpeg.exe   # optional
 ```
 
-Without `videoEncoder`, or without a `rig.yml`, the writer uses `libx264` and the first `ffmpeg.exe` on PATH. `libx264` runs anywhere but takes about three cores for three 1440 x 1080 cameras at 50 Hz, so a rig with a GPU or Quick Sync should name its encoder. `ffmpegPath` is for a machine where the account that runs Bonsai does not have FFmpeg on its PATH; `winget install Gyan.FFmpeg` puts it on the installing user's PATH. If `ffmpeg.exe` is not found, or `codec` or another key is not one the writer knows, the workflow stops at Start with an error naming it. The workflow's rig model must know the key too (`open_rigs.rigs.lab_rig`'s `LabRig` and `BehaviourBoxRig` do), so update the workflow before adding `videoEncoder` to a rig's `rig.yml`.
+Without `videoEncoder`, or without a `rig.yml`, the writer uses `libx264` and the first `ffmpeg.exe` on PATH. `libx264` runs anywhere but takes about three cores for three 1440 x 1080 cameras at 50 Hz, so a rig with a GPU or Quick Sync should name its encoder. `ffmpegPath` is for a machine where the account that runs Bonsai does not have FFmpeg on its PATH; `winget install Gyan.FFmpeg` puts it on the installing user's PATH. If `ffmpeg.exe` is not found, or `codec` or another key is not one the writer knows, the workflow stops at Start with an error naming it. The lab rig model (`open_rigs.rigs.lab_rig`'s `LabRig`) knows it.
 
 Every codec writes H.264 with no B-frames and a keyframe every two seconds, at a constant quality (`-cq 20` on NVENC, `-global_quality 20` on Quick Sync, `-crf 20` on libx264), so a noisy camera costs bytes rather than frames.
 

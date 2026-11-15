@@ -26,6 +26,13 @@ DocFX will print a `http://localhost:8080`-style URL. Open it to preview the sit
 
 To also render workflow images (requires Bonsai on Windows), run `pwsh docs/build.ps1` instead.
 
+## Adding a rig or a device
+
+A workflow builds its rig from device pieces, one include per device instance ([Building Blocks](docs/articles/building-blocks.md)).
+
+- **A new rig of devices the lab already has:** give the rig its `rig.yml` with an entry per device, then in its workflow include `ReadLabRig` (set `ConfigRoot`), `ReadyGate`, one clock (`ClockFromTimestampGenerator` or `ClockFromBoard`), one piece per device with its `Name` set, and `CameraTriggers` if it has a camera. Set `ReadyWaitsFor` to the stages the pieces announce. Run `scripts\check-workflow.ps1` and the workflow's tests: `workflow_lint.hardware_problems` names anything missing or misnamed. No new hardware code. When a second task runs on the same rig kind, move its pieces into a rig list include beside `DomeHardware`, and add it to `RIG_LISTS` and `SIGNATURES` in `workflow_lint.py`.
+- **A new kind of device:** add its part to the rig model (`src/open_rigs/components/`, then `uv run regenerate-lab-rig`), and write its piece in `OpenRigs.Devices`: one externalised `Name` mapped to `RigDevice`, its `AsyncSubject` and its log (`LogHarpDevice` for a Harp device), `CommandsSubjectName` and `DataSubjectName` defaulting empty, a refusal at Start naming what is missing, and an `AnnounceStage` into `ReadyStages` if a task must wait for it. Teach `workflow_lint` its file and subjects, and add it to the acceptance fixture in `tests/rigs/test_workflow_lint.py`.
+
 ## Python workflow
 
 ```bash

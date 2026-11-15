@@ -8,21 +8,19 @@
     href: OpenRigs.Core/rig-config.md
 - name: OpenRigs.Devices
   items:
-  - name: Arduino LED Driver
-    href: OpenRigs.Devices/arduino-led-driver.md
   - name: Behavior Board
     href: OpenRigs.Devices/behavior-board.md
     items:
-    - name: PulseController
-      href: OpenRigs.Devices/behavior-board.md#pulsecontroller
+    - name: PulseController and PulseOutputs
+      href: OpenRigs.Devices/behavior-board.md#pulsecontroller-and-pulseoutputs
     - name: CameraTriggerController
       href: OpenRigs.Devices/behavior-board.md#cameratriggercontroller
     - name: RunningWheel
       href: OpenRigs.Devices/behavior-board.md#runningwheel
-    - name: Timestamps
-      href: OpenRigs.Devices/behavior-board.md#timestamps
-  - name: Harp Lick Spout Stage
-    href: OpenRigs.Devices/harp-lick-spout-stage.md
+    - name: ZapitTriggerLine
+      href: OpenRigs.Devices/behavior-board.md#zapittriggerline
+    - name: ClockFromBoard
+      href: OpenRigs.Devices/behavior-board.md#clockfromboard
   - name: Harp Timestamp Generator Gen3
     href: OpenRigs.Devices/harp-timestamp-generator-gen3.md
   - name: Lick Spout Stage

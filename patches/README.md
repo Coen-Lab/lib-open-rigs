@@ -63,6 +63,12 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `7572616` | Logging (.9) | `BinaryLogWriter` writes `LogHarp` and `LogHarpDemux`'s `.bin` files in place of `MatrixWriter`, on a foreground thread that keeps headless Bonsai open until each file is closed: `MatrixWriter`'s background thread died when Bonsai exited, so a log could lose its last messages or never be created (`LogHarpTests` failed in 9 of 20 runs under parallel load, none of 20 with it) | Not reported |
 | `87dd494` | Logging (.12), Devices (.13) | `LogCameras` (each camera `RigHardware` opens, logged by `LogVideoFfmpeg`) and `Zapit.ZapitLogs` | Lab-only |
 | `1f4c719`, `d5b3ea7` | Core (.17), Devices (.17), Audio (.9), Python | `RigHardware` reports Ready once every stage its `ReadyWaitsFor` names has come (`HarpClockSet, SpoutsHomed` by default), and `SpeakerMixer` multicasts `MixerStarted` into `RigHardware`'s `ReadyStages` once the mixer has started, so a workflow with speakers sets `ReadyWaitsFor` to `HarpClockSet, SpoutsHomed, MixerStarted` and Go waits for the mixer; `StartupWatchdog` emits its last stage when complete; rig.yml's `speakerArray.device.bootDelaySeconds` and SerialBalance's `bootDelaySeconds` (were `bootDelay`, `bootDelayS`); no per-speaker `gain`; `DispenseSample.pulses` (was `repeats`); `workflow_lint.fixed_width_pulses_on_reward_valves` | Lab-only |
+| `74582c1` to `83a15fc` | Core (.18), Devices (.18), Video (.16), Logging (.14), Audio (.10), Vision (.4), Python | Rig hardware as device pieces (15 Nov 2026, [Building Blocks](../docs/articles/building-blocks.md)): one include per device instance with one `Name` (`BehaviorBoard`, `PulseOutputs`, `ZapitTriggerLine`, `RunningWheel`, `LicketySplit`, `LickSpoutStage`, `SpinnakerCamera`, `CameraLiveControls`), a core (`ReadLabRig` publishing `ConfigRoot` and `RigFile`, `ReadyGate`, `ClockFromTimestampGenerator` or `ClockFromBoard` with `SetHarpClock`, `CameraTriggers`) and the rig list `DomeHardware`; `AnnounceStage`, `RequireValue`, `CamerasOpen`, `CameraTrigger`, `CameraTriggerPulses`, `PulseEnabledLines`, `WiredLines`, `CameraLiveSetting`. Cameras start triggering once every camera acquires, pair frames to Event messages only with gaps filled, and log from the first frame; blank `PixelFormat` keeps the camera's stored format (upstream's meaning). Deleted: `RigHardware`, `HarpLogs`, `LogCameras`, `HarpLickSpoutStage`, the old `LickSpoutStage`, `TriggeredSpinnaker` and `BehaviorBoard.Timestamps` includes, `ArduinoLedDriver`, `RequireEntries`, `WithoutPulseLine`, `ExposureFitsTrigger`, `GoByName`, `DescribeCalibrationCurve`, `BehaviourBoxRig` and `camera.triggerFrequency` | Lab-only |
+| `c7a47ba` | Python | `workflow_lint.hardware_problems` and `required_devices` for the pieces; `check-workflow.ps1` fills the rig template with the workflow's own devices (`filled_rig`) | Lab-only |
+| `ebe292f`, `287f7b9` | Streaming (.4), LiveView (.13), Vision (.4), Control (.11), Core (.18), Audio (.10), HarpDevices (.12), Manifest (.22), Python | Stop cannot hang (stream controllers on the task pool, `DrawStimuli` a `PublishSubject`, a stuck render-thread dispose falls back); refusals by name: `QuietWait.SettingsProblems` (caps 10 s, 20 cm), an empty `rig.yml`, a blank `portName`, Go without SubjectId or SessionId, a speaker on `syncChannel` or unequalised, `GroupNode` naming the Bonsai.Core version (`src\Shared`, so HarpDevices and Manifest too) | Lab-only |
+| `3e19a06`, `bef49d0` | Devices (.18), Logging (.14), Python | `Zapit.ConnectForTask`, `BehaviorBoard.ManualRewards`, `LogLabExperiment` and `LogControlEvents`, what every task did the same way, each one include, linted | Lab-only |
+| `1f9fbff` | Manifest (.22) | `ExperimentManifest`'s `{RigFiles}`, the default `ConfigFiles`: `rig.yml` under the launch's `ConfigRoot`, every file it names, and the mouse's spout positions on a rig with a spout stage | Lab-only |
+| `a31806e`, `d580fe1` | Logging (.14), Core (.18), Video (.16), Python | Descriptions (a speaker's filter required, LogDataSchema's experiment folder); flaky tests (WeighStable, ffmpeg's report after a kill, LogDataSchema unbuffered) | Lab-only |
 
 OpenRigs.yml's publish job also pushes each green build's packages, versioned `0.0.0-ciN`, to Coen-Lab's GitHub Packages feed. No workflow installs from that feed: workflows install the `-coen-lab.N` builds in this repository's `local_packages\`, which app-rig-setup's `workflows\update-workflows.ps1` copies into each one.
 
@@ -74,55 +80,4 @@ When open-rigs publishes a release in which every row of the table above is upst
 
 ## Proposed upstream
 
-- `TriggeredSpinnaker` `PixelFormat` (cffa26c, Video 0.1.1-coen-lab.7 and Devices .5; blank means Mono8 since Video .8, audit 11 Nov 2026): upstream's operator never sets the format, so a camera opens in whatever format it stored (one rig's were Mono16), and LogVideo writes 8-bit frames only. The diff below is made from the code against upstream `main` at `f313716` (regenerated 14 Nov 2026).
-- Upstream's branch `triggered-spinnaker` (to 12 Nov 2026, not on its `main` on 15 Nov 2026) takes the format (`518ca24`), the chunk copy inside the callback (`7a441c2`, ucl-open#67), the region reset after binning (`1d0b4a2`, ucl-open#66) and a start signal for the cameras (`6f81c6c`). Merged into this repository it conflicts in `TriggeredSpinnaker.cs`, `TriggeredSpinnaker.bonsai`, `VideoDataFrame.cs` and `docs/bonsai-operators/OpenRigs.Devices/behavior-board.md` (`git merge-tree`, 15 Nov 2026). Its blank `PixelFormat` keeps the camera's stored format, where the lab's is Mono8: a rig.yml without `pixelFormat` is still Mono8 (the lab rig model's default), but one that gives it blank or null would record a camera stored as Mono16 in Mono16 again.
-
-```diff
---- a/src/OpenRigs.Video/TriggeredSpinnaker.cs
-+++ b/src/OpenRigs.Video/TriggeredSpinnaker.cs
-@@ -15,6 +15,7 @@
-         {
-             ExposureTime = 1e6 / 50 - 1000;
-             Binning = 1;
-+            PixelFormat = PixelFormatEnums.Mono8.ToString();
-         }
- 
-         [Description("The duration of each individual exposure, in microseconds. In general, this should be 1 / frameRate - 1 millisecond to prepare for next trigger.")]
-@@ -26,10 +27,18 @@
-         [Description("The size of the binning area of the sensor, e.g. a binning size of 2 specifies a 2x2 binning region.")]
-         public int Binning { get; set; }
- 
-+        // A string, not PixelFormatEnums, so rig.yml's pixelFormat maps onto it; the camera refuses an
-+        // unknown name when it opens.
-+        [Description("The pixel format the camera sends, a Spinnaker PixelFormat name LogVideo can write, Mono8 (rig.yml's pixelFormat; blank is Mono8). Set every time the camera opens, so a format stored on the camera is never used. Taken only when the camera opens.")]
-+        public string PixelFormat { get; set; }
-+
-         protected override void Configure(IManagedCamera camera)
-         {
-             try { camera.AcquisitionStop.Execute(); }
-             catch { }
-+            // Before binning and the region: a format change can change their limits. Blank means Mono8,
-+            // as coen-qc-preflight-rig reads it (audit, 11 Nov 2026).
-+            camera.PixelFormat.Value = string.IsNullOrWhiteSpace(PixelFormat) ? "Mono8" : PixelFormat.Trim();
-             camera.BinningSelector.Value = BinningSelectorEnums.All.ToString();
-             camera.BinningHorizontalMode.Value = BinningHorizontalModeEnums.Sum.ToString();
-             camera.BinningVerticalMode.Value = BinningVerticalModeEnums.Sum.ToString();
---- a/src/OpenRigs.Devices/TriggeredSpinnaker.bonsai
-+++ b/src/OpenRigs.Devices/TriggeredSpinnaker.bonsai
-@@ -14,6 +14,7 @@
-         <Property Name="Binning" />
-         <Property Name="SerialNumber" />
-         <Property Name="ColorProcessing" />
-+        <Property Name="PixelFormat" />
-       </Expression>
-       <Expression xsi:type="Combinator">
-         <Combinator xsi:type="p1:TriggeredSpinnaker">
-@@ -22,6 +23,7 @@
-           <p1:ExposureTime>19000</p1:ExposureTime>
-           <p1:Gain>0</p1:Gain>
-           <p1:Binning>1</p1:Binning>
-+          <p1:PixelFormat>Mono8</p1:PixelFormat>
-         </Combinator>
-       </Expression>
-       <Expression xsi:type="ExternalizedMapping">
-```
+- `TriggeredSpinnaker` `PixelFormat`: withdrawn 15 Nov 2026. The lab adopted upstream's meaning (blank keeps the camera's stored format), and every lab `rig.yml` camera states its `pixelFormat`. Upstream's branch `triggered-spinnaker` (to 12 Nov 2026) carries the format (`518ca24`), the chunk copy inside the callback (`7a441c2`, ucl-open#67), the region reset after binning (`1d0b4a2`, ucl-open#66) and a start signal for the cameras (`6f81c6c`). The lab's operator now also has `Name`, announces to `CamerasOpen` once streaming, and fills frame gaps; converging the two is open.

@@ -47,4 +47,4 @@ lick_detector:
 ![LicketySplit](~/assets/workflows/devices/LicketySplit.svg){data-bonsai="~/src/OpenRigs.Devices/LicketySplit.bonsai"}
 :::
 
-The workflow opens the Harp serial connection, writes the configured thresholds at startup, and publishes the device event stream on a named `PublishSubject`. Downstream nodes can subscribe to that subject to extract the lick trigger events stamped against the Harp hardware clock.
+`LicketySplit` is a device piece (see [Building Blocks](../../articles/building-blocks.md)): `Name` (`LicketySplit-<Entry>`) picks its entry under `licketySplit` in `rig.yml`, published as the `AsyncSubject` `<Name>`. It opens the device on its `portName` behind `<Name>.Data` and `<Name>.Commands`, writes its channel 0 trigger and untrigger thresholds at its first message, publishes the lick state (true while a lick is detected) on `LickStateSubjectName`, and logs the device as `<Name>` once the experiment folder exists and the Harp clock is set. Stops the workflow at Start, naming the entries `rig.yml` has, if it has none by that name.
