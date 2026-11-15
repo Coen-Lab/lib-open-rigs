@@ -191,6 +191,18 @@ jobs:
         if: matrix.platform.rid == 'win-x64'
         uses: bonsai-rx/setup-bonsai@v1
 
+      # OpenRigs.Video's tests with real ffmpeg.exe and ffprobe.exe (libx264), skipped where ffmpeg.exe is not on PATH.
+      - name: Set up ffmpeg
+        if: matrix.platform.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP ffmpeg.zip
+          Invoke-WebRequest https://github.com/GyanD/codexffmpeg/releases/download/8.0.1/ffmpeg-8.0.1-essentials_build.zip -OutFile $zip
+          Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP
+          $bin = Join-Path $env:RUNNER_TEMP ffmpeg-8.0.1-essentials_build\bin
+          if (-not (Test-Path (Join-Path $bin ffmpeg.exe))) { throw "ffmpeg.exe is not in $bin" }
+          Add-Content $env:GITHUB_PATH $bin
+
       # .NET Framework test assemblies can only be executed on Windows
       - name: Test .NET Framework 4.7.2
         if: matrix.platform.rid == 'win-x64'
