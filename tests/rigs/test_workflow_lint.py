@@ -182,19 +182,21 @@ def test_a_new_combination_of_the_lab_s_devices_needs_no_hardware_code(tmp_path)
 
 
 def test_the_dome_rig_list_is_expanded_with_the_workflow_s_settings(tmp_path):
-    waits = "HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted"
-    rig_list = include(lint.DEVICES + "DomeHardware.bonsai", f"<ReadyWaitsFor>{waits}</ReadyWaitsFor>")
-    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + rig_list + include(lint.SPEAKER_MIXER))
-    assert lint.hardware_problems(wf) == []
+    rig_list = include(lint.DEVICES + "DomeHardware.bonsai", "<SpoutStepSize>99</SpoutStepSize>")
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + rig_list)
+    assert lint.hardware_problems(wf) == [] and lint.speaker_mixer_problems(wf) == []
+    assert dict(lint.hardware(wf))[lint.LICK_SPOUT_STAGE]["SpoutStepSize"] == "99"
+    assert lint.SPEAKER_MIXER in dict(lint.hardware(wf)) and lint.PROJECTOR_DISPLAY in dict(lint.hardware(wf))
     assert [name for name, _ in lint.required_devices(wf)] == [
         "TimestampGeneratorGen3-Main", "BehaviorBoard-Main", "LicketySplit-Left", "LicketySplit-Right",
         "StepperDriver-A", "StepperDriver-B", "Camera-Face", "Camera-Pupil", "Camera-Body"]
-    unwaited = workflow(tmp_path / "b", include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + include(lint.SPEAKER_MIXER))
-    assert lint.hardware_problems(unwaited) == [
-        "ReadyGate's ReadyWaitsFor is HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, not "
-        "HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted"]
+    # The speakers and projector are the rig list's: a task that includes them again has two.
+    twice = workflow(tmp_path / "b", include(lint.READ_LAB_RIG) + rig_list + include(lint.SPEAKER_MIXER) + include(lint.PROJECTOR_DISPLAY))
+    assert lint.hardware_problems(twice) == ["the workflow includes SpeakerMixer more than once",
+                                             "the workflow includes ProjectorDisplay more than once"]
+    assert lint.speaker_mixer_problems(twice) == ["the workflow does not include OpenRigs.Audio's SpeakerMixer once"]
     # The rig list holds no ReadLabRig: RigConfigs defined inside it would be defined in terms of itself.
-    late = workflow(tmp_path / "c", rig_list + include(lint.SPEAKER_MIXER) + include(lint.READ_LAB_RIG))
+    late = workflow(tmp_path / "c", rig_list + include(lint.READ_LAB_RIG))
     assert lint.hardware_problems(late) == ["ReadLabRig comes after ReadyGate"]
 
 

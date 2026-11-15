@@ -41,11 +41,11 @@ Every sound plays at a level, never a gain: `levelDbfs`, in dBFS RMS, the RMS of
 
 ## The shared mixer
 
-`OpenRigs.Audio:SpeakerMixer.bonsai`, included once by every workflow that plays sound, ahead of every node that subscribes `Speakers`:
+`OpenRigs.Audio:SpeakerMixer.bonsai`, included once by every workflow that plays sound (its own, or its rig list's: `DomeHardware` holds one), ahead of every node that subscribes `Speakers`:
 
 - loads the speakers once at Start (`RigFile` -> `LoadSpeakers` -> `Speakers`, an `AsyncSubject`);
 - starts the mixer on `rig.yml`'s `speakerArray.device` (from `RigConfigs`), never sooner than 3 s after Start, or `device.bootDelaySeconds` if longer: deliberate, as a fault while the sound card boots can blue-screen the PC, so never remove or shorten it;
-- plays four sounds over each other, one mixer source each, from the `BehaviorSubject` of `Mat` it declares for it: `StimulusSounds` (each trial's stimulus), `RewardToneSounds`, `PenaltySounds` and `BackgroundNoise` (one buffer, looped, faded in over 2 s when it comes). Each buffer already carries its level, so the mixer plays them at gain 1. The mixer reads `StimulusSounds`, `RewardToneSounds` and `PenaltySounds` through a `PublishSubject` each (`Mixer<name>`), so a sound sent before the mixer has started is never played at its start: a stimulus or penalty sound sent then stops the workflow, naming it and the boot delay (`CheckMixerStarted`), as the trial log would record it as sent; a reward tone sent then is not played, as a manual drop before Go may be. Once the mixer has started it announces `MixerStarted` into `ReadyGate`'s `ReadyStages` (`AnnounceStage`); a workflow that includes `SpeakerMixer` adds `MixerStarted` to `ReadyGate`'s `ReadyWaitsFor` (through `DomeHardware`'s when the workflow includes it), so Ready, and with it Go, comes only once the mixer plays (see [Building Blocks](../../articles/building-blocks.md#ready)), and `CheckMixerStarted` is the safety net behind it. A sound sent while the one before it on its source is still playing is queued behind it (`AppendBuffer` appends to the source's playback queue): it starts only after the previous one has finished. `BackgroundNoise` plays when the mixer starts. A workflow multicasts only what it plays, from a per-trial graph if it likes (a `BehaviorSubject` is not closed by it).
+- plays four sounds over each other, one mixer source each, from the `BehaviorSubject` of `Mat` it declares for it: `StimulusSounds` (each trial's stimulus), `RewardToneSounds`, `PenaltySounds` and `BackgroundNoise` (one buffer, looped, faded in over 2 s when it comes). Each buffer already carries its level, so the mixer plays them at gain 1. The mixer reads `StimulusSounds`, `RewardToneSounds` and `PenaltySounds` through a `PublishSubject` each (`Mixer<name>`), so a sound sent before the mixer has started is never played at its start: a stimulus or penalty sound sent then stops the workflow, naming it and the boot delay (`CheckMixerStarted`), as the trial log would record it as sent; a reward tone sent then is not played, as a manual drop before Go may be. Once the mixer has started it announces `MixerStarted` into `ReadyGate`'s `ReadyStages` (`AnnounceStage`); a workflow that includes `SpeakerMixer` adds `MixerStarted` to `ReadyGate`'s `ReadyWaitsFor` (`DomeHardware`'s already waits for it), so Ready, and with it Go, comes only once the mixer plays (see [Building Blocks](../../articles/building-blocks.md#ready)), and `CheckMixerStarted` is the safety net behind it. A sound sent while the one before it on its source is still playing is queued behind it (`AppendBuffer` appends to the source's playback queue): it starts only after the previous one has finished. `BackgroundNoise` plays when the mixer starts. A workflow multicasts only what it plays, from a per-trial graph if it likes (a `BehaviorSubject` is not closed by it).
 
 It needs `ReadLabRig` (`RigFile`, `RigConfigs`), `ReadyGate` (`ReadyStages`) and Bonsai.Mixer in the workflow's environment.
 
@@ -68,8 +68,7 @@ It needs `ReadLabRig` (`RigFile`, `RigConfigs`), `ReadyGate` (`ReadyStages`) and
 ## In a workflow
 
 ```
-IncludeWorkflow OpenRigs.Devices:DomeHardware.bonsai        (ReadyWaitsFor: HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted)
-IncludeWorkflow OpenRigs.Audio:SpeakerMixer.bonsai          (Speakers, the mixer, its four sound subjects, MixerStarted)
+IncludeWorkflow OpenRigs.Devices:DomeHardware.bonsai        (holds SpeakerMixer: Speakers, the mixer, its four sound subjects, MixerStarted)
 
 SubscribeSubject TaskConfig -> TaskParameters.<sound>.LevelDbfs ─┐
 SubscribeSubject Speakers ─┐                                       │

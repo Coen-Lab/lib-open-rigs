@@ -47,6 +47,7 @@ LICK_SPOUT_STAGE = DEVICES + "LickSpoutStage.bonsai"
 CAMERA = DEVICES + "SpinnakerCamera.bonsai"
 CAMERA_TRIGGERS = DEVICES + "CameraTriggers.bonsai"
 CAMERA_LIVE_CONTROLS = DEVICES + "CameraLiveControls.bonsai"
+PROJECTOR_DISPLAY = "OpenRigs.Vision:ProjectorDisplay.bonsai"
 # What each piece takes: Name, Board and Camera name a device; X.Commands / X.Data are the subject properties
 # (CommandsSubjectName, BoardDataSubjectName, ...) that must equal that device's name plus the suffix.
 PIECES = {
@@ -61,7 +62,10 @@ PIECES = {
     CAMERA: ("Name", "Name.Data", "Board", "Board.Data"),
     CAMERA_TRIGGERS: ("Board", "Board.Commands", "Board.Data"),
     CAMERA_LIVE_CONTROLS: ("Camera", "Board"),
+    SPEAKER_MIXER: (),
+    PROJECTOR_DISPLAY: (),
 }
+ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY)  # pieces a workflow has at most once
 # The rig.yml group of each piece that is a device of its own, and the Harp WhoAmI of those that are Harp boards.
 DEVICE_GROUPS = {CLOCK_FROM_GENERATOR: "timestampGeneratorGen3", BOARD: "behaviorBoard", LICKETY_SPLIT: "licketySplit", CAMERA: "camera"}
 WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDriver": 1130, "licketySplit": 1400}
@@ -301,7 +305,8 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
 def speaker_mixer_problems(wf: Workflow) -> list[str]:
     """Every sound plays through OpenRigs.Audio's SpeakerMixer, included once, which loads the speakers and starts the
     mixer no sooner than 3 s after Start: the workflow starts no mixer, makes no source and loads no speakers itself."""
-    problems = [] if wf.text.count(f'Path="{SPEAKER_MIXER}"') == 1 else ["the workflow does not include OpenRigs.Audio's SpeakerMixer once"]
+    mixers = [p for p, _ in hardware(wf)].count(SPEAKER_MIXER)  # its own, or its rig list's
+    problems = [] if mixers == 1 else ["the workflow does not include OpenRigs.Audio's SpeakerMixer once"]
     prefixes = [p for p, ns in re.findall(r'xmlns:(\w+)="clr-namespace:([\w.]+);', wf.text) if ns == "Bonsai.Mixer"]
     problems += [f"the workflow uses Bonsai.Mixer's {op} itself" for p in prefixes for op in sorted(set(re.findall(r'xsi:type="' + p + r':(\w+)"', wf.text)))]
     if ":LoadSpeakers" in wf.text:
@@ -422,8 +427,8 @@ def hardware_problems(wf: Workflow) -> list[str]:
     clocks = [p for p in paths if p in CLOCKS]
     if len(clocks) != 1:
         problems.append(f"the workflow has {len(clocks)} clocks, not one (ClockFromTimestampGenerator or ClockFromBoard)")
-    if paths.count(LICK_SPOUT_STAGE) > 1:
-        problems.append("the workflow includes LickSpoutStage more than once")
+    problems += [f"the workflow includes {p.split(':')[1].removesuffix('.bonsai')} more than once"
+                 for p in ONE_EACH if paths.count(p) > 1]
     gate = paths.index(READY_GATE) if READY_GATE in paths else len(paths)
     if READ_LAB_RIG in paths[gate:]:
         problems.append("ReadLabRig comes after ReadyGate")
@@ -456,7 +461,7 @@ def hardware_problems(wf: Workflow) -> list[str]:
     elif triggers and set(_stages(triggers[0].get("CamerasExpected"))) != set(cameras):
         problems.append(f"CameraTriggers' CamerasExpected is {triggers[0].get('CamerasExpected') or 'not set'}, not {', '.join(cameras)}")
     announced = (["HarpClockSet"] if clocks else []) + (["SpoutsHomed"] if LICK_SPOUT_STAGE in paths else []) + cameras \
-        + (["MixerStarted"] if f'Path="{SPEAKER_MIXER}"' in wf.text else [])
+        + (["MixerStarted"] if SPEAKER_MIXER in paths else [])
     waits = next((props.get("ReadyWaitsFor") for p, props in pieces if p == READY_GATE), None)
     if READY_GATE in paths and set(_stages(waits)) != set(announced):
         problems.append(f"ReadyGate's ReadyWaitsFor is {waits or 'not set'}, not {', '.join(announced)}")

@@ -2,17 +2,17 @@
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The domes' hardware (every such rig has the same devices and names in rig.yml), as device pieces after the workflow's own ReadLabRig (which every workflow includes once, before this: a piece's log waits for PathPrefix, whose LogLabExperiment reads RigConfigs, so RigConfigs defined in here would be defined in terms of itself): the Ready gate (ReadyGate, ReadyWaitsFor), the clock (TimestampGeneratorGen3-Main), the Behavior board BehaviorBoard-Main with its pulsed reward lines, Zapit trigger line and running wheel (WheelDistanceCm), the lick detectors LicketySplit-Left and -Right (LickStateLeft, LickStateRight), the lick spout stage (StepperDriver-A and -B), and the cameras Camera-Face, Camera-Pupil, Camera-Body on the board's camera triggers. Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it. A task that plays sound includes OpenRigs.Audio's SpeakerMixer itself and adds MixerStarted to ReadyWaitsFor.</Description>
+  <Description>The domes' hardware (every such rig has the same devices and names in rig.yml), as device pieces after the workflow's own ReadLabRig (which every workflow includes once, before this: a piece's log waits for PathPrefix, whose LogLabExperiment reads RigConfigs, so RigConfigs defined in here would be defined in terms of itself): the Ready gate (ReadyGate), the clock (TimestampGeneratorGen3-Main), the Behavior board BehaviorBoard-Main with its pulsed reward lines, Zapit trigger line and running wheel (WheelDistanceCm), the lick detectors LicketySplit-Left and -Right (LickStateLeft, LickStateRight), the lick spout stage (StepperDriver-A and -B), and the cameras Camera-Face, Camera-Pupil, Camera-Body on the board's camera triggers, the speakers and their mixer (OpenRigs.Audio SpeakerMixer: Speakers, the four sound subjects) and the projector (OpenRigs.Vision ProjectorDisplay from rig.yml's projectionCalibration; stimuli draw on DrawStimuli; DisplayDevice). Every task on these rigs has background noise and a screen, so both are the rig's, not the task's. Ready waits for the Harp clock, the spouts homed, each camera's first frame and the mixer started. Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it. Needs OpenRigs.Audio, OpenRigs.Vision and Bonsai.Mixer in the workflow's environment.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="ReadyWaitsFor" Description="The stages Ready waits for, comma separated: HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, and MixerStarted on a workflow that includes SpeakerMixer." />
-      </Expression>
-      <Expression xsi:type="ExternalizedMapping">
         <Property Name="SpoutStepSize" Description="Motor steps each spout nudge moves, read at each nudge." />
       </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="DisplayDevice" Description="The display the projector is on." />
+      </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
-        <ReadyWaitsFor>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body</ReadyWaitsFor>
+        <ReadyWaitsFor>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted</ReadyWaitsFor>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ClockFromTimestampGenerator.bonsai">
         <Name>TimestampGeneratorGen3-Main</Name>
@@ -77,10 +77,25 @@
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <CamerasExpected>Camera-Face, Camera-Pupil, Camera-Body</CamerasExpected>
       </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:SpeakerMixer.bonsai" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>ProjectionCalibration</Selector>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Vision:ProjectorDisplay.bonsai">
+        <DisplayDevice>First</DisplayDevice>
+        <WindowState>Fullscreen</WindowState>
+        <Width>1920</Width>
+        <Height>1080</Height>
+      </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="2" Label="Source1" />
-      <Edge From="1" To="10" Label="Source1" />
+      <Edge From="0" To="10" Label="Source1" />
+      <Edge From="1" To="18" Label="Source2" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
