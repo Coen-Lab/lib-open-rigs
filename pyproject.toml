@@ -23,7 +23,7 @@ check-videos = "open_rigs.rigs.video_frames:main"
 dev = [
   "pandas-stubs",
   "pre-commit",
-  "pyright==1.1.409",
+  "pyright[nodejs]==1.1.409",  # Node from a wheel: without it pyright downloads Node, which failed on a rig
   "pytest",
   "pytest-cov",
   "pytest-mock",
