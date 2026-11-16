@@ -51,6 +51,15 @@ def test_template_validates():
     assert rig.speaker_array.penalty_sound_channel == 2
 
 
+def test_a_value_left_as_change_me_is_refused_by_its_key():
+    # Round 3 LM1: a rig.yml copied from the template with CHANGE-ME left in passed the model.
+    rig = copy.deepcopy(RIG)
+    rig["rootPath"] = "CHANGE-ME"
+    rig["licketySplit"]["left"] = {**HARP, "usbSerial": "CHANGE-ME"}
+    with pytest.raises(ValidationError, match=r"still has CHANGE-ME at licketySplit\.left\.usbSerial, rootPath "):
+        LabRig.model_validate(rig)
+
+
 def test_the_background_noise_is_a_rig_file_the_speaker_array_names():
     # The lab's one noise (16 Nov 2026): RigConfigs\shared beside the rig's folder, listed with the rig's other files.
     from open_rigs.core.artefacts import rig_artefacts
@@ -257,8 +266,8 @@ def test_the_lab_rig_template_validates_and_fits_the_committed_schema():
     from open_rigs._generators.lab_rig import build_schema
 
     package = resources.files("open_rigs")
-    template = yaml.safe_load((package / "rigs" / "rig-template.yml").read_text(encoding="utf-8"))
-    rig = LabRig.model_validate(template)
+    text = (package / "rigs" / "rig-template.yml").read_text(encoding="utf-8")
+    rig = LabRig.model_validate(yaml.safe_load(text.replace("CHANGE-ME", "FILLED")))
     assert rig.behavior_board["main"].wiring.do3.device == "ZapitTrigger"
     committed = json.loads((package / "schemas" / "lab_rig.json").read_text(encoding="utf-8"))
     assert committed == json.loads(json.dumps(build_schema()))

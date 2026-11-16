@@ -29,6 +29,7 @@ ZAPIT_TRIGGER = "ZapitTrigger"
 CAMERA_TRIGGER = "CameraTrigger"
 SIDES = ("left", "right")
 WHERE = "(lab rig model, open_rigs.rigs.lab_rig)"
+PLACEHOLDER = "CHANGE-ME"  # rig-template.yml's mark on each value a rig fills in
 # The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, DeliverReward's MaxRewardUl).
 MAX_REWARD_UL = 20
 
@@ -76,6 +77,11 @@ class LabRig(Rig):
         if isinstance(data, dict):
             known = {key for field, info in cls.model_fields.items() for key in (field, info.alias)}
             _refuse_unknown([str(key) for key in data if key not in known])
+            unfilled = sorted(_placeholders(data))
+            if unfilled:
+                raise ValueError(
+                    f"rig.yml still has {PLACEHOLDER} at {', '.join(unfilled)} {WHERE}. Fill in this rig's value for each."
+                )
         rig = handler(data)
         if isinstance(data, dict):
             # A rig built in Python names its parts by field (video_encoder), which the dump below names by alias.
@@ -189,6 +195,18 @@ def _unknown_keys(given: Any, kept: Any, path: str = "") -> Iterator[str]:
     elif isinstance(given, list) and isinstance(kept, list):
         for index, (value, kept_value) in enumerate(zip(given, kept)):
             yield from _unknown_keys(value, kept_value, f"{path}{index}.")
+
+
+def _placeholders(given: Any, path: str = "") -> Iterator[str]:
+    """The key paths of `given` (rig.yml as read) whose value still holds the template's PLACEHOLDER."""
+    if isinstance(given, dict):
+        for key, value in given.items():
+            yield from _placeholders(value, f"{path}{key}.")
+    elif isinstance(given, list):
+        for index, value in enumerate(given):
+            yield from _placeholders(value, f"{path}{index}.")
+    elif isinstance(given, str) and PLACEHOLDER in given:
+        yield path.rstrip(".")
 
 
 def _refuse_unknown(keys: list[str]) -> None:
