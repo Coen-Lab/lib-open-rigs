@@ -86,7 +86,7 @@ namespace OpenRigs.Devices.Tests
         }
 
         /// <summary>
-        /// The check from Go to Finished, headless, through the controller as rig-control drives it: a board stand-in
+        /// The check from Go to Finished, headless, through the controller as a rig's agent drives it: a board stand-in
         /// counted for countSeconds, its question answered with Confirm, then Finished with the raw file closed and whole.
         /// </summary>
         [TestMethod]
