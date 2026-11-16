@@ -2,7 +2,7 @@
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The domes' hardware (every such rig has the same devices and names in rig.yml), as device pieces after the workflow's own ReadLabRig (which every workflow includes once, before this: a piece's log waits for PathPrefix, whose LogLabExperiment reads RigConfigs, so RigConfigs defined in here would be defined in terms of itself): the Ready gate (ReadyGate), the clock (TimestampGeneratorGen3-Main), the Behavior board BehaviorBoard-Main with its pulsed reward lines, Zapit trigger line and running wheel (WheelDistanceCm), the lick detectors LicketySplit-Left and -Right (LickStateLeft, LickStateRight), the lick spout stage (StepperDriver-A and -B), and the cameras Camera-Face, Camera-Pupil, Camera-Body on the board's camera triggers, the speakers and their mixer (OpenRigs.Audio SpeakerMixer: Speakers, the four sound subjects) and the projector (OpenRigs.Vision ProjectorDisplay from rig.yml's projectionCalibration; stimuli draw on DrawStimuli; DisplayDevice). Every task on these rigs has background noise and a screen, so both are the rig's, not the task's. Ready waits for the Harp clock, the spouts homed, each camera's first frame and the mixer started. Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it. Needs OpenRigs.Audio, OpenRigs.Vision and Bonsai.Mixer in the workflow's environment.</Description>
+  <Description>The domes' hardware (every such rig has the same devices and names in rig.yml), as device pieces after the workflow's own ReadLabRig (which every workflow includes once, before this: a piece's log waits for PathPrefix, whose LogLabExperiment reads RigConfigs, so RigConfigs defined in here would be defined in terms of itself): the Ready gate (ReadyGate), the clock (TimestampGeneratorGen3-Main), the Behavior board BehaviorBoard-Main with its pulsed reward lines, Zapit trigger line and running wheel (WheelDistanceCm), the lick detectors LicketySplit-Left and -Right (LickStateLeft, LickStateRight), the lick spout stage (StepperDriver-A and -B), and the cameras Camera-Face, Camera-Pupil, Camera-Body on the board's camera triggers, the speakers and their mixer (OpenRigs.Audio SpeakerMixer: Speakers, the four sound subjects) and the projector (OpenRigs.Vision ProjectorDisplay from rig.yml's projectionCalibration; stimuli draw on DrawStimuli; DisplayDevice). Every task on these rigs has background noise and a screen, so both are the rig's, not the task's. Ready waits for the Harp clock, the spouts homed, each camera's first frame and the mixer started, and for the workflow's own stages (WorkflowStages, each announced by the workflow itself, such as a calibration's CalibrationReady). Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it. Needs OpenRigs.Audio, OpenRigs.Vision and Bonsai.Mixer in the workflow's environment.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -10,6 +10,7 @@
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
         <PieceStages>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted</PieceStages>
+        <WorkflowStages />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ClockFromTimestampGenerator.bonsai">
         <Name>TimestampGeneratorGen3-Main</Name>
@@ -85,11 +86,15 @@
         <Width>1920</Width>
         <Height>1080</Height>
       </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="WorkflowStages" Description="The workflow's own stages Ready also waits for, comma separated, each announced by the workflow itself (AnnounceStage into ReadyStages), such as CalibrationReady. Empty for a workflow whose Ready waits only for its pieces." />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="17" Label="Source2" />
       <Edge From="15" To="16" Label="Source1" />
       <Edge From="16" To="17" Label="Source1" />
+      <Edge From="18" To="1" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

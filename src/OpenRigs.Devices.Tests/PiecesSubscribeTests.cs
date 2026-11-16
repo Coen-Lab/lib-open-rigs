@@ -61,6 +61,53 @@ namespace OpenRigs.Devices.Tests
             Check(Run("BehaviorBoxHardware.bonsai", rig => rig.Replace("  face:", "  overhead:").Replace("Camera-Face", "Camera-Overhead")));
         }
 
+        // A workflow on a rig list (a thin entry per rig kind) gives the rig list its own stages, which the rig list
+        // passes to its ReadyGate's watchdog, so Ready waits for them too: built as a rig builds it. Without the
+        // <WorkflowStages /> written on the rig list's ReadyGate node, Bonsai 2.9 dropped the value silently (16 Nov 2026).
+        [DataTestMethod]
+        [DataRow("DomeHardware")]
+        [DataRow("BehaviorBoxHardware")]
+        public void EachRigListPassesTheWorkflowStagesToItsReadyGate(string rigList)
+        {
+            RequireSpinnaker();
+            var path = "OpenRigs.Devices:" + rigList + ".bonsai";
+            var xml = File.ReadAllText(Path.Combine(Folder, rigList + ".bonsai"));
+            var given = xml.Replace("Path=\"" + path + "\" />", "Path=\"" + path + "\"><WorkflowStages>CalibrationReady</WorkflowStages></Expression>");
+            Assert.AreNotEqual(xml, given);
+            WorkflowBuilder builder;
+            using (var reader = XmlReader.Create(new StringReader(given)))
+            {
+                builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            }
+            builder.Workflow.Build();
+            var gate = Included(Included(builder.Workflow, path).Workflow, "OpenRigs.Devices:ReadyGate.bonsai");
+            var watchdog = gate.Workflow.Select(node => ExpressionBuilder.GetWorkflowElement(node.Value)).OfType<OpenRigs.Core.StartupWatchdog>().Single();
+            Assert.AreEqual("CalibrationReady", watchdog.WorkflowStages);
+        }
+
+        // The box's Binning reaches its camera, as the workflow stages reach ReadyGate.
+        [TestMethod]
+        public void TheBehaviourBoxRigListPassesBinningToItsCamera()
+        {
+            RequireSpinnaker();
+            var path = "OpenRigs.Devices:BehaviorBoxHardware.bonsai";
+            var xml = File.ReadAllText(Path.Combine(Folder, "BehaviorBoxHardware.bonsai"))
+                .Replace("Path=\"" + path + "\" />", "Path=\"" + path + "\"><Binning>2</Binning></Expression>");
+            WorkflowBuilder builder;
+            using (var reader = XmlReader.Create(new StringReader(xml)))
+            {
+                builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            }
+            builder.Workflow.Build();
+            var camera = Included(Included(builder.Workflow, path).Workflow, "OpenRigs.Devices:SpinnakerCamera.bonsai");
+            Assert.AreEqual("2", camera.PropertiesXml.Single(x => x.Name.LocalName == "Binning").Value);
+        }
+
+        static IncludeWorkflowBuilder Included(ExpressionBuilderGraph workflow, string path)
+        {
+            return workflow.Select(node => node.Value).OfType<IncludeWorkflowBuilder>().Single(b => b.Path == path);
+        }
+
         // From the SDK's install, as on a rig: Bonsai.Spinnaker's own copy is not the SDK's build and does not load.
         static readonly string SpinnakerNet = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"Teledyne\Spinnaker\bin64\vs2015\SpinnakerNET_v140.dll");

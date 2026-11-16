@@ -2,6 +2,8 @@ import re
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from ruamel.yaml import YAML
 
 from open_rigs.rigs import workflow_lint as lint
@@ -61,7 +63,7 @@ def test_a_stimulus_or_penalty_sound_sent_while_the_mixer_boots_stops_the_workfl
 
 
 def workflow(tmp_path: Path, nodes: str) -> lint.Workflow:
-    (tmp_path / "src").mkdir(parents=True)
+    (tmp_path / "src").mkdir(parents=True, exist_ok=True)
     (tmp_path / "src" / "main.bonsai").write_text(HEAD + nodes + "</Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
     return lint.Workflow(tmp_path)
 
@@ -236,16 +238,20 @@ def test_a_piece_s_kind_board_and_camera_are_its_own(tmp_path):
 
 def test_a_rig_list_given_a_property_it_does_not_expose_is_refused(tmp_path):
     wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BehaviorBoxHardware.bonsai", "<PieceStages>HarpClockSet</PieceStages>"))
-    assert lint.hardware_problems(wf) == ["BehaviorBoxHardware is given PieceStages, which it does not expose (Binning)"]
+    assert lint.hardware_problems(wf) == ["BehaviorBoxHardware is given PieceStages, which it does not expose (Binning, WorkflowStages)"]
 
 
 def own_include(tmp_path: Path, nodes: str, inner: str, edges: str = "") -> lint.Workflow:
-    wf = workflow(tmp_path, nodes + '<Expression xsi:type="IncludeWorkflow" Path="Extensions\\Own.bonsai" />')
-    (tmp_path / "src" / "Extensions").mkdir()
-    (tmp_path / "src" / "Extensions" / "Own.bonsai").write_text(
+    own_file(tmp_path, "Extensions/Own.bonsai", inner, edges)
+    return workflow(tmp_path, nodes + include("Extensions\\Own.bonsai"))
+
+
+def own_file(tmp_path: Path, name: str, inner: str, edges: str = "") -> None:
+    """src/<name>, a workflow file of the workflow's own, written before the Workflow, which reads it."""
+    (tmp_path / "src" / name).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src" / name).write_text(
         HEAD.replace("xmlns=", 'xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core" xmlns=') + inner
         + f"</Nodes><Edges>{edges}</Edges></Workflow></WorkflowBuilder>", encoding="utf-8")
-    return wf
 
 
 def test_the_workflow_s_own_includes_are_the_workflow(tmp_path):
@@ -286,6 +292,64 @@ def test_a_stage_the_workflow_announces_itself_is_one_of_ready_gate_s_workflow_s
         "ReadyGate's WorkflowStages is not set, not the stages the workflow announces itself (CalibrationReady)"]
     assert lint.hardware_problems(workflow(tmp_path / "c", listed)) == [
         "ReadyGate's WorkflowStages is CalibrationReady, not the stages the workflow announces itself (none)"]
+
+
+CALIBRATION_READY = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orc:AnnounceStage"><orc:Stage>CalibrationReady</orc:Stage>'
+                     '</Combinator></Expression><Expression xsi:type="MulticastSubject"><Name>ReadyStages</Name></Expression>')
+ANNOUNCED = '<Edge From="0" To="1" Label="Source1" />'
+LIVE_VIEW = '<Expression xsi:type="lv:StreamDevices" xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView" />'
+
+
+def thin_entry(tmp_path: Path, rig_list: str, settings: str = "") -> lint.Workflow:
+    """The rule since 16 Nov 2026: one thin entry per rig kind (its rig list) over one shared include of the workflow's
+    own, which holds the job and the live view; the job's spouts, a file beside it, announce CalibrationReady."""
+    own_file(tmp_path, "Extensions/Spouts.bonsai", CALIBRATION_READY, ANNOUNCED)
+    own_file(tmp_path, "Extensions/Job.bonsai", include("Extensions\\Spouts.bonsai") + LIVE_VIEW)
+    return workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + rig_list, settings) + include("Extensions\\Job.bonsai"))
+
+
+def test_a_thin_entry_s_rig_list_waits_for_the_stage_its_shared_include_announces(tmp_path):
+    for n, rig_list in enumerate(lint.RIG_LISTS):
+        name = rig_list.split(":")[1]
+        wf = thin_entry(tmp_path / str(n), name, "<WorkflowStages>CalibrationReady</WorkflowStages>")
+        assert lint.hardware_problems(wf) == []
+        assert dict(lint.hardware(wf))[lint.READY_GATE]["WorkflowStages"] == "CalibrationReady"
+        assert lint.live_view_problems(wf) == []
+        assert lint.hardware_problems(thin_entry(tmp_path / f"{n}b", name)) == [
+            "ReadyGate's WorkflowStages is not set, not the stages the workflow announces itself (CalibrationReady)"]
+
+
+def test_an_own_include_is_opened_from_src_as_bonsai_opens_it_and_one_bonsai_would_not_find_stops_the_lint(tmp_path):
+    # Bonsai 2.9 opens an include's Path from its working directory, the launched workflow's folder (src), never from
+    # the including file's: Extensions\Job.bonsai's Extensions\Spouts.bonsai is src\Extensions\Spouts.bonsai.
+    own_file(tmp_path, "Extensions/Extensions/Spouts.bonsai", CALIBRATION_READY, ANNOUNCED)
+    own_file(tmp_path, "Extensions/Job.bonsai", include("Extensions\\Spouts.bonsai"))
+    with pytest.raises(ValueError, match=r"src\\Extensions\\Job\.bonsai includes Extensions\\Spouts\.bonsai, which Bonsai opens as "
+                                         r".*src\\Extensions\\Spouts\.bonsai \(from src"):
+        workflow(tmp_path, include("Extensions\\Job.bonsai"))
+    # A Path with no extension is opened with .bonsai added.
+    own_file(tmp_path / "b", "Extensions/Spouts.bonsai", CALIBRATION_READY, ANNOUNCED)
+    wf = workflow(tmp_path / "b", include(lint.READ_LAB_RIG) + piece(lint.READY_GATE, PieceStages="", WorkflowStages="CalibrationReady")
+                  + include("Extensions\\Spouts"))
+    assert "<orc:Stage>CalibrationReady</orc:Stage>" in wf.text and len(wf.texts) == 2
+    own_file(tmp_path / "c", "Loop.bonsai", include("Loop.bonsai"))
+    with pytest.raises(ValueError, match=r"src\\Loop\.bonsai's include Loop\.bonsai includes itself"):
+        workflow(tmp_path / "c", include("Loop.bonsai"))
+
+
+def test_experiment_control_in_an_own_include_is_given_the_launch_id_through_it(tmp_path):
+    mapping = '<Expression xsi:type="ExternalizedMapping"><Property Name="LaunchId" /></Expression>'
+    own_file(tmp_path, "Extensions/Initialization.bonsai", mapping + include(lint.EXPERIMENT_CONTROL), ANNOUNCED)
+    (tmp_path / "src" / "main.bonsai").write_text(HEAD + mapping + include("Extensions\\Initialization.bonsai")
+                                                  + f"</Nodes><Edges>{ANNOUNCED}</Edges></Workflow></WorkflowBuilder>", encoding="utf-8")
+    assert lint.launch_id_problems(lint.Workflow(tmp_path)) == []
+    assert lint.launch_id_problems(workflow(tmp_path, include("Extensions\\Initialization.bonsai"))) == [
+        "the include Extensions\\Initialization.bonsai is not given LaunchId by an ExternalizedMapping (map the top-level LaunchId down to ExperimentControl)"]
+    own_file(tmp_path / "b", "Extensions/Initialization.bonsai", include(lint.EXPERIMENT_CONTROL))
+    (tmp_path / "b" / "src" / "main.bonsai").write_text(HEAD + mapping + include("Extensions\\Initialization.bonsai")
+                                                        + f"</Nodes><Edges>{ANNOUNCED}</Edges></Workflow></WorkflowBuilder>", encoding="utf-8")
+    assert lint.launch_id_problems(lint.Workflow(tmp_path / "b")) == [
+        "ExperimentControl is not given LaunchId by an ExternalizedMapping (map the top-level LaunchId down to ExperimentControl)"]
 
 
 def test_a_workflow_s_own_ready_report_is_found_under_any_prefix(tmp_path):
@@ -737,10 +801,8 @@ def test_a_workflow_makes_the_experiment_folder_or_uses_no_experiment_folder_nev
         "the workflow includes LogLabExperiment 0 and NoExperimentFolder 0 times: one of the two once"]
     # The QC workflows' stand-ins before 16 Nov 2026: a never-published PathPrefix, and a SubjectId in a file of their own.
     path_prefix = '<Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:String"><rx:Name>PathPrefix</rx:Name></Expression>'
+    own_file(tmp_path / "e", "Extensions/Spouts.bonsai", '<Expression xsi:type="rx:BehaviorSubject"><Name>SubjectId</Name></Expression>')
     spouts = workflow(tmp_path / "e", path_prefix + none + include(lint.LAUNCH_SETTINGS) + include("Extensions\\Spouts.bonsai"))
-    (tmp_path / "e" / "src" / "Extensions").mkdir()
-    (tmp_path / "e" / "src" / "Extensions" / "Spouts.bonsai").write_text(
-        HEAD + '<Expression xsi:type="rx:BehaviorSubject"><Name>SubjectId</Name></Expression></Nodes><Edges /></Workflow></WorkflowBuilder>', encoding="utf-8")
     assert lint.no_experiment_folder_problems(spouts) == [
         "the workflow declares PathPrefix itself", "the workflow declares SubjectId itself",
         "the workflow includes LaunchSettings and NoExperimentFolder (both declare SubjectId)"]
@@ -836,14 +898,17 @@ def test_a_device_opened_by_hand_is_refused_unless_unpieced_and_allowed(tmp_path
     nodes = ''.join(f'<Expression xsi:type="Combinator" {ns}><Combinator xsi:type="{t}" /></Expression>'
                     for t in ("beh:Device", "vid:TriggeredSpinnaker", "vid:UsbCamera", "gl:CreateWindow"))
     wf = workflow(tmp_path, nodes)
+    window = "Bonsai.Shaders.CreateWindow (ProjectorDisplay or RawProjectorDisplay)"
     assert lint.hand_opened_devices(wf) == ["Harp.Behavior.Device (the board's piece)", "OpenRigs.Video.TriggeredSpinnaker (SpinnakerCamera)",
-                                            "OpenRigs.Video.UsbCamera (none yet)", "Bonsai.Shaders.CreateWindow (ProjectorDisplay)"]
+                                            "OpenRigs.Video.UsbCamera (none yet)", window]
+    # A projector calibration's window is RawProjectorDisplay: no workflow opens a CreateWindow by hand.
     assert lint.hand_opened_devices(wf, ("UsbCamera", "CreateWindow", "TriggeredSpinnaker")) == [
-        "TriggeredSpinnaker is not a source UNPIECED lists", "Harp.Behavior.Device (the board's piece)", "OpenRigs.Video.TriggeredSpinnaker (SpinnakerCamera)"]
+        "CreateWindow is not a source UNPIECED lists", "TriggeredSpinnaker is not a source UNPIECED lists",
+        "Harp.Behavior.Device (the board's piece)", "OpenRigs.Video.TriggeredSpinnaker (SpinnakerCamera)", window]
     # A file of the workflow's own counts as the workflow; a lab include's pieces do not.
-    own = workflow(tmp_path / "b", include("Extensions\\Camera.bonsai") + include(lint.BOARD))
-    (tmp_path / "b" / "src" / "Extensions").mkdir()
+    (tmp_path / "b" / "src" / "Extensions").mkdir(parents=True)
     (tmp_path / "b" / "src" / "Extensions" / "Camera.bonsai").write_text(HEAD + nodes.split("</Expression>")[2] + "</Expression></Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
+    own = workflow(tmp_path / "b", include("Extensions\\Camera.bonsai") + include(lint.BOARD))
     assert lint.hand_opened_devices(own) == ["OpenRigs.Video.UsbCamera (none yet)"]
 
 

@@ -17,7 +17,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PureWindowsPath
 
 W = "{https://bonsai-rx.org/2018/workflow}"
 XSI = "{http://www.w3.org/2001/XMLSchema-instance}type"
@@ -133,17 +133,57 @@ PREFIXES = {"Bonsai.Reactive": "rx", "Bonsai.Dsp": "dsp", "Bonsai.Shaders": "gl"
 
 class Workflow:
     """A workflow repository's src\\main.bonsai (or another workflow in src), as text and as XML, its root's xsi:type
-    prefixes those of PREFIXES."""
+    prefixes those of PREFIXES. Each workflow file of its own it includes (an IncludeWorkflow Path that is no package's)
+    is the workflow's as much as its own nodes: its Workflow is put inside the include node, as Bonsai builds it, so
+    every check reads it, and `texts` holds each file's text once per inclusion (`text` all of them). An own include
+    Bonsai would not find stops the lint (ValueError), as it stops Bonsai."""
 
     def __init__(self, repo: Path, file: str = "main.bonsai"):
         self.repo = Path(repo)
         self.file = file
-        self.text = (self.repo / "src" / file).read_text(encoding="utf-8-sig")
-        self.root = _parse(self.text)
+        entry = self.repo / "src" / file
+        self.texts = [entry.read_text(encoding="utf-8-sig")]
+        self.root = _parse(self.texts[0])
+        self._inline(self.root, [entry.resolve()])
+        self.text = "\n".join(self.texts)
+
+    def own_include(self, path: str) -> Path:
+        """The file Bonsai 2.9 opens for an own include's Path: IncludeWorkflowBuilder adds .bonsai to a Path with no
+        extension and opens it as given (File.OpenRead), so a relative Path is relative to the working directory, which
+        Bonsai.exe sets to the launched workflow's folder (src) for the editor and --no-editor alike; never relative to
+        the including file's folder."""
+        path = path if PureWindowsPath(path).suffix else path + ".bonsai"
+        if PureWindowsPath(path).anchor:
+            return Path(path)
+        return (self.repo / "src" / self.file).parent / path.replace("\\", "/")
+
+    def _inline(self, root: ET.Element, including: list[Path]) -> None:
+        for node in list(root.iter(W + "Expression")):
+            path = node.get("Path") or ""
+            if node.get(XSI) != "IncludeWorkflow" or not path or _is_package(path):
+                continue
+            target = self.own_include(path).resolve()
+            where = "src\\" + str(PureWindowsPath(including[-1].relative_to((self.repo / "src").resolve())))
+            if not target.is_file():
+                raise ValueError(f"{where} includes {path}, which Bonsai opens as {target} (from src, the launched "
+                                 "workflow's folder), and there is no such file")
+            if target in including:
+                raise ValueError(f"{where}'s include {path} includes itself")
+            text = target.read_text(encoding="utf-8-sig")
+            self.texts.append(text)
+            own = _parse(text)
+            self._inline(own, [*including, target])
+            node.append(child(own, W + "Workflow"))
 
     def named(self, name: str) -> ET.Element:
         """The first node named `name`, at any depth; a ValueError naming it when there is none (not a bare StopIteration)."""
         return _named(self.root, name, f"src\\{self.file}")
+
+
+def _is_package(path: str) -> bool:
+    """Whether an IncludeWorkflow Path names a package's embedded workflow (Bonsai's IsEmbeddedResourcePath: a colon,
+    and not a rooted file path)."""
+    return ":" in path and not PureWindowsPath(path).anchor
 
 
 def _parse(text: str) -> ET.Element:
@@ -361,7 +401,7 @@ def _hardware(wf: Workflow) -> list[tuple[str, dict[str, str], bool]]:
     known = set(PIECES) | {READ_LAB_RIG, READY_GATE}
     found: list[tuple[str, dict[str, str], bool]] = []
 
-    def walk(workflow: ET.Element, file: Path, given: dict[str, str], conditional: bool) -> None:
+    def walk(workflow: ET.Element, given: dict[str, str], conditional: bool) -> None:
         nodes, edges = nodes_and_edges(workflow)
         for j, node in enumerate(nodes):
             path = node.get("Path") or ""
@@ -374,32 +414,27 @@ def _hardware(wf: Workflow) -> list[tuple[str, dict[str, str], bool]]:
             if path in known:
                 found.append((path, props, conditional))
             elif path in RIG_LISTS:
-                walk(child(package_include(wf, path), W + "Workflow"), file, props, conditional)
-            elif node.get(XSI) == "IncludeWorkflow" and ":" not in path:
-                target = (file.parent / path.replace("\\", "/")).resolve()
-                if target.is_file():
-                    own = _parse(target.read_text(encoding="utf-8-sig"))
-                    walk(child(own, W + "Workflow"), target, props, conditional)
-            inner = node.find(W + "Workflow")
+                walk(child(package_include(wf, path), W + "Workflow"), props, conditional)
+            inner = node.find(W + "Workflow")  # a group's, or an own include's (Workflow puts it there)
             if inner is not None:
-                walk(inner, file, {}, conditional or node.get(XSI) in PER_ELEMENT)
+                own = node.get(XSI) == "IncludeWorkflow"
+                walk(inner, props if own else {}, conditional or node.get(XSI) in PER_ELEMENT)
 
-    walk(child(wf.root, W + "Workflow"), wf.repo / "src" / wf.file, {}, False)
+    walk(child(wf.root, W + "Workflow"), {}, False)
     return found
 
 
 def _rig_list_problems(wf: Workflow) -> list[str]:
     """Each property a workflow gives a rig list that the rig list does not expose (Bonsai ignores it silently)."""
     problems = []
-    for root in _local_roots(wf):
-        for node in root.iter(W + "Expression"):
-            path = node.get("Path") or ""
-            if path in RIG_LISTS:
-                exposed = {p.get("DisplayName") or p.get("Name") or "" for m in package_include(wf, path).iter(W + "Expression")
-                           if m.get(XSI) == "ExternalizedMapping" for p in m.iter(W + "Property")}
-                name = path.split(":")[1].removesuffix(".bonsai")
-                problems += [f"{name} is given {p}, which it does not expose ({', '.join(sorted(exposed)) or 'none'})"
-                             for p in _properties(node) if p not in exposed and p not in ("Name", "Description")]
+    for node in wf.root.iter(W + "Expression"):
+        path = node.get("Path") or ""
+        if path in RIG_LISTS:
+            exposed = {p.get("DisplayName") or p.get("Name") or "" for m in package_include(wf, path).iter(W + "Expression")
+                       if m.get(XSI) == "ExternalizedMapping" for p in m.iter(W + "Property")}
+            name = path.split(":")[1].removesuffix(".bonsai")
+            problems += [f"{name} is given {p}, which it does not expose ({', '.join(sorted(exposed)) or 'none'})"
+                         for p in _properties(node) if p not in exposed and p not in ("Name", "Description")]
     return problems
 
 
@@ -490,8 +525,7 @@ def hardware_problems(wf: Workflow) -> list[str]:
     waits = gate_props.get("PieceStages")
     if READY_GATE in paths and set(_stages(waits)) != set(announced):
         problems.append(f"ReadyGate's PieceStages is {waits or 'not set'}, not {', '.join(announced)}")
-    roots = _local_roots(wf)
-    own = [child(n, W + "Combinator").findtext(CORE + "Stage") or "" for root in roots for n in root.iter(W + "Expression")
+    own = [child(n, W + "Combinator").findtext(CORE + "Stage") or "" for n in wf.root.iter(W + "Expression")
            if kind(n) == "core:AnnounceStage"]
     workflow_stages = gate_props.get("WorkflowStages")
     if READY_GATE in paths and set(_stages(workflow_stages)) != set(own):
@@ -500,8 +534,7 @@ def hardware_problems(wf: Workflow) -> list[str]:
     problems += [f"the workflow has its own {what}" for what, found in (
         ("Ready report", re.search(r"<\w+:Phase>Ready</\w+:Phase>", wf.text)),
         ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
-    return (problems + _rig_list_problems(wf) + [p for root in roots for p in ready_announcer_problems(root)]
-            + shared_mapping_problems(wf.root))
+    return problems + _rig_list_problems(wf) + ready_announcer_problems(wf.root) + shared_mapping_problems(wf.root)
 
 
 def shared_mapping_problems(root: ET.Element) -> list[str]:
@@ -583,7 +616,7 @@ def experiment_log_problems(wf: Workflow) -> list[str]:
                  if f"<Name>{name}</Name>" in wf.text]
     # Every device's log waits for PathPrefix, and Bonsai builds a subject's whole top-level node when a subscriber comes
     # first: LogLabExperiment inside a group with a Timestamp reader, or after the pieces, is defined in terms of itself.
-    top = nodes_and_edges(child(wf.root, W + "Workflow"))[0]
+    top = _top(wf)[0]
     paths = [n.get("Path") for n in top]
     log = "OpenRigs.Logging:LogLabExperiment.bonsai"
     if log in wf.text and log not in paths:
@@ -684,7 +717,7 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
                 if any(kind(n).endswith(":" + name) for n in wf.root.iter(W + "Expression"))]
     if 'Path="OpenRigs.Logging:LogControlEvents.bonsai"' in wf.text:
         problems.append("the workflow has its own LogControlEvents (ExperimentRecords does)")
-    top = nodes_and_edges(child(wf.root, W + "Workflow"))[0]
+    top = _top(wf)[0]
     at = next((i for i, n in enumerate(top) if n.get("Path") == EXPERIMENT_RECORDS), None)
     if at is None or any(not kind(n).endswith(":StreamDevices") for n in top[at + 1:]):
         problems.append("ExperimentRecords is not the last top-level node (StreamDevices alone may follow)")
@@ -698,26 +731,10 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
 # Harp.* namespace, Bonsai.Harp or LicketySplit's) is its kind's piece too. A workflow that opens one itself skips the
 # piece's checks, log and Ready stage.
 PIECED_SOURCES = {("Bonsai.Spinnaker", "SpinnakerCapture"): "SpinnakerCamera", ("OpenRigs.Video", "TriggeredSpinnaker"): "SpinnakerCamera",
-                  ("OpenRigs.Video", "UsbCamera"): "none yet", ("Bonsai.Shaders", "CreateWindow"): "ProjectorDisplay"}
+                  ("OpenRigs.Video", "UsbCamera"): "none yet", ("Bonsai.Shaders", "CreateWindow"): "ProjectorDisplay or RawProjectorDisplay"}
 # The sources opened by hand today because no piece fits them, each a workflow allows by name (hand_opened_devices'
 # allowed), and only these.
-UNPIECED = {"UsbCamera": "a calibration's balance camera, a USB camera in no rig.yml (no piece yet)",
-            "CreateWindow": "a projector calibration's own window, which ProjectorDisplay's mesh map and gamma table would distort"}
-
-
-def _own_texts(wf: Workflow) -> list[str]:
-    """The text of the workflow's file and of each workflow file of its own it includes, at any depth."""
-    texts, todo, seen = [], [wf.repo / "src" / wf.file], set()
-    while todo:
-        path = todo.pop()
-        text = path.read_text(encoding="utf-8-sig")
-        texts.append(text)
-        for included in re.findall(r'xsi:type="IncludeWorkflow" Path="([^":]+)"', text):
-            target = (path.parent / included.replace("\\", "/")).resolve()
-            if target not in seen and target.is_file():
-                seen.add(target)
-                todo.append(target)
-    return texts
+UNPIECED = {"UsbCamera": "a calibration's balance camera, a USB camera in no rig.yml (no piece yet)"}
 
 
 def hand_opened_devices(wf: Workflow, allowed: tuple[str, ...] = ()) -> list[str]:
@@ -725,7 +742,7 @@ def hand_opened_devices(wf: Workflow, allowed: tuple[str, ...] = ()) -> list[str
     piece for it (PIECED_SOURCES, and any Harp board's Device), as "<type> (<piece>)". `allowed` names the UNPIECED
     sources this workflow opens by hand; a name not in UNPIECED is refused, so the exceptions stay the listed ones."""
     found = [f"{name} is not a source UNPIECED lists" for name in allowed if name not in UNPIECED]
-    for text in _own_texts(wf):
+    for text in wf.texts:
         namespaces = dict(re.findall(r'xmlns:(\w+)="clr-namespace:([\w.]+);', text))
         for prefix, local in re.findall(r'xsi:type="(\w+):(\w+)"', text):
             ns = namespaces.get(prefix, "")
@@ -736,11 +753,32 @@ def hand_opened_devices(wf: Workflow, allowed: tuple[str, ...] = ()) -> list[str
     return found
 
 
+def _top(wf: Workflow) -> tuple[list[ET.Element], list[tuple[int, int, str]]]:
+    """The workflow's top-level nodes and edges, each own include with no edge into or out of it replaced in place by
+    its own top level: Bonsai builds an include's nodes where the include stands, so a thin entry file's shared include
+    (the job and the live view) is the top level too."""
+    def flat(workflow: ET.Element) -> tuple[list[ET.Element], list[tuple[int, int, str]]]:
+        nodes, edges = nodes_and_edges(workflow)
+        out, out_edges, at = [], [], {}
+        for j, node in enumerate(nodes):
+            inner = node.find(W + "Workflow")
+            if node.get(XSI) == "IncludeWorkflow" and inner is not None and not any(j in e[:2] for e in edges):
+                inner_nodes, inner_edges = flat(inner)
+                out_edges += [(a + len(out), b + len(out), label) for a, b, label in inner_edges]
+                out += inner_nodes
+            else:
+                at[j] = len(out)
+                out.append(node)
+        return out, out_edges + [(at[a], at[b], label) for a, b, label in edges]
+
+    return flat(child(wf.root, W + "Workflow"))
+
+
 def live_view_problems(wf: Workflow) -> list[str]:
-    """The live view is one OpenRigs.LiveView StreamDevices, the workflow's last top-level node, with no edge into or
-    out of it: it streams only the subjects built before it, and an edge into it builds it before them, so it streams
-    nothing (a task shipped that way)."""
-    nodes, edges = nodes_and_edges(child(wf.root, W + "Workflow"))
+    """The live view is one OpenRigs.LiveView StreamDevices, the workflow's last top-level node (_top: a thin entry's
+    shared include may hold it), with no edge into or out of it: it streams only the subjects built before it, and an
+    edge into it builds it before them, so it streams nothing (a task shipped that way)."""
+    nodes, edges = _top(wf)
     live = [i for i, n in enumerate(nodes) if kind(n).endswith(":StreamDevices")]
     if len(live) != 1 or len(list(e for e in wf.root.iter(W + "Expression") if kind(e).endswith(":StreamDevices"))) != 1:
         return ["the workflow does not have one StreamDevices, at its top level"]
@@ -759,7 +797,7 @@ def reward_problems(wf: Workflow) -> list[str]:
     count = wf.text.count(f'Path="{REWARDS}"')
     sent = _order(wf.root, lambda n: n.get(XSI) == "MulticastSubject" and _name(n) == "RewardRequests")
     problems = [f"the workflow includes Rewards {count} times, not once"] if count > 1 or (sent is not None and count != 1) else []
-    nodes = [n for root in _local_roots(wf) for n in root.iter(W + "Expression")]
+    nodes = list(wf.root.iter(W + "Expression"))
     if any(_declares("RewardRequests")(n) for n in nodes):
         problems.append("the workflow declares RewardRequests itself (Rewards does)")
     if any(n.get(XSI) == "SubscribeSubject" and _name(n) == "RewardRequests" for n in nodes):
@@ -808,28 +846,14 @@ def launch_id_problems(wf: Workflow) -> list[str]:
             if not any(e.get("Path") == EXPERIMENT_CONTROL for e in node.iter(W + "Expression")):
                 continue
             if not mapped(nodes, edges, j):
-                where = "ExperimentControl" if node.get("Path") == EXPERIMENT_CONTROL else f"the group {_name(node) or kind(node)}"
+                where = ("ExperimentControl" if node.get("Path") == EXPERIMENT_CONTROL else f"the include {node.get('Path')}"
+                         if node.get(XSI) == "IncludeWorkflow" else f"the group {_name(node) or kind(node)}")
                 return [f"{where} is not given LaunchId by an ExternalizedMapping (map the top-level LaunchId down to ExperimentControl)"]
             inner = node.find(W + "Workflow")
             return walk(inner) if inner is not None and node.get("Path") != EXPERIMENT_CONTROL else []
         return []
 
     return walk(child(wf.root, W + "Workflow"))
-
-
-def _local_roots(wf: Workflow) -> list[ET.Element]:
-    """The workflow and each workflow file of its own it includes (an IncludeWorkflow Path with no package), at any depth."""
-    roots, todo, seen = [], [(wf.repo / "src" / wf.file, wf.root)], set()
-    while todo:
-        path, root = todo.pop()
-        roots.append(root)
-        for n in root.iter(W + "Expression"):
-            included = n.get("Path") or ""
-            target = (path.parent / included.replace("\\", "/")).resolve()
-            if n.get(XSI) == "IncludeWorkflow" and ":" not in included and target not in seen and target.is_file():
-                seen.add(target)
-                todo.append((target, _parse(target.read_text(encoding="utf-8-sig"))))
-    return roots
 
 
 def no_experiment_folder_problems(wf: Workflow) -> list[str]:
@@ -840,7 +864,7 @@ def no_experiment_folder_problems(wf: Workflow) -> list[str]:
     log, none = (wf.text.count(f'Path="{path}"') for path in (LOG_LAB_EXPERIMENT, NO_EXPERIMENT_FOLDER))
     if log + none != 1:
         return [f"the workflow includes LogLabExperiment {log} and NoExperimentFolder {none} times: one of the two once"]
-    nodes = [n for root in _local_roots(wf) for n in root.iter(W + "Expression")]
+    nodes = list(wf.root.iter(W + "Expression"))
     problems = [f"the workflow {what} {name} itself" for what, name, found in (
         ("declares", "PathPrefix", _declares("PathPrefix")),
         ("publishes", "PathPrefix", lambda n: n.get(XSI) == "MulticastSubject" and _name(n) == "PathPrefix"),
@@ -894,7 +918,7 @@ def included_roots(wf: Workflow) -> list[ET.Element]:
     """The workflow, each workflow file of its own it includes, and each lab include they reach that package_include
     reads (every one that declares controls: test_every_declaring_piece_is_readable), at any depth, once per include
     node: a piece included twice is two pieces."""
-    roots, todo = [], _local_roots(wf)
+    roots, todo = [], [wf.root]
     while todo:
         root = todo.pop(0)
         roots.append(root)

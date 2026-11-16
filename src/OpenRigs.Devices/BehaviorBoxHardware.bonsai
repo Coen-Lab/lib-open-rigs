@@ -2,7 +2,7 @@
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The behaviour boxes' hardware (every such rig has the same devices and names in rig.yml), as device pieces after the workflow's own ReadLabRig (which every workflow includes once, before this: a piece's log waits for PathPrefix, whose LogLabExperiment reads RigConfigs, so RigConfigs defined in here would be defined in terms of itself): the Ready gate (ReadyGate), the Behavior board BehaviorBoard-Main with its own clock (ClockFromBoard) and running wheel (WheelDistanceCm), and the camera Camera-Overhead on the board's camera trigger (CameraTriggers; Binning in place of rig.yml's while set). Ready waits for the Harp clock and the camera's first frame. Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it.</Description>
+  <Description>The behaviour boxes' hardware (every such rig has the same devices and names in rig.yml), as device pieces after the workflow's own ReadLabRig (which every workflow includes once, before this: a piece's log waits for PathPrefix, whose LogLabExperiment reads RigConfigs, so RigConfigs defined in here would be defined in terms of itself): the Ready gate (ReadyGate), the Behavior board BehaviorBoard-Main with its own clock (ClockFromBoard) and running wheel (WheelDistanceCm), and the camera Camera-Overhead on the board's camera trigger (CameraTriggers; Binning in place of rig.yml's while set). Ready waits for the Harp clock and the camera's first frame, and for the workflow's own stages (WorkflowStages, each announced by the workflow itself, such as a calibration's CalibrationReady). Each piece takes its entry from rig.yml, logs itself and stops the workflow at start, naming itself, if rig.yml lacks it.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -10,6 +10,7 @@
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
         <PieceStages>HarpClockSet, Camera-Overhead</PieceStages>
+        <WorkflowStages />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai">
         <Name>BehaviorBoard-Main</Name>
@@ -39,9 +40,13 @@
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <CamerasExpected>Camera-Overhead</CamerasExpected>
       </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="WorkflowStages" Description="The workflow's own stages Ready also waits for, comma separated, each announced by the workflow itself (AnnounceStage into ReadyStages), such as CalibrationReady. Empty for a workflow whose Ready waits only for its pieces." />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="5" Label="Source1" />
+      <Edge From="7" To="1" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
