@@ -34,10 +34,10 @@ def test_quiet_wait_refuses_an_endless_wait(key):
 
 def test_a_task_s_own_field_on_a_lab_block_is_finite_too():
     class TimedStage(QuietWait):
-        time_limit_seconds: float
+        response_window_seconds: float
 
     with pytest.raises(ValidationError, match="finite number"):
-        TimedStage.model_validate({"timeLimitSeconds": float("inf")})
+        TimedStage.model_validate({"responseWindowSeconds": float("inf")})
 
 
 def test_penalty_refuses_an_endless_timeout():
