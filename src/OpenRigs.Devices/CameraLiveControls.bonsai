@@ -7,7 +7,7 @@
                  xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Optional live controls for one SpinnakerCamera piece, Camera: two experiment parameters the piece declares itself (DeclareControls), CameraExposureUs (us) and CameraGainDb (dB), so the workflow declares neither, each taken straight to the open camera when the controller sets it (OnParameterSet, CameraLiveSetting), so the preview shows the change while ready; Go fixes them. One second after Start, once the controller's server is up, shows rig.yml's exposureTime and gain as the parameters' values (ParameterDefault) and limits a set exposure to the camera's trigger period less 1000 us (ParameterMaximum), so a longer one is refused at the controller instead of stopping the workflow. Board is the camera's board, for its trigger.</Description>
+  <Description>Optional live controls for one SpinnakerCamera piece, Camera, included once per camera: two experiment parameters the piece declares itself for its camera (DeclareDeviceControls, the piece its camera), Camera.ExposureUs (us) and Camera.GainDb (dB), such as Camera-Overhead.ExposureUs, so the workflow declares neither, each taken straight to the open camera when the controller sets it (OnDeviceParameterSet, CameraLiveSetting), so the preview shows the change while ready; Go fixes them. One second after Start, once the controller's server is up, shows rig.yml's exposureTime and gain as the parameters' values (DeviceParameterDefault) and limits a set exposure to the camera's trigger period less 1000 us (DeviceParameterMaximum), so a longer one is refused at the controller instead of stopping the workflow. Board is the camera's board, for its trigger.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -20,8 +20,9 @@
         <Name>ControlEvents</Name>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orcl:OnParameterSet">
-          <orcl:Name>CameraExposureUs</orcl:Name>
+        <Combinator xsi:type="orcl:OnDeviceParameterSet">
+          <orcl:Name />
+          <orcl:Parameter>ExposureUs</orcl:Parameter>
         </Combinator>
       </Expression>
       <Expression xsi:type="scr:ExpressionTransform">
@@ -37,8 +38,9 @@
         <Name>ControlEvents</Name>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orcl:OnParameterSet">
-          <orcl:Name>CameraGainDb</orcl:Name>
+        <Combinator xsi:type="orcl:OnDeviceParameterSet">
+          <orcl:Name />
+          <orcl:Parameter>GainDb</orcl:Parameter>
         </Combinator>
       </Expression>
       <Expression xsi:type="scr:ExpressionTransform">
@@ -73,16 +75,18 @@
         <Selector>Camera.Settings.ExposureTime</Selector>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orcl:ParameterDefault">
-          <orcl:Name>CameraExposureUs</orcl:Name>
+        <Combinator xsi:type="orcl:DeviceParameterDefault">
+          <orcl:Name />
+          <orcl:Parameter>ExposureUs</orcl:Parameter>
         </Combinator>
       </Expression>
       <Expression xsi:type="MemberSelector">
         <Selector>Camera.Settings.Gain</Selector>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orcl:ParameterDefault">
-          <orcl:Name>CameraGainDb</orcl:Name>
+        <Combinator xsi:type="orcl:DeviceParameterDefault">
+          <orcl:Name />
+          <orcl:Parameter>GainDb</orcl:Parameter>
         </Combinator>
       </Expression>
       <Expression xsi:type="scr:ExpressionTransform">
@@ -91,26 +95,27 @@
         <scr:Expression>1000000.0 / Frequency - 1000.0</scr:Expression>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orcl:ParameterMaximum">
-          <orcl:Name>CameraExposureUs</orcl:Name>
+        <Combinator xsi:type="orcl:DeviceParameterMaximum">
+          <orcl:Name />
+          <orcl:Parameter>ExposureUs</orcl:Parameter>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orcl:DeclareControls">
-          <orcl:Piece>CameraLiveControls</orcl:Piece>
+        <Combinator xsi:type="orcl:DeclareDeviceControls">
+          <orcl:Name />
           <orcl:Parameters>
             <orcl:Parameter>
-              <orcl:Name>CameraExposureUs</orcl:Name>
+              <orcl:Name>ExposureUs</orcl:Name>
               <orcl:Value />
               <orcl:Description>Camera exposure in microseconds, taken by the camera live until Go. Starts at rig.yml's; at most the trigger period less 1,000.</orcl:Description>
               <orcl:Minimum>100</orcl:Minimum>
             </orcl:Parameter>
             <orcl:Parameter>
-              <orcl:Name>CameraGainDb</orcl:Name>
+              <orcl:Name>GainDb</orcl:Name>
               <orcl:Value />
-              <orcl:Description>Camera gain in dB, 0 to 5, taken by the camera live until Go. Starts at rig.yml's.</orcl:Description>
+              <orcl:Description>Camera gain in dB, 0 to 48 (wide enough for every lab camera's own range; a value above a camera's own maximum is refused by the camera), taken by the camera live until Go. Starts at rig.yml's.</orcl:Description>
               <orcl:Minimum>0</orcl:Minimum>
-              <orcl:Maximum>5</orcl:Maximum>
+              <orcl:Maximum>48</orcl:Maximum>
             </orcl:Parameter>
           </orcl:Parameters>
           <orcl:Commands />
@@ -121,6 +126,12 @@
       <Edge From="0" To="5" Label="Source2" />
       <Edge From="0" To="9" Label="Source2" />
       <Edge From="0" To="10" Label="Source1" />
+      <Edge From="0" To="3" Label="Source2" />
+      <Edge From="0" To="7" Label="Source2" />
+      <Edge From="0" To="16" Label="Source2" />
+      <Edge From="0" To="18" Label="Source2" />
+      <Edge From="0" To="20" Label="Source2" />
+      <Edge From="0" To="21" Label="Source1" />
       <Edge From="1" To="11" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
       <Edge From="3" To="4" Label="Source1" />

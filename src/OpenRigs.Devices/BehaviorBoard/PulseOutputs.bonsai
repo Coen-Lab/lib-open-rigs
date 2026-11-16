@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A Behavior board's pulsed output lines (Board), for a rig with reward valves: pulse-enables the lines rig.yml's pulseController.outputPulseEnable names, without the ZapitTrigger's line (PulseEnabledLines), and fires a pulse on a line from TriggerPulse (its DO line, 1 to 3, at the line's set width) or TriggerCalibratedPulse (its line and width). Stops the workflow at start if a line wiring gives a RewardValve is not pulse-enabled, as a reward would then open the valve and leave it open.</Description>
+  <Description>A Behavior board's pulsed output lines (Board), for a rig with reward valves: pulse-enables the lines rig.yml's pulseController.outputPulseEnable names, without the ZapitTrigger's line (PulseEnabledLines), and fires a pulse on a line from TriggerPulse (its DO line, 1 to 3, at the line's set width) or TriggerCalibratedPulse (its line and width). Announces PulsesEnabled into ReadyStages once its lines' pulse mode and widths have gone to the board (0.5 s after the board's first message), so Ready (ReadyGate PieceStages) waits for it and no pulse can go to a line not yet in pulse mode. Stops the workflow at start if a line wiring gives a RewardValve is not pulse-enabled, as a reward would then open the valve and leave it open.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">

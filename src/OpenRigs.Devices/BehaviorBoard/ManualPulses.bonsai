@@ -35,7 +35,7 @@
         <Property Name="Name" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the board's command subject." Category="Subjects" />
       </Expression>
       <Expression xsi:type="MulticastSubject">
-        <Name>BehaviorCommands</Name>
+        <Name>UNMAPPED</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orcl:DeclareControls">

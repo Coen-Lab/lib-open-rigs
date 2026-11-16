@@ -51,19 +51,19 @@
         <Property Name="Name" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the board's command subject." Category="Subjects" />
       </Expression>
       <Expression xsi:type="MulticastSubject">
-        <Name>BehaviorCommands</Name>
+        <Name>UNMAPPED</Name>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Name" DisplayName="BoardDataSubjectName" Description="Board.Data: the board's message subject." Category="Subjects" />
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>BehaviorEvents</Name>
+        <Name>UNMAPPED</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:SubscribeWhen" />
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>BehaviorEvents</Name>
+        <Name>UNMAPPED</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:DelaySubscription">
@@ -148,7 +148,7 @@
         <Property Name="Name" DisplayName="WheelDistanceSubjectName" Description="The name of the Subject that carries the wheel distance in cm" Category="Subjects" />
       </Expression>
       <Expression xsi:type="rx:PublishSubject">
-        <Name>WheelDistanceCm</Name>
+        <Name>UNMAPPED</Name>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Name" DisplayName="Board" Description="The Behavior board the wheel's encoder is on, such as BehaviorBoard-Main." />
