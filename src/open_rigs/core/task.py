@@ -150,6 +150,7 @@ class Optogenetics(TaskBlock):
                     f"laser_to_stimulus_seconds - Zapit's {margin} s reply margin): the next trial's StartStimulus goes once the line falls"
                 )
             return
+        assert laser_duration_seconds is not None  # the other of the two, checked above
         longest = response_delay_seconds + iti - ramp_down_seconds - margin
         if laser_duration_seconds > longest + 1e-9:
             raise ValueError(

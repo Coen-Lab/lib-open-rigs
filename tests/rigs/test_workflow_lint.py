@@ -901,7 +901,7 @@ def test_camera_live_controls_takes_a_pupil_camera_s_gain_of_20_db():
     # Pupil cameras run at gain 20 in rig.yml: the live control must neither clamp nor refuse it.
     root = lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / "CameraLiveControls.bonsai").read_bytes())
     gain = next(p for p in root.iter(lint.CONTROL + "Parameter") if p.findtext(lint.CONTROL + "Name") == "GainDb")
-    assert float(gain.findtext(lint.CONTROL + "Minimum")) <= 0 and float(gain.findtext(lint.CONTROL + "Maximum")) >= 20
+    assert float(gain.findtext(lint.CONTROL + "Minimum") or "nan") <= 0 and float(gain.findtext(lint.CONTROL + "Maximum") or "nan") >= 20
 
 def test_each_lick_detector_and_wheel_publishes_its_own_subject(tmp_path):
     # Audit B6: two detectors both on LickStateRight, or two wheels on one subject, passed the lint.

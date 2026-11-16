@@ -361,7 +361,9 @@ def test_the_c_sharp_helper_fills_the_shared_block_these_name():
     from pathlib import Path
 
     source = (Path(__file__).parents[2] / "src" / "OpenRigs.Devices" / "Trials" / "SharedTrialColumns.cs").read_text(encoding="utf-8")
-    named = {block: re.findall(r'"(\w+)"', re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source).group(1)) for block in ("Core", "QuietWait", "Opto")}
+    blocks = {block: re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source) for block in ("Core", "QuietWait", "Opto")}
+    assert all(blocks.values()), blocks
+    named = {block: re.findall(r'"(\w+)"', found.group(1)) for block, found in blocks.items() if found}
     task_s_own = {"harpTime", "trialType", "outcome"}
     assert named["Core"] == [c[0] for c in CORE_COLUMNS if c[0] not in task_s_own]
     assert named["QuietWait"] == [c[0] for c in trials_module.QUIET_WAIT_COLUMNS]
