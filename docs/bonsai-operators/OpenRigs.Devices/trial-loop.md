@@ -17,7 +17,7 @@
 | Outcome | the tick (or lick or wheel sample, timed at the latest tick) the rules return an outcome, or the window's end | `Outcome`; `TriggerOff` when the line falls |
 | Cues | the task's `TrialCue`s, from the stimulus or the next interval's start (`CueAnchor.Stimulus`, `NextIti`), outcome or not; a stimulus cue made with `droppedAtOutcome` never comes once the trial has its outcome (the spouts in after an early answer) | `Cue` |
 
-`TrialTimes` gives the rules the trial's times as its row logs them (`ItiStartTime` for `itiStartTime`, `ItiSeconds` for `itiSeconds`, `quietWaitSeconds`, `trialStartTime`, `stimulusOnsetTime`, `laserTriggerTime`, and `Now` for `outcomeTime`); `LaserFired` is false on a trial answered before its trigger, which logs 0 mW. `SharedTrialColumns.Fill` fills a row's shared block from them, so every task logs it one way.
+`TrialTimes` gives the rules the trial's times as its row logs them (`ItiStartTime` for `itiStartTime`, `ItiSeconds` for `itiSeconds`, `quietWaitSeconds`, `trialStartTime`, `stimulusOnsetTime`, `laserTriggerTime`, and `Now` for `outcomeTime`); `LaserFired` is false on a trial answered before its trigger, which logs 0 mW. `SharedTrialColumns.Fill` fills a row's shared block from them and the outcome's reward and penalty (`rewardOfferedUl`, `rewarded`, `penalised`), so every task logs it one way; a task makes its reward command from the same `rewarded` it gives `Fill`.
 
 ## The laser
 

@@ -4,12 +4,12 @@ Every task's schemas/trial-columns.yml starts with the shared block, in order, w
 word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
 (QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, opto (OPTO_COLUMNS: laserCondition, laserPowerMw,
-laserTriggerTime) after penaltyTimeoutSeconds. trialType, outcome, rewardSizeUl and penaltySound are in the core by
-name, type and place, each described by its task. A task's own columns follow the block.
+laserTriggerTime) after penalised. trialType, outcome and penaltySound are in the core by name, type and place, each
+described by its task. A task's own columns follow the block.
 
 summarise reads one experiment's BonsaiData/BonsaiData_Trial_*.csv, BonsaiData/BonsaiData_Async_*.csv (each
-RewardDelivered row, Value the microlitres delivered), Settings/Settings_Task_*.json (the lead and the penalty)
-and manifest.json (how the run ended), and checks the rows against each other and the task:
+RewardDelivered row, Value the microlitres delivered and Detail the microlitres requested=), Settings/Settings_Task_*.json
+(the lead and the penalty) and manifest.json (how the run ended), and checks the rows against each other and the task:
 
 - trial numbers run 1, 2, 3 ... with none missing, and each outcome is Correct, Incorrect, NoResponse or Probe;
 - each trial's start (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
@@ -18,9 +18,10 @@ and manifest.json (how the run ended), and checks the rows against each other an
 - each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
   within 2 ms;
 - each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds, within 2 ms;
-- the penalty sound (penaltySound) played on each trial with a timeout when the task's penalty.sound is enabled,
-  and on no trial without one when the task's timeout is above 0;
-- each rewarded trial (rewardSizeUl above 0, and Correct or autoRewarded) has a RewardDelivered row at its outcome.
+- each penalised trial (penalised) had the penalty sound (penaltySound) exactly when the task's penalty.sound is enabled
+  and the task's penalty.timeoutSeconds as its penaltyTimeoutSeconds; an unpenalised one neither;
+- each rewarded trial (rewarded) has a RewardDelivered row at its outcome requesting its rewardOfferedUl, and no
+  RewardDelivered comes at the outcome of a trial not rewarded.
 
 These checks run on finished trials, the rows of BonsaiData_Trial. A run stopped mid-trial has no row for that trial, but
 a task that logs BonsaiData/BonsaiData_StimulusState_*.csv (harpTime, trialNumber, stimulusActive) shows it: rows for the
@@ -30,8 +31,9 @@ without that log has no unfinished trial.
 
 A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
 Performance is Correct / (Correct + Incorrect), over the trials both
-spouts were offered where the task records bothSpouts; the response rate is the trials neither NoResponse nor Probe, of the trials that are not Probe (a Probe trial, both
-modalities shown and never rewarded or penalised, counts in neither).
+spouts were offered where the task records bothSpouts; the response rate is the trials neither NoResponse nor Probe, of the trials that are not Probe (a Probe trial,
+one with no right answer, counts in neither, though rewarded and penalised say what it got: a random-reward probe's
+choice is rewarded or penalised on a coin).
 
 A file without a column the checks read (harpTime, outcomeTime and the rest of the core) is one problem,
 not checked further; without a Settings_Task file the checks that need the task are one problem. A trial row with an
@@ -88,11 +90,20 @@ CORE_COLUMNS: List[Column] = [
      "trial is named; the reward, the penalty sound and the timeout are timed from it. On a lick it is the Harp clock's "
      "latest tick when the workflow saw the lick, a few ms after it; each lick's own Harp time is in the lick "
      "detectors' logs."),
-    ("rewardSizeUl", "double", "ul", None),
+    ("rewardOfferedUl", "double", "ul",
+     "Microlitres a reward on this trial gives, on every trial whether or not it was rewarded: the size the task drew "
+     "for it (its stage's rewardSizeUl, or a larger reward where the task has one); 0 on a trial that offers none. "
+     "rewarded says whether it was given; what was delivered is RewardDelivered in BonsaiData_Async."),
+    ("rewarded", "bool", None,
+     "True when the trial's outcome delivered its reward (rewardOfferedUl, at outcomeTime): the value the workflow's "
+     "reward command is made from. Which outcomes are rewarded is the task's (its note)."),
     ("penaltySound", "bool", None, None),
     ("penaltyTimeoutSeconds", "double", "s",
      "The timeout after this trial: the task's penalty.timeoutSeconds when the trial was penalised, else 0. The next "
      "interval starts after it (itiStartTime)."),
+    ("penalised", "bool", None,
+     "True when the trial was penalised: the task's penalty timeout (penaltyTimeoutSeconds) and, with its penalty.sound "
+     "enabled, the penalty sound (penaltySound) followed its outcome. Which outcomes are penalised is the task's (its note)."),
 ]
 
 QUIET_WAIT_COLUMNS: List[Column] = [
@@ -119,7 +130,7 @@ OPTO_COLUMNS: List[Column] = [
 # Each opt-in block by the name a task gives it, with the core column it follows.
 BLOCKS: Dict[str, Tuple[str, List[Column]]] = {
     "quietWait": ("itiSeconds", QUIET_WAIT_COLUMNS),
-    "opto": ("penaltyTimeoutSeconds", OPTO_COLUMNS),
+    "opto": ("penalised", OPTO_COLUMNS),
 }
 
 TIME_COLUMN = "harpTime"
@@ -177,7 +188,7 @@ class Summary:
     responded: float = float("nan")  # the trials neither NoResponse nor Probe, of the not-Probe; NaN with no trials
     response_seconds: List[float] = field(default_factory=list)  # each trial's outcome less its stimulus onset
     interval_seconds: List[float] = field(default_factory=list)  # each outcome to the next stimulus onset
-    requested_ul: float = 0.0  # the task's rewards: rewardSizeUl of each rewarded trial
+    requested_ul: float = 0.0  # the task's rewards: rewardOfferedUl of each rewarded trial
     delivered_ul: float = 0.0  # every RewardDelivered row's Value (manual rewards included)
     problems: List[str] = field(default_factory=list)
     videos: List[str] = field(default_factory=list)  # each camera video's frames and CSV rows, when checked
@@ -208,12 +219,12 @@ def _true(text: Any) -> bool:
 
 
 # The columns summarise reads: of a trial row, and of an async row.
-TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "penaltySound", "penaltyTimeoutSeconds")
+TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds", "penalised")
 ASYNC_NEEDS = (TIME_COLUMN, "Event", "Value")
 # A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an infinity, an
 # empty cell or text is a problem and the row's checks are skipped.
 TRIAL_NUMBERS = ("trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime",
-                 "rewardSizeUl", "penaltyTimeoutSeconds", "quietWaitSeconds", "laserTriggerTime")
+                 "rewardOfferedUl", "penaltyTimeoutSeconds", "quietWaitSeconds", "laserTriggerTime")
 NAN_ALLOWED = ("stimulusOnsetTime", "laserTriggerTime")
 
 
@@ -234,7 +245,18 @@ def _not_numbers(row: Dict[str, str]) -> List[str]:
 
 
 def _rewarded(row: Dict[str, str]) -> bool:
-    return _f(row, "rewardSizeUl") > 0 and (row["outcome"] == "Correct" or _true(row.get("autoRewarded", "")))
+    return _true(row["rewarded"])
+
+
+def _requested(detail: str) -> Optional[float]:
+    """A RewardDelivered row's requested microlitres (`requested=` in its Detail), or None without one."""
+    for part in str(detail or "").split():
+        if part.startswith("requested="):
+            try:
+                return float(part[len("requested="):])
+            except ValueError:
+                return None
+    return None
 
 
 @dataclass
@@ -294,14 +316,14 @@ def _summarise(folder: Path) -> Summary:
     if trials and task is None:
         s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the penalty sound not checked")
     rewards = [e for e in events if e["Event"] == "RewardDelivered"]
-    reward_times = []
+    reward_times: List[Tuple[float, Optional[float]]] = []  # each RewardDelivered's time and requested microlitres
     for e in rewards:
         try:
             s.delivered_ul += float(e["Value"] or 0)
         except (TypeError, ValueError):
             s.problems.append(f"BonsaiData_Async: a RewardDelivered row's Value {e['Value']!r} is not a number")
         try:
-            reward_times.append(_f(e, TIME_COLUMN))
+            reward_times.append((_f(e, TIME_COLUMN), _requested(e.get("Detail", ""))))
         except (TypeError, ValueError):
             s.problems.append(f"BonsaiData_Async: a RewardDelivered row's {TIME_COLUMN} {e[TIME_COLUMN]!r} is not a number")
     last: Optional[Dict[str, str]] = None  # the row before, when its numbers could be read
@@ -339,13 +361,14 @@ def _summarise(folder: Path) -> Summary:
             if not math.isnan(trigger) and abs(trigger - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: laser trigger {trigger - due:+.4f} s from laserToStimulusSeconds "
                                   f"({task.laser_to_stimulus:g} s) before the stimulus was due")
-            sounded, timed_out = _true(row["penaltySound"]), _f(row, "penaltyTimeoutSeconds") > 0
-            if timed_out and sounded != task.sound:
-                s.problems.append(f"trial {number}: a timeout {'with' if sounded else 'without'} the penalty sound, but the "
-                                  f"task's penalty.sound is {'off' if sounded else 'on'}")
-            if not timed_out and sounded and task.timeout_seconds > 0:
-                s.problems.append(f"trial {number}: the penalty sound with no timeout, though the task's timeout is "
-                                  f"{task.timeout_seconds:g} s")
+            penalised, sounded, timeout = _true(row["penalised"]), _true(row["penaltySound"]), _f(row, "penaltyTimeoutSeconds")
+            if sounded != (penalised and task.sound):
+                s.problems.append(f"trial {number}: penaltySound {sounded} on a trial {'penalised' if penalised else 'not penalised'}, "
+                                  f"with the task's penalty.sound {'on' if task.sound else 'off'}")
+            want = task.timeout_seconds if penalised else 0.0
+            if abs(timeout - want) > 1e-9:
+                s.problems.append(f"trial {number}: penaltyTimeoutSeconds {timeout:g} on a trial "
+                                  f"{'penalised' if penalised else 'not penalised'}, not {want:g}")
         if last is not None:
             due = _f(last, "outcomeTime") + _f(last, "penaltyTimeoutSeconds")
             if abs(_f(row, "itiStartTime") - due) > TOLERANCE_S:
@@ -354,12 +377,19 @@ def _summarise(folder: Path) -> Summary:
             if shown:
                 s.interval_seconds.append(onset - _f(last, "outcomeTime"))
         last = row
+        at_outcome = [r for t, r in reward_times if abs(t - end) <= TOLERANCE_S]
+        offered = _f(row, "rewardOfferedUl")
         if _rewarded(row):
-            s.requested_ul += _f(row, "rewardSizeUl")
-            if not any(abs(t - end) <= TOLERANCE_S for t in reward_times):
-                nearest = min(reward_times, key=lambda t: abs(t - end), default=None)
-                s.problems.append(f"trial {number}: rewarded with rewardSizeUl {row['rewardSizeUl']} but no RewardDelivered at its outcome"
+            s.requested_ul += offered
+            if not at_outcome:
+                nearest = min((t for t, _ in reward_times), key=lambda t: abs(t - end), default=None)
+                s.problems.append(f"trial {number}: rewarded with rewardOfferedUl {row['rewardOfferedUl']} but no RewardDelivered at its outcome"
                                   + (f" (the nearest {(nearest - end) * 1000:+.0f} ms from it)" if nearest is not None else ""))
+            elif not any(r is None or abs(r - offered) <= 1e-6 for r in at_outcome):
+                s.problems.append(f"trial {number}: rewarded with rewardOfferedUl {row['rewardOfferedUl']} but its RewardDelivered "
+                                  f"requested {', '.join(f'{r:g}' for r in at_outcome)} ul")
+        elif at_outcome:
+            s.problems.append(f"trial {number}: a RewardDelivered at its outcome, but rewarded is False")
     _unfinished(s, folder, trials, last)
     return s
 

@@ -7,14 +7,14 @@ namespace OpenRigs.Devices
 {
     /// <summary>
     /// The lab's shared block of trial columns (open_rigs.rigs.trials CORE_COLUMNS, QUIET_WAIT_COLUMNS, OPTO_COLUMNS),
-    /// filled the same way in every task from the trial loop's <see cref="TrialTimes"/>: a task's row is a class with one
-    /// public field per column, in its schemas\trial-columns.yml order, and fills its own columns (trialType, outcome,
-    /// rewardSizeUl and the task's) itself.
+    /// filled the same way in every task from the trial loop's <see cref="TrialTimes"/> and the outcome's reward and penalty:
+    /// a task's row is a class with one public field per column, in its schemas\trial-columns.yml order, and fills its own
+    /// columns (trialType, outcome and the task's) itself.
     /// </summary>
     public static class SharedTrialColumns
     {
-        /// <summary>The core columns this fills; every row has them (harpTime is the row's timestamp, and trialType, outcome and rewardSizeUl the task's).</summary>
-        public static readonly string[] Core = { "trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "penaltySound", "penaltyTimeoutSeconds" };
+        /// <summary>The core columns this fills; every row has them (harpTime is the row's timestamp, and trialType and outcome the task's).</summary>
+        public static readonly string[] Core = { "trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds", "penalised" };
 
         /// <summary>The quietWait block: filled when the row has it.</summary>
         public static readonly string[] QuietWait = { "quietWaitSeconds" };
@@ -24,12 +24,14 @@ namespace OpenRigs.Devices
 
         /// <summary>
         /// Fills <paramref name="row"/>'s shared block at the trial's outcome (times.Now): its number; the loop's times;
-        /// penaltySound true only when the trial is penalised and the task's penalty sound is on; penaltyTimeoutSeconds the
-        /// task's timeout when penalised, else 0; with the opto block, the trial's laser condition, its power only if the
+        /// rewardOfferedUl, the microlitres a reward on this trial gives, on every trial; rewarded, whether the outcome
+        /// delivers it (the same value the task's valve command is made from); penaltySound true only when the trial is
+        /// penalised and the task's penalty sound is on; penaltyTimeoutSeconds the task's timeout when penalised, else 0;
+        /// penalised itself; with the opto block, the trial's laser condition, its power only if the
         /// laser was triggered (else 0 mW) and the trigger's time (NaN if none), or 0, 0 and NaN for a trial that is not an
         /// IZapitTrial. Throws naming a missing or mistyped column. Returns the row.
         /// </summary>
-        public static T Fill<T>(T row, ITrial trial, TrialTimes times, bool penalised, double penaltyTimeoutSeconds, bool penaltySoundEnabled) where T : class
+        public static T Fill<T>(T row, ITrial trial, TrialTimes times, double rewardOfferedUl, bool rewarded, bool penalised, double penaltyTimeoutSeconds, bool penaltySoundEnabled) where T : class
         {
             if (row == null) throw new ArgumentNullException("row");
             if (trial == null) throw new ArgumentNullException("trial");
@@ -43,8 +45,11 @@ namespace OpenRigs.Devices
                 { "trialStartTime", times.TrialStartTime },
                 { "stimulusOnsetTime", times.StimulusOnsetTime },
                 { "outcomeTime", times.Now },
+                { "rewardOfferedUl", rewardOfferedUl },
+                { "rewarded", rewarded },
                 { "penaltySound", penalised && penaltySoundEnabled },
                 { "penaltyTimeoutSeconds", penalised ? penaltyTimeoutSeconds : 0.0 },
+                { "penalised", penalised },
             };
             var missing = new List<string>();
             foreach (var name in Core) if (Field(type, name) == null) missing.Add(name);

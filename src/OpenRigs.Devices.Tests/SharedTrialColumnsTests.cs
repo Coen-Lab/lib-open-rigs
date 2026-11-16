@@ -18,9 +18,11 @@ namespace OpenRigs.Devices.Tests
             public double trialStartTime;
             public double stimulusOnsetTime;
             public double outcomeTime;
-            public double rewardSizeUl;
+            public double rewardOfferedUl;
+            public bool rewarded;
             public bool penaltySound;
             public double penaltyTimeoutSeconds;
+            public bool penalised;
             public int laserCondition;
             public double laserPowerMw;
             public double laserTriggerTime;
@@ -35,8 +37,11 @@ namespace OpenRigs.Devices.Tests
             public double trialStartTime;
             public double stimulusOnsetTime;
             public double outcomeTime;
+            public double rewardOfferedUl;
+            public bool rewarded;
             public bool penaltySound;
             public double penaltyTimeoutSeconds;
+            public bool penalised;
         }
 
         class HalfOpto : CoreRow { public int laserCondition; }
@@ -51,8 +56,11 @@ namespace OpenRigs.Devices.Tests
             public double trialStartTime;
             public double stimulusOnsetTime;
             public double outcomeTime;
+            public double rewardOfferedUl;
+            public bool rewarded;
             public bool penaltySound;
             public double penaltyTimeoutSeconds;
+            public bool penalised;
         }
 
         static TrialTimes Times(double trigger)
@@ -65,7 +73,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void FillsTheSharedBlockFromTheLoopsTimes()
         {
-            var row = SharedTrialColumns.Fill(new OptoRow { choice = "Left" }, Laser(), Times(12.25), true, 6, true);
+            var row = SharedTrialColumns.Fill(new OptoRow { choice = "Left" }, Laser(), Times(12.25), 3, false, true, 6, true);
             Assert.AreEqual(7, row.trialNumber);
             Assert.AreEqual(10, row.itiStartTime);
             Assert.AreEqual(2.5, row.itiSeconds);
@@ -73,8 +81,11 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual(12.25, row.trialStartTime);
             Assert.AreEqual(12.751, row.stimulusOnsetTime);
             Assert.AreEqual(13.5, row.outcomeTime, "the outcome is Now");
+            Assert.AreEqual(3, row.rewardOfferedUl, "the offer, on a trial not rewarded too");
+            Assert.IsFalse(row.rewarded);
             Assert.IsTrue(row.penaltySound);
             Assert.AreEqual(6, row.penaltyTimeoutSeconds);
+            Assert.IsTrue(row.penalised);
             Assert.AreEqual(3, row.laserCondition);
             Assert.AreEqual(4.5, row.laserPowerMw);
             Assert.AreEqual(12.25, row.laserTriggerTime);
@@ -85,14 +96,18 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void AnUnpenalisedOrUntriggeredTrialLogsNoTimeoutSoundOrPower()
         {
-            var row = SharedTrialColumns.Fill(new OptoRow(), Laser(), Times(double.NaN), false, 6, true);
+            var row = SharedTrialColumns.Fill(new OptoRow(), Laser(), Times(double.NaN), 3, true, false, 6, true);
+            Assert.IsTrue(row.rewarded);
+            Assert.IsFalse(row.penalised);
             Assert.IsFalse(row.penaltySound);
             Assert.AreEqual(0, row.penaltyTimeoutSeconds);
             Assert.AreEqual(0, row.laserPowerMw, "answered before its trigger: no laser");
             Assert.IsTrue(double.IsNaN(row.laserTriggerTime));
-            Assert.IsFalse(SharedTrialColumns.Fill(new OptoRow(), Laser(), Times(1), true, 6, false).penaltySound, "the sound off");
+            var silent = SharedTrialColumns.Fill(new OptoRow(), Laser(), Times(1), 0, false, true, 6, false);
+            Assert.IsFalse(silent.penaltySound, "the sound off");
+            Assert.IsTrue(silent.penalised, "penalised whether or not the sound plays");
 
-            var core = SharedTrialColumns.Fill(new CoreRow(), Laser(), Times(1), true, 6, true);
+            var core = SharedTrialColumns.Fill(new CoreRow(), Laser(), Times(1), 3, false, true, 6, true);
             Assert.AreEqual(7, core.trialNumber, "a row without the opt-in blocks");
         }
 
@@ -105,9 +120,10 @@ namespace OpenRigs.Devices.Tests
                 catch (InvalidOperationException e) { return e.Message; }
                 throw new AssertFailedException("no refusal");
             };
-            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), false, 0, false)), "has no itiStartTime, itiSeconds");
-            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOpto(), Laser(), Times(1), false, 0, false)), "not all of laserCondition, laserPowerMw, laserTriggerTime");
-            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new FloatTimes(), Laser(), Times(1), false, 0, false)), "itiSeconds is a Single, not a Double");
+            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), 0, false, false, 0, false)), "has no itiStartTime, itiSeconds");
+            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), 0, false, false, 0, false)), "rewardOfferedUl, rewarded, penaltySound, penaltyTimeoutSeconds, penalised");
+            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOpto(), Laser(), Times(1), 0, false, false, 0, false)), "not all of laserCondition, laserPowerMw, laserTriggerTime");
+            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new FloatTimes(), Laser(), Times(1), 0, false, false, 0, false)), "itiSeconds is a Single, not a Double");
         }
     }
 }

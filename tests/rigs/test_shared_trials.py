@@ -11,17 +11,18 @@ from open_rigs.rigs import trials as trials_module
 from open_rigs.rigs.trials import CORE_COLUMNS, shared_block_problems, shared_columns, summarise
 
 COLUMNS = ["harpTime", "trialNumber", "trialType", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds",
-           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardSizeUl", "penaltySound", "penaltyTimeoutSeconds",
-           "autoRewarded"]
+           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds",
+           "penalised", "autoRewarded"]
 
 
-def _trial(n, start, iti, response, outcome="Correct", timeout=0.0, quiet=0.0, reward=2.0, auto=False):
+def _trial(n, start, iti, response, outcome="Correct", timeout=0.0, quiet=0.0, reward=2.0, auto=False, rewarded=None):
     onset = start + iti + quiet
     end = onset + response
     return {"harpTime": end, "trialNumber": n, "trialType": "auditory", "outcome": outcome, "itiStartTime": start,
             "itiSeconds": iti, "quietWaitSeconds": quiet, "trialStartTime": onset - 0.1, "stimulusOnsetTime": onset,
-            "outcomeTime": end, "rewardSizeUl": reward, "penaltySound": timeout > 0, "penaltyTimeoutSeconds": timeout,
-            "autoRewarded": auto}
+            "outcomeTime": end, "rewardOfferedUl": reward,
+            "rewarded": outcome == "Correct" or auto if rewarded is None else rewarded, "penaltySound": timeout > 0,
+            "penaltyTimeoutSeconds": timeout, "penalised": timeout > 0, "autoRewarded": auto}
 
 
 TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "penalty": {"timeoutSeconds": 4.0, "sound": {"enabled": True}}}
@@ -40,7 +41,7 @@ def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, colu
     with open(folder / "BonsaiData" / "BonsaiData_Async_2026-11-14T01-00-00.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["harpTime", "Event", "Detail", "Value"])
-        w.writerows([[t, "RewardDelivered", "left DO1", ul] for t, ul in rewards])
+        w.writerows([[r[0], "RewardDelivered", r[2] if len(r) > 2 else "left DO1", r[1]] for r in rewards])
     (folder / "manifest.json").write_text(json.dumps({"run": {"outcome": outcome, "final": final}}))
     return folder
 
@@ -85,7 +86,7 @@ def test_an_auto_rewarded_miss_is_a_rewarded_trial(tmp_path):
     trials = [_trial(1, 1000.0, 2.5, 3.0, outcome="NoResponse", auto=True)]
     s = summarise(_experiment(tmp_path, trials, []))
     assert s.requested_ul == 2.0
-    assert s.problems == ["trial 1: rewarded with rewardSizeUl 2.0 but no RewardDelivered at its outcome"]
+    assert s.problems == ["trial 1: rewarded with rewardOfferedUl 2.0 but no RewardDelivered at its outcome"]
 
 
 def test_an_uncalibrated_line_asks_water_but_delivers_none(tmp_path):
@@ -105,7 +106,7 @@ def test_each_inconsistency_is_named(tmp_path):
     assert "trial 2: stimulus" in text
     assert "trial 4: interval started +0.5000 s" in text
     assert "row 3 is trial 4" in text
-    assert "trial 1: rewarded with rewardSizeUl 2.0 but no RewardDelivered" in text
+    assert "trial 1: rewarded with rewardOfferedUl 2.0 but no RewardDelivered" in text
 
 
 def test_a_trial_without_a_stimulus_is_a_note_and_left_out_of_the_times(tmp_path):
@@ -175,16 +176,17 @@ def test_each_block_sits_in_its_place_in_the_core():
     core = [name for name, _, _, _ in CORE_COLUMNS]
     assert [name for name, _, _, _ in shared_columns(())] == core
     both = [name for name, _, _, _ in shared_columns(BOTH)]
-    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-4:] == [
-        "penaltyTimeoutSeconds", "laserCondition", "laserPowerMw", "laserTriggerTime"]
-    assert len(both) == 16 and len(core) == 12
+    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-8:] == [
+        "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds", "penalised", "laserCondition",
+        "laserPowerMw", "laserTriggerTime"]
+    assert len(both) == 18 and len(core) == 14
 
 
 def test_a_task_without_a_block_is_held_to_the_core_alone():
     assert shared_block_problems(_block(()), ()) == []
     # A task naming a block its file lacks, or lacking one it names, is told.
-    assert shared_block_problems(_block(()), ("opto",))[0].startswith("the first 15 columns are")
-    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 12 columns are")
+    assert shared_block_problems(_block(()), ("opto",))[0].startswith("the first 17 columns are")
+    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 14 columns are")
 
 
 def test_an_unknown_block_is_refused():
@@ -201,22 +203,60 @@ def test_a_change_to_the_shared_block_is_named():
         "laserCondition is double, not int",
     ]
     reordered = dict(reversed(list(_block().items())))
-    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 16 columns are")
+    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 18 columns are")
 
 
-def test_go_the_outcomes_and_the_penalty_sound_are_checked_against_the_task(tmp_path):
+def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):
     # A trial start 5 s off, an outcome that is no outcome, a timeout without the sound and a sound without a timeout were
-    # all passed before (audit, 14 Nov 2026).
+    # all passed before (audit, 14 Nov 2026); the penalty is held exactly to penalised from 16 Nov 2026.
     trials = _chain(4)
     trials[0]["trialStartTime"] -= 5
-    trials[1]["penaltySound"] = False  # Incorrect, with a 4 s timeout, the task's sound on
+    trials[1]["penaltySound"] = False  # penalised, the task's sound on
     trials[2]["outcome"] = "Banana"
-    trials[2]["penaltySound"] = True  # no timeout
+    trials[2]["penaltySound"] = True  # not penalised
+    trials[3]["penaltyTimeoutSeconds"] = 3.0  # penalised, the task's timeout 4 s
     text = "\n".join(summarise(_experiment(tmp_path, trials, [])).problems)
     assert "trial 1: trial start (trialStartTime) -5.0000 s from its interval's end less the lead (0.1 s) plus quietWaitSeconds" in text
-    assert "trial 2: a timeout without the penalty sound, but the task's penalty.sound is on" in text
+    assert "trial 2: penaltySound False on a trial penalised, with the task's penalty.sound on" in text
     assert "trial 3: outcome 'Banana' is not one of Correct, Incorrect, NoResponse" in text
-    assert "trial 3: the penalty sound with no timeout, though the task's timeout is 4 s" in text
+    assert "trial 3: penaltySound True on a trial not penalised, with the task's penalty.sound on" in text
+    assert "trial 4: penaltyTimeoutSeconds 3 on a trial penalised, not 4" in text
+
+
+def test_a_timeout_on_an_unpenalised_trial_and_the_sound_off_are_named(tmp_path):
+    trials = _chain(2)
+    trials[0]["penaltyTimeoutSeconds"] = 0.5  # not penalised
+    trials[1]["penaltySound"] = True  # penalised, but the task's sound off
+    task = {**TASK, "penalty": {"timeoutSeconds": 4.0, "sound": {"enabled": False}}}
+    rewards = [(trials[0]["outcomeTime"], 2.0)]
+    text = "\n".join(summarise(_experiment(tmp_path, trials, rewards, task=task)).problems)
+    assert "trial 1: penaltyTimeoutSeconds 0.5 on a trial not penalised, not 0" in text
+    assert "trial 2: penaltySound True on a trial penalised, with the task's penalty.sound off" in text
+
+
+def test_a_reward_is_checked_both_ways_and_by_its_request(tmp_path):
+    # rewarded is the value the reward command came from: a rewarded trial has its RewardDelivered at its outcome,
+    # requesting rewardOfferedUl; a trial not rewarded has none there.
+    trials = _chain(4)
+    trials[2]["rewardOfferedUl"] = 3.0
+    rewards = [(trials[0]["outcomeTime"], 1.9, "left DO1 requested=2 pulses=3"),
+               (trials[1]["outcomeTime"], 2.0, "left DO1 requested=2 pulses=3"),
+               (trials[2]["outcomeTime"], 2.0, "left DO1 requested=2 pulses=3")]
+    s = summarise(_experiment(tmp_path, trials, rewards))
+    assert s.problems == ["trial 2: a RewardDelivered at its outcome, but rewarded is False",
+                          "trial 3: rewarded with rewardOfferedUl 3.0 but its RewardDelivered requested 2 ul"]
+    assert s.requested_ul == 5.0
+
+
+def test_a_paid_probe_counts_as_asked_and_an_unpaid_one_offers_without_a_reward(tmp_path):
+    trials = _chain(2)
+    start = trials[-1]["outcomeTime"] + trials[-1]["penaltyTimeoutSeconds"]
+    heads = _trial(3, start, 2.5, 3.0, outcome="Probe", rewarded=True)
+    tails = _trial(4, heads["outcomeTime"], 2.5, 3.0, outcome="Probe", timeout=4.0)
+    trials += [heads, tails]
+    rewards = [(trials[0]["outcomeTime"], 2.0), (heads["outcomeTime"], 2.0)]
+    s = summarise(_experiment(tmp_path, trials, rewards))
+    assert s.problems == [] and s.requested_ul == 4.0
 
 
 def test_a_negative_quiet_wait_is_named(tmp_path):
@@ -316,13 +356,13 @@ def test_a_task_without_a_stimulus_state_log_has_no_unfinished_trial(tmp_path):
 
 def test_the_c_sharp_helper_fills_the_shared_block_these_name():
     # Audit B5: each task filled the shared block by hand, and two had diverged. OpenRigs.Devices SharedTrialColumns fills
-    # every column of it but the ones each task describes (trialType, outcome, rewardSizeUl) and harpTime, the row's time.
+    # every column of it but trialType and outcome, each task's own, and harpTime, the row's time.
     import re
     from pathlib import Path
 
     source = (Path(__file__).parents[2] / "src" / "OpenRigs.Devices" / "Trials" / "SharedTrialColumns.cs").read_text(encoding="utf-8")
     named = {block: re.findall(r'"(\w+)"', re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source).group(1)) for block in ("Core", "QuietWait", "Opto")}
-    task_s_own = {"harpTime", "trialType", "outcome", "rewardSizeUl"}
+    task_s_own = {"harpTime", "trialType", "outcome"}
     assert named["Core"] == [c[0] for c in CORE_COLUMNS if c[0] not in task_s_own]
     assert named["QuietWait"] == [c[0] for c in trials_module.QUIET_WAIT_COLUMNS]
     assert named["Opto"] == [c[0] for c in trials_module.OPTO_COLUMNS]
