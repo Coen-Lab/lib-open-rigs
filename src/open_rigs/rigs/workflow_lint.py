@@ -378,10 +378,6 @@ def _name(n: ET.Element) -> str:
     return n.findtext(W + "Name") or n.findtext(RX + "Name") or ""
 
 
-def _value(n: ET.Element) -> str:
-    return child(n, W + "Combinator").findtext(W + "Value") or ""
-
-
 def package_include(wf: Workflow, path: str) -> ET.Element:
     """A lab include's workflow (`path` as an IncludeWorkflow names it, of those in SIGNATURES): from lib-open-rigs'
     source when this module runs from it, else from the OpenRigs.Devices package Bonsai.config pins, in local_packages."""
@@ -623,8 +619,8 @@ def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[str]) -> 
     which writes each pulse's width before it sets the line. Refused: a board message that pulses, sets or sizes a
     valve's line itself (OutputSet, OutputPulseEnable, PulseDO<n>, PulseDOPort<n>)."""
     found = []
-    for nodes, edges in _scopes(wf.root):
-        for i, node in enumerate(nodes):
+    for nodes, _ in _scopes(wf.root):
+        for node in nodes:
             payload = next((e for e in node if e.tag.endswith("}Payload")), None)
             if payload is None:
                 continue

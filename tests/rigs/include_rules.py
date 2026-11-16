@@ -12,13 +12,16 @@ from open_rigs.rigs.workflow_lint import (
     ZAPIT_INCLUDE,
     _name,  # pyright: ignore[reportPrivateUsage]
     _named,  # pyright: ignore[reportPrivateUsage]
-    _value,  # pyright: ignore[reportPrivateUsage]
     child,
     kind,
     nodes_and_edges,
     scope,
     upstream,
 )
+
+def _value(n: ET.Element) -> str:
+    return child(n, W + "Combinator").findtext(W + "Value") or ""
+
 
 MANUAL_REWARD_DROP_UL = 2.5  # each valve's manual drop (RewardValve-Left.Reward) gives this, before and during a run
 
