@@ -61,6 +61,38 @@ namespace OpenRigs.Devices.Tests
             StringAssert.Contains(error.Message, "TimestampGeneratorGen3-Main's Harp clock was not set within 0.3 s");
         }
 
+        // A port opened late, after the other devices: the clock counts from the first heartbeat.
+        [TestMethod]
+        public void SetsTheClock_WhenTheFirstHeartbeatComesAfterTimeoutSeconds()
+        {
+            var device = new Subject<HarpMessage>();
+            Exception error = null;
+            using (Clock(timeout: 0.3).Process(device).Subscribe(_ => { }, e => error = e))
+            {
+                Thread.Sleep(600);
+                device.OnNext(Heartbeat(-3600));
+                Thread.Sleep(100);
+                device.OnNext(Heartbeat(0.2));
+                Thread.Sleep(400);
+            }
+            Assert.IsNull(error, "stopped: " + error);
+        }
+
+        [TestMethod]
+        public void StopsNamingTheDevice_WhenItSendsNoHeartbeat()
+        {
+            var device = new Subject<HarpMessage>();
+            var failed = new ManualResetEventSlim();
+            Exception error = null;
+            var clock = Clock();
+            clock.FirstHeartbeatSeconds = 0.3;
+            using (clock.Process(device).Subscribe(_ => { }, e => { error = e; failed.Set(); }))
+            {
+                Assert.IsTrue(failed.Wait(TimeSpan.FromSeconds(5)), "no error");
+            }
+            StringAssert.Contains(error.Message, "TimestampGeneratorGen3-Main sent no heartbeat within 0.3 s");
+        }
+
         [TestMethod]
         public void StopsNamingTheDevice_WhenHeartbeatsStopMidRun()
         {

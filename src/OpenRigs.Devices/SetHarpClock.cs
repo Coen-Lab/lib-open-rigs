@@ -12,10 +12,11 @@ namespace OpenRigs.Devices
     /// time to the device at start and again at each of its heartbeats until one of them agrees with UTC
     /// within <see cref="ToleranceSeconds"/>: a write can be lost (about one start in four on a
     /// behaviour box). Stops the workflow, naming the device, if the clock is not set within
-    /// <see cref="TimeoutSeconds"/>, or if its heartbeats stop for <see cref="GapSeconds"/> mid-run.
+    /// <see cref="TimeoutSeconds"/> of its first heartbeat, if it sends none within
+    /// <see cref="FirstHeartbeatSeconds"/>, or if its heartbeats stop for <see cref="GapSeconds"/> mid-run.
     /// </summary>
     [Combinator]
-    [Description("Writes UTC to the clock device (the input is its messages, the output its commands) at start and at each heartbeat until a heartbeat agrees with UTC. Stops the workflow, naming the device, if that takes longer than TimeoutSeconds or its heartbeats stop for GapSeconds.")]
+    [Description("Writes UTC to the clock device (the input is its messages, the output its commands) at start and at each heartbeat until a heartbeat agrees with UTC. Stops the workflow, naming the device, if that takes longer than TimeoutSeconds from its first heartbeat, it sends none within FirstHeartbeatSeconds, or its heartbeats stop for GapSeconds.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class SetHarpClock
     {
@@ -27,9 +28,13 @@ namespace OpenRigs.Devices
         [Description("How far a heartbeat may be from the PC's UTC clock for the clock to count as set, in seconds.")]
         public double ToleranceSeconds { get; set; } = 2;
 
-        /// <summary>Gets or sets how long setting the clock may take, in seconds.</summary>
-        [Description("How long setting the clock may take, from subscription, in seconds.")]
+        /// <summary>Gets or sets how long setting the clock may take from the device's first heartbeat, in seconds.</summary>
+        [Description("How long setting the clock may take, from the device's first heartbeat, in seconds.")]
         public double TimeoutSeconds { get; set; } = 10;
+
+        /// <summary>Gets or sets how long the device's first heartbeat may take, in seconds.</summary>
+        [Description("How long the device's first heartbeat may take, from subscription, in seconds: its port opens only after every device subscribed before it.")]
+        public double FirstHeartbeatSeconds { get; set; } = 30;
 
         /// <summary>Gets or sets the longest gap allowed between heartbeats, in seconds.</summary>
         [Description("The longest gap allowed between the device's heartbeats (one a second), in seconds.")]
@@ -49,10 +54,19 @@ namespace OpenRigs.Devices
                 var writes = Observable.Return(0L).Concat(heartbeats.Select(_ => 0L))
                     .Select(_ => Write(DateTime.UtcNow))
                     .TakeUntil(set);
-                var notSet = Observable.Timer(TimeSpan.FromSeconds(TimeoutSeconds))
+                // From the first heartbeat: a workflow that opens many devices can take most of TimeoutSeconds
+                // to reach this one's port, which says nothing about its clock.
+                var timeout = TimeSpan.FromSeconds(TimeoutSeconds);
+                var notSet = heartbeats.Take(1)
+                    .SelectMany(_ => Observable.Timer(timeout))
                     .SelectMany(_ => Observable.Throw<HarpMessage>(new TimeoutException(string.Format(
-                        "{0}'s Harp clock was not set within {1} s: no heartbeat agreed with the PC's UTC clock. Check its USB cable and power.", name, TimeoutSeconds))))
+                        "{0}'s Harp clock was not set within {1} s of its first heartbeat: no heartbeat agreed with the PC's UTC clock. Check its USB cable and power.", name, timeout.TotalSeconds))))
                     .TakeUntil(set);
+                var firstHeartbeat = TimeSpan.FromSeconds(FirstHeartbeatSeconds);
+                var silent = Observable.Timer(firstHeartbeat)
+                    .SelectMany(_ => Observable.Throw<HarpMessage>(new TimeoutException(string.Format(
+                        "{0} sent no heartbeat within {1} s of the start, so its Harp clock was not set. Check its USB cable and power.", name, firstHeartbeat.TotalSeconds))))
+                    .TakeUntil(heartbeats);
                 // From the first heartbeat on (the port may take a while to open), on a thread of its own:
                 // a busy thread pool can hold a deadline past it.
                 var gap = TimeSpan.FromSeconds(GapSeconds);
@@ -64,7 +78,7 @@ namespace OpenRigs.Devices
                         Observable.Defer(() => Observable.Throw<HarpMessage>(new TimeoutException(string.Format(
                             "{0}'s Harp clock stopped: no heartbeat for {1} s. Check its USB cable and power.", name, gap.TotalSeconds)))))
                         .IgnoreElements());
-                return writes.Merge(notSet).Merge(stopped);
+                return writes.Merge(notSet).Merge(silent).Merge(stopped);
             });
         }
 
