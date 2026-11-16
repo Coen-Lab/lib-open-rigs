@@ -43,6 +43,11 @@ LOG_LAB_EXPERIMENT = "OpenRigs.Logging:LogLabExperiment.bonsai"
 NO_EXPERIMENT_FOLDER = "OpenRigs.Logging:NoExperimentFolder.bonsai"
 EXPERIMENT_CONTROL = "OpenRigs.Control:ExperimentControl.bonsai"
 DELIVER_REWARD = "OpenRigs.Devices:BehaviorBoard.DeliverReward.bonsai"
+PLAY_PENALTY_SOUND = "OpenRigs.Audio:PlayPenaltySound.bonsai"
+SET_ZAPIT_TRIGGER_LINE = "OpenRigs.Devices:BehaviorBoard.SetZapitTriggerLine.bonsai"
+LOG_RNG_SEED = "OpenRigs.Logging:LogRngSeed.bonsai"
+TASK_LOGS = "OpenRigs.Logging:TaskLogs.bonsai"
+TRAINING_STAGE = "OpenRigs.Control:TrainingStage.bonsai"
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
 DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
@@ -610,6 +615,13 @@ def zapit_include_problems(wf: Workflow) -> list[str]:
     problems += [f"the workflow builds {local} itself" for local in ("zap:ZapitClient", "zap:CheckZapitConditionCount") if local in kinds]
     problems += ["the workflow declares ZapitCommands, which ConnectZapit declares"
                  for n in wf.root.iter(W + "Expression") if n.get(XSI, "").startswith("rx:") and _name(n) == "ZapitCommands"]
+    if _order(wf.root, _declares("Optogenetics")) is not None:
+        problems.append("the workflow declares Optogenetics itself (Zapit.ConnectForTask does)")
+    if "zap:ZapitLineMessage" in kinds:
+        problems.append("the workflow writes the ZapitTrigger line itself (BehaviorBoard.SetZapitTriggerLine does)")
+    for n in wf.root.iter(W + "Expression"):
+        if n.get("Path") == SET_ZAPIT_TRIGGER_LINE and not ({"Set", "BoardCommandsSubjectName"} <= set(_properties(n))):
+            problems.append("a SetZapitTriggerLine does not state Set and BoardCommandsSubjectName")
     return problems
 
 
@@ -626,6 +638,9 @@ def zapit_for_task_problems(root: ET.Element) -> list[str]:
         problems.append("ConnectZapit is not given TaskParameters.Optogenetics.ZapitConfigPath")
     if not any(n.get(XSI) == "rx:Condition" and "Optogenetics.UseZapit" in ET.tostring(n, encoding="unicode") for n in path):
         problems.append("ConnectZapit is not behind a Condition on Optogenetics.UseZapit")
+    flags = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and _name(n) == "Optogenetics"]
+    if len(flags) != 1 or "TaskParameters.Optogenetics.UseZapit" not in {nodes[a].findtext(W + "Selector") for a in upstream(edges, flags[0])}:
+        problems.append("ConnectForTask does not publish Optogenetics from Optogenetics.UseZapit")
     return problems
 
 
@@ -798,25 +813,41 @@ def no_experiment_folder_problems(wf: Workflow) -> list[str]:
 
 
 def penalty_sound_problems(wf: Workflow) -> list[str]:
-    """The penalty sound is OpenRigs.Audio's PenaltySoundBuffer, made once the task file's penalty.sound.levelDbfs is in
-    (Zip with Speakers, InputMapping LevelDbfs from Item1), never at the default level from the speakers alone."""
-    for nodes, edges in _scopes(wf.root):
-        buffers = [i for i, n in enumerate(nodes) if kind(n) == "aud:PenaltySoundBuffer"]
-        if not buffers:
-            continue
-        mapping = [a for a, b, _ in edges if b == buffers[0]]
-        if len(mapping) != 1 or nodes[mapping[0]].get(XSI) != "InputMapping" or \
-                [(p.get("Name"), p.get("Selector")) for p in nodes[mapping[0]].iter(W + "Property")] != [("LevelDbfs", "Item1")]:
-            return ["PenaltySoundBuffer is not fed by an InputMapping of LevelDbfs from Item1"]
-        zips = [a for a, b, _ in edges if b == mapping[0]]
-        inputs = [nodes[a] for a in upstream(edges, zips[0])] if zips and kind(nodes[zips[0]]) == "rx:Zip" else []
-        problems = []
-        if not any("TaskParameters.Penalty.Sound.LevelDbfs" in (n.findtext(W + "Selector") or "") for n in inputs):
-            problems.append("the penalty sound's level is not the task file's penalty.sound.levelDbfs")
-        if not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "Speakers" for n in inputs):
-            problems.append("the penalty sound is not made from Speakers")
-        return problems + (["the workflow reads its own penalty sound file"] if "Sound.Path" in wf.text else [])
-    return ["no PenaltySoundBuffer"]
+    """The penalty sound is OpenRigs.Audio's PlayPenaltySound, included once: the workflow makes no PenaltySoundBuffer,
+    sends nothing into PenaltySounds and reads no penalty sound file itself."""
+    count = wf.text.count(f'Path="{PLAY_PENALTY_SOUND}"')
+    problems = [] if count == 1 else [f"the workflow includes PlayPenaltySound {count} times, not once"]
+    nodes = list(wf.root.iter(W + "Expression"))
+    if any(kind(n) == "aud:PenaltySoundBuffer" for n in nodes):
+        problems.append("the workflow makes its own PenaltySoundBuffer (PlayPenaltySound does)")
+    if any(n.get(XSI) == "MulticastSubject" and _name(n) == "PenaltySounds" for n in nodes):
+        problems.append("the workflow sends PenaltySounds itself (PlayPenaltySound does)")
+    return problems + (["the workflow reads its own penalty sound file"] if "Sound.Path" in wf.text else [])
+
+
+def play_penalty_sound_problems(root: ET.Element) -> list[str]:
+    """PlayPenaltySound makes the PenaltySoundBuffer once the task file's penalty.sound.levelDbfs is in (Zip with
+    Speakers, InputMapping LevelDbfs from Item1), never at the default level from the speakers alone, and sends it into
+    PenaltySounds on each input. `root` is OpenRigs.Audio's PlayPenaltySound.bonsai."""
+    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+    buffers = [i for i, n in enumerate(nodes) if kind(n) == "aud:PenaltySoundBuffer"]
+    if len(buffers) != 1:
+        return ["PlayPenaltySound does not make one PenaltySoundBuffer"]
+    mapping = [a for a, b, _ in edges if b == buffers[0]]
+    if len(mapping) != 1 or nodes[mapping[0]].get(XSI) != "InputMapping" or \
+            [(p.get("Name"), p.get("Selector")) for p in nodes[mapping[0]].iter(W + "Property")] != [("LevelDbfs", "Item1")]:
+        return ["PenaltySoundBuffer is not fed by an InputMapping of LevelDbfs from Item1"]
+    zips = [a for a, b, _ in edges if b == mapping[0]]
+    inputs = [nodes[a] for a in upstream(edges, zips[0])] if zips and kind(nodes[zips[0]]) == "rx:Zip" else []
+    problems = []
+    if not any("TaskParameters.Penalty.Sound.LevelDbfs" in (n.findtext(W + "Selector") or "") for n in inputs):
+        problems.append("the penalty sound's level is not the task file's penalty.sound.levelDbfs")
+    if not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "Speakers" for n in inputs):
+        problems.append("the penalty sound is not made from Speakers")
+    sends = [i for i, n in enumerate(nodes) if n.get(XSI) == "MulticastSubject" and _name(n) == "PenaltySounds"]
+    if len(sends) != 1 or "WorkflowInput" not in {nodes[a].get(XSI) for a in upstream(edges, sends[0])}:
+        problems.append("PlayPenaltySound does not send the buffer into PenaltySounds on each input")
+    return problems
 
 
 def readme_missing_blocks(wf: Workflow) -> list[str]:
@@ -908,16 +939,52 @@ def layout_problems(wf: Workflow) -> list[str]:
 
 
 def rng_seed_problems(wf: Workflow) -> list[str]:
-    """The RngSeed event is logged once, at TaskLogic's top level from trial 1's start (TrialStart), and nowhere else."""
-    nodes, edges = scope(wf.named("TaskLogic"))
-    seeds = [i for i, n in enumerate(nodes) if n.findtext(W + "Name") == "RngSeed"]
-    everywhere = [n for n in wf.root.iter(W + "Expression") if n.findtext(W + "Name") == "RngSeed"]
-    if len(seeds) != 1 or len(everywhere) != 1:
-        return [f"RngSeed is {len(everywhere)} node(s), {len(seeds)} at TaskLogic's top level; it is one, there"]
-    sources = [nodes[a] for a, b, _ in edges if b == seeds[0]]
-    if len(sources) != 1 or sources[0].get(XSI) != "SubscribeSubject" or sources[0].findtext(W + "Name") != "TrialStart":
-        return ["RngSeed is not fed by TrialStart alone"]
-    return []
+    """The RngSeed event is OpenRigs.Logging's LogRngSeed, included once at TaskLogic's top level (each task gives it
+    its trials' seed from their start), and the workflow makes no RngSeed event itself."""
+    nodes = scope(wf.named("TaskLogic"))[0]
+    here = sum(n.get("Path") == LOG_RNG_SEED for n in nodes)
+    count = wf.text.count(f'Path="{LOG_RNG_SEED}"')
+    problems = [] if here == count == 1 else [f"LogRngSeed is included {count} times, {here} at TaskLogic's top level; it is once, there"]
+    if any(c.findtext("{clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging}Event") == "RngSeed" for c in wf.root.iter(W + "Combinator")):
+        problems.append("the workflow makes its own RngSeed event (LogRngSeed does)")
+    return problems
+
+
+def task_logs_problems(wf: Workflow) -> list[str]:
+    """A task's trial log, Settings_Task and Zapit's logs are OpenRigs.Logging's TaskLogs, included once and given the
+    task file as JSON; the workflow includes no LogTrial or ZapitLogs and logs no Settings_Task itself."""
+    count = wf.text.count(f'Path="{TASK_LOGS}"')
+    problems = [] if count == 1 else [f"the workflow includes TaskLogs {count} times, not once"]
+    problems += [f"the workflow includes {path.split(':')[1].removesuffix('.bonsai').split('.')[-1]} itself (TaskLogs does)"
+                 for path in ("OpenRigs.Logging:LogTrial.bonsai", "OpenRigs.Devices:Zapit.ZapitLogs.bonsai") if f'Path="{path}"' in wf.text]
+    if "<Name>Settings_Task</Name>" in wf.text:
+        problems.append("the workflow logs Settings_Task itself (TaskLogs does)")
+    for nodes, edges in _scopes(wf.root):
+        for i, n in enumerate(nodes):
+            if n.get("Path") == TASK_LOGS and not any(kind(nodes[a]).endswith(":SerializeToJson") for a, b, _ in edges if b == i):
+                problems.append("TaskLogs is not given the task file as JSON (the task's SerializeToJson)")
+    return problems
+
+
+def training_stage_problems(wf: Workflow) -> list[str]:
+    """The training stage is OpenRigs.Control's TrainingStage, included once after ExperimentControl, which declares
+    the parameter TrainingStage; the workflow reads the parameter, declares the subject and reports the metric nowhere
+    itself."""
+    count = wf.text.count(f'Path="{TRAINING_STAGE}"')
+    if count != 1:
+        return [f"the workflow includes TrainingStage {count} times, not once"]
+    problems = [] if re.search(r"<Parameter>\s*<Name>TrainingStage</Name>", wf.text) else [
+        "ExperimentControl does not declare the parameter TrainingStage, which TrainingStage reads"]
+    if _order(wf.root, _declares("TrainingStage")) is not None:
+        problems.append("the workflow declares TrainingStage itself (TrainingStage does)")
+    names = {c.findtext(CONTROL + "Name") for c in wf.root.iter(W + "Combinator")
+             if (c.get(XSI) or "").split(":")[-1] in ("ParameterValue", "ReportMetric")}
+    problems += [f"the workflow handles {name} itself (TrainingStage does)" for name in sorted(names & {"TrainingStage", "trainingStage"})]
+    at = _order(wf.root, lambda n: n.get("Path") == TRAINING_STAGE)
+    control = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_CONTROL)
+    if control is None or control > at:
+        problems.append("TrainingStage comes before ExperimentControl")
+    return problems
 
 
 # The blocks that write an experiment's files, and what each writes. A log's file is FormatFileName's
@@ -929,6 +996,7 @@ FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is
     "OpenRigs.Logging:LogLabExperiment.bonsai": [("Settings_Rig", None), ("Settings_Experiment", None), ("BonsaiData_Async", None)],
     "OpenRigs.Devices:Zapit.ZapitLogs.bonsai": [("BonsaiData_ZapitReplies", "Optogenetics"), ("Settings_ZapitConditions", "Optogenetics")],
 }
+FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrial.bonsai"], *FIXED_LOGS["OpenRigs.Devices:Zapit.ZapitLogs.bonsai"]]
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
                *DEVICE_GROUPS, LICK_SPOUT_STAGE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)

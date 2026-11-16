@@ -362,24 +362,91 @@ def test_a_workflow_without_a_manifest_has_nothing_to_name(tmp_path):
     assert lint.expected_files_problems(workflow(tmp_path, LOGS)) == []
 
 
+def block_text(path: str) -> str:
+    package, resource = path.split(":")
+    return (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
+
+
 def test_the_fixed_logs_are_the_names_their_blocks_write():
     for path, logs in lint.FIXED_LOGS.items():
-        package, resource = path.split(":")
-        text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
-        if 'Path="OpenRigs.Logging:LogAsync.bonsai"' in text:  # a block that includes LogAsync writes its log too
-            text += (ROOT / "src" / "OpenRigs.Logging" / "LogAsync.bonsai").read_text(encoding="utf-8-sig")
+        text = block_text(path)
+        for inner in ("OpenRigs.Logging:LogAsync.bonsai", "OpenRigs.Logging:LogTrial.bonsai", "OpenRigs.Devices:Zapit.ZapitLogs.bonsai"):
+            if f'Path="{inner}"' in text:  # a block that includes another writes its logs too
+                text += block_text(inner)
         assert all(f">{name}<" in text for name, _ in logs), path
 
 
-def test_the_rng_seed_event_is_fed_by_the_trial_start_subject_alone(tmp_path):
-    def logic(subject: str) -> lint.Workflow:
-        sub = f'<Expression xsi:type="SubscribeSubject"><Name>{subject}</Name></Expression>'
-        seed = '<Expression xsi:type="ExternalizedMapping"><Name>RngSeed</Name></Expression>'
-        return pulse_workflow(tmp_path / subject, '<Expression xsi:type="GroupWorkflow"><Name>TaskLogic</Name><Workflow><Nodes>' + sub + seed
-                              + '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow></Expression>', "")
+def task_logic(tmp_path: Path, nodes: str) -> lint.Workflow:
+    return workflow(tmp_path, f'<Expression xsi:type="GroupWorkflow"><Name>TaskLogic</Name><Workflow><Nodes>{nodes}</Nodes><Edges /></Workflow></Expression>')
 
-    assert lint.rng_seed_problems(logic("TrialStart")) == []
-    assert lint.rng_seed_problems(logic("TrialGo")) == ["RngSeed is not fed by TrialStart alone"]
+
+def test_the_rng_seed_event_is_the_lab_s_include_at_task_logic_s_top_level(tmp_path):
+    assert lint.rng_seed_problems(task_logic(tmp_path, include(lint.LOG_RNG_SEED))) == []
+    # The tasks' own chain until 16 Nov 2026: a CreateAsyncEvent of RngSeed into AsyncEvents.
+    own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orl:CreateAsyncEvent" '
+           'xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"><orl:Event>RngSeed</orl:Event></Combinator></Expression>')
+    assert lint.rng_seed_problems(task_logic(tmp_path / "b", own)) == [
+        "LogRngSeed is included 0 times, 0 at TaskLogic's top level; it is once, there", "the workflow makes its own RngSeed event (LogRngSeed does)"]
+    text = block_text(lint.LOG_RNG_SEED)
+    assert "<orl:Event>RngSeed</orl:Event>" in text and text.index("<Name>AsyncEvents</Name>") < text.index("rx:Take")
+
+
+def test_the_task_logs_are_the_lab_s_include_given_the_task_file_as_json(tmp_path):
+    serialize = '<Expression xsi:type="Combinator"><Combinator xsi:type="t:SerializeToJson" xmlns:t="clr-namespace:Task;assembly=Extensions" /></Expression>'
+    edge = '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow></Expression>'
+    group = '<Expression xsi:type="GroupWorkflow"><Workflow><Nodes>'
+    assert lint.task_logs_problems(workflow(tmp_path, group + serialize + include(lint.TASK_LOGS) + edge)) == []
+    # The tasks' own logs until 16 Nov 2026.
+    own = (include("OpenRigs.Logging:LogTrial.bonsai") + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Task</Name>")
+           + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai"))
+    assert lint.task_logs_problems(workflow(tmp_path / "b", own)) == [
+        "the workflow includes TaskLogs 0 times, not once", "the workflow includes LogTrial itself (TaskLogs does)",
+        "the workflow includes ZapitLogs itself (TaskLogs does)", "the workflow logs Settings_Task itself (TaskLogs does)"]
+    assert lint.task_logs_problems(workflow(tmp_path / "c", include(lint.TASK_LOGS))) == [
+        "TaskLogs is not given the task file as JSON (the task's SerializeToJson)"]
+    expected = ("Settings/Settings_Task_;BonsaiData/BonsaiData_Trial_;BonsaiData/BonsaiData_ZapitReplies_?Optogenetics;"
+                "Settings/Settings_ZapitConditions_?Optogenetics")
+    assert lint.expected_files_problems(workflow(tmp_path / "d", include(lint.TASK_LOGS) + manifest_node(expected))) == []
+
+
+def test_the_training_stage_is_the_lab_s_include_after_experiment_control(tmp_path):
+    control = include(lint.EXPERIMENT_CONTROL, "<Parameters><Parameter><Name>TrainingStage</Name></Parameter></Parameters>")
+    assert lint.training_stage_problems(workflow(tmp_path, control + include(lint.TRAINING_STAGE))) == []
+    # The tasks' own chain until 16 Nov 2026.
+    own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:ParameterValue" ' + CONTROL + '><orcl:Name>TrainingStage</orcl:Name></Combinator></Expression>'
+           '<Expression xsi:type="rx:AsyncSubject"><Name>TrainingStage</Name></Expression>'
+           '<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:ReportMetric" ' + CONTROL + '><orcl:Name>trainingStage</orcl:Name></Combinator></Expression>')
+    assert lint.training_stage_problems(workflow(tmp_path / "b", control + own)) == ["the workflow includes TrainingStage 0 times, not once"]
+    assert lint.training_stage_problems(workflow(tmp_path / "c", control + own + include(lint.TRAINING_STAGE))) == [
+        "the workflow declares TrainingStage itself (TrainingStage does)",
+        "the workflow handles TrainingStage itself (TrainingStage does)", "the workflow handles trainingStage itself (TrainingStage does)"]
+    assert lint.training_stage_problems(workflow(tmp_path / "d", include(lint.TRAINING_STAGE) + include(lint.EXPERIMENT_CONTROL))) == [
+        "ExperimentControl does not declare the parameter TrainingStage, which TrainingStage reads", "TrainingStage comes before ExperimentControl"]
+
+
+def test_the_penalty_sound_is_the_lab_s_include(tmp_path):
+    assert lint.play_penalty_sound_problems(lint.ET.fromstring(block_text(lint.PLAY_PENALTY_SOUND).encode("utf-8"))) == []
+    assert lint.penalty_sound_problems(workflow(tmp_path, include(lint.PLAY_PENALTY_SOUND))) == []
+    # The tasks' own chain until 16 Nov 2026.
+    own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="aud:PenaltySoundBuffer" xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio" /></Expression>'
+           '<Expression xsi:type="MulticastSubject"><Name>PenaltySounds</Name></Expression>')
+    assert lint.penalty_sound_problems(workflow(tmp_path / "b", own)) == [
+        "the workflow includes PlayPenaltySound 0 times, not once", "the workflow makes its own PenaltySoundBuffer (PlayPenaltySound does)",
+        "the workflow sends PenaltySounds itself (PlayPenaltySound does)"]
+
+
+def test_the_zapit_trigger_line_is_set_and_cleared_by_the_lab_s_include(tmp_path):
+    line = include(lint.SET_ZAPIT_TRIGGER_LINE, "<Set>true</Set><BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>")
+    assert lint.zapit_include_problems(workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + line)) == []
+    # The tasks' own chain until 16 Nov 2026, and the Optogenetics flag they declared.
+    own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="zap:ZapitLineMessage" xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices" /></Expression>'
+           '<Expression xsi:type="rx:AsyncSubject"><Name>Optogenetics</Name></Expression>' + include(lint.SET_ZAPIT_TRIGGER_LINE))
+    assert lint.zapit_include_problems(workflow(tmp_path / "b", include(lint.ZAPIT_FOR_TASK) + own)) == [
+        "the workflow declares Optogenetics itself (Zapit.ConnectForTask does)",
+        "the workflow writes the ZapitTrigger line itself (BehaviorBoard.SetZapitTriggerLine does)",
+        "a SetZapitTriggerLine does not state Set and BoardCommandsSubjectName"]
+    text = block_text(lint.SET_ZAPIT_TRIGGER_LINE)
+    assert 'DisplayName="BoardCommandsSubjectName"' in text and "<Name>ZapitTriggerLine</Name>" in text
 
 
 def test_each_include_read_from_the_package_is_found_by_its_description(tmp_path, monkeypatch):

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A task's logs, the same in every task: the input, the task file read at Go as JSON (TaskConfig through the task's own SerializeToJson), as Settings_Task; and, once the experiment folder exists (PathPrefix), BonsaiData_Trial (LogTrial of TrialRow, one row per trial) and Zapit's logs (OpenRigs.Devices Zapit.ZapitLogs: BonsaiData_ZapitReplies and Settings_ZapitConditions, in an optogenetics experiment). A task's other logs stay in the task. Needs TrialRow, TaskConfig, ZapitReplies, Timestamp and PathPrefix from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogDataSchema.bonsai">
+        <Name>Settings_Task</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PathPrefix</Name>
+      </Expression>
+      <Expression xsi:type="rx:SelectMany">
+        <Name>TrialAndZapitLogs</Name>
+        <Description>The logs that wait for the experiment folder (PathPrefix): BonsaiData_Trial and Zapit's.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>TrialRow</Name>
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogTrial.bonsai" />
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:Zapit.ZapitLogs.bonsai" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="4" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

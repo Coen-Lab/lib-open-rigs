@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit for a task, only in an optogenetics experiment: takes the task file (TaskConfig) once and, when its optogenetics.useZapit is true, gives its optogenetics.zapitConfigPath to Zapit.ConnectZapit, which connects to rig.yml's Zapit, carries ZapitCommands and ZapitReplies, and stops the workflow on an error reply, no conditions file loaded, a conditions count other than the file's, or a real mouse on a rig without hardware triggering. Needs TaskConfig (with TaskParameters.Optogenetics), RigConfigs, SubjectId and ZapitReplies from the workflow.</Description>
+  <Description>Zapit for a task, only in an optogenetics experiment: takes the task file (TaskConfig) once and, when its optogenetics.useZapit is true, gives its optogenetics.zapitConfigPath to Zapit.ConnectZapit, which connects to rig.yml's Zapit, carries ZapitCommands and ZapitReplies, and stops the workflow on an error reply, no conditions file loaded, a conditions count other than the file's, or a real mouse on a rig without hardware triggering. Publishes the task file's optogenetics.useZapit as the AsyncSubject Optogenetics, the condition of Zapit's logs in ExperimentManifest's ExpectedFiles (?Optogenetics). Needs TaskConfig (with TaskParameters.Optogenetics), RigConfigs, SubjectId and ZapitReplies from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -36,12 +36,23 @@
         <Selector>TaskParameters.Optogenetics.ZapitConfigPath</Selector>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:Zapit.ConnectZapit.bonsai" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TaskConfig</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>TaskParameters.Optogenetics.UseZapit</Selector>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>Optogenetics</Name>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
       <Edge From="3" To="4" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

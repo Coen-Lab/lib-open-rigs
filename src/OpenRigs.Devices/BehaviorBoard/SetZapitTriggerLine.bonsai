@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The ZapitTrigger line set or cleared, the same in every task: each input writes ZapitTriggerLine (the ZapitTriggerLine piece's line) high (Set true) or low (Set false) on the board, sent into BoardCommandsSubjectName. A task raises it at its laser trigger and clears it at the laser's end. Needs ZapitTriggerLine from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ZapitTriggerLine</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Item2</Selector>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Set" Description="True sets the line high, false clears it." />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zap:ZapitLineMessage">
+          <zap:Set>false</zap:Set>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="BoardCommandsSubjectName" Description="The subject the write is sent into: the board's command subject, such as BehaviorBoard-Main.Commands, or a task's own subject that feeds it." />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="2" Label="Source1" />
+      <Edge From="1" To="2" Label="Source2" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="5" Label="Source1" />
+      <Edge From="4" To="5" Label="Source2" />
+      <Edge From="5" To="7" Label="Source1" />
+      <Edge From="6" To="7" Label="Source2" />
+      <Edge From="7" To="8" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

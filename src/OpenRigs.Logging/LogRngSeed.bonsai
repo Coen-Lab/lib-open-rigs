@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The RngSeed event, the same in every task: the first input, the seed every draw of the experiment follows from (OpenRigs.Core RngSeed.Resolve: the task file's rngSeed, or one drawn at Go when it is null), as an AsyncEvent named RngSeed, stamped on the Harp clock (Timestamp), into AsyncEvents, once. Give it each trial's seed from its start; the Take(1) is after the multicast, so the shared AsyncEvents subject never completes. Needs Timestamp and AsyncEvents from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orl:CreateAsyncEvent">
+          <orl:Event>RngSeed</orl:Event>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="Bonsai.Harp:WithLatestTimestamp.bonsai">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>AsyncEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>1</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
