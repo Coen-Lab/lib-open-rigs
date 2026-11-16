@@ -621,6 +621,16 @@ def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_pat
     assert lint.experiment_records_problems(wf) == [] and lint.experiment_log_problems(wf) == [] and lint.expected_files_problems(wf) == []
     late = workflow(tmp_path / "b", logs + RECORDS + include(lint.MANUAL_REWARDS) + LIVE)
     assert lint.experiment_records_problems(late) == ["ExperimentRecords is not the last top-level node (StreamDevices alone may follow)"]
+    # Rewards are not records: a workflow that gives them includes DeliverReward itself, before ExperimentRecords.
+    rewards = workflow(tmp_path / "e", logs + include(lint.DELIVER_REWARD) + RECORDS + LIVE)
+    assert lint.experiment_records_problems(rewards) == []
+    asks = include(lint.MANUAL_REWARDS)
+    assert lint.reward_delivery_problems(workflow(tmp_path / "f", logs + asks + include(lint.DELIVER_REWARD) + RECORDS + LIVE)) == []
+    assert lint.reward_delivery_problems(workflow(tmp_path / "g", logs + asks + RECORDS + LIVE)) == [
+        "the workflow includes DeliverReward 0 times, not once"]
+    assert lint.reward_delivery_problems(workflow(tmp_path / "h", logs + asks + RECORDS + include(lint.DELIVER_REWARD) + LIVE)) == [
+        "DeliverReward comes after ExperimentRecords"]
+    assert lint.reward_delivery_problems(wf) == []
     own = workflow(tmp_path / "c", logs + include("OpenRigs.Logging:LogControlEvents.bonsai") + manifest_node("auto")
                    + include(lint.EXPERIMENT_RECORDS, "<ExpectedFiles>auto</ExpectedFiles>"))
     assert lint.experiment_records_problems(own) == [

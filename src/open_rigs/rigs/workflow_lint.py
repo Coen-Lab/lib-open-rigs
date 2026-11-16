@@ -618,17 +618,17 @@ def background_noise_problems(wf: Workflow) -> list[str]:
 
 
 def experiment_records_problems(wf: Workflow) -> list[str]:
-    """The experiment's records are OpenRigs.Logging's ExperimentRecords (DeliverReward on RewardRequests,
-    LogControlEvents, RecordHarpDevices, ExperimentManifest), included once with ConfigRoot, IngestScript and
-    ExpectedFiles set, as the last top-level node but StreamDevices: RecordHarpDevices and ExperimentManifest find each
-    device by the subjects published before them. The workflow has none of the four of its own."""
+    """The experiment's records are OpenRigs.Logging's ExperimentRecords (LogControlEvents, RecordHarpDevices,
+    ExperimentManifest), included once with ConfigRoot, IngestScript and ExpectedFiles set, as the last top-level node
+    but StreamDevices: RecordHarpDevices and ExperimentManifest find each device by the subjects published before them.
+    The workflow has none of the three of its own. Rewards are not records: DeliverReward is the workflow's own include."""
     count = wf.text.count(f'Path="{EXPERIMENT_RECORDS}"')
     if count != 1:
         return [f"the workflow includes ExperimentRecords {count} times, not once"]
     problems = [f"the workflow has its own {name} (ExperimentRecords does)" for name in ("RecordHarpDevices", "ExperimentManifest")
                 if any(kind(n).endswith(":" + name) for n in wf.root.iter(W + "Expression"))]
-    problems += [f"the workflow has its own {path.split(':')[1].removesuffix('.bonsai').split('.')[-1]} (ExperimentRecords does)"
-                 for path in (DELIVER_REWARD, "OpenRigs.Logging:LogControlEvents.bonsai") if f'Path="{path}"' in wf.text]
+    if 'Path="OpenRigs.Logging:LogControlEvents.bonsai"' in wf.text:
+        problems.append("the workflow has its own LogControlEvents (ExperimentRecords does)")
     top = nodes_and_edges(child(wf.root, W + "Workflow"))[0]
     at = next((i for i, n in enumerate(top) if n.get("Path") == EXPERIMENT_RECORDS), None)
     if at is None or any(not kind(n).endswith(":StreamDevices") for n in top[at + 1:]):
@@ -637,6 +637,21 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
         props = _properties(top[at])
         problems += [f"ExperimentRecords has no {p}" for p in ("ConfigRoot", "IngestScript", "ExpectedFiles") if not props.get(p)]
     return problems
+
+
+def reward_delivery_problems(wf: Workflow) -> list[str]:
+    """A workflow that asks for rewards (ManualRewards, or its own RewardRequests) includes OpenRigs.Devices'
+    BehaviorBoard.DeliverReward once, ahead of ExperimentRecords: rewards are not records, so ExperimentRecords holds
+    none, and a second DeliverReward would open each valve twice."""
+    asks = f'Path="{MANUAL_REWARDS}"' in wf.text or "<Name>RewardRequests</Name>" in wf.text
+    count = wf.text.count(f'Path="{DELIVER_REWARD}"')
+    if count != (1 if asks else 0):
+        return [f"the workflow includes DeliverReward {count} times, " + ("not once" if asks else "and asks for no reward")]
+    if not count:
+        return []
+    at = _order(wf.root, lambda n: n.get("Path") == DELIVER_REWARD)
+    records = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_RECORDS)
+    return ["DeliverReward comes after ExperimentRecords"] if records is not None and at is not None and at > records else []
 
 
 def launch_settings_problems(wf: Workflow) -> list[str]:
