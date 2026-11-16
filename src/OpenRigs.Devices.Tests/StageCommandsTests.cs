@@ -25,7 +25,7 @@ namespace OpenRigs.Devices.Tests
             var text = Resource("LickSpoutStage.bonsai");
             var heard = Regex.Matches(text, @"""orcl:OnCommand"">\s*<orcl:Name>(\w+)</orcl:Name>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
             var sent = Regex.Matches(text, @"<dev:Command>(\w+)</dev:Command>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
-            Assert.AreEqual(14, heard.Length);
+            Assert.AreEqual(15, heard.Length);
             CollectionAssert.AreEqual(heard, sent.Take(heard.Length).ToArray(), "each OnCommand feeds the command of its own name");
             foreach (var name in heard) Assert.IsTrue(Enum.IsDefined(typeof(LickSpoutCommand), name), name);
         }

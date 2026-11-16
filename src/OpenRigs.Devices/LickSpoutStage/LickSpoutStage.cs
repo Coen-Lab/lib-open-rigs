@@ -13,6 +13,8 @@ namespace OpenRigs.Devices
         SpoutsHome,
         /// <summary>Both spouts to the mouse's in position.</summary>
         SpoutsIn,
+        /// <summary>The in position reset to rig.yml's lickSpoutDefaultPosition, both spouts there (saved only by SaveSpoutPositions).</summary>
+        SpoutsDefault,
         /// <summary>Both spouts drawn back and down.</summary>
         SpoutsOut,
         /// <summary>The left spout in, the right drawn back and down.</summary>
@@ -47,10 +49,11 @@ namespace OpenRigs.Devices
     /// The lick spout stage's state: the mouse's in positions, loaded once from its file (or rig.yml's
     /// lickSpoutDefaultPosition when it has none), and the placement last asked for. Each placement
     /// command outputs the stage's new target; each nudge changes the in positions and outputs the
-    /// current placement's target again; SaveSpoutPositions writes the file and outputs nothing.
+    /// current placement's target again; SpoutsDefault sets the in positions back to rig.yml's default
+    /// and places the spouts in; SaveSpoutPositions writes the file and outputs nothing.
     /// </summary>
     [Combinator]
-    [Description("Turns lick spout stage commands into the stage's targets, in steps: loads the mouse's in positions from PositionsFile (rig.yml's lickSpoutDefaultPosition if there is none), nudges them by StepSize, saves them, and places the spouts home, in, out, left in or right in.")]
+    [Description("Turns lick spout stage commands into the stage's targets, in steps: loads the mouse's in positions from PositionsFile (rig.yml's lickSpoutDefaultPosition if there is none), nudges them by StepSize, resets them to rig.yml's default (SpoutsDefault), saves them, and places the spouts home, in, out, left in or right in.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class LickSpoutStage
     {
@@ -85,7 +88,7 @@ namespace OpenRigs.Devices
         {
             if (string.IsNullOrEmpty(positionsFile)) throw new InvalidOperationException("LickSpoutStage has no PositionsFile.");
             var positions = File.Exists(positionsFile) ? SpoutPositions.Load(positionsFile) : SpoutPositions.FromRigFile(rigFile);
-            return new StageState { In = positions, PositionsFile = positionsFile, Placement = LickSpoutCommand.SpoutsHome };
+            return new StageState { In = positions, RigFile = rigFile, PositionsFile = positionsFile, Placement = LickSpoutCommand.SpoutsHome };
         }
 
         /// <summary>The stage's in positions and its current placement.</summary>
@@ -96,6 +99,9 @@ namespace OpenRigs.Devices
 
             /// <summary>Gets or sets the positions file.</summary>
             public string PositionsFile { get; set; }
+
+            /// <summary>Gets or sets the path of rig.yml, whose lickSpoutDefaultPosition SpoutsDefault resets to.</summary>
+            public string RigFile { get; set; }
 
             /// <summary>Gets or sets the placement last asked for.</summary>
             public LickSpoutCommand Placement { get; set; }
@@ -112,6 +118,10 @@ namespace OpenRigs.Devices
                     case LickSpoutCommand.LeftIn:
                     case LickSpoutCommand.RightIn:
                         Placement = command;
+                        return Target(retractSteps);
+                    case LickSpoutCommand.SpoutsDefault:
+                        In = SpoutPositions.FromRigFile(RigFile);
+                        Placement = LickSpoutCommand.SpoutsIn;
                         return Target(retractSteps);
                     case LickSpoutCommand.SaveSpoutPositions:
                         In.Save(PositionsFile);

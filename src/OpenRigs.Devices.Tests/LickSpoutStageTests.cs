@@ -55,6 +55,21 @@ namespace OpenRigs.Devices.Tests
         }
 
         [TestMethod]
+        public void SpoutsDefaultResetsTheMousesPositionsToRigYmls()
+        {
+            var folder = TempFolder();
+            var file = Path.Combine(folder, "M1.csv");
+            File.WriteAllText(file, "10,2000,2100,3150,3100");
+            var state = LickSpoutStage.Start(RigFile(folder), file);
+            Assert.AreEqual("10,2000,2100,3150,3100", state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500).ToString(), "in: the mouse's own");
+            Assert.AreEqual("10,2000,2100,3000,3100", state.Apply(LickSpoutCommand.SpoutsDefault, 150, 1500).ToString(), "default: rig.yml's");
+            Assert.AreEqual(LickSpoutCommand.SpoutsIn, state.Placement);
+            Assert.AreEqual("10,2000,2100,3150,3100", File.ReadAllText(file).Trim(), "the file kept until saved");
+            state.Apply(LickSpoutCommand.SaveSpoutPositions, 150, 1500);
+            Assert.AreEqual("10,2000,2100,3000,3100", File.ReadAllText(file).Trim());
+        }
+
+        [TestMethod]
         public void NudgesMoveTheCurrentPlacement()
         {
             var state = LickSpoutStage.Start(RigFile(TempFolder()), Path.Combine(TempFolder(), "none.csv"));
