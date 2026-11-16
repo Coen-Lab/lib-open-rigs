@@ -33,6 +33,7 @@
         <Board>BehaviorBoard-Main</Board>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <DataSubjectName>Camera-Overhead.Data</DataSubjectName>
+        <Binning xsi:nil="true" />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:CameraTriggers.bonsai">
         <Board>BehaviorBoard-Main</Board>
