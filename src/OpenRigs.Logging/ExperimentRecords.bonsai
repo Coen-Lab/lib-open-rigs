@@ -4,16 +4,16 @@
                  xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices"
                  xmlns:mf="clr-namespace:OpenRigs.Manifest;assembly=OpenRigs.Manifest"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The experiment's records, the same in every workflow that makes an experiment folder, after everything else: every controller event in BonsaiData_Async (LogControlEvents); every Harp device in rig.yml checked at Start and recorded into the experiment (OpenRigs.HarpDevices RecordHarpDevices, from rig.yml under ConfigRoot, read when the workflow is built, so ConfigRoot is a property, not the ConfigRoot subject); and manifest.json (OpenRigs.Manifest ExperimentManifest, with the workflow's IngestScript, ExpectedFiles and TrialColumns, schemas	rial-columns.yml by default, blank for a workflow with no trial log). No run input: the manifest's outcome is the controller's phase when the workflow stops. RecordHarpDevices and ExperimentManifest find each device by its subjects published before them, so this include is the workflow's last node but StreamDevices. Rewards are not records: a workflow that gives them includes OpenRigs.Devices BehaviorBoard.DeliverReward itself. Needs OpenRigs.HarpDevices and OpenRigs.Manifest in the workflow's environment.</Description>
+  <Description>The experiment's records, the same in every workflow that makes an experiment folder, after everything else: every controller event in BonsaiData_Async (LogControlEvents); every Harp device in rig.yml checked at Start and recorded into the experiment (OpenRigs.HarpDevices RecordHarpDevices, from rig.yml under ConfigRoot, read when the workflow is built, so ConfigRoot is a property, not the ConfigRoot subject); and manifest.json (OpenRigs.Manifest ExperimentManifest, with the workflow's IngestScript, ExpectedFiles and TrialColumns, schemas\trial-columns.yml by default, blank for a workflow with no trial log). No run input: the manifest's outcome is the controller's phase when the workflow stops. RecordHarpDevices and ExperimentManifest find each device by its subjects published before them, so this include is the workflow's last node but StreamDevices. Rewards are not records: a workflow that gives them includes OpenRigs.Devices BehaviorBoard.DeliverReward itself. Needs OpenRigs.HarpDevices and OpenRigs.Manifest in the workflow's environment.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="ConfigRoot" Description="The root under which each machine has its rig.yml (&lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml), the same as ReadLabRig's: read when the workflow is built, so it cannot come from the ConfigRoot subject." />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="IngestScript" Description="The workflow's name, which the overnight copy (jacuzzi-ingest) files the experiment under." />
+        <Property Name="IngestScript" Description="The workflow's name, which the overnight copy files the experiment under." />
         <Property Name="ExpectedFiles" Description="What the experiment must leave, separated by ; (ExperimentManifest's ExpectedFiles): auto, harp and the start of each log's path, with its condition." />
-        <Property Name="TrialColumns" Description="The trial columns file copied into the manifest, schemas	rial-columns.yml by default; blank for a workflow with no trial log." />
+        <Property Name="TrialColumns" Description="The trial columns file copied into the manifest, schemas\trial-columns.yml by default; blank for a workflow with no trial log." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogControlEvents.bonsai" />
       <Expression xsi:type="hd:RecordHarpDevices">

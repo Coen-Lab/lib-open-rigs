@@ -78,7 +78,7 @@ Two trigger subjects, one per kind of line:
 - `TriggerPulse` (`int`, the DO line) for a `FixedPulse` line. Its width is written once at startup from the `PulseDO1`, `PulseDO2` and `PulseDO3` properties, which the rig maps from its configuration, and each trigger only sets the line.
 - `TriggerCalibratedPulse` (`Tuple<int, int>`, the DO line 1 to 3 and the width in milliseconds) for a `CalibratedPulse` line. Each trigger writes the width to that line's `PulseDO` register and then sets the line, in that order on the same command subject, so the board applies the new width before it fires. The width comes from the calibration curve lookup in `OpenRigs.Core` at trial time; nothing about it is stored in the rig configuration or the workflow.
 
-Both subject names are externalized, so a rig can rename them to match its own.
+Both subject names are externalized properties of `PulseController`; `PulseOutputs` fixes them to `TriggerPulse` and `TriggerCalibratedPulse`, so a rig that wants other names includes `PulseController` itself.
 
 `PulseOutputs` (`BehaviorBoard.PulseOutputs.bonsai`) is the piece around it: it pulse-enables the lines `rig.yml`'s `outputPulseEnable` names without the ZapitTrigger's (`PulseEnabledLines`), and stops the workflow at Start if a line `wiring` gives a `RewardValve` is not pulse-enabled, as a reward would then open the valve and leave it open. `DeliverReward` and `ManualRewards` send rewards through it ([Building Blocks](../../articles/building-blocks.md#task-side-includes)).
 

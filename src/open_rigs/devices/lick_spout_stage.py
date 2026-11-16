@@ -90,10 +90,10 @@ class MotorAddress(BaseSchema):
 
 class StageAxisMapping(BaseSchema):
     """
-    Maps each of the 5 stage axes to a (board, motor) address.
-    Editing only the YAML re-routes axes across boards without touching the Bonsai workflow.
+    Each of the 5 stage axes as a (board, motor) address, as OpenRigs.Devices' LickSpoutStage drives them. Nothing
+    reads it: the layout is fixed in LickSpoutStage's C#, and no rig.yml key holds it.
 
-    Default layout, as OpenRigs.Devices' LickSpoutStage drives it:
+    The layout:
         Board A: base_transverse(0), left_radial(1), right_radial(2)
         Board B: left_elevation(0), right_elevation(1)
     """

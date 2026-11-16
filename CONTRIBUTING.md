@@ -17,7 +17,7 @@ How to add docs pages and open a pull request is in [docs/articles/contributing.
 - One concern per PR. Unrelated fixes, refactors and follow-ups go in their own PR or issue.
 - The smallest change that fixes it, in the idiom of the surrounding code. Use an existing operator or package before writing a new one. No options, layers or abstractions nobody asked for.
 - Remove rather than keep: no commented-out code, disabled nodes, unused files or leftover dependencies.
-- Names spelled out in full and plural for collections; units go in descriptions, not names. A description says what this class does, not what is true of every class.
+- Names spelled out in full and plural for collections; a value with a unit names it at the end (`WheelDiameterMm`, `CameraExposureUs`, `itiSeconds`). A description says what this class does, not what is true of every class.
 
 ### Bonsai workflows
 

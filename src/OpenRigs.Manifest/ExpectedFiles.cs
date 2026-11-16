@@ -99,7 +99,7 @@ namespace OpenRigs.Manifest
             foreach (var raw in (expectedFiles ?? "").Split(';'))
             {
                 var entry = raw.Trim().Replace('\\', '/');
-                // The overnight copy (jacuzzi-ingest's ingest-rig) matches paths relative to the experiment folder, so ./ is dropped.
+                // The overnight copy matches paths relative to the experiment folder, so ./ is dropped.
                 while (entry.StartsWith("./")) entry = entry.Substring(2);
                 if (entry.Length == 0) continue;
                 // path?Subject: required only while the bool subject is true (the workflow decides, the manifest records required).
@@ -118,7 +118,7 @@ namespace OpenRigs.Manifest
                 }
                 if (string.Equals(entry, Auto, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, false);
                 else if (string.Equals(entry, Harp, StringComparison.OrdinalIgnoreCase)) plan.AddDevices(rigConfig, publishedType, true);
-                // The overnight copy (jacuzzi-ingest's ingest-rig) matches a path or a folder, never a pattern: a wildcard would match nothing and hold the experiment back.
+                // The overnight copy matches a path or a folder, never a pattern: a wildcard would match nothing and hold the experiment back.
                 else if (entry.IndexOfAny(new[] { '*', '?' }) >= 0) plan.Note("ExpectedFiles entry " + entry + " is not expected: a wildcard is not a path. Name the folder (Camera-Overhead/) instead.");
                 else if (entry.StartsWith("/") || entry.Contains(":") || entry.Split('/').Contains(".."))
                     plan.Note("ExpectedFiles entry " + entry + " is not expected: it is not a path inside the experiment folder.");
