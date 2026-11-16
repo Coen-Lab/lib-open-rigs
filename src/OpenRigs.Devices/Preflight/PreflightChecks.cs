@@ -16,7 +16,7 @@ using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 // A preflight's check, shared by every rig kind's preflight (PreflightChecks.bonsai): the rows are rig.yml's devices,
-// counted from the device pieces' own data (PreflightTap), so a device rig.yml has and the run does not open still
+// counted from the device pieces' own data (PreflightTap), so a device rig.yml has that sends nothing still
 // has a row, its error. Bonsai measures: nothing here judges a device.
 namespace OpenRigs.Devices
 {
@@ -31,13 +31,11 @@ namespace OpenRigs.Devices
         public string Measure { get; set; }
     }
 
-    /// <summary>One item a device piece sent (Data), or the tap saying it is open (Data false), once a second.</summary>
+    /// <summary>One item a device piece sent.</summary>
     public class DeviceTick
     {
         /// <summary>The device's name.</summary>
         public string Device { get; set; }
-        /// <summary>True for an item the device sent; false for the tap's once-a-second word that it is open.</summary>
-        public bool Data { get; set; }
     }
 
     /// <summary>How many test sounds the mixer has been sent for each rig.yml speaker, in rig.yml's order.</summary>
@@ -79,9 +77,9 @@ namespace OpenRigs.Devices
         public long Count { get; set; }
         /// <summary>The interval's length, by a stopwatch: intervals follow one another with no gap.</summary>
         public double Seconds { get; set; }
-        /// <summary>Whether the device is open (its tap has spoken) or has its error.</summary>
+        /// <summary>Whether the device has sent its first item, or has its error.</summary>
         public bool Settled { get; set; }
-        /// <summary>Why the device has no count; null while it is open.</summary>
+        /// <summary>Why the device has no count; null once it has sent its first item.</summary>
         public string Error { get; set; }
     }
 
@@ -212,12 +210,12 @@ namespace OpenRigs.Devices
     }
 
     /// <summary>
-    /// A device piece's data as the preflight's ticks: one per item, and one each second saying the device is open, so the
-    /// check knows every device the run opens, sending or not. Into DeviceTicks, which PreflightChecks declares.
+    /// A device piece's data as the preflight's ticks, one per item: a device is known to work from its first item, never
+    /// from being tapped. Into DeviceTicks, which PreflightChecks declares.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Transform)]
-    [Description("A device's data (its Name.Data) as the preflight's ticks: one per item, and one each second saying the device is open. Multicast into DeviceTicks.")]
+    [Description("A device's data (its Name.Data) as the preflight's ticks, one per item. Multicast into DeviceTicks.")]
     public class PreflightTap
     {
         /// <summary>The device's name, as rig.yml's entry gives it, such as Camera-Face.</summary>
@@ -229,28 +227,27 @@ namespace OpenRigs.Devices
         {
             return Observable.Defer(() =>
             {
-                var data = new DeviceTick { Device = Device, Data = true };
-                var open = new DeviceTick { Device = Device, Data = false };
-                return source.Select(_ => data).Merge(Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(1)).Select(_ => open));
+                var tick = new DeviceTick { Device = Device };
+                return source.Select(_ => tick);
             });
         }
     }
 
     /// <summary>
     /// Each counted device's report about once a second, from the ticks: the items it sent in that interval, or, for a
-    /// device rig.yml has and no tap names within OpenSeconds, its error.
+    /// device rig.yml has that has sent nothing within OpenSeconds, its error, until its first item.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Combinator)]
-    [Description("Each counted device's report once a second from the ticks: items sent in the interval, or an error for a device rig.yml has and the run does not open.")]
+    [Description("Each counted device's report once a second from the ticks: items sent in the interval, or an error for a device rig.yml has that has sent nothing yet.")]
     public class DeviceReports
     {
         /// <summary>Kinds with nothing to count, only a person's answer.</summary>
         [Description("Kinds with nothing to count, only a person's answer.")]
         public string NotCounted { get; set; } = "speakerArray";
 
-        /// <summary>Seconds after which a device no tap has named is reported as not opened.</summary>
-        [Description("Seconds after which a device no tap has named is reported as not opened.")]
+        /// <summary>Seconds after which a device that has sent nothing is reported with its error.</summary>
+        [Description("Seconds after which a device that has sent nothing is reported with its error.")]
         public double OpenSeconds { get; set; } = 5;
 
         /// <summary>The reports.</summary>
@@ -272,7 +269,9 @@ namespace OpenRigs.Devices
                     lock (gate)
                     {
                         seen.Add(t.Device);
-                        if (t.Data) { long n; counts.TryGetValue(t.Device, out n); counts[t.Device] = n + 1; }
+                        long n;
+                        counts.TryGetValue(t.Device, out n);
+                        counts[t.Device] = n + 1;
                     }
                 }, observer.OnError);
                 var reported = Observable.Interval(TimeSpan.FromSeconds(1)).Subscribe(_ =>
@@ -292,7 +291,8 @@ namespace OpenRigs.Devices
                             else if (now >= open)
                             {
                                 report.Settled = true;
-                                report.Error = Preflight.Clean("rig.yml has " + device.Name + " but this preflight opens none: its rig list has no such device");
+                                report.Error = Preflight.Clean("rig.yml has " + device.Name + " but nothing has come from it in " +
+                                    open.TotalSeconds.ToString(Preflight.Invariant) + " s: the rig list has no such device or it sends nothing");
                             }
                             reports.Add(report);
                         }
@@ -306,13 +306,13 @@ namespace OpenRigs.Devices
     }
 
     /// <summary>
-    /// The devices metric, once a second once every device has opened or has its error: each device in list order as
+    /// The devices metric, once a second once every device has sent or has its error: each device in list order as
     /// Device measure rate (per second over the last second) or Device error detail, joined by ;. A speaker array is
     /// SpeakerArray sounds n: every rig.yml speaker has been sent at least n test sounds through the mixer.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Combinator)]
-    [Description("Each device's rate over the last second, or its error, once a second once every device has opened or has its error; a speaker array as the test sounds each speaker has been sent.")]
+    [Description("Each device's rate over the last second, or its error, once a second once every device has sent or has its error; a speaker array as the test sounds each speaker has been sent.")]
     public class DeviceRates
     {
         /// <summary>Kinds with nothing to count: a speaker array is listed as SpeakerArray sounds n, any other as Device person 0.</summary>
@@ -512,7 +512,9 @@ namespace OpenRigs.Devices
                 else if (item is PreflightTask) task = (PreflightTask)item;
                 else if (item is SpeakerSounds) sent = (SpeakerSounds)item;
                 var report = item as DeviceReport;
+                // A device's latest error: one that has since sent its first item has none.
                 if (report != null && report.Error != null) errors[report.Device] = report.Error;
+                else if (report != null) errors.Remove(report.Device);
                 var text = item as string;
                 if (text != null && task != null)
                 {
