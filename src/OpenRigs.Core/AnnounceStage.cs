@@ -13,7 +13,7 @@ namespace OpenRigs.Core
     /// </summary>
     [Combinator]
     [DefaultProperty("Stage")]
-    [Description("Emits Stage at the first element of its input and never completes, so a multicast into ReadyStages after it leaves the subject open for every other stage.")]
+    [Description("Emits Stage at the first element of its input and never completes, so a multicast into ReadyStages after it leaves the subject open for every other stage. Stays subscribed to its input until the input ends, so the input's completion still reaches any subject multicast before it.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class AnnounceStage
     {
@@ -28,7 +28,17 @@ namespace OpenRigs.Core
             {
                 var stage = Stage;
                 if (string.IsNullOrWhiteSpace(stage)) throw new InvalidOperationException("AnnounceStage has no Stage to announce.");
-                return source.Take(1).Select(_ => stage).Concat(Observable.Never<string>());
+                // Never Take(1): it would dispose the source inside its first OnNext, so a source that completes
+                // right after (HarpClockSet's Take(1)) loses its completion, and an AsyncSubject multicast before
+                // this never completes (BLUE-OPTO-2, 16 Nov 2026: every Harp log waited on HarpClockSet forever).
+                return Observable.Create<string>(observer =>
+                {
+                    var announced = 0;
+                    return source.Subscribe(
+                        _ => { if (System.Threading.Interlocked.Exchange(ref announced, 1) == 0) observer.OnNext(stage); },
+                        observer.OnError,
+                        () => { });
+                });
             });
         }
     }

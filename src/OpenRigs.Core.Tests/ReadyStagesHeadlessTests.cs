@@ -28,5 +28,16 @@ namespace OpenRigs.Core.Tests
             var result = BonsaiWorkflowRunner.Run("ReadyStagesClosedByATake.bonsai", timeout: System.TimeSpan.FromSeconds(60));
             StringAssert.Contains(result.StandardError + result.StandardOutput, "Never arrived: B, C", result.Describe());
         }
+
+        // A source that completes after its one value (HarpClockSet's Take(1)), multicast into an AsyncSubject and
+        // then announced: AnnounceStage must not cut its source short, or the source's completion never reaches
+        // the subject and everything waiting on it (every Harp device's log) waits forever (BLUE-OPTO-2,
+        // 16 Nov 2026: no .bin in any device folder).
+        [TestMethod]
+        public void AnnouncingAfterAMulticast_LetsTheSourceCompleteItsSubject()
+        {
+            var result = BonsaiWorkflowRunner.Run("AnnouncedAsyncSubjectCompletes.bonsai", timeout: System.TimeSpan.FromSeconds(60));
+            StringAssert.Contains(result.StandardError + result.StandardOutput, "CLOCKSET 0", result.Describe());
+        }
     }
 }
