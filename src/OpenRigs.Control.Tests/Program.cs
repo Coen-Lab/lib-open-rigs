@@ -50,6 +50,7 @@ namespace OpenRigs.Control.Tests
                 ConnectionString = "@" + endpoint,
                 SubjectId = "TC002",
                 SessionId = "003B1",
+                LaunchId = "rig-TC002-003B1-20261116T090000Z",
                 Parameters = new Collection<Parameter>
                 {
                     new Parameter { Name = "RunLengthMinutes", Value = "30", Minimum = 1, Maximum = 9999, WholeNumber = true },
@@ -95,7 +96,9 @@ namespace OpenRigs.Control.Tests
                 Check("OnGo drops sets", !new OnGo().Process(sets.ToObservable()).ToList().Wait().Any(), "passed one");
                 new ParameterDefault { Name = "RewardUl" }.Process(Observable.Return(3.5)).Wait();
                 new ParameterDefault { Name = "RunLengthMinutes" }.Process(Observable.Return(60)).Wait();
-                var defaults = Ask(socket, new { cmd = "status" })["parameters"];
+                var launched = Ask(socket, new { cmd = "status" });
+                Check("status carries the launcher's run id", (string)launched["launch_id"] == "rig-TC002-003B1-20261116T090000Z", launched.ToString());
+                var defaults = launched["parameters"];
                 Check("ParameterDefault sets a parameter no controller has set, shown in status", (string)defaults[1]["value"] == "3.5", defaults.ToString());
                 Check("... but leaves one a controller set", (string)defaults[0]["value"] == "45", defaults.ToString());
                 new ParameterMaximum { Name = "RewardUl" }.Process(Observable.Return(5.0)).Wait();

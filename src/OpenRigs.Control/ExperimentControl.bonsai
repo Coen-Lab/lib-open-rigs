@@ -9,6 +9,7 @@
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="SubjectId" DisplayName="SubjectId" Description="The subject (mouse) ID." />
         <Property Name="SessionId" DisplayName="SessionId" Description="The session ID." />
+        <Property Name="LaunchId" DisplayName="LaunchId" Description="The launcher's run id (a launcher passes it to a workflow that exposes LaunchId), recorded in the manifest as control.launch_id so the launcher finds the experiment folder after a crash; empty from the editor." />
         <Property Name="ConnectionString" DisplayName="ControlEndpoint" Description="Where the controller connects. @ binds, > connects. Local only by default: the rig agent relays." />
         <Property Name="Parameters" DisplayName="Parameters" Description="Settings a controller may change until Go, with their defaults; read with ParameterValue." />
         <Property Name="Commands" DisplayName="Commands" Description="Commands a controller may send while ready or recording; taken with OnCommand." />
@@ -18,6 +19,7 @@
           <p1:ConnectionString>@tcp://127.0.0.1:5561</p1:ConnectionString>
           <p1:SubjectId />
           <p1:SessionId />
+          <p1:LaunchId />
           <p1:Parameters />
           <p1:Commands />
         </Combinator>

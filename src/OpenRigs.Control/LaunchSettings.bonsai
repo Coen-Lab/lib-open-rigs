@@ -2,9 +2,8 @@
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
-                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A launch's own settings, the same in every task: the mouse's lab ID from the launch property SubjectId as the AsyncSubject SubjectId (from Start: a mouse's spout positions and Zapit need it before Go), the task file's path from TaskPath as TaskFilePath, and at Go the Go event's SubjectId and SessionId as RunSettings (Item1, Item2), which LogLabExperiment makes the experiment folder from; a Go with either blank stops the workflow. After ExperimentControl, whose ExperimentGo it reads: the workflow maps its launch property SubjectId onto both ExperimentControl and this include, and keeps its own task file's path as this include's TaskPath, its value when run from the editor.</Description>
+  <Description>A launch's own settings, the same in every task: the mouse's lab ID from the launch property SubjectId as the AsyncSubject SubjectId (from Start: a mouse's spout positions and Zapit need it before Go), the task file's path from TaskPath as TaskFilePath, and at Go the Go event's SubjectId and SessionId as RunSettings (Item1, Item2), which LogLabExperiment makes the experiment folder from (ControlServer refuses a Go with either blank, naming it, so RunSettings always has both). After ExperimentControl, whose ExperimentGo it reads: the workflow maps its launch property SubjectId onto both ExperimentControl and this include, and keeps its own task file's path as this include's TaskPath, its value when run from the editor.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -59,28 +58,6 @@
           <rx:Count>1</rx:Count>
         </Combinator>
       </Expression>
-      <Expression xsi:type="rx:Condition">
-        <Name>RunSettingsValid</Name>
-        <Description>Subject and session given.</Description>
-        <Workflow>
-          <Nodes>
-            <Expression xsi:type="WorkflowInput">
-              <Name>Source1</Name>
-            </Expression>
-            <Expression xsi:type="scr:ExpressionTransform">
-              <scr:Expression>Item1.Trim().Length &gt; 0 &amp;&amp; Item2.Trim().Length &gt; 0</scr:Expression>
-            </Expression>
-            <Expression xsi:type="WorkflowOutput" />
-          </Nodes>
-          <Edges>
-            <Edge From="0" To="1" Label="Source1" />
-            <Edge From="1" To="2" Label="Source1" />
-          </Edges>
-        </Workflow>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:First" />
-      </Expression>
       <Expression xsi:type="rx:AsyncSubject">
         <Name>RunSettings</Name>
       </Expression>
@@ -98,8 +75,6 @@
       <Edge From="11" To="12" Label="Source2" />
       <Edge From="12" To="13" Label="Source1" />
       <Edge From="13" To="14" Label="Source1" />
-      <Edge From="14" To="15" Label="Source1" />
-      <Edge From="15" To="16" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

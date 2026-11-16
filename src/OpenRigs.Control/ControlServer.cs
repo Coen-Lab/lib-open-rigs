@@ -243,6 +243,9 @@ namespace OpenRigs.Control
         /// <summary>Gets the session ID.</summary>
         public string SessionId { get; }
 
+        /// <summary>Gets the launcher's run id; empty when the workflow was started without one.</summary>
+        public string LaunchId { get; }
+
         /// <summary>Gets the declared parameters, with their values as they stand.</summary>
         public List<Parameter> Parameters { get; }
 
@@ -284,6 +287,7 @@ namespace OpenRigs.Control
         {
             SubjectId = server.SubjectId ?? "";
             SessionId = server.SessionId ?? "";
+            LaunchId = server.LaunchId ?? "";
             Parameters = new List<Parameter>();
             Commands = new List<Command>();
             Add(new PieceDeclaration("", server.Parameters, server.Commands));
@@ -476,6 +480,7 @@ namespace OpenRigs.Control
                     ["since"] = PhaseSince.ToString("o"),
                     ["subject_id"] = SubjectId,
                     ["session_id"] = SessionId,
+                    ["launch_id"] = LaunchId,
                     ["go_requested"] = GoRequested,
                     ["launched_by"] = Person.ToJson(LaunchedBy),
                     ["go_by"] = Person.ToJson(GoBy),
@@ -514,6 +519,12 @@ namespace OpenRigs.Control
         /// <summary>Gets or sets the session ID.</summary>
         [Description("The session ID, reported in status and carried on the Go event.")]
         public string SessionId { get; set; }
+
+        /// <summary>Gets or sets the launcher's run id, passed as the launch
+        /// property LaunchId; the manifest records it as control.launch_id, by which the launcher
+        /// finds the experiment folder after a crash.</summary>
+        [Description("The launcher's run id, reported in status; the manifest records it as control.launch_id.")]
+        public string LaunchId { get; set; }
 
         /// <summary>
         /// The task's settings a controller may change until Go. Each is read in the workflow with
