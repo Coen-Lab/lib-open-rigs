@@ -16,12 +16,12 @@ namespace OpenRigs.Devices.Tests
             string text;
             using (var stream = assembly.GetManifestResourceStream("OpenRigs.Devices.LickSpoutStage.bonsai"))
             using (var reader = new StreamReader(stream)) text = reader.ReadToEnd();
-            var heard = Regex.Matches(text, @"<orcl:Name>(\w+)</orcl:Name>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
+            var heard = Regex.Matches(text, @"""orcl:OnCommand"">\s*<orcl:Name>(\w+)</orcl:Name>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
             var sent = Regex.Matches(text, @"<dev:Command>(\w+)</dev:Command>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
             Assert.AreEqual(14, heard.Length);
             CollectionAssert.AreEqual(heard, sent.Take(heard.Length).ToArray(), "each OnCommand feeds the command of its own name");
             foreach (var name in heard) Assert.IsTrue(Enum.IsDefined(typeof(LickSpoutCommand), name), name);
-            StringAssert.Contains(text, "The workflow declares the commands: " + string.Join(", ", heard) + ".");
+            StringAssert.Contains(text, "The workflow declares the parameter SpoutStepSize and the commands: " + string.Join(", ", heard) + ".");
         }
     }
 }

@@ -9,7 +9,7 @@
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The two-driver lick spout stage, a device piece: StepperDriver-A and StepperDriver-B from their entries a and b under stepperDriver in rig.yml (RigConfigs), each opened behind its .Data and .Commands subjects and logged under its name once the experiment folder exists and the Harp clock is set. Sets the drivers up, homes all five motors (LickSpoutStage.Homed once done, announced into ReadyStages as SpoutsHomed, then the spouts go in), and moves the stage for the controller's spout commands and for LickSpoutCommand values sent to LickSpoutStage.Commands. Each target is published on LickSpoutStage.Target. The mouse's in positions come from calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml (RigConfigDirectory), else rig.yml's lickSpoutDefaultPosition (RigFile). Stops the workflow at start, naming the entries rig.yml has, if it lacks a or b. The workflow declares the commands: SpoutsHome, SpoutsIn, SpoutsOut, SaveSpoutPositions, LeftUp, LeftDown, RightUp, RightDown, LeftFront, LeftBack, RightFront, RightBack, BaseLeft, BaseRight.</Description>
+  <Description>The two-driver lick spout stage, a device piece: StepperDriver-A and StepperDriver-B from their entries a and b under stepperDriver in rig.yml (RigConfigs), each opened behind its .Data and .Commands subjects and logged under its name once the experiment folder exists and the Harp clock is set. Sets the drivers up, homes all five motors (LickSpoutStage.Homed once done, announced into ReadyStages as SpoutsHomed, then the spouts go in), and moves the stage for the controller's spout commands and for LickSpoutCommand values sent to LickSpoutStage.Commands. Each target is published on LickSpoutStage.Target. The mouse's in positions come from calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml (RigConfigDirectory), else rig.yml's lickSpoutDefaultPosition (RigFile). Stops the workflow at start, naming the entries rig.yml has, if it lacks a or b. A nudge moves the stage by the experiment parameter SpoutStepSize, in motor steps, taken live as the controller sets it (OnParameterSet) and 150 until then; one second after Start, once the controller's server is up, the controller is shown 150 as its value (ParameterDefault). The workflow declares the parameter SpoutStepSize and the commands: SpoutsHome, SpoutsIn, SpoutsOut, SaveSpoutPositions, LeftUp, LeftDown, RightUp, RightDown, LeftFront, LeftBack, RightFront, RightBack, BaseLeft, BaseRight.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
@@ -414,14 +414,41 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:SubscribeWhen" />
       </Expression>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="StepSize" DisplayName="SpoutStepSize" Description="Motor steps each spout nudge moves, read at each nudge." />
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="IntProperty">
+          <Value>150</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>LickSpoutStage.StepSize</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnParameterSet">
+          <orcl:Name>SpoutStepSize</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Name>StepSizeToInt</scr:Name>
+        <scr:Expression>Convert.ToInt32(it)</scr:Expression>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>LickSpoutStage.StepSize</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LickSpoutStage.StepSize</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="StepSize" />
+        </PropertyMappings>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:LickSpoutStage">
           <dev:RigFile>UNMAPPED</dev:RigFile>
           <dev:PositionsFile>UNMAPPED</dev:PositionsFile>
-          <dev:StepSize>150</dev:StepSize>
           <dev:RetractSteps>1500</dev:RetractSteps>
         </Combinator>
       </Expression>
@@ -526,6 +553,24 @@
       <Expression xsi:type="MulticastSubject">
         <Name>ReadyStages</Name>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LickSpoutStage.StepSize</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>1</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:DelaySubscription">
+          <rx:DueTime>PT1S</rx:DueTime>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ParameterDefault">
+          <orcl:Name>SpoutStepSize</orcl:Name>
+        </Combinator>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="2" To="3" Label="Source1" />
@@ -628,30 +673,38 @@
       <Edge From="92" To="93" Label="Source16" />
       <Edge From="93" To="95" Label="Source1" />
       <Edge From="94" To="95" Label="Source2" />
-      <Edge From="95" To="97" Label="Source1" />
-      <Edge From="96" To="97" Label="Source2" />
-      <Edge From="97" To="98" Label="Source1" />
-      <Edge From="99" To="100" Label="Source1" />
-      <Edge From="100" To="101" Label="Source1" />
-      <Edge From="102" To="103" Label="Source1" />
-      <Edge From="103" To="104" Label="Source1" />
-      <Edge From="105" To="106" Label="Source1" />
+      <Edge From="95" To="104" Label="Source1" />
+      <Edge From="104" To="105" Label="Source1" />
       <Edge From="106" To="107" Label="Source1" />
       <Edge From="107" To="108" Label="Source1" />
       <Edge From="109" To="110" Label="Source1" />
-      <Edge From="111" To="112" Label="Source1" />
+      <Edge From="110" To="111" Label="Source1" />
       <Edge From="112" To="113" Label="Source1" />
       <Edge From="113" To="114" Label="Source1" />
-      <Edge From="115" To="116" Label="Source1" />
-      <Edge From="117" To="119" Label="Source1" />
-      <Edge From="118" To="119" Label="Source2" />
+      <Edge From="114" To="115" Label="Source1" />
+      <Edge From="116" To="117" Label="Source1" />
+      <Edge From="118" To="119" Label="Source1" />
       <Edge From="119" To="120" Label="Source1" />
       <Edge From="120" To="121" Label="Source1" />
-      <Edge From="121" To="97" Label="Source3" />
       <Edge From="122" To="123" Label="Source1" />
-      <Edge From="123" To="97" Label="Source4" />
-      <Edge From="124" To="125" Label="Source1" />
-      <Edge From="125" To="126" Label="Source1" />
+      <Edge From="124" To="126" Label="Source1" />
+      <Edge From="125" To="126" Label="Source2" />
+      <Edge From="126" To="127" Label="Source1" />
+      <Edge From="127" To="128" Label="Source1" />
+      <Edge From="128" To="104" Label="Source3" />
+      <Edge From="129" To="130" Label="Source1" />
+      <Edge From="130" To="104" Label="Source4" />
+      <Edge From="131" To="132" Label="Source1" />
+      <Edge From="132" To="133" Label="Source1" />
+      <Edge From="96" To="97" Label="Source1" />
+      <Edge From="98" To="99" Label="Source1" />
+      <Edge From="99" To="100" Label="Source1" />
+      <Edge From="100" To="101" Label="Source1" />
+      <Edge From="102" To="103" Label="Source1" />
+      <Edge From="103" To="104" Label="Source2" />
+      <Edge From="134" To="135" Label="Source1" />
+      <Edge From="135" To="136" Label="Source1" />
+      <Edge From="136" To="137" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

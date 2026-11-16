@@ -6,9 +6,6 @@
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="SpoutStepSize" Description="Motor steps each spout nudge moves, read at each nudge." />
-      </Expression>
-      <Expression xsi:type="ExternalizedMapping">
         <Property Name="DisplayDevice" Description="The display the projector is on." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
@@ -50,9 +47,7 @@
         <DataSubjectName>LicketySplit-Right.Data</DataSubjectName>
         <LickStateSubjectName>LickStateRight</LickStateSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LickSpoutStage.bonsai">
-        <SpoutStepSize>150</SpoutStepSize>
-      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LickSpoutStage.bonsai" />
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SpinnakerCamera.bonsai">
         <Name>Camera-Face</Name>
         <Board>BehaviorBoard-Main</Board>
@@ -92,10 +87,9 @@
       </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="10" Label="Source1" />
-      <Edge From="1" To="18" Label="Source2" />
+      <Edge From="0" To="17" Label="Source2" />
+      <Edge From="15" To="16" Label="Source1" />
       <Edge From="16" To="17" Label="Source1" />
-      <Edge From="17" To="18" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
