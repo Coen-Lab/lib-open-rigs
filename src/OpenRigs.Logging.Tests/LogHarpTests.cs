@@ -123,7 +123,7 @@ namespace OpenRigs.Logging.Tests
 
         // PathPrefix 0.5 s after the device starts (LogController subscribed late): the log still holds the
         // messages of the second before it, as a camera frame reaches its log about 75 ms after the trigger it
-        // is stamped with and every trigger must be in the board's log (BLUE-OPTO-2, 16 Nov 2026: the first 4
+        // is stamped with and every trigger must be in the board's log (rig test, 16 Nov 2026: the first 4
         // triggers of every camera CSV were missing from the board's log).
         [TestMethod]
         public void LogHarpDevice_PathPrefixLate_LogsTheSecondBeforeIt()

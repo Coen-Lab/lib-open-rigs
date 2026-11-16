@@ -31,7 +31,7 @@ namespace OpenRigs.Core.Tests
 
         // A source that completes after its one value (HarpClockSet's Take(1)), multicast into an AsyncSubject and
         // then announced: AnnounceStage must not cut its source short, or the source's completion never reaches
-        // the subject and everything waiting on it (every Harp device's log) waits forever (BLUE-OPTO-2,
+        // the subject and everything waiting on it (every Harp device's log) waits forever (rig test,
         // 16 Nov 2026: no .bin in any device folder).
         [TestMethod]
         public void AnnouncingAfterAMulticast_LetsTheSourceCompleteItsSubject()
