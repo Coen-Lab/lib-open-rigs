@@ -278,6 +278,61 @@ namespace OpenRigs.Control.Tests
                 early.Dispose();
             }
 
+            Console.WriteLine("A device's own declarations (DeclareDeviceControls), one per camera:");
+            {
+                const string deviceEndpoint = "tcp://127.0.0.1:5647";
+                Func<string, DeclareDeviceControls> camera = name => new DeclareDeviceControls
+                {
+                    Name = name,
+                    Parameters = new Collection<Parameter> { new Parameter { Name = "ExposureUs", Minimum = 100 }, new Parameter { Name = "GainDb", Minimum = 0, Maximum = 48 } },
+                };
+                var server = Server(deviceEndpoint).Generate().Subscribe(_ => { }, _ => { });
+                Exception clash = null;
+                var face = camera("Camera-Face").Generate().Subscribe(_ => { }, e => clash = e);
+                var body = camera("Camera-Body").Generate().Subscribe(_ => { }, e => clash = e);
+                using (var socket = new RequestSocket(">" + deviceEndpoint))
+                {
+                    var status = Ask(socket, new { cmd = "status" });
+                    var names = string.Join(",", status["parameters"].Where(p => (string)p["piece"] != null && ((string)p["piece"]).StartsWith("Camera-")).Select(p => (string)p["name"] + "/" + (string)p["piece"]));
+                    Check("two cameras declare their own, named from each, the piece each camera", clash == null && names == "Camera-Face.ExposureUs/Camera-Face,Camera-Face.GainDb/Camera-Face,Camera-Body.ExposureUs/Camera-Body,Camera-Body.GainDb/Camera-Body", names + (clash == null ? "" : " " + clash.Message));
+                    Check("a set within the limits is taken", Ok(Ask(socket, new { cmd = "set", name = "Camera-Body.GainDb", value = "2" })), "refused");
+                    new DeviceParameterMaximum { Name = "Camera-Face", Parameter = "ExposureUs" }.Process(Observable.Return(9000.0)).Wait();
+                    new DeviceParameterDefault { Name = "Camera-Face", Parameter = "ExposureUs" }.Process(Observable.Return(5000.0)).Wait();
+                    var over = Ask(socket, new { cmd = "set", name = "Camera-Face.ExposureUs", value = "9500" });
+                    Check("DeviceParameterMaximum limits that device's parameter alone", !Ok(over) && ((string)over["why"]).Contains("from 100 to 9000") && Ok(Ask(socket, new { cmd = "set", name = "Camera-Body.ExposureUs", value = "9500" })), over.ToString());
+                    new DeviceParameterDefault { Name = "Camera-Face", Parameter = "GainDb" }.Process(Observable.Return(20.0)).Wait();
+                    Check("a pupil camera's gain of 20 dB starts as its value and a set of 20 is taken", (string)Ask(socket, new { cmd = "status" })["parameters"].First(p => (string)p["name"] == "Camera-Face.GainDb")["value"] == "20" && Ok(Ask(socket, new { cmd = "set", name = "Camera-Face.GainDb", value = "20" })), "refused");
+                    Check("DeviceParameterDefault sets that device's", (string)Ask(socket, new { cmd = "status" })["parameters"].First(p => (string)p["name"] == "Camera-Face.ExposureUs")["value"] == "5000", "not set");
+                }
+                var cameraSets = new[]
+                {
+                    new ControlEvent { Kind = ControlEventKind.Set, Name = "Camera-Face.GainDb", Arguments = "1" },
+                    new ControlEvent { Kind = ControlEventKind.Set, Name = "Camera-Body.GainDb", Arguments = "2" },
+                };
+                var heard = new OnDeviceParameterSet { Name = "Camera-Body", Parameter = "GainDb" }.Process(cameraSets.ToObservable()).ToList().Wait();
+                Check("OnDeviceParameterSet passes its device's parameter alone", heard.SequenceEqual(new[] { "2" }), string.Join(",", heard));
+                Exception unnamed = null;
+                try { new DeclareDeviceControls { Parameters = { new Parameter { Name = "GainDb" } } }.Generate(); }
+                catch (InvalidOperationException e) { unnamed = e; }
+                Check("a device control with no device Name is refused", unnamed != null && unnamed.Message.Contains("(GainDb) has no device Name"), unnamed == null ? "taken" : unnamed.Message);
+                body.Dispose();
+                face.Dispose();
+                server.Dispose();
+            }
+
+            Console.WriteLine("EndAfterStop:");
+            {
+                int code;
+                Check("nothing while the workflow runs", EndAfterStop.Why(null, false, out code) == null, "a reason");
+                Check("the controller's stop is exit code 0", EndAfterStop.Why("operator", false, out code) == "the stop (operator)" && code == 0, code.ToString());
+                Check("ending with no stop is an error, exit code 1", EndAfterStop.Why(null, true, out code).Contains("no stop, after an error") && code == 1, code.ToString());
+                var message = EndAfterStop.Message(2, "the stop (operator)", 0);
+                Check("its message names itself, the grace and the code", message == "EndAfterStop: Bonsai was still running 2 s after the stop (operator), its teardown held up, so EndAfterStop ends it with exit code 0", message);
+                var gave = 0;
+                using (new EndAfterStop().Process().Subscribe(_ => gave++)) { }
+                Check("outside headless Bonsai it watches nothing and gives nothing", gave == 0, gave.ToString());
+            }
+
             Console.WriteLine("Two servers on one port:");
             {
                 var first = Server().Generate().Subscribe(_ => { }, _ => { });
