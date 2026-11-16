@@ -4,9 +4,9 @@ using System.Collections.Generic;
 namespace OpenRigs.Core
 {
     /// <summary>
-    /// A trial's quiet waits on the Harp clock, counted from the interval's start: Go needs every spout released for
-    /// lickQuietSeconds (a held contact blocks Go), and the wheel's distance (forward and back added) within wheelQuietCm over
-    /// the last wheelQuietSeconds; Go is the first moment at or after earliest at which both hold. With both off, Go is
+    /// A trial's quiet waits on the Harp clock, counted from the interval's start: the trial start needs every spout released for
+    /// lickQuietSeconds (a held contact blocks it), and the wheel's distance (forward and back added) within wheelQuietCm over
+    /// the last wheelQuietSeconds; the start is the first moment at or after earliest at which both hold. With both off, the start is
     /// earliest. One class for every task, so all of them wait alike. Not thread-safe, as a List is not: a task calls it
     /// under the one lock its lick, wheel and clock inputs share.
     /// </summary>
@@ -48,8 +48,8 @@ namespace OpenRigs.Core
         /// Starts the waits for one interval.
         /// </summary>
         /// <param name="intervalStart">Harp time the interval began, where both waits start.</param>
-        /// <param name="earliest">The soonest Go may be: the interval's end less the lead.</param>
-        /// <param name="lickQuietSeconds">How long every spout must be released before Go; 0 for no lick wait.</param>
+        /// <param name="earliest">The soonest the trial may start: the interval's end less the lead.</param>
+        /// <param name="lickQuietSeconds">How long every spout must be released before the trial starts; 0 for no lick wait.</param>
         /// <param name="wheelQuietSeconds">The window the wheel's travel is counted over; 0 for no wheel wait.</param>
         /// <param name="wheelQuietCm">The most travel, in cm, the window may hold.</param>
         /// <param name="wheelAtStart">The wheel's distance in cm at the interval's start, NaN if none has been read.</param>
@@ -58,7 +58,7 @@ namespace OpenRigs.Core
         {
             var problems = SettingsProblems(lickQuietSeconds, wheelQuietSeconds, wheelQuietCm);
             if (double.IsNaN(intervalStart) || double.IsInfinity(intervalStart)) problems.Add("the interval's start is " + intervalStart);
-            if (double.IsNaN(earliest) || double.IsInfinity(earliest)) problems.Add("the earliest Go is " + earliest);
+            if (double.IsNaN(earliest) || double.IsInfinity(earliest)) problems.Add("the earliest start is " + earliest);
             if (problems.Count > 0) throw new ArgumentException("QuietWait: " + string.Join("; ", problems) + ".");
             this.earliest = earliest;
             this.lickQuietSeconds = lickQuietSeconds;
@@ -96,8 +96,8 @@ namespace OpenRigs.Core
             }
         }
 
-        /// <summary>When the trial's start (Go) falls if nothing more restarts a wait (infinity while a spout is held): exact, not rounded to a clock tick.</summary>
-        public double GoTime
+        /// <summary>When the trial starts if nothing more restarts a wait (infinity while a spout is held): exact, not rounded to a clock tick.</summary>
+        public double TrialStartTime
         {
             get
             {
@@ -106,7 +106,7 @@ namespace OpenRigs.Core
             }
         }
 
-        /// <summary>The soonest Go may be, as given.</summary>
+        /// <summary>The soonest the trial may start, as given.</summary>
         public double Earliest { get { return earliest; } }
     }
 }
