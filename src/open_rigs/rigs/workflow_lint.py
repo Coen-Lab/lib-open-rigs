@@ -977,12 +977,12 @@ def training_stage_problems(wf: Workflow) -> list[str]:
         "ExperimentControl does not declare the parameter TrainingStage, which TrainingStage reads"]
     if _order(wf.root, _declares("TrainingStage")) is not None:
         problems.append("the workflow declares TrainingStage itself (TrainingStage does)")
-    names = {c.findtext(CONTROL + "Name") for c in wf.root.iter(W + "Combinator")
+    names = {c.findtext(CONTROL + "Name") or "" for c in wf.root.iter(W + "Combinator")
              if (c.get(XSI) or "").split(":")[-1] in ("ParameterValue", "ReportMetric")}
     problems += [f"the workflow handles {name} itself (TrainingStage does)" for name in sorted(names & {"TrainingStage", "trainingStage"})]
     at = _order(wf.root, lambda n: n.get("Path") == TRAINING_STAGE)
     control = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_CONTROL)
-    if control is None or control > at:
+    if control is None or at is None or control > at:
         problems.append("TrainingStage comes before ExperimentControl")
     return problems
 
