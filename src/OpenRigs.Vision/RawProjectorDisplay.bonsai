@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:vis="clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A projector's raw display, for calibrating the projector: the projector's window (ProjectorWindow), as ProjectorDisplay has it, with no mesh mapping and no gamma correction, so what is drawn reaches the projector untouched, black where nothing is drawn. Stimuli draw on the DrawStimuli subject in the same orthographic view (azimuth -135 to 135, elevation -22.5 to 82.5), which spans the whole window unmapped: a quad of extent 270 by 105 at (0, 30) fills it. Needs no projectionCalibration. Stops the workflow at start, saying so, if DisplayDevice is not a display on this machine (RequireDisplay). Disposed on the render thread (DisposeOnRenderThread).</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="DisplayDevice" Description="The display the projector is on." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="WindowState" Description="Fullscreen for the projector; Normal to test on a desk." />
+        <Property Name="Width" Description="The window width, in pixels: the display mode set at start when full screen." />
+        <Property Name="Height" Description="The window height, in pixels: the display mode set at start when full screen." />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Vision:ProjectorWindow.bonsai">
+        <DisplayDevice>First</DisplayDevice>
+        <WindowState>Fullscreen</WindowState>
+        <Width>1920</Width>
+        <Height>1080</Height>
+        <ClearColor>Black</ClearColor>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vis:RequireDisplay">
+          <vis:DisplayDevice>First</vis:DisplayDevice>
+          <vis:Name>RawProjectorDisplay</vis:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vis:DisposeOnRenderThread">
+          <vis:TimeoutSeconds>2</vis:TimeoutSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="2" Label="Source1" />
+      <Edge From="1" To="2" Label="Source2" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="0" To="3" Label="Source2" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

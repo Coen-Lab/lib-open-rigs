@@ -20,7 +20,7 @@ Upstream column: an issue where reported, else "Not reported" for a fix upstream
 | Streaming | Stream controllers on the task pool, so Stop cannot hang; otherwise upstream's at the base commit | Not reported |
 | Video | `TriggeredSpinnaker`: the region reset to full frame after binning; the chunk fields copied inside the camera callback; a new `ExposureTime` or `Gain` sent to the open camera, both per frame in `VideoChunkData`; `Name`, `CamerasOpen` once streaming, frame gaps filled | ucl-open/ucl-open#66, #67 |
 | Video | `FfmpegVideoWriter` (a kill-safe .mkv on rig.yml's `videoEncoder`, every frame written at Stop, a frame CSV); `UsbCamera` | Own |
-| Vision | `ProjectorDisplay`, `DisposeOnRenderThread` (a stuck dispose falls back; the shader window's error written out) | Own |
+| Vision | `ProjectorDisplay`, `RawProjectorDisplay` and their shared `ProjectorWindow`, `DisposeOnRenderThread` (a stuck dispose falls back; the shader window's error written out), `RequireDisplay` | Own |
 | Python | `open_rigs.rigs.lab_rig.LabRig` and its parts in `open_rigs.components`, generated into Devices and Core; `workflow_lint`; `summarise-experiment`, `check-videos`; `MAX_REWARD_UL` and `ZAPIT_MAX_RAMP_DOWN_SECONDS`, held by C# tests to their C# twins | Own |
 
 `OpenRigs.Streaming` declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.

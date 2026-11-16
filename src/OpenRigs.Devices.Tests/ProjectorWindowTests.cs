@@ -21,7 +21,7 @@ namespace OpenRigs.Devices.Tests
     /// source from the workflow's own subscription at that moment takes the connection lock first and
     /// then waits for the replay lock: neither thread moves, the workflow never finishes starting, and
     /// no error can stop it (a rig, 16 Nov 2026: two launches in ten, Bonsai left in Starting until
-    /// killed). ProjectorDisplay therefore creates its window only once the workflow has subscribed.
+    /// killed). ProjectorWindow, the window of ProjectorDisplay and RawProjectorDisplay, is therefore created only once the workflow has subscribed.
     /// </summary>
     [TestClass]
     public class ProjectorWindowTests
@@ -30,7 +30,7 @@ namespace OpenRigs.Devices.Tests
         static readonly XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
         static readonly XNamespace Shaders = "clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders";
 
-        // ProjectorDisplay's window as it creates it, small and windowed, then a node that subscribes the
+        // ProjectorWindow as it creates the window, small and windowed, then a node that subscribes the
         // window source while the window loads, as the stimuli a task draws do.
         [TestMethod]
         public void TheWorkflowFinishesSubscribing_WhileItsWindowLoads()
@@ -63,13 +63,13 @@ namespace OpenRigs.Devices.Tests
         {
             var assembly = typeof(OpenRigs.Vision.DisposeOnRenderThread).Assembly;
             XDocument display;
-            using (var stream = assembly.GetManifestResourceStream("OpenRigs.Vision.ProjectorDisplay.bonsai"))
+            using (var stream = assembly.GetManifestResourceStream("OpenRigs.Vision.ProjectorWindow.bonsai"))
             {
-                Assert.IsNotNull(stream, "ProjectorDisplay.bonsai is not embedded in OpenRigs.Vision.");
+                Assert.IsNotNull(stream, "ProjectorWindow.bonsai is not embedded in OpenRigs.Vision.");
                 display = XDocument.Load(stream);
             }
 
-            // The window and every node from it up to BonVision's resources, as ProjectorDisplay has them.
+            // The window and every node from it up to BonVision's resources, as ProjectorWindow has them.
             var window = display.Descendants(Bonsai + "Workflow").Single(w => w.Element(Bonsai + "Nodes").Elements()
                 .Any(n => IsCreateWindow(n)));
             var nodes = window.Element(Bonsai + "Nodes").Elements(Bonsai + "Expression").ToList();
