@@ -38,6 +38,8 @@ MANUAL_REWARDS = "OpenRigs.Devices:BehaviorBoard.ManualRewards.bonsai"
 BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
 EXPERIMENT_RECORDS = "OpenRigs.Logging:ExperimentRecords.bonsai"
 LAUNCH_SETTINGS = "OpenRigs.Control:LaunchSettings.bonsai"
+LOG_LAB_EXPERIMENT = "OpenRigs.Logging:LogLabExperiment.bonsai"
+NO_EXPERIMENT_FOLDER = "OpenRigs.Logging:NoExperimentFolder.bonsai"
 EXPERIMENT_CONTROL = "OpenRigs.Control:ExperimentControl.bonsai"
 DELIVER_REWARD = "OpenRigs.Devices:BehaviorBoard.DeliverReward.bonsai"
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
@@ -748,6 +750,43 @@ def launch_settings_problems(wf: Workflow) -> list[str]:
     node = next(n for n in wf.root.iter(W + "Expression") if n.get("Path") == LAUNCH_SETTINGS)
     if not _properties(node).get("TaskPath"):
         problems.append("LaunchSettings has no TaskPath (the task file run from the editor)")
+    return problems
+
+
+def _local_roots(wf: Workflow) -> list[ET.Element]:
+    """The workflow and each workflow file of its own it includes (an IncludeWorkflow Path with no package), at any depth."""
+    roots, todo, seen = [], [(wf.repo / "src" / wf.file, wf.root)], set()
+    while todo:
+        path, root = todo.pop()
+        roots.append(root)
+        for n in root.iter(W + "Expression"):
+            included = n.get("Path") or ""
+            target = (path.parent / included.replace("\\", "/")).resolve()
+            if n.get(XSI) == "IncludeWorkflow" and ":" not in included and target not in seen and target.is_file():
+                seen.add(target)
+                todo.append((target, ET.fromstring(target.read_text(encoding="utf-8-sig").encode("utf-8"))))
+    return roots
+
+
+def no_experiment_folder_problems(wf: Workflow) -> list[str]:
+    """The workflow makes the experiment folder (OpenRigs.Logging's LogLabExperiment, with LaunchSettings) or makes none
+    (NoExperimentFolder: a calibration, a preflight), one of the two once, and stands in for neither itself: no own
+    PathPrefix declared or published, and with NoExperimentFolder no LaunchSettings, no own SubjectId (in its own
+    included files too), and its SubjectId property set."""
+    log, none = (wf.text.count(f'Path="{path}"') for path in (LOG_LAB_EXPERIMENT, NO_EXPERIMENT_FOLDER))
+    if log + none != 1:
+        return [f"the workflow includes LogLabExperiment {log} and NoExperimentFolder {none} times: one of the two once"]
+    nodes = [n for root in _local_roots(wf) for n in root.iter(W + "Expression")]
+    problems = [f"the workflow {what} {name} itself" for what, name, found in (
+        ("declares", "PathPrefix", _declares("PathPrefix")),
+        ("publishes", "PathPrefix", lambda n: n.get(XSI) == "MulticastSubject" and _name(n) == "PathPrefix"),
+        ("declares", "SubjectId", _declares("SubjectId") if none else lambda n: False)) if any(map(found, nodes))]
+    if none:
+        if f'Path="{LAUNCH_SETTINGS}"' in wf.text:
+            problems.append("the workflow includes LaunchSettings and NoExperimentFolder (both declare SubjectId)")
+        node = next(n for n in wf.root.iter(W + "Expression") if n.get("Path") == NO_EXPERIMENT_FOLDER)
+        if not _properties(node).get("SubjectId"):
+            problems.append("NoExperimentFolder has no SubjectId (a name that is no mouse's)")
     return problems
 
 
