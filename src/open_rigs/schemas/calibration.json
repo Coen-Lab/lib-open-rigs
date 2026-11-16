@@ -281,14 +281,14 @@
         "minX": {
           "description": "Smallest x the fit is valid for, such as the shortest pulse width measured.",
           "maximum": 65535,
-          "minimum": 0,
+          "minimum": 1,
           "title": "MinX",
           "type": "integer"
         },
         "maxX": {
           "description": "Largest x the fit is valid for, such as the longest pulse width measured.",
           "maximum": 65535,
-          "minimum": 0,
+          "minimum": 1,
           "title": "MaxX",
           "type": "integer"
         }

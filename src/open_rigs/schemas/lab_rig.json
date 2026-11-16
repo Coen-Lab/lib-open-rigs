@@ -1120,7 +1120,7 @@
         "channel": {
           "description": "Mixer output channel driving this speaker.",
           "maximum": 2147483647,
-          "minimum": -2147483648,
+          "minimum": 0,
           "title": "Channel",
           "type": "integer"
         },

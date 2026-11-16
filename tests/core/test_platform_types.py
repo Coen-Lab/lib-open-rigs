@@ -78,3 +78,29 @@ def test_dispense_calibration_round_trips_through_yaml(tmp_path):
     # swc.aeon's BaseSchema links each child to its container, so nested models are compared by dump.
     restored = rig_yaml.load(DispenseCalibration, path)
     assert restored.model_dump(mode="json") == settings.model_dump(mode="json")
+
+
+def test_a_model_s_own_bound_on_a_sized_integer_wins_and_the_type_s_range_holds_otherwise():
+    # Round 3: Int = Annotated[int, Field(ge=..., le=...)] replaced a model's own Field(ge=1), so a task took
+    # thresholdLicks 0 and maxRepeats -1, and the schema said nothing of the bound.
+    from typing import Optional
+
+    from pydantic import BaseModel, Field
+
+    from open_rigs.core.base import Int, UInt
+
+    class Task(BaseModel):
+        licks: Int = Field(ge=1)
+        repeats: Optional[Int] = Field(default=None, ge=0)
+        anything: Int = 0
+        count: UInt = Field(default=1, gt=0)
+
+    for bad in ({"licks": 0}, {"licks": 1, "repeats": -1}, {"licks": 1, "anything": 2**31}, {"licks": 1, "count": 0}):
+        try:
+            Task(**bad)
+        except pydantic.ValidationError:
+            continue
+        raise AssertionError(f"{bad} accepted")
+    properties = Task.model_json_schema()["properties"]
+    assert (properties["licks"]["minimum"], properties["anything"]["minimum"]) == (1, -2147483648)
+    assert properties["repeats"]["anyOf"][0]["minimum"] == 0
