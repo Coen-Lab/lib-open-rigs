@@ -31,6 +31,7 @@ namespace OpenRigs.Devices.Tests
             var rig = Deserialize(Template());
             Assert.AreEqual(3, rig.Camera.Count);
             Assert.AreEqual(2, rig.SpeakerArray.PenaltySoundChannel);
+            Assert.AreEqual("../shared/sounds/background_noise.wav", rig.SpeakerArray.BackgroundNoise);
             Assert.IsNotNull(rig.Zapit);
         }
 

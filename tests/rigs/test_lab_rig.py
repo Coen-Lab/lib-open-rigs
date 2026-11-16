@@ -52,6 +52,17 @@ def test_template_validates():
     assert "triggerLine" not in LabRig.model_json_schema(by_alias=True)["$defs"]["ZapitServer"]["properties"]
 
 
+def test_the_background_noise_is_a_rig_file_the_speaker_array_names():
+    # The lab's one noise (16 Nov 2026): RigConfigs\shared beside the rig's folder, listed with the rig's other files.
+    from open_rigs.core.artefacts import rig_artefacts
+
+    rig = copy.deepcopy(RIG)
+    rig["speakerArray"]["backgroundNoise"] = "../shared/sounds/background_noise.wav"
+    found = rig_artefacts(LabRig.model_validate(rig))
+    assert found["speakerArray.backgroundNoise"] == "../shared/sounds/background_noise.wav"
+    assert LabRig.model_validate(RIG).speaker_array.background_noise is None
+
+
 def test_old_keys_gone():
     # The generated C# refuses a key its classes lack, so a rig.yml still holding these stops at Start.
     keys = set(LabRig.model_json_schema(by_alias=True)["properties"])

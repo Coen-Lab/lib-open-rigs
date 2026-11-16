@@ -2,11 +2,17 @@
 from pydantic import Field, model_validator
 
 from open_rigs.components.audio import SpeakerArray
+from open_rigs.core.artefacts import ArtefactPath
 
 
 class EqualisedSpeakerArray(SpeakerArray):
     __doc__ = SpeakerArray.__doc__
     penalty_sound_channel: int = Field(ge=0, description="Mixer output channel the penalty sound plays on.")
+    background_noise: ArtefactPath | None = Field(
+        default=None,
+        examples=["../shared/sounds/background_noise.wav"],
+        description="The lab's background noise, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with sound plays it (OpenRigs.Audio BackgroundNoise), which stops at Start when it is missing.",
+    )
 
     @model_validator(mode="after")
     def _every_speaker_filtered(self):

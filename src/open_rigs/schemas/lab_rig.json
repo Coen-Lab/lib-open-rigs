@@ -603,6 +603,23 @@
           "minimum": 0,
           "title": "PenaltySoundChannel",
           "type": "integer"
+        },
+        "backgroundNoise": {
+          "anyOf": [
+            {
+              "type": "string",
+              "x-rig-artefact": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The lab's background noise, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with sound plays it (OpenRigs.Audio BackgroundNoise), which stops at Start when it is missing.",
+          "examples": [
+            "../shared/sounds/background_noise.wav"
+          ],
+          "title": "BackgroundNoise"
         }
       },
       "required": [

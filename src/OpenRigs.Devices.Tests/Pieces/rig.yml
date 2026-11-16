@@ -119,6 +119,8 @@ speakerArray:
   syncGain: 0.2
   penaltySoundChannel: 2    # the penalty sound's channel
   unusedChannels: [30]      # not connected
+  # the lab's one background noise, from this directory: the server's config\shared copy, kept by the rig's upkeep
+  backgroundNoise: ../shared/sounds/background_noise.wav
   # Speakers currently wired on this rig. Position is relative to the subject:
   # azimuth 0 = straight ahead, positive to the right; elevation 0 = horizontal.
   # filter: the speaker's SpeakerFilter artefact (FIR taps for the device's sample rate), relative

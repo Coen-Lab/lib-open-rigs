@@ -1557,6 +1557,8 @@ namespace OpenRigs.Devices.Rigs
     
         private int _penaltySoundChannel;
     
+        private string _backgroundNoise;
+    
         public EqualisedSpeakerArray()
         {
             _device = new AudioDevice();
@@ -1573,6 +1575,7 @@ namespace OpenRigs.Devices.Rigs
             _syncGain = other._syncGain;
             _unusedChannels = other._unusedChannels;
             _penaltySoundChannel = other._penaltySoundChannel;
+            _backgroundNoise = other._backgroundNoise;
         }
     
         /// <summary>
@@ -1686,6 +1689,24 @@ namespace OpenRigs.Devices.Rigs
             }
         }
     
+        /// <summary>
+        /// The lab's background noise, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with sound plays it (OpenRigs.Audio BackgroundNoise), which stops at Start when it is missing.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("backgroundNoise")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="backgroundNoise")]
+        [System.ComponentModel.DescriptionAttribute(@"The lab's background noise, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with sound plays it (OpenRigs.Audio BackgroundNoise), which stops at Start when it is missing.")]
+        public string BackgroundNoise
+        {
+            get
+            {
+                return _backgroundNoise;
+            }
+            set
+            {
+                _backgroundNoise = value;
+            }
+        }
+    
         public System.IObservable<EqualisedSpeakerArray> Generate()
         {
             return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new EqualisedSpeakerArray(this)));
@@ -1703,7 +1724,8 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("SyncChannel = " + _syncChannel + ", ");
             stringBuilder.Append("SyncGain = " + _syncGain + ", ");
             stringBuilder.Append("UnusedChannels = " + _unusedChannels + ", ");
-            stringBuilder.Append("PenaltySoundChannel = " + _penaltySoundChannel);
+            stringBuilder.Append("PenaltySoundChannel = " + _penaltySoundChannel + ", ");
+            stringBuilder.Append("BackgroundNoise = " + _backgroundNoise);
             return true;
         }
     
