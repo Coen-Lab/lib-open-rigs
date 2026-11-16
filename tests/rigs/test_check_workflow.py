@@ -105,14 +105,15 @@ def test_a_workflow_other_than_main_is_checked_when_named(tmp_path):
     (repo / "src" / "box.bonsai").write_text("<WorkflowBuilder />", encoding="utf-8")
     assert "1. Compiling src\\Extensions as C# 5..." in check(repo, "-Workflow", "box.bonsai").stdout
 
+
 @windows_only
 def test_a_workflow_with_no_extensions_project_has_no_extensions_to_build(tmp_path):
     # The projector calibration has no src\Extensions.csproj: step 1 says so and passes, and the check goes on.
     repo = environment(tmp_path, {"OpenRigs.Core": "0.1.1-fork-lab.14"}, ["OpenRigs.Core.0.1.1-fork-lab.14"])
     run = check(repo)
     lines = run.stdout.splitlines()
-    assert lines[:2] == ["1. Compiling src\Extensions as C# 5...", "  ok    no extensions to build (no src\Extensions.csproj)"]
-    assert lines[2] == "2. tests\Extensions.Tests..."
+    assert lines[:2] == ["1. Compiling src\\Extensions as C# 5...", "  ok    no extensions to build (no src\\Extensions.csproj)"]
+    assert lines[2] == "2. tests\\Extensions.Tests..."
 
 
 def test_only_a_workflow_with_no_experiment_folder_skips_the_records_and_task_checks():

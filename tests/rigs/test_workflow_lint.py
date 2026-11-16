@@ -357,7 +357,7 @@ def test_an_own_include_is_opened_from_src_as_bonsai_opens_it_and_one_bonsai_wou
     own_file(tmp_path, "Extensions/Extensions/Spouts.bonsai", CALIBRATION_READY, ANNOUNCED)
     own_file(tmp_path, "Extensions/Job.bonsai", include("Extensions\\Spouts.bonsai"))
     with pytest.raises(ValueError, match=r"src\\Extensions\\Job\.bonsai includes Extensions\\Spouts\.bonsai, which Bonsai opens as "
-                                         r".*src\\Extensions\\Spouts\.bonsai \(from src"):
+                                         r".*src[\\/]Extensions[\\/]Spouts\.bonsai \(from src"):
         workflow(tmp_path, include("Extensions\\Job.bonsai"))
     # A Path with no extension is opened with .bonsai added.
     own_file(tmp_path / "b", "Extensions/Spouts.bonsai", CALIBRATION_READY, ANNOUNCED)
