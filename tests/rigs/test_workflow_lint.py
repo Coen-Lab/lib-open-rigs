@@ -681,3 +681,20 @@ def test_each_clock_publishes_timestamp_from_its_fast_register():
         return next(iter(nodes[at])).get(lint.XSI) or ""
     assert register_into_timestamp("BehaviorBoard/ClockFromBoard.bonsai") == "beh:TimestampedAnalogData"
     assert register_into_timestamp("ClockFromTimestampGenerator.bonsai") == "tsg:TimestampedTimer"
+
+
+def test_camera_live_controls_declares_its_own_parameters_and_a_workflow_has_one(tmp_path):
+    live = piece(lint.CAMERA_LIVE_CONTROLS, Camera="Camera-Overhead", Board="BehaviorBoard-Main")
+    one = workflow(tmp_path / "one", include(lint.READ_LAB_RIG) + live + include(lint.EXPERIMENT_CONTROL))
+    # What status lists, each with the piece's name: the parameters are fixed, so the include has no property for them.
+    assert {(who, name) for who, kind, name in lint.control_declarations(one) if kind == "parameter"} == {
+        ("CameraLiveControls", "CameraExposureUs"), ("CameraLiveControls", "CameraGainDb")}
+    assert lint.declared_twice(one) == []
+    text = (ROOT / "src" / "OpenRigs.Devices" / "CameraLiveControls.bonsai").read_text(encoding="utf-8-sig")
+    assert "ExposureParameter" not in text and "GainParameter" not in text
+    copy = "<Parameters><Parameter><Name>CameraExposureUs</Name></Parameter><Parameter><Name>CameraGainDb</Name></Parameter></Parameters>"
+    task = workflow(tmp_path / "task", include(lint.READ_LAB_RIG) + live + include(lint.EXPERIMENT_CONTROL, copy))
+    assert lint.declared_twice(task) == ["the parameter CameraExposureUs is declared by ExperimentControl and by CameraLiveControls",
+                                         "the parameter CameraGainDb is declared by ExperimentControl and by CameraLiveControls"]
+    twice = workflow(tmp_path / "twice", include(lint.READ_LAB_RIG) + live + live)
+    assert "the workflow includes CameraLiveControls more than once" in lint.hardware_problems(twice)

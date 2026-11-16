@@ -79,7 +79,7 @@ PIECES = {
     SPEAKER_MIXER: (),
     PROJECTOR_DISPLAY: (),
 }
-ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY)  # pieces a workflow has at most once
+ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY, CAMERA_LIVE_CONTROLS)  # pieces a workflow has at most once
 # The stage each piece announces into ReadyStages (its AnnounceStage's Stage), which ReadyGate must wait for; a camera
 # announces its own Name. test_ready_stages checks each piece's file says the same.
 READY_STAGES = {CLOCK_FROM_GENERATOR: "HarpClockSet", CLOCK_FROM_BOARD: "HarpClockSet", LICK_SPOUT_STAGE: "SpoutsHomed",
@@ -91,7 +91,8 @@ LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage'
 # Lab includes read from the package (never from the workflow), found in OpenRigs.Devices.dll by the start of their
 # Description: a rig list holds only pieces, and is expanded in place.
 RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The domes' hardware"}
-SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task"}
+SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task",
+                          CAMERA_LIVE_CONTROLS: "Optional live controls for one SpinnakerCamera piece"}
 # lib-open-rigs' own source, when this module runs from it (its tests); a workflow's lint reads its package instead.
 LIB_SRC = Path(__file__).parents[2]
 BLOCK_SUBJECTS = {
