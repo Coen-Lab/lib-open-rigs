@@ -11,7 +11,7 @@ summarise reads one experiment's BonsaiData/BonsaiData_Trial_*.csv, BonsaiData/B
 RewardDelivered row, Value the microlitres delivered), Settings/Settings_Task_*.json (the lead and the penalty)
 and manifest.json (how the run ended), and checks the rows against each other and the task:
 
-- trial numbers run 1, 2, 3 ... with none missing, and each outcome is Correct, Incorrect or NoResponse;
+- trial numbers run 1, 2, 3 ... with none missing, and each outcome is Correct, Incorrect, NoResponse or Probe;
 - each trial's start (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
   quietWaitSeconds (never negative), within 2 ms;
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
@@ -30,7 +30,8 @@ without that log has no unfinished trial.
 
 A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
 Performance is Correct / (Correct + Incorrect), over the trials both
-spouts were offered where the task records bothSpouts; the response rate is the trials not NoResponse.
+spouts were offered where the task records bothSpouts; the response rate is the trials neither NoResponse nor Probe, of the trials that are not Probe (a Probe trial, both
+modalities shown and never rewarded or penalised, counts in neither).
 
 A file without a column the checks read (harpTime, outcomeTime and the rest of the core) is one problem,
 not checked further; without a Settings_Task file the checks that need the task are one problem. A trial row with an
@@ -163,7 +164,7 @@ def shared_block_problems(columns: Dict[str, Any], blocks: Iterable[str]) -> Lis
     return problems
 
 
-OUTCOMES = ("Correct", "Incorrect", "NoResponse")
+OUTCOMES = ("Correct", "Incorrect", "NoResponse", "Probe")
 
 
 @dataclass
@@ -173,7 +174,7 @@ class Summary:
     trials: int
     correct: int
     performance: float  # Correct / (Correct + Incorrect), two-spout trials where recorded; NaN with none
-    responded: float = float("nan")  # the trials not NoResponse, of all; NaN with no trials
+    responded: float = float("nan")  # the trials neither NoResponse nor Probe, of the not-Probe; NaN with no trials
     response_seconds: List[float] = field(default_factory=list)  # each trial's outcome less its stimulus onset
     interval_seconds: List[float] = field(default_factory=list)  # each outcome to the next stimulus onset
     requested_ul: float = 0.0  # the task's rewards: rewardSizeUl of each rewarded trial
@@ -285,9 +286,10 @@ def _summarise(folder: Path) -> Summary:
         return Summary(folder.name, outcome, len(trials), 0, float("nan"), problems=missing)
     correct = sum(r["outcome"] == "Correct" for r in trials)
     counted = [r for r in trials if r["outcome"] in ("Correct", "Incorrect") and _true(r.get("bothSpouts", "True"))]
+    scored = [r for r in trials if r["outcome"] != "Probe"]
     s = Summary(folder.name, outcome, len(trials), correct,
                 sum(r["outcome"] == "Correct" for r in counted) / len(counted) if counted else float("nan"),
-                sum(r["outcome"] != "NoResponse" for r in trials) / len(trials) if trials else float("nan"))
+                sum(r["outcome"] != "NoResponse" for r in scored) / len(scored) if scored else float("nan"))
     task = _task(folder)
     if trials and task is None:
         s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the penalty sound not checked")

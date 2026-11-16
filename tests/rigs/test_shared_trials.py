@@ -251,6 +251,13 @@ def test_performance_is_rig_controls(tmp_path):
     assert (s.correct, round(s.performance, 4), s.responded) == (2, round(1 / 3, 4), 0.8)  # trial 3, one spout, left out
 
 
+def test_a_probe_trial_is_accepted_and_left_out_of_performance_and_the_response_rate(tmp_path):
+    trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="Probe")]
+    s = summarise(_experiment(tmp_path, trials, []))
+    assert not any("not one of" in p for p in s.problems)
+    assert (s.trials, s.correct, s.performance, s.responded) == (5, 2, 0.5, 1.0)
+
+
 def test_videos_are_checked_when_asked(tmp_path):
     trials = _chain(2)
     folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])
