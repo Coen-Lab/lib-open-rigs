@@ -4,7 +4,6 @@ import xml.etree.ElementTree as ET
 
 from open_rigs.rigs.workflow_lint import (
     AUDIO,
-    MANUAL_REWARD_DROP_UL,
     RX,
     SCRIPT,
     SPEAKER_MIXER_SOUNDS,
@@ -20,6 +19,8 @@ from open_rigs.rigs.workflow_lint import (
     scope,
     upstream,
 )
+
+MANUAL_REWARD_DROP_UL = 2.5  # RewardLeft and RewardRight each give this, before and during a run
 
 
 def mixer_boot_delay_problems(root: ET.Element) -> list[str]:

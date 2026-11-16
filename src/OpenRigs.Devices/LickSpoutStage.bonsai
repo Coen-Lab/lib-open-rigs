@@ -248,7 +248,7 @@
       <Expression xsi:type="rx:BehaviorSubject">
         <Name>LickSpoutStage-Main.Homed</Name>
       </Expression>
-      <Expression xsi:type="rx:PublishSubject" TypeArguments="dev:LickSpoutCommand">
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="dev:LickSpoutCommand">
         <rx:Name>LickSpoutStage-Main.Commands</rx:Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">

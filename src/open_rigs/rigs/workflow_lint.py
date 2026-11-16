@@ -77,9 +77,13 @@ PIECES = {
     CAMERA: ("Name", "Name.Data", "Board", "Board.Data"),
     CAMERA_TRIGGERS: ("Board", "Board.Commands", "Board.Data"),
     CAMERA_LIVE_CONTROLS: ("Camera", "Board"),
+    MANUAL_PULSES: ("Board", "Board.Commands"),
     SPEAKER_MIXER: (),
     PROJECTOR_DISPLAY: (),
 }
+# The Kind each named piece's Name starts with (Kind-Instance): RigDevice finds the entry by the Instance alone, in the
+# piece's own rig.yml group, so a BehaviorBoard piece named Camera-Main would open the board main and log as a camera.
+KINDS = {CLOCK_FROM_GENERATOR: "TimestampGeneratorGen3", BOARD: "BehaviorBoard", LICKETY_SPLIT: "LicketySplit", CAMERA: "Camera"}
 ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY, CAMERA_LIVE_CONTROLS)  # pieces a workflow has at most once
 # The stage each piece announces into ReadyStages (its AnnounceStage's Stage), which ReadyGate must wait for; a camera
 # announces its own Name. test_ready_stages checks each piece's file says the same.
@@ -104,7 +108,7 @@ BLOCK_SUBJECTS = {
     ZAPIT_INCLUDE: {"ZapitCommands": "rx:BehaviorSubject"},
     SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
     READY_GATE: {"ReadyStages": "rx:ReplaySubject", "HarpClockSet": "rx:AsyncSubject", "Ready": "rx:AsyncSubject"},
-    LICK_SPOUT_STAGE: {"LickSpoutStage-Main.Commands": "rx:PublishSubject", "LickSpoutStage-Main.Homed": "rx:BehaviorSubject",
+    LICK_SPOUT_STAGE: {"LickSpoutStage-Main.Commands": "rx:BehaviorSubject","LickSpoutStage-Main.Homed": "rx:BehaviorSubject",
                        "StepperDriver-A.Commands": "rx:BehaviorSubject", "StepperDriver-B.Commands": "rx:BehaviorSubject"},
     CLOCK_FROM_GENERATOR: {"Timestamp": "rx:BehaviorSubject"},
     CLOCK_FROM_BOARD: {"Timestamp": "rx:BehaviorSubject"},
@@ -118,7 +122,6 @@ FIXED_WIDTH_PULSE = "TriggerPulse"
 # The lab's Bonsai setup, one copy that each workflow's .bonsai\Setup.ps1 runs from the open-rigs it pins.
 SETUP_BONSAI = Path(__file__).parents[1] / "scripts" / "setup-bonsai.ps1"
 SETUP_BONSAI_RUN = "open_rigs\\scripts\\setup-bonsai.ps1"
-MANUAL_REWARD_DROP_UL = 2.5  # RewardLeft and RewardRight each give this, before and during a run (15 Nov 2026)
 # The prefix each check names a type by ("core:HarpDelay"), by CLR namespace. A workflow's own prefix can differ: a Bonsai
 # save numbers those of packages that fix none (OpenRigs.Core as p1:), and a workflow may name it orc:.
 PREFIXES = {"Bonsai.Reactive": "rx", "Bonsai.Dsp": "dsp", "Bonsai.Shaders": "gl", "Bonsai.Mixer": "mix", "OpenRigs.Core": "core",
@@ -133,16 +136,22 @@ class Workflow:
         self.repo = Path(repo)
         self.file = file
         self.text = (self.repo / "src" / file).read_text(encoding="utf-8-sig")
-        self.root = ET.fromstring(self.text.encode("utf-8"))
-        ours = {p: PREFIXES[ns] for p, ns in re.findall(r'xmlns:(\w+)="clr-namespace:([\w.]*);', self.text) if ns in PREFIXES}
-        for e in self.root.iter():
-            prefix, _, local = (e.get(XSI) or "").partition(":")
-            if local and prefix in ours:
-                e.set(XSI, f"{ours[prefix]}:{local}")
+        self.root = _parse(self.text)
 
     def named(self, name: str) -> ET.Element:
         """The first node named `name`, at any depth; a ValueError naming it when there is none (not a bare StopIteration)."""
         return _named(self.root, name, f"src\\{self.file}")
+
+
+def _parse(text: str) -> ET.Element:
+    """A workflow file's XML, its xsi:type prefixes those of PREFIXES."""
+    root = ET.fromstring(text.encode("utf-8"))
+    ours = {p: PREFIXES[ns] for p, ns in re.findall(r'xmlns:(\w+)="clr-namespace:([\w.]*);', text) if ns in PREFIXES}
+    for e in root.iter():
+        prefix, _, local = (e.get(XSI) or "").partition(":")
+        if local and prefix in ours:
+            e.set(XSI, f"{ours[prefix]}:{local}")
+    return root
 
 
 def _named(root: ET.Element, name: str, where: str) -> ET.Element:
@@ -337,27 +346,58 @@ def _properties(node: ET.Element) -> dict[str, str]:
 
 def hardware(wf: Workflow) -> list[tuple[str, dict[str, str]]]:
     """Every core include and device piece the workflow includes (PIECES, READ_LAB_RIG, READY_GATE), in the
-    workflow's order, with the properties the workflow gives it; an included rig list (RIG_LISTS) is expanded in place,
-    its own settings overridden by those the workflow gives the rig list."""
+    workflow's order, with the properties the workflow gives it; an included rig list (RIG_LISTS) and each workflow file
+    of the workflow's own it includes are expanded in place, their own settings overridden by those the workflow gives
+    the include."""
+    return [(path, props) for path, props, _ in _hardware(wf)]
+
+
+def _hardware(wf: Workflow) -> list[tuple[str, dict[str, str], bool]]:
+    """hardware(), each piece with whether it runs behind a per-element operator (a SelectMany that starts it only on a
+    rig whose rig.yml has its device), so it may never run."""
     known = set(PIECES) | {READ_LAB_RIG, READY_GATE}
-    found: list[tuple[str, dict[str, str]]] = []
-    for node in wf.root.iter(W + "Expression"):
-        path = node.get("Path") or ""
-        if path in known:
-            found.append((path, _properties(node)))
-        elif path in RIG_LISTS:
-            given = _properties(node)
-            nodes, edges = nodes_and_edges(child(package_include(wf, path), W + "Workflow"))
-            for j, inner in enumerate(nodes):
-                if inner.get("Path") in known:
-                    props = _properties(inner)
-                    for i, _, _ in (e for e in edges if e[1] == j and nodes[e[0]].get(XSI) == "ExternalizedMapping"):
-                        for p in nodes[i].iter(W + "Property"):
-                            outer = p.get("DisplayName") or p.get("Name")
-                            if outer in given:
-                                props[p.get("Name") or ""] = given[outer]
-                    found.append((inner.get("Path") or "", props))
+    found: list[tuple[str, dict[str, str], bool]] = []
+
+    def walk(workflow: ET.Element, file: Path, given: dict[str, str], conditional: bool) -> None:
+        nodes, edges = nodes_and_edges(workflow)
+        for j, node in enumerate(nodes):
+            path = node.get("Path") or ""
+            props = _properties(node)
+            for i, _, _ in (e for e in edges if e[1] == j and nodes[e[0]].get(XSI) == "ExternalizedMapping"):
+                for p in nodes[i].iter(W + "Property"):
+                    outer = p.get("DisplayName") or p.get("Name")
+                    if outer in given:
+                        props[p.get("Name") or ""] = given[outer]
+            if path in known:
+                found.append((path, props, conditional))
+            elif path in RIG_LISTS:
+                walk(child(package_include(wf, path), W + "Workflow"), file, props, conditional)
+            elif node.get(XSI) == "IncludeWorkflow" and ":" not in path:
+                target = (file.parent / path.replace("\\", "/")).resolve()
+                if target.is_file():
+                    own = _parse(target.read_text(encoding="utf-8-sig"))
+                    walk(child(own, W + "Workflow"), target, props, conditional)
+            inner = node.find(W + "Workflow")
+            if inner is not None:
+                walk(inner, file, {}, conditional or node.get(XSI) in PER_ELEMENT)
+
+    walk(child(wf.root, W + "Workflow"), wf.repo / "src" / wf.file, {}, False)
     return found
+
+
+def _rig_list_problems(wf: Workflow) -> list[str]:
+    """Each property a workflow gives a rig list that the rig list does not expose (Bonsai ignores it silently)."""
+    problems = []
+    for root in _local_roots(wf):
+        for node in root.iter(W + "Expression"):
+            path = node.get("Path") or ""
+            if path in RIG_LISTS:
+                exposed = {p.get("DisplayName") or p.get("Name") or "" for m in package_include(wf, path).iter(W + "Expression")
+                           if m.get(XSI) == "ExternalizedMapping" for p in m.iter(W + "Property")}
+                name = path.split(":")[1].removesuffix(".bonsai")
+                problems += [f"{name} is given {p}, which it does not expose ({', '.join(sorted(exposed)) or 'none'})"
+                             for p in _properties(node) if p not in exposed and p not in ("Name", "Description")]
+    return problems
 
 
 def _stages(text: str | None) -> list[str]:
@@ -385,8 +425,12 @@ def hardware_problems(wf: Workflow) -> list[str]:
     camera, expecting every camera; ReadyGate's PieceStages exactly the stages the pieces announce (HarpClockSet,
     SpoutsHomed for the lick spout stage, each camera's Name, MixerStarted for SpeakerMixer) and its WorkflowStages
     exactly those the workflow announces itself (its own AnnounceStage nodes, such as a calibration's CalibrationReady);
-    and the workflow makes no Ready report or StartCameras of its own."""
-    pieces = hardware(wf)
+    and the workflow makes no Ready report or StartCameras of its own. A named piece's Name starts with its Kind
+    (KINDS); CameraLiveControls' Board is its camera's, and CameraTriggers' every camera's. The workflow's own included
+    files count as the workflow; a piece behind a per-element operator (a SelectMany that runs it only on a rig with its
+    device) may never announce, so ReadyGate does not wait for it: the workflow waits with a stage of its own."""
+    walked = _hardware(wf)
+    pieces = [(p, props) for p, props, _ in walked]
     paths = [p for p, _ in pieces]
     problems = [f"the workflow includes {p.split(':')[1].removesuffix('.bonsai')} {paths.count(p)} times, not once"
                 for p in (READ_LAB_RIG, READY_GATE) if paths.count(p) != 1]
@@ -402,8 +446,14 @@ def hardware_problems(wf: Workflow) -> list[str]:
                  + " comes before ReadyGate" for p, props in pieces[:gate] if p in PIECES]
     names = [props.get("Name", "") for p, props in pieces if "Name" in PIECES.get(p, ())]
     problems += [f"two pieces are named {n}" for n in sorted({n for n in names if names.count(n) > 1})]
+    problems += [f"{p.split(':')[1].removesuffix('.bonsai').split('.')[-1]} {props.get('Name')} is not named {KINDS[p]}-<Instance>"
+                 for p, props in pieces if p in KINDS and props.get("Name") and not props["Name"].startswith(KINDS[p] + "-")]
     boards = {props.get("Name") for p, props in pieces if p == BOARD}
     cameras = [props.get("Name", "") for p, props in pieces if p == CAMERA]
+    camera_boards = {props.get("Name", ""): props.get("Board", "") for p, props in pieces if p == CAMERA}
+    problems += [f"CameraLiveControls' Board {props.get('Board')} is not {props.get('Camera')}'s, {camera_boards[props['Camera']]}"
+                 for p, props in pieces if p == CAMERA_LIVE_CONTROLS and props.get("Camera") in camera_boards
+                 and props.get("Board") != camera_boards[props["Camera"]]]
     for p, props in pieces:
         piece = p.split(":")[1].removesuffix(".bonsai").split(".")[-1]
         for takes in PIECES.get(p, ()):
@@ -426,13 +476,19 @@ def hardware_problems(wf: Workflow) -> list[str]:
         problems.append(f"the workflow has {len(cameras)} camera(s) and {len(triggers)} CameraTriggers: one when there is a camera, else none")
     elif triggers and set(_stages(triggers[0].get("CamerasExpected"))) != set(cameras):
         problems.append(f"CameraTriggers' CamerasExpected is {triggers[0].get('CamerasExpected') or 'not set'}, not {', '.join(cameras)}")
-    announced = list(dict.fromkeys(READY_STAGES[p] for p in (*CLOCKS, LICK_SPOUT_STAGE) if p in paths)) + cameras \
-        + ([READY_STAGES[SPEAKER_MIXER]] if SPEAKER_MIXER in paths else [])
+    if len(triggers) == 1:
+        problems += [f"SpinnakerCamera {name}'s Board {board} is not CameraTriggers' Board {triggers[0].get('Board') or '(not set)'}"
+                     for name, board in camera_boards.items() if board != triggers[0].get("Board")]
+    always = [p for p, _, conditional in walked if not conditional]
+    announced = list(dict.fromkeys(READY_STAGES[p] for p in (*CLOCKS, LICK_SPOUT_STAGE) if p in always)) \
+        + [props.get("Name", "") for p, props, conditional in walked if p == CAMERA and not conditional] \
+        + ([READY_STAGES[SPEAKER_MIXER]] if SPEAKER_MIXER in always else [])
     gate_props = next((props for p, props in pieces if p == READY_GATE), {})
     waits = gate_props.get("PieceStages")
     if READY_GATE in paths and set(_stages(waits)) != set(announced):
         problems.append(f"ReadyGate's PieceStages is {waits or 'not set'}, not {', '.join(announced)}")
-    own = [child(n, W + "Combinator").findtext(CORE + "Stage") or "" for n in wf.root.iter(W + "Expression")
+    roots = _local_roots(wf)
+    own = [child(n, W + "Combinator").findtext(CORE + "Stage") or "" for root in roots for n in root.iter(W + "Expression")
            if kind(n) == "core:AnnounceStage"]
     workflow_stages = gate_props.get("WorkflowStages")
     if READY_GATE in paths and set(_stages(workflow_stages)) != set(own):
@@ -441,7 +497,8 @@ def hardware_problems(wf: Workflow) -> list[str]:
     problems += [f"the workflow has its own {what}" for what, found in (
         ("Ready report", re.search(r"<\w+:Phase>Ready</\w+:Phase>", wf.text)),
         ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
-    return problems + ready_announcer_problems(wf.root) + shared_mapping_problems(wf.root)
+    return (problems + _rig_list_problems(wf) + [p for root in roots for p in ready_announcer_problems(root)]
+            + shared_mapping_problems(wf.root))
 
 
 def shared_mapping_problems(root: ET.Element) -> list[str]:
@@ -550,9 +607,15 @@ def zapit_include_problems(wf: Workflow) -> list[str]:
         problems.append("the workflow declares Optogenetics itself (Zapit.ConnectForTask does)")
     if "zap:ZapitLineMessage" in kinds:
         problems.append("the workflow writes the ZapitTrigger line itself (BehaviorBoard.SetZapitTriggerLine does)")
+    commands = {props.get("Name", "") + ".Commands" for p, props in hardware(wf) if p == BOARD}
     for n in wf.root.iter(W + "Expression"):
-        if n.get("Path") == SET_ZAPIT_TRIGGER_LINE and not ({"Set", "BoardCommandsSubjectName"} <= set(_properties(n))):
-            problems.append("a SetZapitTriggerLine does not state Set and BoardCommandsSubjectName")
+        if n.get("Path") == SET_ZAPIT_TRIGGER_LINE:
+            props = _properties(n)
+            if "Set" not in props:
+                problems.append("a SetZapitTriggerLine does not state Set")
+            if props.get("BoardCommandsSubjectName") not in commands:
+                problems.append(f"a SetZapitTriggerLine's BoardCommandsSubjectName is {props.get('BoardCommandsSubjectName') or 'not set'}, "
+                                f"not a BehaviorBoard piece's <Name>.Commands ({', '.join(sorted(commands)) or 'no board'})")
     return problems
 
 
@@ -560,7 +623,6 @@ def manual_reward_problems(wf: Workflow) -> list[str]:
     """RewardLeft and RewardRight are BehaviorBoard.ManualRewards', included once: 2.5 ul at that side, no setting, and
     the workflow handles neither itself."""
     problems = [] if wf.text.count(f'Path="{MANUAL_REWARDS}"') == 1 else ["the workflow does not include BehaviorBoard.ManualRewards once"]
-    problems += [f"{name} is still named" for name in ("ManualRewardUl", "ManualRewardDropUl") if name in wf.text]
     own = _on_commands(wf.root) & {"RewardLeft", "RewardRight"}
     problems += [f"the workflow handles {name} itself (ManualRewards does)" for name in sorted(own)]
     return problems
@@ -577,10 +639,8 @@ def _declares(name: str):
 
 def spout_step_size_problems(wf: Workflow) -> list[str]:
     """SpoutStepSize is LickSpoutStage's: the piece declares it, takes it live and shows its default (150) at Start. The
-    workflow declares it nowhere (declared twice, ControlServer stops at Start), handles it nowhere itself and sets it
-    on no include."""
-    problems = ["the workflow declares SpoutStepSize, which LickSpoutStage declares itself" for declarer, kind, name in control_declarations(wf)
-                if (kind, name, declarer) == ("parameter", "SpoutStepSize", "ExperimentControl")]
+    workflow handles it nowhere itself and sets it on no include; a declaration of its own is declared_twice's."""
+    problems = []
     own = [c for c in wf.root.iter(W + "Combinator") if c.get(XSI, "").split(":")[-1] in ("OnParameterSet", "ParameterDefault")
            and c.findtext(CONTROL + "Name") == "SpoutStepSize"]
     if own or _order(wf.root, _declares("SpoutStepSize")) is not None:
@@ -683,7 +743,7 @@ def _local_roots(wf: Workflow) -> list[ET.Element]:
             target = (path.parent / included.replace("\\", "/")).resolve()
             if n.get(XSI) == "IncludeWorkflow" and ":" not in included and target not in seen and target.is_file():
                 seen.add(target)
-                todo.append((target, ET.fromstring(target.read_text(encoding="utf-8-sig").encode("utf-8"))))
+                todo.append((target, _parse(target.read_text(encoding="utf-8-sig"))))
     return roots
 
 

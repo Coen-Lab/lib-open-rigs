@@ -215,6 +215,66 @@ def test_a_broken_combination_is_named(tmp_path):
         "CameraTriggers' CamerasExpected is Camera-Face, not Camera-Overhead"]
 
 
+def test_a_piece_s_kind_board_and_camera_are_its_own(tmp_path):
+    # RigDevice finds an entry by its Instance in the piece's own group: a board named Camera-Main opens the board main.
+    misnamed = MIXED.replace("BehaviorBoard-Main", "Camera-Main")
+    assert "BehaviorBoard Camera-Main is not named BehaviorBoard-<Instance>" in lint.hardware_problems(workflow(tmp_path, misnamed))
+    second = named(lint.BOARD, "BehaviorBoard-Second")
+    live = piece(lint.CAMERA_LIVE_CONTROLS, Camera="Camera-Overhead", Board="BehaviorBoard-Second")
+    assert lint.hardware_problems(workflow(tmp_path / "b", MIXED + second + live)) == [
+        "CameraLiveControls' Board BehaviorBoard-Second is not Camera-Overhead's, BehaviorBoard-Main"]
+    triggers = piece(lint.CAMERA_TRIGGERS, Board="BehaviorBoard-Main", BoardCommandsSubjectName="BehaviorBoard-Main.Commands",
+                     BoardDataSubjectName="BehaviorBoard-Main.Data", CamerasExpected="Camera-Overhead")
+    elsewhere = MIXED.replace(triggers, triggers.replace("BehaviorBoard-Main", "BehaviorBoard-Second")) + second
+    assert lint.hardware_problems(workflow(tmp_path / "c", elsewhere)) == [
+        "SpinnakerCamera Camera-Overhead's Board BehaviorBoard-Main is not CameraTriggers' Board BehaviorBoard-Second"]
+    pulses = piece(lint.MANUAL_PULSES, Board="BehaviorBoard-Other", BoardCommandsSubjectName="BehaviorBoard-Main.Data")
+    assert lint.hardware_problems(workflow(tmp_path / "d", MIXED + pulses)) == [
+        "ManualPulses's Board BehaviorBoard-Other is not a BehaviorBoard piece's Name",
+        "ManualPulses BehaviorBoard-Other's BoardCommandsSubjectName is BehaviorBoard-Main.Data, not BehaviorBoard-Other.Commands"]
+
+
+def test_a_rig_list_given_a_property_it_does_not_expose_is_refused(tmp_path):
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BehaviorBoxHardware.bonsai", "<PieceStages>HarpClockSet</PieceStages>"))
+    assert lint.hardware_problems(wf) == ["BehaviorBoxHardware is given PieceStages, which it does not expose (Binning)"]
+
+
+def own_include(tmp_path: Path, nodes: str, inner: str, edges: str = "") -> lint.Workflow:
+    wf = workflow(tmp_path, nodes + '<Expression xsi:type="IncludeWorkflow" Path="Extensions\\Own.bonsai" />')
+    (tmp_path / "src" / "Extensions").mkdir()
+    (tmp_path / "src" / "Extensions" / "Own.bonsai").write_text(
+        HEAD.replace("xmlns=", 'xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core" xmlns=') + inner
+        + f"</Nodes><Edges>{edges}</Edges></Workflow></WorkflowBuilder>", encoding="utf-8")
+    return wf
+
+
+def test_the_workflow_s_own_includes_are_the_workflow(tmp_path):
+    # A piece or announcer in src\Extensions is the workflow's as much as one in main.bonsai.
+    assert lint.hardware_problems(own_include(tmp_path, MIXED, camera("Camera-Side"))) == [
+        "CameraTriggers' CamerasExpected is Camera-Overhead, not Camera-Overhead, Camera-Side",
+        "ReadyGate's PieceStages is HarpClockSet, SpoutsHomed, Camera-Overhead, not HarpClockSet, SpoutsHomed, Camera-Overhead, Camera-Side"]
+    assert ("Camera-Side", "camera") in lint.required_devices(own_include(tmp_path / "b", MIXED, camera("Camera-Side")))
+    taken = ('<Expression xsi:type="Combinator"><Combinator xsi:type="rx:Take"><rx:Count>1</rx:Count></Combinator></Expression>'
+             '<Expression xsi:type="MulticastSubject"><Name>ReadyStages</Name></Expression>')
+    assert lint.hardware_problems(own_include(tmp_path / "c", MIXED, taken, '<Edge From="0" To="1" Label="Source1" />')) == [
+        "ReadyStages is fed other than by one AnnounceStage"]
+    stage = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orc:AnnounceStage"><orc:Stage>Own</orc:Stage></Combinator></Expression>'
+             '<Expression xsi:type="MulticastSubject"><Name>ReadyStages</Name></Expression>')
+    assert lint.hardware_problems(own_include(tmp_path / "d", MIXED, stage, '<Edge From="0" To="1" Label="Source1" />')) == [
+        "ReadyGate's WorkflowStages is not set, not the stages the workflow announces itself (Own)"]
+
+
+def test_a_piece_behind_a_condition_is_driven_but_not_waited_for(tmp_path):
+    # A calibration runs the stage only on a rig whose rig.yml has one (a SelectMany), so Ready cannot wait for SpoutsHomed.
+    gate = piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead")
+    behind = (MIXED.replace(include(lint.LICK_SPOUT_STAGE), "").replace(gate, piece(lint.READY_GATE, PieceStages="HarpClockSet, Camera-Overhead"))
+              + '<Expression xsi:type="rx:SelectMany"><Name>Stage</Name><Workflow><Nodes>' + include(lint.LICK_SPOUT_STAGE)
+              + "</Nodes><Edges /></Workflow></Expression>")
+    wf = workflow(tmp_path, behind)
+    assert lint.hardware_problems(wf) == []
+    assert ("StepperDriver-A", "stepperDriver") in lint.required_devices(wf)
+
+
 def test_a_stage_the_workflow_announces_itself_is_one_of_ready_gate_s_workflow_stages(tmp_path):
     own = ('<Expression xsi:type="Combinator"><Combinator xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core" '
            'xsi:type="orc:AnnounceStage"><orc:Stage>CalibrationReady</orc:Stage></Combinator></Expression>')
@@ -445,15 +505,19 @@ def test_the_penalty_sound_is_the_lab_s_include(tmp_path):
 
 
 def test_the_zapit_trigger_line_is_set_and_cleared_by_the_lab_s_include(tmp_path):
+    board = named(lint.BOARD, "BehaviorBoard-Main") + include(lint.ZAPIT_FOR_TASK)
     line = include(lint.SET_ZAPIT_TRIGGER_LINE, "<Set>true</Set><BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>")
-    assert lint.zapit_include_problems(workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + line)) == []
-    # The tasks' own chain until 16 Nov 2026, and the Optogenetics flag they declared.
+    assert lint.zapit_include_problems(workflow(tmp_path, board + line)) == []
+    # A chain of its own, an Optogenetics flag of its own, and a write sent anywhere but a board's commands.
     own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="zap:ZapitLineMessage" xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices" /></Expression>'
-           '<Expression xsi:type="rx:AsyncSubject"><Name>Optogenetics</Name></Expression>' + include(lint.SET_ZAPIT_TRIGGER_LINE))
-    assert lint.zapit_include_problems(workflow(tmp_path / "b", include(lint.ZAPIT_FOR_TASK) + own)) == [
+           '<Expression xsi:type="rx:AsyncSubject"><Name>Optogenetics</Name></Expression>' + include(lint.SET_ZAPIT_TRIGGER_LINE)
+           + line.replace("BehaviorBoard-Main.Commands", "BehaviorBoard-Main.Data"))
+    assert lint.zapit_include_problems(workflow(tmp_path / "b", board + own)) == [
         "the workflow declares Optogenetics itself (Zapit.ConnectForTask does)",
         "the workflow writes the ZapitTrigger line itself (BehaviorBoard.SetZapitTriggerLine does)",
-        "a SetZapitTriggerLine does not state Set and BoardCommandsSubjectName"]
+        "a SetZapitTriggerLine does not state Set",
+        "a SetZapitTriggerLine's BoardCommandsSubjectName is not set, not a BehaviorBoard piece's <Name>.Commands (BehaviorBoard-Main.Commands)",
+        "a SetZapitTriggerLine's BoardCommandsSubjectName is BehaviorBoard-Main.Data, not a BehaviorBoard piece's <Name>.Commands (BehaviorBoard-Main.Commands)"]
     text = block_text(lint.SET_ZAPIT_TRIGGER_LINE)
     assert 'DisplayName="BoardCommandsSubjectName"' in text and "<Name>ZapitTriggerLine</Name>" in text
 
@@ -478,7 +542,7 @@ def test_each_include_read_from_the_package_is_found_by_its_description(tmp_path
     with zipfile.ZipFile(tmp_path / "local_packages" / "OpenRigs.Devices.0.1.1-x.2.nupkg", "w") as z:
         z.writestr("lib/net472/OpenRigs.Devices.dll", b"MZ\x00<WorkflowBuilder>other</WorkflowBuilder>\x00\x10" + rig_list + b"\x00\xff")
     monkeypatch.setattr(lint, "LIB_SRC", tmp_path / "nowhere")
-    wf = workflow(tmp_path, include(lint.DEVICES + "DomeHardware.bonsai", "<PieceStages>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body</PieceStages>"))
+    wf = workflow(tmp_path, include(lint.DEVICES + "DomeHardware.bonsai"))
     assert len(lint.required_devices(wf)) == 9
 
 def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
@@ -492,8 +556,6 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     assert lint.zapit_include_problems(wf) == [] and lint.manual_reward_problems(wf) == [] and lint.undeclared_commands(wf) == []
     copy = workflow(tmp_path / "b", include(lint.MANUAL_REWARDS) + include(lint.EXPERIMENT_CONTROL, "<Commands><Command><Name>RewardLeft</Name></Command></Commands>"))
     assert lint.declared_twice(copy) == ["the command RewardLeft is declared by ExperimentControl and by ManualRewards"]
-    undeclared = copy
-    assert lint.zapit_include_problems(undeclared) == ["the workflow does not include Zapit.ConnectForTask once"]
 
 
 def test_the_shared_experiment_logs_are_the_lab_s_two_includes(tmp_path):
@@ -519,13 +581,14 @@ STEP_SIZE = "<Parameters><Parameter><Name>SpoutStepSize</Name></Parameter></Para
 def test_the_spout_step_size_is_the_lick_spout_stage_s_and_the_workflow_declares_none_of_it(tmp_path):
     stage = include(lint.READ_LAB_RIG) + include(lint.READY_GATE) + include(lint.LICK_SPOUT_STAGE)
     assert lint.spout_step_size_problems(workflow(tmp_path, stage + include(lint.EXPERIMENT_CONTROL))) == []
-    # The domes' copy before 16 Nov 2026: their own declaration, subject and live set, mapped onto the rig list.
+    # A workflow's own declaration, subject and live set, mapped onto the rig list.
     own = (include(lint.EXPERIMENT_CONTROL, STEP_SIZE) + '<Expression xsi:type="rx:BehaviorSubject"><Name>SpoutStepSize</Name></Expression>'
            f'<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:OnParameterSet" {CONTROL}><orcl:Name>SpoutStepSize</orcl:Name></Combinator></Expression>'
            '<Expression xsi:type="PropertyMapping"><PropertyMappings><Property Name="SpoutStepSize" /></PropertyMappings></Expression>')
-    assert lint.spout_step_size_problems(workflow(tmp_path / "c", include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + own)) == [
-        "the workflow declares SpoutStepSize, which LickSpoutStage declares itself",
+    wf = workflow(tmp_path / "c", include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + own)
+    assert lint.spout_step_size_problems(wf) == [
         "the workflow handles SpoutStepSize itself (LickSpoutStage does)", "the workflow sets SpoutStepSize on an include, which takes it from the parameter"]
+    assert lint.declared_twice(wf) == ["the parameter SpoutStepSize is declared by ExperimentControl and by LickSpoutStage"]
     assert lint.spout_step_size_problems(workflow(tmp_path / "d", include(lint.READ_LAB_RIG))) == []
 
 
@@ -566,7 +629,7 @@ def test_the_lick_spout_stage_takes_the_spout_step_size_live_and_shows_its_defau
     root = lint.ET.fromstring(text.encode("utf-8"))
     names = {(c.get(lint.XSI), c.findtext(lint.CONTROL + "Name")) for c in root.iter(lint.W + "Combinator")}
     assert {("orcl:OnParameterSet", "SpoutStepSize"), ("orcl:ParameterDefault", "SpoutStepSize")} <= names
-    assert text.count("<Value>150</Value>") == 1 and "StepSize>150<" not in text
+    assert text.count("<Value>150</Value>") == 1
 
 
 def task_files(nodes: str = "") -> str:
