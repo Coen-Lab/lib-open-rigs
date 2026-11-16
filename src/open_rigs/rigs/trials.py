@@ -56,6 +56,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from open_rigs import trial_log
 from open_rigs.rigs import video_frames
 
 # (name, type, unit or None, description or None: None where each task describes it)
@@ -316,8 +317,8 @@ def summarise(folder: Path, videos: bool = False) -> Summary:
 
 
 def _summarise(folder: Path) -> Summary:
-    trials = _rows(folder, "BonsaiData/BonsaiData_Trial*.csv")
-    events = _rows(folder, "BonsaiData/BonsaiData_Async*.csv")
+    trials = trial_log.text_rows(folder)
+    events = _rows(folder, "BonsaiData/BonsaiData_Async_*.csv")
     try:
         run = json.loads((folder / "manifest.json").read_text(encoding="utf-8-sig"))["run"]
         outcome = (run["outcome"] or "unknown") + (" (not final: the workflow never finished closing)" if run.get("final") is False else "")
@@ -414,7 +415,7 @@ def _summarise(folder: Path) -> Summary:
 def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Optional[Dict[str, str]]) -> None:
     """The trial after the last finished one, when StimulusState has rows for it: the run stopped in it. Its first
     stimulusActive row is the stimulus the last outcome's interval ran to."""
-    rows = _rows(folder, "BonsaiData/BonsaiData_StimulusState*.csv")
+    rows = _rows(folder, "BonsaiData/BonsaiData_StimulusState_*.csv")
     if not rows or not trials:
         return
     if any(c not in rows[0] for c in ("harpTime", "trialNumber", "stimulusActive")):

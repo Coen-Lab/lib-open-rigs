@@ -66,7 +66,6 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "src/Shared/GroupNode.cs": 1,
     "src/Shared/Json.cs": 1,
     "src/Shared/RigDevices.cs": 3,
-    "src/open_rigs/trials.py": 1,
 }
 
 

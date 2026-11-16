@@ -1,4 +1,4 @@
-"""open_rigs.trials joins an experiment's hourly BonsaiData_Trial files into one typed table, by the
+"""open_rigs.trial_log joins an experiment's hourly BonsaiData_Trial files into one typed table, by the
 trial columns its manifest carries, or the workflow repository's file."""
 
 import json
@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from open_rigs import trials
+from open_rigs import trial_log
 
 COLUMNS = {
     "Seconds": {"type": "double", "unit": "s"},
@@ -43,14 +43,14 @@ def test_hour_files_join_typed_with_codes(tmp_path):
           "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,bothSpouts\n"
           "3600.2,2,4,NoResponse,3598.0,NaN,False\n"
           "3610.0,3,0,Inco")
-    rows = trials.read(tmp_path)
+    rows = trial_log.read(tmp_path)
     assert len(rows) == 2
     first, second = rows
     assert first == {"Seconds": 12.5, "trialNumber": 1, "trialType": "AVCoherent", "outcome": "Correct",
                      "stimulusOnsetTime": 10.1, "bothSpouts": True, "extra": "x"}
     assert second["trialType"] == "Neutral" and second["bothSpouts"] is False
     assert math.isnan(second["choiceTime"])
-    assert trials.read(tmp_path, decode=False)[0]["trialType"] == 2
+    assert trial_log.read(tmp_path, decode=False)[0]["trialType"] == 2
 
 
 def test_a_cell_of_the_wrong_type_is_named(tmp_path):
@@ -58,11 +58,11 @@ def test_a_cell_of_the_wrong_type_is_named(tmp_path):
     write(tmp_path / "BonsaiData", "BonsaiData_Trial_2026-11-05T10-00-00.csv",
           "Seconds,trialNumber,bothSpouts\n1.0,1,maybe\n")
     with pytest.raises(ValueError, match="line 2, bothSpouts"):
-        trials.read(tmp_path)
+        trial_log.read(tmp_path)
 
 
 def test_no_log_is_no_rows(tmp_path):
-    assert trials.read(tmp_path) == []
+    assert trial_log.read(tmp_path) == []
 
 
 def git(repo, *args):
@@ -83,19 +83,19 @@ def test_an_older_experiment_reads_the_repo_at_its_commit(tmp_path):
     experiment = tmp_path / "ses"
     manifest(experiment, source={"commit": commit})
     write(experiment / "BonsaiData", "BonsaiData_Trial_2026-11-05T10-00-00.csv", "trialNumber,trialType\n1,1\n")
-    assert trials.read(experiment, repo=repo)[0]["trialType"] == "Audio"
+    assert trial_log.read(experiment, repo=repo)[0]["trialType"] == "Audio"
     # With no manifest, the repo's current file.
     (experiment / "manifest.json").unlink()
-    assert trials.read(experiment, repo=repo)[0]["trialType"] == "Changed"
+    assert trial_log.read(experiment, repo=repo)[0]["trialType"] == "Changed"
 
 
 def test_no_columns_anywhere_is_an_error(tmp_path):
     write(tmp_path / "BonsaiData", "BonsaiData_Trial_2026-11-05T10-00-00.csv", "trialNumber\n1\n")
     with pytest.raises(ValueError, match="no manifest.json"):
-        trials.read(tmp_path)
+        trial_log.read(tmp_path)
     manifest(tmp_path, trial_columns={"path": "x", "missing": True, "why": "not found"})
     with pytest.raises(ValueError, match="not found"):
-        trials.read(tmp_path)
+        trial_log.read(tmp_path)
 
 
 FIXTURES = Path(__file__).parents[2] / "fixtures" / "manifest" / "v3"
@@ -105,12 +105,12 @@ FIXTURES = Path(__file__).parents[2] / "fixtures" / "manifest" / "v3"
 def test_reads_the_writers_own_v3_manifests(tmp_path, name):
     write(tmp_path, "manifest.json", (FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
     with pytest.raises(ValueError, match="no trial columns"):
-        trials.columns(tmp_path)
+        trial_log.columns(tmp_path)
 
 
 @pytest.mark.parametrize("name", ["no-version", "unknown-version", "unreadable"])
 def test_refuses_a_manifest_of_no_known_version(tmp_path, name):
     write(tmp_path, "manifest.json", (FIXTURES / "refuse" / f"{name}.json").read_text(encoding="utf-8"))
     with pytest.raises(ValueError) as raised:
-        trials.columns(tmp_path, repo=tmp_path)
+        trial_log.columns(tmp_path, repo=tmp_path)
     assert "no trial columns" not in str(raised.value)

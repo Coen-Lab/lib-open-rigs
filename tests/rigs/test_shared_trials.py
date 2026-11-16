@@ -384,3 +384,15 @@ def test_the_c_sharp_helper_fills_the_shared_block_these_name():
     assert named["Core"] == [c[0] for c in CORE_COLUMNS if c[0] not in task_s_own]
     assert named["QuietWait"] == [c[0] for c in trials_module.QUIET_WAIT_COLUMNS]
     assert named["Opto"] == [c[0] for c in trials_module.OPTO_COLUMNS]
+
+
+def test_summarise_reads_the_trial_log_as_open_rigs_trial_log_does(tmp_path):
+    # Round 3 LL3: summarise had its own reader, whose BonsaiData_Trial*.csv also took BonsaiData_TrialState files and
+    # a last line still being written.
+    trials = _chain(2)
+    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])
+    (folder / "BonsaiData" / "BonsaiData_TrialState_2026-11-14T01-00-00.csv").write_text("harpTime,state\n1,x\n")
+    with open(folder / "BonsaiData" / "BonsaiData_Trial_2026-11-14T01-00-00.csv", "a") as f:
+        f.write("1,3,auditory")  # no newline: still being written
+    s = summarise(folder)
+    assert (s.trials, s.problems) == (2, [])

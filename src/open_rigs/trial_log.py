@@ -1,7 +1,7 @@
 """An experiment's BonsaiData_Trial as one typed table, by the workflow's own trial columns.
 
-    from open_rigs import trials
-    rows = trials.read(r"...\\sub-<mouse>\\ses-<id>_<DateTime>")
+    from open_rigs import trial_log
+    rows = trial_log.read(r"...\\sub-<mouse>\\ses-<id>_<DateTime>")
 
 LogTrial writes the log hourly (`BonsaiData\\BonsaiData_Trial_<hour>.csv`, split at the Harp clock's
 hour); this joins the files in name order, converts each column to its type (int, double, bool or string; an
@@ -10,8 +10,8 @@ name (`values`, such as a task's trialType). Columns the workflow's file does no
 written, as text. Nothing on disk is changed: recorded data is never rewritten.
 
 What each column means comes from the experiment itself: `manifest.json`'s `trial_columns`, which
-the workflow's ExperimentManifest copies from its `schemas/trial-columns.yml` at Start (since
-OpenRigs.Manifest 0.1.1-coen.4). For an experiment recorded before that, give `repo`, a clone of the
+the workflow's ExperimentManifest copies from its `schemas/trial-columns.yml` at Start. For an
+experiment whose manifest has none, give `repo`, a clone of the
 workflow's repository: its file at the manifest's `source.commit`, or its current file when the
 experiment has no manifest or the file did not exist at that commit.
 """
@@ -20,7 +20,7 @@ import csv
 import json
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from ruamel.yaml import YAML
 
@@ -85,31 +85,40 @@ def _value(text: str, column: Optional[Dict[str, Any]], decode: bool) -> Any:
     return text
 
 
+def _text_rows(experiment: Union[str, Path]) -> Iterator[Tuple[Path, int, Dict[str, str]]]:
+    """Each row of the experiment's hourly files, BonsaiData/BonsaiData_Trial_<hour>.csv in name order, as written: its
+    file, line number and cells by column name. A file's last line without a newline (still being written) is left out."""
+    for path in sorted((Path(experiment) / LOG.split("_", 1)[0]).glob(f"{LOG}_*.csv")):
+        text = path.read_text(encoding="utf-8-sig")
+        if not text.endswith("\n"):
+            text = text[: text.rfind("\n") + 1]
+        lines = [r for r in csv.reader(text.splitlines()) if r]
+        for number, cells in enumerate(lines[1:], 2):
+            yield path, number, dict(zip(lines[0], cells))
+
+
+def text_rows(experiment: Union[str, Path]) -> List[Dict[str, str]]:
+    """Every row of the experiment's BonsaiData_Trial as written, in file order, each cell its text: what `read` types,
+    for a reader that checks the cells itself (open_rigs.rigs.trials' summarise)."""
+    return [row for _, _, row in _text_rows(experiment)]
+
+
 def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, decode: bool = True) -> List[Dict[str, Any]]:
     """Every row of the experiment's BonsaiData_Trial, in file order, as a dict by column name.
     A file's last line without a newline (still being written) is left out. Raises ValueError naming
     the file, row and column of a cell that is not its column's type. An experiment with no trial log
     is no rows, without looking for its columns."""
-    folder = Path(experiment) / LOG.split("_", 1)[0]
-    paths = sorted(folder.glob(f"{LOG}_*.csv"))
-    if not paths:
+    found = list(_text_rows(experiment))
+    if not found:
         return []
     table = columns(experiment, repo)
     rows: List[Dict[str, Any]] = []
-    for path in paths:
-        text = path.read_text(encoding="utf-8-sig")
-        if not text.endswith("\n"):
-            text = text[: text.rfind("\n") + 1]
-        lines = [r for r in csv.reader(text.splitlines()) if r]
-        if not lines:
-            continue
-        header = lines[0]
-        for number, cells in enumerate(lines[1:], 2):
-            row = {}
-            for name, cell in zip(header, cells):
-                try:
-                    row[name] = _value(cell, table.get(name), decode)
-                except ValueError as error:
-                    raise ValueError(f"{path.name} line {number}, {name}: {error}") from None
-            rows.append(row)
+    for path, number, cells in found:
+        row = {}
+        for name, cell in cells.items():
+            try:
+                row[name] = _value(cell, table.get(name), decode)
+            except ValueError as error:
+                raise ValueError(f"{path.name} line {number}, {name}: {error}") from None
+        rows.append(row)
     return rows
