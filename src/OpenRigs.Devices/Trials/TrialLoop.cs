@@ -165,7 +165,7 @@ namespace OpenRigs.Devices
             if (double.IsNaN(t.LaserToStimulusSeconds) || double.IsInfinity(t.LaserToStimulusSeconds)) problems.Add(string.Format("its laserToStimulusSeconds is {0}", t.LaserToStimulusSeconds));
             else if (t.LaserToStimulusSeconds > t.IntervalSeconds + TrialLoop.Tolerance) problems.Add(string.Format("its lead ({0} s) is longer than its interval ({1} s), so it would start before its interval", t.LaserToStimulusSeconds, t.IntervalSeconds));
             if (!(t.ResponseDelaySeconds >= 0) || double.IsInfinity(t.ResponseDelaySeconds)) problems.Add(string.Format("its response delay is {0} s, not a finite number from 0", t.ResponseDelaySeconds));
-            if (!(t.ResponseSeconds > 0)) problems.Add(string.Format("its response window is {0} s, not above 0 (infinity for no limit)", t.ResponseSeconds));
+            if (!(t.ResponseWindowSeconds > 0)) problems.Add(string.Format("its response window is {0} s, not above 0 (infinity for no limit)", t.ResponseWindowSeconds));
             if (t.Laser && laser == null) problems.Add("it is a laser trial, but the rules give no LaserTiming");
             problems.AddRange(QuietWait.SettingsProblems(t.LickQuietSeconds, t.WheelQuietSeconds, t.WheelQuietCm));
             if (problems.Count > 0) throw new InvalidOperationException(string.Format("Trial {0} cannot be run: {1}.", next.TrialNumber, string.Join("; ", problems)));
@@ -179,7 +179,7 @@ namespace OpenRigs.Devices
             stimulusTime = start + Math.Max(timing.LaserToStimulusSeconds, 0);
             triggerDue = start + Math.Max(-timing.LaserToStimulusSeconds, 0);
             responseStart = stimulusTime + timing.ResponseDelaySeconds;
-            responseEnd = responseStart + timing.ResponseSeconds;
+            responseEnd = responseStart + timing.ResponseWindowSeconds;
             rules.Start(trial, Times(), wheel);
             events.Add(Event(TrialEventKind.Start, start, trial, null));
             Run(events);

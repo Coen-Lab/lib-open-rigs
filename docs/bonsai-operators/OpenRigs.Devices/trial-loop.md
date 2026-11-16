@@ -13,7 +13,7 @@
 | Start | the interval's end less the lead, `max(laserToStimulusSeconds, 0)`, or later until the quiet waits hold (`QuietWait`) | `Start` (exact time) |
 | Trigger | `laserToStimulusSeconds` before the stimulus, if no outcome yet; the workflow stops if Zapit has not armed the trial | `Trigger`: raise the trigger line (and, without hardware triggering, send the StartStimulus) |
 | Stimulus | the first tick at or after the start plus the lead | `Stimulus`, then the rules' `Update`s |
-| Response | from `ResponseDelaySeconds` after the stimulus for `ResponseSeconds` (infinity: no limit) | the rules' `Update`s; `LaserCap` once the laser has run `LaserMaxSeconds` |
+| Response | from `ResponseDelaySeconds` after the stimulus for `ResponseWindowSeconds` (infinity: no limit) | the rules' `Update`s; `LaserCap` once the laser has run `LaserMaxSeconds` |
 | Outcome | the tick (or lick or wheel sample, timed at the latest tick) the rules return an outcome, or the window's end | `Outcome`; `TriggerOff` when the line falls |
 | Cues | the task's `TrialCue`s, from the stimulus or the next interval's start, outcome or not | `Cue` |
 

@@ -142,7 +142,7 @@ namespace OpenRigs.Devices
         /// <summary>A trial with no interval, lead, quiet waits, laser or cues and no response limit.</summary>
         public TrialTiming()
         {
-            ResponseSeconds = double.PositiveInfinity;
+            ResponseWindowSeconds = double.PositiveInfinity;
         }
 
         /// <summary>Gets or sets the interval drawn for the trial (itiSeconds): its start to the stimulus with a quiet mouse.</summary>
@@ -167,7 +167,7 @@ namespace OpenRigs.Devices
         public double ResponseDelaySeconds { get; set; }
 
         /// <summary>Gets or sets how long the response window stays open, in seconds; at its end the rules' ResponseEnd gives the outcome. Infinity for no limit.</summary>
-        public double ResponseSeconds { get; set; }
+        public double ResponseWindowSeconds { get; set; }
 
         /// <summary>Gets or sets the trial's cues; null or empty for none.</summary>
         public IList<TrialCue> Cues { get; set; }

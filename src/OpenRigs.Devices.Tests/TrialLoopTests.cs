@@ -28,7 +28,7 @@ namespace OpenRigs.Devices.Tests
     class StubRules : ITrialRules<StubTrial, string, StubOutcome>
     {
         public LaserTiming Laser { get; set; }
-        public Func<int, TrialTiming> Plan = n => new TrialTiming { IntervalSeconds = 2, ResponseSeconds = 1.5 };
+        public Func<int, TrialTiming> Plan = n => new TrialTiming { IntervalSeconds = 2, ResponseWindowSeconds = 1.5 };
         public Func<StubTrial, TrialTimes, ICollection<string>, StubOutcome> OnTick = (t, x, u) => null;
         public Func<StubTrial, int, TrialTimes, ICollection<string>, StubOutcome> OnLick = (t, s, x, u) => Outcome("Lick" + s, 0, x);
         public Func<StubTrial, double, TrialTimes, ICollection<string>, StubOutcome> OnWheel = (t, cm, x, u) => null;
@@ -107,7 +107,7 @@ namespace OpenRigs.Devices.Tests
     {
         static TrialTiming Timing(double lead = 0, bool laser = false, double response = 1.5)
         {
-            return new TrialTiming { IntervalSeconds = 2, LaserToStimulusSeconds = lead, Laser = laser, ResponseSeconds = response };
+            return new TrialTiming { IntervalSeconds = 2, LaserToStimulusSeconds = lead, Laser = laser, ResponseWindowSeconds = response };
         }
 
         static string Refusal(Action action)
@@ -121,7 +121,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void TheFirstIntervalStartsAtTheFirstTickAndTheStimulusIsTheIntervalAfterIt()
         {
-            var rules = new StubRules { Plan = n => new TrialTiming { IntervalSeconds = 2.0004, LaserToStimulusSeconds = 0.5, ResponseSeconds = 1.5 } };
+            var rules = new StubRules { Plan = n => new TrialTiming { IntervalSeconds = 2.0004, LaserToStimulusSeconds = 0.5, ResponseWindowSeconds = 1.5 } };
             var rig = new LoopRig(rules);
             rig.Tick();
             var interval = rig.Of(TrialEventKind.Interval).Single();
@@ -171,7 +171,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ALickRestartsTheLickWaitOnEitherSpoutAndAHeldContactHoldsTheStart()
         {
-            Func<TrialTiming> quiet = () => new TrialTiming { IntervalSeconds = 2, LaserToStimulusSeconds = 0.5, LickQuietSeconds = 1, ResponseSeconds = 1.5 };
+            Func<TrialTiming> quiet = () => new TrialTiming { IntervalSeconds = 2, LaserToStimulusSeconds = 0.5, LickQuietSeconds = 1, ResponseWindowSeconds = 1.5 };
             var still = new LoopRig(new StubRules { Plan = n => quiet() }, 10.001);
             Assert.AreEqual(11.501, still.RunTo(TrialEventKind.Start).Seconds, 1e-9, "quiet from the interval's start");
 
@@ -205,7 +205,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void TheWheelWaitCountsTheLastWheelQuietSeconds()
         {
-            Func<TrialTiming> quiet = () => new TrialTiming { IntervalSeconds = 2, LaserToStimulusSeconds = 0.5, WheelQuietSeconds = 1, WheelQuietCm = 1, ResponseSeconds = 1.5 };
+            Func<TrialTiming> quiet = () => new TrialTiming { IntervalSeconds = 2, LaserToStimulusSeconds = 0.5, WheelQuietSeconds = 1, WheelQuietCm = 1, ResponseWindowSeconds = 1.5 };
             var rock = new LoopRig(new StubRules { Plan = n => quiet() }, 10.001);
             rock.Wheel(0);
             rock.Until(11.0);
@@ -318,7 +318,7 @@ namespace OpenRigs.Devices.Tests
         {
             var rules = new StubRules
             {
-                Plan = n => new TrialTiming { IntervalSeconds = 5, LaserToStimulusSeconds = 0.5, Laser = true, ResponseSeconds = 1.5 },
+                Plan = n => new TrialTiming { IntervalSeconds = 5, LaserToStimulusSeconds = 0.5, Laser = true, ResponseWindowSeconds = 1.5 },
                 Laser = LaserTiming.ForDuration(true, 2.5, 0.5),
             };
             var rig = new LoopRig(rules);
@@ -341,7 +341,7 @@ namespace OpenRigs.Devices.Tests
         {
             var rules = new StubRules
             {
-                Plan = n => new TrialTiming { IntervalSeconds = 0.4, LaserToStimulusSeconds = -0.5, Laser = true, ResponseSeconds = 1.5 },
+                Plan = n => new TrialTiming { IntervalSeconds = 0.4, LaserToStimulusSeconds = -0.5, Laser = true, ResponseWindowSeconds = 1.5 },
                 Laser = LaserTiming.ForDuration(true, 2.5, 0.5),
             };
             var rig = new LoopRig(rules);
@@ -360,7 +360,7 @@ namespace OpenRigs.Devices.Tests
             var seen = new List<bool>();
             var rules = new StubRules
             {
-                Plan = n => new TrialTiming { IntervalSeconds = 2, ResponseDelaySeconds = 0.5, ResponseSeconds = 1.5 },
+                Plan = n => new TrialTiming { IntervalSeconds = 2, ResponseDelaySeconds = 0.5, ResponseWindowSeconds = 1.5 },
                 OnLick = (t, s, x, u) => { seen.Add(x.Responding); return x.Responding ? StubRules.Outcome("Left", 0, x) : null; },
             };
             var rig = new LoopRig(rules);
@@ -374,7 +374,7 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual(stimulus.Seconds + 0.6, outcome.Seconds, 1e-9, "the outcome at the latest tick");
             Assert.AreEqual(stimulus.Seconds + 0.5, outcome.Outcome.Times.ResponseStartTime, 1e-9);
 
-            var miss = new LoopRig(new StubRules { Plan = n => new TrialTiming { IntervalSeconds = 2, ResponseDelaySeconds = 0.5, ResponseSeconds = 1.5 } });
+            var miss = new LoopRig(new StubRules { Plan = n => new TrialTiming { IntervalSeconds = 2, ResponseDelaySeconds = 0.5, ResponseWindowSeconds = 1.5 } });
             var shown = miss.RunTo(TrialEventKind.Stimulus);
             Assert.AreEqual(shown.Seconds + 2.0, miss.RunTo(TrialEventKind.Outcome).Seconds, 1e-9, "no response: the window's end");
 
@@ -418,7 +418,7 @@ namespace OpenRigs.Devices.Tests
                 Plan = n => new TrialTiming
                 {
                     IntervalSeconds = 3,
-                    ResponseSeconds = 1.5,
+                    ResponseWindowSeconds = 1.5,
                     Cues = new[] { new TrialCue("SpoutsIn", CueAnchor.Stimulus, 0.5), new TrialCue("GratingOff", CueAnchor.Stimulus, 1.5), new TrialCue("Drink", CueAnchor.NextInterval, 1.5) },
                 },
                 OnLick = (t, s, x, u) => StubRules.Outcome("Left", 1, x),
@@ -436,7 +436,7 @@ namespace OpenRigs.Devices.Tests
 
             var early = new StubRules
             {
-                Plan = n => new TrialTiming { IntervalSeconds = 2, LaserToStimulusSeconds = 0.5, ResponseSeconds = 1.5, Cues = new[] { new TrialCue("SpoutsIn", CueAnchor.Stimulus, 0), new TrialCue("Drink", CueAnchor.NextInterval, 0.2) } },
+                Plan = n => new TrialTiming { IntervalSeconds = 2, LaserToStimulusSeconds = 0.5, ResponseWindowSeconds = 1.5, Cues = new[] { new TrialCue("SpoutsIn", CueAnchor.Stimulus, 0), new TrialCue("Drink", CueAnchor.NextInterval, 0.2) } },
                 OnWheel = (t, cm, x, u) => cm > 10 ? StubRules.Outcome("EndOfTrack", 0, x) : null,
             };
             var ended = new LoopRig(early);
@@ -492,7 +492,7 @@ namespace OpenRigs.Devices.Tests
             StringAssert.Contains(refused(new TrialTiming { IntervalSeconds = 0.4, LaserToStimulusSeconds = 0.5 }), "longer than its interval");
             StringAssert.Contains(refused(new TrialTiming { IntervalSeconds = double.NaN }), "its interval is NaN");
             StringAssert.Contains(refused(new TrialTiming { IntervalSeconds = 2, Laser = true }), "no LaserTiming");
-            StringAssert.Contains(refused(new TrialTiming { IntervalSeconds = 2, ResponseSeconds = 0 }), "response window");
+            StringAssert.Contains(refused(new TrialTiming { IntervalSeconds = 2, ResponseWindowSeconds = 0 }), "response window");
             StringAssert.Contains(refused(new TrialTiming { IntervalSeconds = 2, WheelQuietSeconds = 1 }), "wheelQuietSeconds");
             StringAssert.Contains(Refusal(() => LaserTiming.UntilOutcome(true, -1, 10)), "triggerHoldSeconds");
             StringAssert.Contains(Refusal(() => LaserTiming.ForDuration(true, 0, 0.5)), "laserDurationSeconds");
@@ -538,7 +538,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void PickTrialEventsPassesOneKindOrOneCue()
         {
-            var rig = new LoopRig(new StubRules { Plan = n => new TrialTiming { IntervalSeconds = 2, ResponseSeconds = 1.5, Cues = new[] { new TrialCue("SpoutsIn", CueAnchor.Stimulus, 0.5), new TrialCue("GratingOff", CueAnchor.Stimulus, 1.5) } } });
+            var rig = new LoopRig(new StubRules { Plan = n => new TrialTiming { IntervalSeconds = 2, ResponseWindowSeconds = 1.5, Cues = new[] { new TrialCue("SpoutsIn", CueAnchor.Stimulus, 0.5), new TrialCue("GratingOff", CueAnchor.Stimulus, 1.5) } } });
             rig.Until(106);
             var source = rig.Events.ToObservable();
             Assert.AreEqual(rig.Of(TrialEventKind.Start).Count(), new PickTrialEvents { Kind = TrialEventKind.Start }.Process(source).ToEnumerable().Count());
