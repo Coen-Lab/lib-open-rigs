@@ -30,10 +30,7 @@ them with stimulusActive True is its stimulus onset, which gives the last outcom
 without that log has no unfinished trial.
 
 A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
-Performance is Correct / (Correct + Incorrect), over the trials both
-spouts were offered where the task records bothSpouts; the response rate is the trials neither NoResponse nor Probe, of the trials that are not Probe (a Probe trial,
-one with no right answer, counts in neither, though rewarded and penalised say what it got: a random-reward probe's
-choice is rewarded or penalised on a coin).
+Performance and the response rate are performance()'s, which says what each counts.
 
 A file without a column the checks read (harpTime, outcomeTime and the rest of the core) is one problem,
 not checked further; without a Settings_Task file the checks that need the task are one problem. A trial row with an
@@ -176,6 +173,30 @@ def shared_block_problems(columns: Dict[str, Any], blocks: Iterable[str]) -> Lis
 
 
 OUTCOMES = ("Correct", "Incorrect", "NoResponse", "Probe")
+GO_NO_GO = ("Go", "NoGo", "NoReward")  # a go/no-go task's targets: one spout by design, NoReward its probe
+
+
+def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
+    """Performance and the response rate of trial rows (text or typed cells), each NaN with no trial to count.
+
+    Performance is Correct / (Correct + Incorrect) over the trials both spouts were offered (bothSpouts, True where the
+    task does not record it) and every go/no-go trial (target Go or NoGo; one spout by design), a Go trial with no lick
+    (NoResponse) counted Incorrect. The response rate is the share of trials the mouse responded to: in a go/no-go task
+    (a target Go, NoGo or NoReward) the Go trials it licked on, as withholding is a NoGo's answer; else the trials not
+    NoResponse, of those not Probe. A Probe (no right answer) counts in neither, though rewarded and penalised say what
+    it got."""
+    rows = list(rows)
+    go_no_go = any(str(r.get("target")) in GO_NO_GO for r in rows)
+    correct = counted = 0
+    for r in rows:
+        target, outcome = str(r.get("target")), r["outcome"]
+        go_miss = target == "Go" and outcome == "NoResponse"
+        if (_true(r.get("bothSpouts", True)) or target in ("Go", "NoGo")) and (outcome in ("Correct", "Incorrect") or go_miss):
+            counted += 1
+            correct += outcome == "Correct"
+    asked = [r for r in rows if (str(r.get("target")) == "Go" if go_no_go else r["outcome"] != "Probe")]
+    answered = sum(r["outcome"] != "NoResponse" for r in asked)
+    return (correct / counted if counted else float("nan"), answered / len(asked) if asked else float("nan"))
 
 
 @dataclass
@@ -184,8 +205,8 @@ class Summary:
     outcome: str  # the manifest's run outcome (completed, stopped, ...), "not final" when it never closed; or unknown
     trials: int
     correct: int
-    performance: float  # Correct / (Correct + Incorrect), two-spout trials where recorded; NaN with none
-    responded: float = float("nan")  # the trials neither NoResponse nor Probe, of the not-Probe; NaN with no trials
+    performance: float  # performance()'s first: Correct / (Correct + Incorrect), two-spout and go/no-go trials; NaN with none
+    responded: float = float("nan")  # performance()'s second: the share responded to; NaN with none
     response_seconds: List[float] = field(default_factory=list)  # each trial's outcome less its stimulus onset
     interval_seconds: List[float] = field(default_factory=list)  # each outcome to the next stimulus onset
     requested_ul: float = 0.0  # the task's rewards: rewardOfferedUl of each rewarded trial
@@ -307,11 +328,7 @@ def _summarise(folder: Path) -> Summary:
     if missing:
         return Summary(folder.name, outcome, len(trials), 0, float("nan"), problems=missing)
     correct = sum(r["outcome"] == "Correct" for r in trials)
-    counted = [r for r in trials if r["outcome"] in ("Correct", "Incorrect") and _true(r.get("bothSpouts", "True"))]
-    scored = [r for r in trials if r["outcome"] != "Probe"]
-    s = Summary(folder.name, outcome, len(trials), correct,
-                sum(r["outcome"] == "Correct" for r in counted) / len(counted) if counted else float("nan"),
-                sum(r["outcome"] != "NoResponse" for r in scored) / len(scored) if scored else float("nan"))
+    s = Summary(folder.name, outcome, len(trials), correct, *performance(trials))
     task = _task(folder)
     if trials and task is None:
         s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the penalty sound not checked")
@@ -438,7 +455,7 @@ def describe(s: Summary) -> str:
 
     cut = f", and trial {s.unfinished} unfinished at the stop" if s.unfinished is not None else ""
     lines = [f"{s.folder}: {s.outcome}, {s.trials} trials, {s.correct} correct{cut}",
-             f"  performance {percent(s.performance)} (Correct / (Correct + Incorrect), two-spout trials),"
+             f"  performance {percent(s.performance)} (Correct / (Correct + Incorrect), two-spout and go/no-go trials),"
              f" responded {percent(s.responded)}",
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",
              f"  outcome to next stimulus: {spread(s.interval_seconds)}",

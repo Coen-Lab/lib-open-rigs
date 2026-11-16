@@ -291,6 +291,18 @@ def test_performance_is_rig_controls(tmp_path):
     assert (s.correct, round(s.performance, 4), s.responded) == (2, round(1 / 3, 4), 0.8)  # trial 3, one spout, left out
 
 
+def test_go_no_go_counts_its_one_spout_a_go_miss_as_incorrect_and_responds_on_go_trials(tmp_path):
+    # Round 3 F1: go/no-go rows are all bothSpouts False, so performance was NaN, and a withheld NoGo counted as responded.
+    trials = _chain(5)
+    for t, (outcome, target) in zip(trials, [("Correct", "Go"), ("Correct", "NoGo"), ("Incorrect", "NoGo"),
+                                             ("NoResponse", "Go"), ("Probe", "NoReward")]):
+        t.update(outcome=outcome, target=target, bothSpouts=False)
+    s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["target", "bothSpouts"]))
+    assert (s.performance, s.responded) == (0.5, 0.5)  # 2 of 4 Go/NoGo right; 1 of 2 Go trials licked
+    typed = [{"outcome": t["outcome"], "target": t["target"], "bothSpouts": False} for t in trials]
+    assert trials_module.performance(typed) == (0.5, 0.5)  # typed rows (open_rigs.trials.read) read the same
+
+
 def test_a_probe_trial_is_accepted_and_left_out_of_performance_and_the_response_rate(tmp_path):
     trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="Probe")]
     s = summarise(_experiment(tmp_path, trials, []))
