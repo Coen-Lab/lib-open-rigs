@@ -273,14 +273,103 @@ namespace OpenRigs.Control
         /// does after every run, and a run that finished is still one that finished.</summary>
         public DateTime? FinishedAt { get; private set; }
 
-        internal ControlState(ControlServer server)
+        // The pieces' declarations (DeclareControls) subscribed in this process, and the lock that
+        // orders them with ControlServer's Start: a piece may subscribe before or after it.
+        static readonly object pieceGate = new object();
+        static readonly List<PieceDeclaration> pieces = new List<PieceDeclaration>();
+        readonly Dictionary<string, string> parameterOwners = new Dictionary<string, string>();
+        readonly Dictionary<string, string> commandOwners = new Dictionary<string, string>();
+
+        ControlState(ControlServer server)
         {
             SubjectId = server.SubjectId ?? "";
             SessionId = server.SessionId ?? "";
-            Parameters = server.Parameters.Select(p => new Parameter { Name = p.Name, Value = p.Value ?? "", Description = p.Description ?? "", Minimum = p.Minimum, Maximum = p.Maximum, WholeNumber = p.WholeNumber }).ToList();
-            Commands = server.Commands.Select(c => new Command { Name = c.Name, Description = c.Description ?? "" }).ToList();
+            Parameters = new List<Parameter>();
+            Commands = new List<Command>();
+            Add(new PieceDeclaration("", server.Parameters, server.Commands));
         }
 
+        // A running ControlServer's state: its own declarations and every piece's subscribed so far.
+        internal static ControlState Start(ControlServer server)
+        {
+            lock (pieceGate)
+            {
+                var state = new ControlState(server);
+                foreach (var piece in pieces) state.Add(piece);
+                Current = state;
+                return state;
+            }
+        }
+
+        // A piece's declarations, for as long as it runs: added to the running ControlServer's and to any
+        // started after. A name declared twice throws, naming both declarers.
+        internal static IDisposable Declare(PieceDeclaration piece)
+        {
+            lock (pieceGate)
+            {
+                var state = Current;
+                if (state != null) state.Add(piece);
+                pieces.Add(piece);
+            }
+            return System.Reactive.Disposables.Disposable.Create(() =>
+            {
+                lock (pieceGate)
+                {
+                    pieces.Remove(piece);
+                    var state = Current;
+                    if (state != null) state.Remove(piece);
+                }
+            });
+        }
+
+        static string Declarer(string piece)
+        {
+            return piece.Length == 0 ? "ExperimentControl" : piece;
+        }
+
+        void Add(PieceDeclaration piece)
+        {
+            lock (gate)
+            {
+                var twice = Twice("parameter", parameterOwners, piece.Parameters.Select(p => p.Name), piece.Piece)
+                    ?? Twice("command", commandOwners, piece.Commands.Select(c => c.Name), piece.Piece);
+                if (twice != null) throw new InvalidOperationException(twice);
+                foreach (var p in piece.Parameters) parameterOwners[p.Name] = piece.Piece;
+                foreach (var c in piece.Commands) commandOwners[c.Name] = piece.Piece;
+                Parameters.AddRange(piece.Parameters);
+                Commands.AddRange(piece.Commands);
+            }
+        }
+
+        void Remove(PieceDeclaration piece)
+        {
+            lock (gate)
+            {
+                foreach (var p in piece.Parameters) if (Parameters.Remove(p)) parameterOwners.Remove(p.Name);
+                foreach (var c in piece.Commands) if (Commands.Remove(c)) commandOwners.Remove(c.Name);
+            }
+        }
+
+        // Why a declaration's name is already taken, naming both declarers; null when none is.
+        static string Twice(string what, Dictionary<string, string> owners, IEnumerable<string> names, string piece)
+        {
+            var mine = new HashSet<string>();
+            foreach (var name in names)
+            {
+                string owner;
+                if (!mine.Add(name)) owner = piece;
+                else if (!owners.TryGetValue(name, out owner)) continue;
+                return "The " + what + " '" + name + "' is declared by " + Declarer(owner) + " and by " + Declarer(piece)
+                        + ", so the second could never be reached: a piece declares its own, so remove the other.";
+            }
+            return null;
+        }
+
+        static string Owner(Dictionary<string, string> owners, string name)
+        {
+            string owner;
+            return owners.TryGetValue(name ?? "", out owner) ? owner : "";
+        }
         /// <summary>The state of the running ControlServer, or an error naming what is missing.</summary>
         /// <param name="operatorName">The operator asking, named in the error.</param>
         /// <returns>The running ControlServer's state.</returns>
@@ -341,13 +430,16 @@ namespace OpenRigs.Control
         /// <returns>The parameter.</returns>
         internal Parameter RequireParameter(string name, string operatorName)
         {
-            var parameter = Parameters.FirstOrDefault(p => p.Name == name);
-            if (parameter == null)
+            lock (gate)
             {
-                var declared = Parameters.Count == 0 ? "none" : string.Join(", ", Parameters.Select(p => p.Name));
-                throw new ArgumentException(operatorName + ": no parameter named '" + name + "' was declared on ControlServer. Declared: " + declared + ".");
+                var parameter = Parameters.FirstOrDefault(p => p.Name == name);
+                if (parameter == null)
+                {
+                    var declared = Parameters.Count == 0 ? "none" : string.Join(", ", Parameters.Select(p => p.Name));
+                    throw new ArgumentException(operatorName + ": no parameter named '" + name + "' was declared on ControlServer or by a piece. Declared: " + declared + ".");
+                }
+                return parameter;
             }
-            return parameter;
         }
 
         /// <summary>Sets a parameter's value from the workflow (a rig setting), unless a controller
@@ -388,8 +480,9 @@ namespace OpenRigs.Control
                     ["launched_by"] = Person.ToJson(LaunchedBy),
                     ["go_by"] = Person.ToJson(GoBy),
                     ["stopped_by"] = Person.ToJson(StoppedBy),
-                    ["parameters"] = new JArray(Parameters.Select(p => new JObject { ["name"] = p.Name, ["value"] = p.Value, ["description"] = p.Description })),
-                    ["commands"] = new JArray(Commands.Select(c => new JObject { ["name"] = c.Name, ["description"] = c.Description, ["taken"] = Taken.TryGetValue(c.Name ?? "", out var n) ? n : 0 })),
+                    // "piece": the piece that declared it (DeclareControls), "" for ExperimentControl's own.
+                    ["parameters"] = new JArray(Parameters.Select(p => new JObject { ["name"] = p.Name, ["value"] = p.Value, ["description"] = p.Description, ["piece"] = Owner(parameterOwners, p.Name) })),
+                    ["commands"] = new JArray(Commands.Select(c => new JObject { ["name"] = c.Name, ["description"] = c.Description, ["piece"] = Owner(commandOwners, c.Name), ["taken"] = Taken.TryGetValue(c.Name ?? "", out var n) ? n : 0 })),
                     ["metrics"] = JObject.FromObject(Metrics)
                 };
             }
@@ -423,15 +516,17 @@ namespace OpenRigs.Control
         public string SessionId { get; set; }
 
         /// <summary>
-        /// The settings a controller may change until Go. Each is read in the workflow with ParameterValue.
+        /// The task's settings a controller may change until Go. Each is read in the workflow with
+        /// ParameterValue. A piece declares its own (DeclareControls).
         /// </summary>
-        [Description("The settings a controller may change until Go, with their defaults.")]
+        [Description("The task's settings a controller may change until Go, with their defaults. A piece declares its own.")]
         public Collection<Parameter> Parameters { get; set; } = new Collection<Parameter>();
 
         /// <summary>
-        /// The commands a controller may send while ready or recording. Each is taken in the workflow with OnCommand.
+        /// The task's commands a controller may send while ready or recording. Each is taken in the
+        /// workflow with OnCommand. A piece declares its own (DeclareControls).
         /// </summary>
-        [Description("The commands a controller may send while ready or recording.")]
+        [Description("The task's commands a controller may send while ready or recording. A piece declares its own.")]
         public Collection<Command> Commands { get; set; } = new Collection<Command>();
 
         /// <summary>Opens the reply socket and answers the controller until the workflow stops.</summary>
@@ -447,8 +542,14 @@ namespace OpenRigs.Control
                     observer.OnError(new InvalidOperationException(twice));
                     return Disposable.Empty;
                 }
-                var state = new ControlState(this);
-                ControlState.Current = state;
+                ControlState state;
+                // With the pieces subscribed so far; one subscribed later adds its own (DeclareControls).
+                try { state = ControlState.Start(this); }
+                catch (InvalidOperationException error)
+                {
+                    observer.OnError(error);
+                    return Disposable.Empty;
+                }
                 var cancel = new CancellationTokenSource();
                 var endpoint = ConnectionString ?? "";
                 var thread = new Thread(() => Serve(endpoint, state, observer, cancel.Token))
@@ -550,9 +651,9 @@ namespace OpenRigs.Control
                         return Refuse("parameters can only change before Go (phase " + phase + ")");
                     if (state.Locked(() => state.GoRequested))
                         return Refuse("Go has already been requested");
-                    var parameter = state.Parameters.FirstOrDefault(p => p.Name == name);
+                    var parameter = state.Locked(() => state.Parameters.FirstOrDefault(p => p.Name == name));
                     if (parameter == null)
-                        return Refuse("no parameter named '" + name + "'; this workflow declares: " + Names(state.Parameters.Select(p => p.Name)));
+                        return Refuse("no parameter named '" + name + "'; this workflow declares: " + state.Locked(() => Names(state.Parameters.Select(p => p.Name))));
                     // Under the lock: ParameterMaximum may move the limit from the workflow's thread.
                     var refusal = state.Locked(() => parameter.Refusal(value));
                     if (refusal != null) return Refuse(refusal);
@@ -631,8 +732,8 @@ namespace OpenRigs.Control
                     var phase = state.Locked(() => state.Phase);
                     if (phase != ExperimentPhase.Ready && phase != ExperimentPhase.Recording)
                         return Refuse("commands are taken while ready or recording (phase " + phase + ")");
-                    if (!state.Commands.Any(c => c.Name == name))
-                        return Refuse("no command named '" + name + "'; this workflow declares: " + Names(state.Commands.Select(c => c.Name)));
+                    if (!state.Locked(() => state.Commands.Any(c => c.Name == name)))
+                        return Refuse("no command named '" + name + "'; this workflow declares: " + state.Locked(() => Names(state.Commands.Select(c => c.Name))));
                     state.Locked(() => state.Taken[name] = (state.Taken.TryGetValue(name, out var taken) ? taken : 0) + 1);
                     emit = new ControlEvent
                     {

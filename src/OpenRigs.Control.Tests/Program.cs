@@ -233,6 +233,48 @@ namespace OpenRigs.Control.Tests
                 }
             }
 
+            Console.WriteLine("A piece's own declarations (DeclareControls):");
+            {
+                const string pieceEndpoint = "tcp://127.0.0.1:5645";
+                var stage = new DeclareControls
+                {
+                    Piece = "Stage",
+                    Parameters = new Collection<Parameter> { new Parameter { Name = "StepSize", Minimum = 1, WholeNumber = true } },
+                    Commands = new Collection<Command> { new Command { Name = "In", Description = "Spouts in." } },
+                };
+                var rewards = new DeclareControls { Piece = "Rewards", Commands = new Collection<Command> { new Command { Name = "RewardLeft" } } };
+                // One piece subscribed before the server, one after: both are the server's.
+                var early = stage.Generate().Subscribe(_ => { }, _ => { });
+                var server = Server(pieceEndpoint).Generate().Subscribe(_ => { }, _ => { });
+                var late = rewards.Generate().Subscribe(_ => { }, _ => { });
+                using (var socket = new RequestSocket(">" + pieceEndpoint))
+                {
+                    var status = Ask(socket, new { cmd = "status" });
+                    var commands = string.Join(",", status["commands"].Select(c => (string)c["name"] + "/" + (string)c["piece"]));
+                    Check("status lists the pieces' commands with the piece's name, after the task's", commands == "reward/,In/Stage,RewardLeft/Rewards", commands);
+                    Check("... and their parameters", status["parameters"].Any(p => (string)p["name"] == "StepSize" && (string)p["piece"] == "Stage"), status["parameters"].ToString());
+                    ControlState.Current.SetPhase(ExperimentPhase.Ready);
+                    Check("a piece's command is taken", Ok(Ask(socket, new { cmd = "command", name = "RewardLeft" })), "refused");
+                    var refused = Ask(socket, new { cmd = "set", name = "StepSize", value = "0" });
+                    Check("a piece's parameter is set within its limits", !Ok(refused) && ((string)refused["why"]).Contains("at least 1"), refused.ToString());
+                    new ParameterDefault { Name = "StepSize" }.Process(Observable.Return(150)).Wait();
+                    Check("ParameterDefault reaches a piece's parameter", (string)Ask(socket, new { cmd = "status" })["parameters"].First(p => (string)p["name"] == "StepSize")["value"] == "150", "not set");
+                    late.Dispose();
+                    Check("a piece that stops takes its declarations with it", !Ok(Ask(socket, new { cmd = "command", name = "RewardLeft" })), "taken");
+                    Exception clash = null;
+                    using (new DeclareControls { Piece = "Other", Commands = new Collection<Command> { new Command { Name = "In" } } }.Generate().Subscribe(_ => { }, e => clash = e)) { }
+                    Check("a piece declaring a name another declares stops, naming both", clash is InvalidOperationException && clash.Message.Contains("'In' is declared by Stage and by Other"), clash == null ? "no error" : clash.Message);
+                }
+                server.Dispose();
+                // The task's own copy of a piece's command stops the server at Start, naming both.
+                var copy = Server("tcp://127.0.0.1:5646");
+                copy.Commands.Add(new Command { Name = "In" });
+                Exception refusedCopy = null;
+                using (copy.Generate().Subscribe(_ => { }, e => refusedCopy = e)) { }
+                Check("a task's copy of a piece's command stops it at Start, naming both", refusedCopy is InvalidOperationException && refusedCopy.Message.Contains("'In' is declared by ExperimentControl and by Stage"), refusedCopy == null ? "no error" : refusedCopy.Message);
+                early.Dispose();
+            }
+
             Console.WriteLine("Two servers on one port:");
             {
                 var first = Server().Generate().Subscribe(_ => { }, _ => { });

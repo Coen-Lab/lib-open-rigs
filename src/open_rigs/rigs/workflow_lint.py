@@ -655,13 +655,11 @@ def _declares(name: str):
 
 
 def spout_step_size_problems(wf: Workflow) -> list[str]:
-    """With the lick spout stage, ExperimentControl declares the parameter SpoutStepSize: LickSpoutStage takes it live
-    and shows its default (150) at Start, and ParameterDefault on an undeclared name stops the workflow. The workflow
-    handles SpoutStepSize nowhere itself and sets it on no include."""
-    if not any(p == LICK_SPOUT_STAGE for p, _ in hardware(wf)):
-        return []
-    problems = [] if re.search(r"<Parameter>\s*<Name>SpoutStepSize</Name>", wf.text) else [
-        "ExperimentControl does not declare the parameter SpoutStepSize, which LickSpoutStage takes"]
+    """SpoutStepSize is LickSpoutStage's: the piece declares it, takes it live and shows its default (150) at Start. The
+    workflow declares it nowhere (declared twice, ControlServer stops at Start), handles it nowhere itself and sets it
+    on no include."""
+    problems = ["the workflow declares SpoutStepSize, which LickSpoutStage declares itself" for declarer, kind, name in control_declarations(wf)
+                if (kind, name, declarer) == ("parameter", "SpoutStepSize", "ExperimentControl")]
     own = [c for c in wf.root.iter(W + "Combinator") if c.get(XSI, "").split(":")[-1] in ("OnParameterSet", "ParameterDefault")
            and c.findtext(CONTROL + "Name") == "SpoutStepSize"]
     if own or _order(wf.root, _declares("SpoutStepSize")) is not None:
@@ -838,20 +836,59 @@ def _on_commands(root: ET.Element) -> set[str]:
     return {n for n in names if n}
 
 
-def lick_spout_stage_commands(wf: Workflow) -> set[str]:
-    """The OnCommand names OpenRigs.Devices' LickSpoutStage listens for, read from the package the workflow uses."""
-    return _on_commands(package_include(wf, LICK_SPOUT_STAGE))
+def _readable(path: str) -> bool:
+    """Whether package_include can read the lab include `path`: from lib-open-rigs' source, or by its signature."""
+    package, resource = path.split(":")
+    return path in SIGNATURES or (LIB_SRC / package / resource.replace(".", "/", resource.count(".") - 1)).is_file()
+
+
+def included_roots(wf: Workflow) -> list[ET.Element]:
+    """The workflow, each workflow file of its own it includes, and each lab include they reach that package_include
+    reads (every one that declares controls: test_every_declaring_piece_is_readable), at any depth, once per include
+    node: a piece included twice is two pieces."""
+    roots, todo = [], _local_roots(wf)
+    while todo:
+        root = todo.pop(0)
+        roots.append(root)
+        for n in root.iter(W + "Expression"):
+            included = n.get("Path") or ""
+            if n.get(XSI) == "IncludeWorkflow" and included.startswith("OpenRigs.") and ":" in included and _readable(included):
+                todo.append(package_include(wf, included))
+    return roots
+
+
+def control_declarations(wf: Workflow) -> list[tuple[str, str, str]]:
+    """Every parameter and command the running workflow would declare, as (declarer, "parameter" or "command",
+    name): ExperimentControl's own (declarer "ExperimentControl") and each DeclareControls in the pieces it includes
+    (declarer its Piece), as ControlServer gathers them."""
+    found = []
+    for root in included_roots(wf):
+        for n in root.iter(W + "Expression"):
+            if n.get("Path") == EXPERIMENT_CONTROL:
+                found += [("ExperimentControl", kind, e.findtext(W + "Name") or "") for kind, tag in (("parameter", "Parameters/" + W + "Parameter"), ("command", "Commands/" + W + "Command"))
+                          for e in n.iterfind(W + tag)]
+        for c in root.iter(W + "Combinator"):
+            if (c.get(XSI) or "").endswith(":DeclareControls"):
+                piece = c.findtext(CONTROL + "Piece") or ""
+                found += [(piece, kind, e.findtext(CONTROL + "Name") or "") for kind, tag in (("parameter", "Parameters/" + CONTROL + "Parameter"), ("command", "Commands/" + CONTROL + "Command"))
+                          for e in c.iterfind(CONTROL + tag)]
+    return found
+
+
+def declared_twice(wf: Workflow) -> list[str]:
+    """Each name two declarers declare (a task's copy of a piece's command, two of one piece): ControlServer stops
+    the workflow at Start naming both."""
+    by: dict[tuple[str, str], list[str]] = {}
+    for declarer, kind, name in control_declarations(wf):
+        by.setdefault((kind, name), []).append(declarer)
+    return [f"the {kind} {name} is declared by {' and by '.join(who)}" for (kind, name), who in by.items() if len(who) > 1]
 
 
 def undeclared_commands(wf: Workflow) -> list[str]:
-    """Every command the workflow or its lick spout stage handles that its ExperimentControl does not declare:
-    ControlServer refuses an undeclared command, so it would never fire."""
-    declared = set(re.findall(r"<Command>\s*<Name>(\w+)</Name>", wf.text))
-    handled = _on_commands(wf.root)
-    if any(p == LICK_SPOUT_STAGE for p, _ in hardware(wf)):
-        handled |= lick_spout_stage_commands(wf)
-    if f'Path="{MANUAL_REWARDS}"' in wf.text:
-        handled |= _on_commands(package_include(wf, MANUAL_REWARDS))
+    """Every command the workflow or a piece it includes handles (OnCommand) that neither its ExperimentControl nor a
+    piece declares: ControlServer refuses an undeclared command, so it would never fire."""
+    declared = {name for _, kind, name in control_declarations(wf) if kind == "command"}
+    handled = set().union(*(_on_commands(root) for root in included_roots(wf)))
     return sorted(handled - declared)
 
 
@@ -1014,7 +1051,7 @@ def main() -> None:
     filled rig.yml at <config root>\\<machine>\\rig.yml and prints what the build should make, as JSON."""
     repo, config_root, machine = sys.argv[1:4]
     wf = Workflow(Path(repo))
-    problems = hardware_problems(wf)
+    problems = hardware_problems(wf) + declared_twice(wf)
     text, records, files = filled_rig(wf, Path(config_root).parent, machine)
     folder = Path(config_root) / machine
     folder.mkdir(parents=True, exist_ok=True)

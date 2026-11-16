@@ -251,7 +251,7 @@ def test_a_command_the_workflow_handles_and_does_not_declare_is_found(tmp_path):
     on = '<Expression xsi:type="Combinator"><Combinator xsi:type="c:OnCommand"><c:Name>{}</c:Name></Combinator></Expression>'
     wf = workflow(tmp_path, '<Expression xsi:type="GroupWorkflow" xmlns:c="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control">'
                   '<Name>Commands</Name><Workflow><Nodes>' + on.format("RewardLeft") + on.format("Flush")
-                  + "</Nodes><Edges /></Workflow></Expression><Command><Name>RewardLeft</Name></Command>")
+                  + "</Nodes><Edges /></Workflow></Expression>" + include(lint.EXPERIMENT_CONTROL, "<Commands><Command><Name>RewardLeft</Name></Command></Commands>"))
     assert lint.undeclared_commands(wf) == ["Flush"]
 
 
@@ -403,12 +403,13 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
         return lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
     assert lint.zapit_for_task_problems(root("Zapit/ConnectForTask.bonsai")) == []
     assert lint.manual_rewards_drop_problems(root("BehaviorBoard/ManualRewards.bonsai")) == []
-    commands = '<Command><Name>RewardLeft</Name></Command><Command><Name>RewardRight</Name></Command>'
     group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
-    wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.MANUAL_REWARDS) + group + commands)
+    wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.MANUAL_REWARDS) + group)
+    # ManualRewards declares RewardLeft and RewardRight itself (DeclareControls): the task declares neither.
     assert lint.zapit_include_problems(wf) == [] and lint.manual_reward_problems(wf) == [] and lint.undeclared_commands(wf) == []
-    undeclared = workflow(tmp_path / "b", include(lint.MANUAL_REWARDS) + group)
-    assert lint.undeclared_commands(undeclared) == ["RewardLeft", "RewardRight"]
+    copy = workflow(tmp_path / "b", include(lint.MANUAL_REWARDS) + include(lint.EXPERIMENT_CONTROL, "<Commands><Command><Name>RewardLeft</Name></Command></Commands>"))
+    assert lint.declared_twice(copy) == ["the command RewardLeft is declared by ExperimentControl and by ManualRewards"]
+    undeclared = copy
     assert lint.zapit_include_problems(undeclared) == ["the workflow does not include Zapit.ConnectForTask once"]
 
 
@@ -432,18 +433,49 @@ CONTROL = 'xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
 STEP_SIZE = "<Parameters><Parameter><Name>SpoutStepSize</Name></Parameter></Parameters>"
 
 
-def test_the_spout_step_size_is_the_lick_spout_stage_s_and_the_workflow_only_declares_it(tmp_path):
+def test_the_spout_step_size_is_the_lick_spout_stage_s_and_the_workflow_declares_none_of_it(tmp_path):
     stage = include(lint.READ_LAB_RIG) + include(lint.READY_GATE) + include(lint.LICK_SPOUT_STAGE)
-    assert lint.spout_step_size_problems(workflow(tmp_path, stage + include(lint.EXPERIMENT_CONTROL, STEP_SIZE))) == []
-    assert lint.spout_step_size_problems(workflow(tmp_path / "b", stage + include(lint.EXPERIMENT_CONTROL))) == [
-        "ExperimentControl does not declare the parameter SpoutStepSize, which LickSpoutStage takes"]
-    # The domes' copy before 16 Nov 2026: their own subject and live set, mapped onto the rig list.
+    assert lint.spout_step_size_problems(workflow(tmp_path, stage + include(lint.EXPERIMENT_CONTROL))) == []
+    # The domes' copy before 16 Nov 2026: their own declaration, subject and live set, mapped onto the rig list.
     own = (include(lint.EXPERIMENT_CONTROL, STEP_SIZE) + '<Expression xsi:type="rx:BehaviorSubject"><Name>SpoutStepSize</Name></Expression>'
            f'<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:OnParameterSet" {CONTROL}><orcl:Name>SpoutStepSize</orcl:Name></Combinator></Expression>'
            '<Expression xsi:type="PropertyMapping"><PropertyMappings><Property Name="SpoutStepSize" /></PropertyMappings></Expression>')
     assert lint.spout_step_size_problems(workflow(tmp_path / "c", include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + own)) == [
+        "the workflow declares SpoutStepSize, which LickSpoutStage declares itself",
         "the workflow handles SpoutStepSize itself (LickSpoutStage does)", "the workflow sets SpoutStepSize on an include, which takes it from the parameter"]
     assert lint.spout_step_size_problems(workflow(tmp_path / "d", include(lint.READ_LAB_RIG))) == []
+
+
+def test_a_task_without_its_pieces_copies_passes_and_one_with_them_does_not(tmp_path, monkeypatch):
+    # As a workflow repo reads them: from the OpenRigs.Devices package Bonsai.config pins, the rig list's pieces inside it.
+    dll = b"MZ"
+    for resource in ("DomeHardware.bonsai", "LickSpoutStage.bonsai", "BehaviorBoard/ManualRewards.bonsai"):
+        dll += b"\x00\x10" + (ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes()
+    (tmp_path / ".bonsai").mkdir()
+    (tmp_path / ".bonsai" / "Bonsai.config").write_text('<Packages><Package id="OpenRigs.Devices" version="0.1.1-x.2" /></Packages>')
+    (tmp_path / "local_packages").mkdir()
+    with zipfile.ZipFile(tmp_path / "local_packages" / "OpenRigs.Devices.0.1.1-x.2.nupkg", "w") as z:
+        z.writestr("lib/net472/OpenRigs.Devices.dll", dll + b"\x00")
+    monkeypatch.setattr(lint, "LIB_SRC", tmp_path / "nowhere")
+    pieces = include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + include(lint.MANUAL_REWARDS)
+    task = "<Parameters><Parameter><Name>TrainingStage</Name></Parameter></Parameters>"
+    without = workflow(tmp_path, pieces + include(lint.EXPERIMENT_CONTROL, task))
+    assert lint.undeclared_commands(without) == [] and lint.declared_twice(without) == [] and lint.spout_step_size_problems(without) == []
+    assert {(who, name) for who, kind, name in lint.control_declarations(without) if kind == "command"} >= {("LickSpoutStage", "SpoutsHome"), ("ManualRewards", "RewardRight")}
+    (tmp_path / "src" / "main.bonsai").unlink()
+    (tmp_path / "src").rmdir()
+    copies = "<Commands><Command><Name>SpoutsHome</Name></Command></Commands>"
+    with_copies = workflow(tmp_path, pieces + include(lint.EXPERIMENT_CONTROL, task + copies))
+    assert lint.declared_twice(with_copies) == ["the command SpoutsHome is declared by ExperimentControl and by LickSpoutStage"]
+
+
+def test_every_declaring_piece_is_readable_from_the_package():
+    # included_roots reads a lab include from a workflow repo's package only by its signature: one that declares
+    # controls and has none would leave its declarations unread.
+    for path in (ROOT / "src").glob("OpenRigs.*/**/*.bonsai"):
+        if "Tests" not in path.parts[-2] and "DeclareControls" in path.read_text(encoding="utf-8-sig"):
+            relative = path.relative_to(ROOT / "src")
+            assert f"{relative.parts[0]}:{'.'.join(relative.parts[1:])}" in lint.SIGNATURES, path
 
 
 def test_the_lick_spout_stage_takes_the_spout_step_size_live_and_shows_its_default():
