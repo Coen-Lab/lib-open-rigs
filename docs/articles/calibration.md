@@ -6,7 +6,7 @@ A rig turns a quantity the task asks for, such as a reward volume, into somethin
 
 - **Artefact types** in `OpenRigs.Core.Calibration`, generated once from the pydantic models in `open_rigs.core.calibration`. `CalibrationCurve` holds the measured `(x, y)` points with the axis names and units, provenance (`calibratedAt`, `calibratedBy`, `machineName`, `notes`), the `pulseGapMs` the samples were fired at, and the `linearFit` made from the points (`slope`, `intercept`, and the range `minX` to `maxX` it is valid for). A file without `pulseGapMs` or `linearFit` is refused. `fixtures/calibration/valve-DO1.json` is an example and the contract a fit writes against.
 - **Fits are made in Python** when the curve is written, never in Bonsai: a workflow fires pulses and weighs, the fit is tested code outside it.
-- **Pulse and weighing operators** in `OpenRigs.Core`: `FirePulses` fires a train of `(line, pulseWidthMs)` requests for the PulseController's `TriggerCalibratedPulse`, timed on the Harp clock with `pulseGapMs` off-to-on between pulses, and completes once the last pulse has closed; `WeighStable` takes a weight once that step is over and the balance has settled; `WriteCalibrationArtefact` files the artefact.
+- **Pulse and weighing operators** in `OpenRigs.Core`: `FirePulses` fires a train of `(line, pulseWidthMs)` requests for the PulseController's `TriggerCalibratedPulse`, timed on the Harp clock with `pulseGapMs` off-to-on between pulses, and completes once the last pulse has closed; `WeighStable` takes a weight once that step is over and the balance has settled. `WriteCalibrationArtefact` files an artefact made in Bonsai; a tool that fits in Python writes the same file itself.
 - **Settings types** `DispenseProcedure` and `SerialBalance`, committed by the experiment repository as one `DispenseCalibration` YAML.
 - **A serial balance include**, `OpenRigs.Devices:SerialBalance.bonsai`.
 - **A manual balance include**, `OpenRigs.Devices:ManualBalance.bonsai` (lab addition), for a balance with no data port. It follows the procedure's pulse requests, asks for a weight once each burst has landed, and publishes each weight typed on its entries subject as a stable `WeightMeasurement`. Run its settings through `ApplyBalancePort` with `manual` first, so each weighing takes one reading and waits long enough for a person to type it.
@@ -22,11 +22,13 @@ Artefacts belong to the machine they were measured on. They sit under the machin
     valve-DO1.json
     valve-DO2.json
     MeshMap.csv, gammalut.bmp   projectionCalibration's meshMapPath and gammaLutPath
+    speaker-left.json           a speaker's filter
     history\
       valve-DO1_2026-10-05T143012Z.json
+    runs\<kind>\<run>\          one run's raw files (weights, pulses), as the run left them
 ```
 
-The calibration workflow replaces the file the rig reads on every run and keeps a dated copy in `history\`. `rig.yml` names each file relative to its own folder, as `calibration/valve-DO1.json`; `ResolveRigFile` refuses a full path. See the rig configuration page for `ResolveRigConfigDirectory` and `ResolveRigFile`.
+Each calibration replaces the file the rig reads and keeps a dated copy in `history\`; the raw files a run measured stay in its own folder under `runs\`. `rig.yml` names every file relative to its own folder, as `calibration/valve-DO1.json`: the valves' artefacts, the projector's files, the speakers' filters and the background noise alike. A full path is refused, by the rig model (`ArtefactPath`) and at Start (`ResolveRigFile`, `LoadRewardLine`, `LoadSpeakers`). See the rig configuration page for `ResolveRigConfigDirectory` and `ResolveRigFile`.
 
 ## Running a dispense calibration
 
