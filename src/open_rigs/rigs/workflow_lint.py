@@ -117,6 +117,8 @@ LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage'
 RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The hardware of a two-spout rig with a lick spout stage, projector and speakers", DEVICES + "BehaviorBoxHardware.bonsai": "The behaviour boxes' hardware"}
 # A preflight's check, the same for every rig kind: it declares the Confirm command (DeclareControls).
 PREFLIGHT_CHECKS = DEVICES + "PreflightChecks.bonsai"
+# Each rig list's taps: its devices' data as a preflight's ticks (PreflightTap into DeviceTicks), so a preflight names none.
+RIG_LIST_TAPS = {path: path.removesuffix(".bonsai") + "Taps.bonsai" for path in RIG_LISTS}
 SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task",
                           REWARDS: "Every reward a task gives",
                           MANUAL_PULSES: "A person's pulses on a Behavior board's lines",
@@ -920,6 +922,22 @@ def no_experiment_folder_problems(wf: Workflow) -> list[str]:
         if subject != NO_EXPERIMENT_SUBJECT:
             problems.append(f"NoExperimentFolder's SubjectId is {subject or 'empty'}, not its own {NO_EXPERIMENT_SUBJECT}: "
                             "delete the workflow's value")
+    return problems
+
+
+def preflight_tap_problems(wf: Workflow) -> list[str]:
+    """A preflight (it includes PreflightChecks) taps its devices through its rig list's taps include (RIG_LIST_TAPS),
+    as often as the rig list, and has no PreflightTap of its own (in its own included files too)."""
+    if f'Path="{PREFLIGHT_CHECKS}"' not in wf.text:
+        return []
+    problems = []
+    for rig_list, taps in RIG_LIST_TAPS.items():
+        lists, tapped = wf.text.count(f'Path="{rig_list}"'), wf.text.count(f'Path="{taps}"')
+        if lists != tapped:
+            names = [p.split(":")[1].removesuffix(".bonsai") for p in (rig_list, taps)]
+            problems.append(f"the preflight includes {names[0]} {lists} and {names[1]} {tapped} times: the taps once with their rig list")
+    if any(re.search(r'xsi:type="\w+:PreflightTap"', text) for text in wf.texts):
+        problems.append("the preflight taps a device itself (PreflightTap): its rig list's taps include taps every device")
     return problems
 
 

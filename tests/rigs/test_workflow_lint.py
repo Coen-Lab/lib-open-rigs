@@ -1018,3 +1018,28 @@ def test_a_rig_list_s_description_says_what_rig_it_is_not_its_own_name():
         stem = path.split(":")[1].removesuffix(".bonsai")
         text = (ROOT / "src" / "OpenRigs.Devices" / f"{stem}.bonsai").read_text(encoding="utf-8-sig")
         assert stem not in signature and f"<Description>{signature}" in text
+
+
+@pytest.mark.parametrize("rig_list", lint.RIG_LISTS)
+def test_each_rig_list_s_taps_tap_its_devices(tmp_path, rig_list):
+    # Round 3 QF6: a preflight names no device; its rig list's taps include taps each one the rig list drives, in order.
+    wf = workflow(tmp_path, include(rig_list))
+    expected = [name for name, _ in lint.required_devices(wf)]
+    if "OpenRigs.Vision:ProjectorDisplay.bonsai" in (ROOT / "src" / "OpenRigs.Devices" / rig_list.split(":")[1]).read_text(encoding="utf-8-sig"):
+        expected.append("ProjectionCalibration")
+    text = (ROOT / "src" / "OpenRigs.Devices" / lint.RIG_LIST_TAPS[rig_list].split(":")[1]).read_text(encoding="utf-8-sig")
+    taps = re.findall(r"<Name>([\w.-]+)</Name>\s*</Expression>\s*<Expression xsi:type=\"Combinator\">\s*<Combinator xsi:type=\"dev:PreflightTap\">\s*<dev:Device>([\w-]+)</dev:Device>", text)
+    assert [device for _, device in taps] == expected
+    assert [source for source, _ in taps] == [f"{d}.Data" if d != "ProjectionCalibration" else "DrawStimuli" for d in expected]
+    assert text.count("<Name>DeviceTicks</Name>") == len(expected)
+
+
+def test_a_preflight_taps_through_its_rig_list_s_taps(tmp_path):
+    checks = include(lint.PREFLIGHT_CHECKS)
+    box, taps = (include(lint.DEVICES + name) for name in ("BehaviorBoxHardware.bonsai", "BehaviorBoxHardwareTaps.bonsai"))
+    own = '<Expression xsi:type="Combinator"><Combinator xsi:type="dev:PreflightTap" /></Expression>'
+    assert lint.preflight_tap_problems(workflow(tmp_path, checks + box + taps)) == []
+    assert lint.preflight_tap_problems(workflow(tmp_path / "b", box)) == [], "not a preflight"
+    assert lint.preflight_tap_problems(workflow(tmp_path / "c", checks + box + own)) == [
+        "the preflight includes BehaviorBoxHardware 1 and BehaviorBoxHardwareTaps 0 times: the taps once with their rig list",
+        "the preflight taps a device itself (PreflightTap): its rig list's taps include taps every device"]

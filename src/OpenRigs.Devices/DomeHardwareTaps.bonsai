@@ -1,0 +1,143 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>DomeHardware's devices as a preflight's ticks: each piece's data (its Name.Data) and the projector's frames (DrawStimuli, as ProjectionCalibration), each through PreflightTap into DeviceTicks, which PreflightChecks declares, so a preflight on DomeHardware names no device itself. After PreflightChecks.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TimestampGeneratorGen3-Main.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>TimestampGeneratorGen3-Main</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>BehaviorBoard-Main</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LicketySplit-Left.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>LicketySplit-Left</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LicketySplit-Right.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>LicketySplit-Right</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-A.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>StepperDriver-A</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StepperDriver-B.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>StepperDriver-B</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Camera-Face.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>Camera-Face</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Camera-Pupil.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>Camera-Pupil</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Camera-Body.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>Camera-Body</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>DrawStimuli</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>ProjectionCalibration</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="18" To="19" Label="Source1" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="22" To="23" Label="Source1" />
+      <Edge From="24" To="25" Label="Source1" />
+      <Edge From="25" To="26" Label="Source1" />
+      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="28" To="29" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
