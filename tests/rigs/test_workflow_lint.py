@@ -986,6 +986,11 @@ def test_a_device_opened_by_hand_is_refused_unless_unpieced_and_allowed(tmp_path
     (tmp_path / "b" / "src" / "Extensions" / "Camera.bonsai").write_text(HEAD + nodes.split("</Expression>")[2] + "</Expression></Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
     own = workflow(tmp_path / "b", include("Extensions\\Camera.bonsai") + include(lint.BOARD))
     assert lint.hand_opened_devices(own) == ["OpenRigs.Video.UsbCamera (none yet)"]
+    # Round 3 LM4: a serial port opened by hand passed.
+    port = 'xmlns:port="clr-namespace:Bonsai.IO.Ports;assembly=Bonsai.System" '
+    serial = workflow(tmp_path / "c", ''.join(f'<Expression xsi:type="Combinator" {port}><Combinator xsi:type="port:{t}" /></Expression>'
+                                              for t in ("CreateSerialPort", "SerialReadLine", "SerialWriteLine")))
+    assert lint.hand_opened_devices(serial) == [f"Bonsai.IO.Ports.{t} (SerialBalance, or the device's piece)" for t in ("CreateSerialPort", "SerialReadLine")]
 
 
 def test_the_live_view_is_the_last_top_level_node_fed_by_nothing(tmp_path):

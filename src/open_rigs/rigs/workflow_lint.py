@@ -771,7 +771,10 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
 # Harp.* namespace, Bonsai.Harp or LicketySplit's) is its kind's piece too. A workflow that opens one itself skips the
 # piece's checks, log and Ready stage.
 PIECED_SOURCES = {("Bonsai.Spinnaker", "SpinnakerCapture"): "SpinnakerCamera", ("OpenRigs.Video", "TriggeredSpinnaker"): "SpinnakerCamera",
-                  ("OpenRigs.Video", "UsbCamera"): "none yet", ("Bonsai.Shaders", "CreateWindow"): "ProjectorDisplay or RawProjectorDisplay"}
+                  ("OpenRigs.Video", "UsbCamera"): "none yet", ("Bonsai.Shaders", "CreateWindow"): "ProjectorDisplay or RawProjectorDisplay",
+                  # A serial port, opened by name (Bonsai.System's SerialPortManager) by any of these: a balance is
+                  # SerialBalance's, every other serial device its kind's piece.
+                  **{("Bonsai.IO.Ports", t): "SerialBalance, or the device's piece" for t in ("CreateSerialPort", "SerialReadLine", "SerialStringRead")}}
 # The sources opened by hand today because no piece fits them, each a workflow allows by name (hand_opened_devices'
 # allowed), and only these.
 UNPIECED = {"UsbCamera": "a calibration's balance camera, a USB camera in no rig.yml (no piece yet)"}
