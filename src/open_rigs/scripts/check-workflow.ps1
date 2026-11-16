@@ -1,6 +1,8 @@
 param(
     # The workflow repository to check: .bonsai\ with its packages restored, src\main.bonsai, src\Extensions.
     [Parameter(Mandatory)][string]$Repo,
+    # The workflow in src to check (a QC repo has several, one per rig kind); its layout is config\<stem>.layout.
+    [string]$Workflow = 'main.bonsai',
     # Internal: the step this script runs in a fresh process of its own (assemblies stay loaded).
     [ValidateSet('', 'Build', 'Checks')][string]$Step = ''
 )
@@ -9,10 +11,10 @@ param(
 # without opening Bonsai: no window, no device.
 #   1. Compiles src\Extensions under C# 5, the language Bonsai compiles it with.
 #   2. Runs tests\Extensions.Tests.
-#   3. Builds src\main.bonsai with Bonsai's own expression builders, as Bonsai does at Start before it subscribes
+#   3. Builds src\<Workflow> (main.bonsai unless -Workflow names another) with Bonsai's own expression builders, as Bonsai does at Start before it subscribes
 #      anything, against the lab's rig template (open_rigs\rigs\rig-template.yml) filled in as a rig with exactly the devices the workflow's pieces drive (workflow_lint.filled_rig), and the lint's hardware rules: every type,
 #      selector, include, subject and mapping; what RecordHarpDevices made from rig.yml, what ExperimentManifest
-#      expects, the trial row's columns against schemas\trial-columns.yml, and each window in config\main.layout.
+#      expects, the trial row's columns against schemas\trial-columns.yml, and each window in config\<its stem>.layout.
 #      Skipped, and said, on a machine without the Spinnaker SDK (a CI runner).
 #   4. Each config\task*.yml reads as the workflow reads it at Go, TaskPath is exposed, and every key in the
 #      template reaches the Settings_Rig JSON the experiment logs.
@@ -20,6 +22,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $self = $MyInvocation.MyCommand.Path
 $Repo = (Resolve-Path $Repo).Path
+$workflowFile = Join-Path $Repo "src\$Workflow"
+if (-not (Test-Path $workflowFile -PathType Leaf)) { "check-workflow: $Repo has no src\$Workflow."; exit 1 }
+$layoutFile = Join-Path $Repo ("config\" + [IO.Path]::GetFileNameWithoutExtension($Workflow) + ".layout")
 $bin = Join-Path ([IO.Path]::GetTempPath()) ('check-workflow-' + (Split-Path $Repo -Leaf))
 $bonsaiDir = Join-Path $Repo '.bonsai'
 $template = Join-Path (Split-Path -Parent (Split-Path -Parent $self)) 'rigs\rig-template.yml'
@@ -82,7 +87,7 @@ function Initialize-Assemblies {
 # <bin>\config\<MACHINE>\rig.yml, so the nodes that read rig.yml when the workflow is built make what they make on such
 # a rig; this machine need not have one. Sets $script:plan: the Harp records and files the build should make.
 function Write-FilledTemplate {
-    $out = & { $ErrorActionPreference = 'Continue'; & uv run --project $Repo -q python -m open_rigs.rigs.workflow_lint $Repo (Join-Path $bin 'config') ([Environment]::MachineName) 2>&1 | ForEach-Object { "$_" } }
+    $out = & { $ErrorActionPreference = 'Continue'; & uv run --project $Repo -q python -m open_rigs.rigs.workflow_lint $Repo (Join-Path $bin 'config') ([Environment]::MachineName) $Workflow 2>&1 | ForEach-Object { "$_" } }
     if ($LASTEXITCODE -ne 0) { throw "check-workflow: workflow_lint could not fill the rig template: $($out -join ' ')" }
     $script:plan = ($out | Select-Object -Last 1) | ConvertFrom-Json
     $rigYml = Join-Path $bin "config\$([Environment]::MachineName)\rig.yml"
@@ -92,7 +97,7 @@ function Write-FilledTemplate {
 
 if ($Step -eq 'Build') {
     Initialize-Assemblies
-    $workflowPath = Join-Path $Repo 'src\main.bonsai'
+    $workflowPath = $workflowFile
     foreach ($m in [regex]::Matches((Get-Content $workflowPath -Raw), 'assembly=([A-Za-z0-9\.]+)"')) {
         $null = [Reflection.Assembly]::Load($m.Groups[1].Value)
     }
@@ -147,7 +152,7 @@ if ($Step -eq 'Build') {
         while ($x) { $b = $null; try { $b = $x.Builder } catch {}; $nm = if ($b) { [Bonsai.Expressions.ExpressionBuilder]::GetElementDisplayName($b) } else { '' }; "  FAIL  $($x.GetType().Name): $nm :: $($x.Message)"; $x = $x.InnerException }
         exit 1
     }
-    "  ok    main.bonsai builds"
+    "  ok    $Workflow builds"
     # What the build made, read from the objects in the built expression.
     Add-Type -ReferencedAssemblies System.Core -TypeDefinition @'
 public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
@@ -191,13 +196,13 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
         $schema = @((Get-Content (Join-Path $Repo 'schemas\trial-columns.yml')) | Where-Object { $_ -match '^([A-Za-z]\w*):\s*$' } | ForEach-Object { $Matches[1] })
         if (($columns -join ',') -eq ($schema -join ',')) { "  ok    BonsaiData_Trial's $($columns.Count) columns are schemas\trial-columns.yml's, in its order" }
         else { "  FAIL  BonsaiData_Trial writes $($columns -join ','); schemas\trial-columns.yml lists $($schema -join ',')"; $failed++ }
-    } elseif ((Get-Content (Join-Path $Repo 'src\main.bonsai') -Raw).Contains('OpenRigs.Logging:LogTrial.bonsai')) { "  FAIL  src\Extensions has no TrialRow, the trial log's row"; $failed++ }
+    } elseif ((Get-Content $workflowFile -Raw).Contains('OpenRigs.Logging:LogTrial.bonsai')) { "  FAIL  src\Extensions has no TrialRow, the trial log's row"; $failed++ }
     else { "  ok    no trial log (the workflow includes no LogTrial)" }
     # config\main.layout's windows, on the nodes as the editor has them: Bonsai loads each group in topological
     # order, not file order, so a node fed from later in the file moves up and shifts the indices after it. A window
     # on the wrong node makes the editor offer to delete the layout, and --start waits. A visualizer type not in
     # $wanted fails until it is added with the output type it needs ('' for any).
-    $layoutPath = Join-Path $Repo 'config\main.layout'
+    $layoutPath = $layoutFile
     if (Test-Path $layoutPath) {
         $inspectable = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::ToInspectableGraph($wb.Workflow)
         $null = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::Build($inspectable)
@@ -225,7 +230,7 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
         $layoutLines = @(Test-Layout $layout.VisualizerLayout $inspectable '')
         $layoutLines
         $failed += @($layoutLines | Where-Object { $_ -like '  FAIL*' }).Count
-    } else { "  ok    no config\main.layout; nothing to check" }
+    } else { "  ok    no config\$(Split-Path $layoutFile -Leaf); nothing to check" }
     exit $(if ($failed) { 1 } else { 0 })
 }
 
@@ -248,9 +253,9 @@ if ($Step -eq 'Checks') {
             else { "  FAIL  config\$($file.Name) has no trainingStages"; $failed++ }
         } catch { $x = $_.Exception; while ($x.InnerException) { $x = $x.InnerException }; "  FAIL  config\$($file.Name): $($x.Message)"; $failed++ }
     }
-    $wf = Get-Content (Join-Path $Repo 'src\main.bonsai') -Raw
-    if ($wf -match '<Property Name="TaskPath"') { "  ok    main.bonsai exposes TaskPath" }
-    elseif ($taskFiles.Count) { "  FAIL  main.bonsai does not expose TaskPath"; $failed++ }
+    $wf = Get-Content $workflowFile -Raw
+    if ($wf -match '<Property Name="TaskPath"') { "  ok    $Workflow exposes TaskPath" }
+    elseif ($taskFiles.Count) { "  FAIL  $Workflow does not expose TaskPath"; $failed++ }
     $yaml = [IO.File]::ReadAllText((Write-FilledTemplate))
     $E = [Linq.Expressions.Expression]
     $wait = [System.Reactive.Linq.Observable].GetMethods() | Where-Object { $_.Name -eq 'Wait' -and $_.GetParameters().Count -eq 1 } | Select-Object -First 1
@@ -317,19 +322,19 @@ else {
     $log | Where-Object { $_ -match 'Passed!|Failed|error' } | ForEach-Object { "  $_" }
     if ($testExit -ne 0) { "  FAILED"; $bad++ }
 }
-"3. Building main.bonsai with Bonsai's builders, against the filled template..."
+"3. Building $Workflow with Bonsai's builders, against the filled template..."
 # The camera pieces load SpinnakerNET, which needs the Spinnaker SDK's native Spinnaker_v140.dll on PATH. The SDK
 # is a login-gated download, so a GitHub runner has none and main.bonsai cannot be read there ("There is an error in
 # XML document" at the camera include's first property; CI, 15 Nov 2026). Skipped only then; every rig and lab
 # machine with the SDK runs it, as update-workflows.ps1 does before each push.
 $spinnaker = @($env:Path -split ';' | Where-Object { $_ -and (Test-Path (Join-Path $_ 'Spinnaker_v140.dll')) })
-if (-not $spinnaker.Count) { "  SKIPPED: no Spinnaker SDK (Spinnaker_v140.dll on PATH), so main.bonsai cannot be built here" }
+if (-not $spinnaker.Count) { "  SKIPPED: no Spinnaker SDK (Spinnaker_v140.dll on PATH), so $Workflow cannot be built here" }
 else {
-    & { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Build 2>&1 | ForEach-Object { "$_" } }
+    & { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Workflow $Workflow -Step Build 2>&1 | ForEach-Object { "$_" } }
     if ($LASTEXITCODE -ne 0) { "  FAILED"; $bad++ }
 }
 "4. The task files, the launch properties and Settings_Rig..."
-& { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Step Checks 2>&1 | ForEach-Object { "$_" } }
+& { $ErrorActionPreference = 'Continue'; & powershell -NoProfile -ExecutionPolicy Bypass -File $self -Repo $Repo -Workflow $Workflow -Step Checks 2>&1 | ForEach-Object { "$_" } }
 if ($LASTEXITCODE -ne 0) { "  FAILED"; $bad++ }
 if ($bad) { "check-workflow: $bad step(s) failed."; exit 1 }
 if (-not $spinnaker.Count) { "check-workflow: steps 1, 2 and 4 passed; step 3 skipped (no Spinnaker SDK)." }

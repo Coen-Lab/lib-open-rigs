@@ -64,15 +64,18 @@ CAMERA = DEVICES + "SpinnakerCamera.bonsai"
 CAMERA_TRIGGERS = DEVICES + "CameraTriggers.bonsai"
 CAMERA_LIVE_CONTROLS = DEVICES + "CameraLiveControls.bonsai"
 PROJECTOR_DISPLAY = "OpenRigs.Vision:ProjectorDisplay.bonsai"
+RAW_PROJECTOR_DISPLAY = "OpenRigs.Vision:RawProjectorDisplay.bonsai"  # the same window unmapped: one or the other
+PULSE_OUTPUTS = DEVICES + "BehaviorBoard.PulseOutputs.bonsai"
+RUNNING_WHEEL = DEVICES + "BehaviorBoard.RunningWheel.bonsai"
 # What each piece takes: Name, Board and Camera name a device; X.Commands / X.Data are the subject properties
 # (CommandsSubjectName, BoardDataSubjectName, ...) that must equal that device's name plus the suffix.
 PIECES = {
     CLOCK_FROM_GENERATOR: ("Name", "Name.Commands", "Name.Data"),
     CLOCK_FROM_BOARD: ("Board", "Board.Commands", "Board.Data"),
     BOARD: ("Name", "Name.Commands", "Name.Data"),
-    DEVICES + "BehaviorBoard.PulseOutputs.bonsai": ("Board", "Board.Commands", "Board.Data"),
+    PULSE_OUTPUTS: ("Board", "Board.Commands", "Board.Data"),
     DEVICES + "BehaviorBoard.ZapitTriggerLine.bonsai": ("Board",),
-    DEVICES + "BehaviorBoard.RunningWheel.bonsai": ("Board", "Board.Commands", "Board.Data"),
+    RUNNING_WHEEL: ("Board", "Board.Commands", "Board.Data"),
     LICKETY_SPLIT: ("Name", "Name.Commands", "Name.Data"),
     LICK_SPOUT_STAGE: (),
     CAMERA: ("Name", "Name.Data", "Board", "Board.Data"),
@@ -81,15 +84,25 @@ PIECES = {
     MANUAL_PULSES: ("Board", "Board.Commands"),
     SPEAKER_MIXER: (),
     PROJECTOR_DISPLAY: (),
+    RAW_PROJECTOR_DISPLAY: (),
 }
 # The Kind each named piece's Name starts with (Kind-Instance): RigDevice finds the entry by the Instance alone, in the
 # piece's own rig.yml group, so a BehaviorBoard piece named Camera-Main would open the board main and log as a camera.
 KINDS = {CLOCK_FROM_GENERATOR: "TimestampGeneratorGen3", BOARD: "BehaviorBoard", LICKETY_SPLIT: "LicketySplit", CAMERA: "Camera"}
-ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY, CAMERA_LIVE_CONTROLS)  # pieces a workflow has at most once
+ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY, RAW_PROJECTOR_DISPLAY)  # pieces a workflow has at most once
+# Pieces of which a workflow has one or the other, never both: each opens the projector's window.
+EXCLUSIVE = ((PROJECTOR_DISPLAY, RAW_PROJECTOR_DISPLAY),)
+# Each piece that declares its controls named from its device (OpenRigs.Control DeclareDeviceControls), by the property
+# naming the device: a workflow has at most one per device (CameraLiveControls declares <Camera>.ExposureUs).
+DEVICE_DECLARERS = {CAMERA_LIVE_CONTROLS: "Camera"}
 # The stage each piece announces into ReadyStages (its AnnounceStage's Stage), which ReadyGate must wait for; a camera
-# announces its own Name. test_ready_stages checks each piece's file says the same.
+# announces its own Name. test_ready_stages checks each piece's file (or the file it announces from) says the same.
 READY_STAGES = {CLOCK_FROM_GENERATOR: "HarpClockSet", CLOCK_FROM_BOARD: "HarpClockSet", LICK_SPOUT_STAGE: "SpoutsHomed",
-                SPEAKER_MIXER: "MixerStarted"}
+                PULSE_OUTPUTS: "PulsesEnabled", SPEAKER_MIXER: "MixerStarted"}
+# A lick detector's lick state subject is LickState<Instance> (LicketySplit-Left: LickStateLeft), the name TrialLoop's tasks read.
+LICK_STATE = "LickState"
+# Upstream's video logs, kept for upstream merges: a lab camera logs itself (SpinnakerCamera, LogVideoFfmpeg).
+RETIRED_LOGS = {"OpenRigs.Logging:LogVideo.bonsai": "LogVideoFfmpeg", "OpenRigs.Logging:LogRawVideo.bonsai": "LogVideoFfmpeg"}
 # ClockFromBoard also announces HarpClockRead at the board's first heartbeat. With SetClock false it never sets the
 # board's clock, so Ready waits for that in place of HarpClockSet, and the workflow records nothing (NoExperimentFolder).
 CLOCK_READ = "HarpClockRead"
@@ -99,7 +112,7 @@ WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDrive
 LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage's C# drives drivers a and b
 # Lab includes read from the package (never from the workflow), found in OpenRigs.Devices.dll by the start of their
 # Description: a rig list holds only pieces, and is expanded in place.
-RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The domes' hardware", DEVICES + "BehaviorBoxHardware.bonsai": "The behaviour boxes' hardware"}
+RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The hardware of a DomeHardware rig", DEVICES + "BehaviorBoxHardware.bonsai": "The behaviour boxes' hardware"}
 # A preflight's check, the same for every rig kind: it declares the Confirm command (DeclareControls).
 PREFLIGHT_CHECKS = DEVICES + "PreflightChecks.bonsai"
 SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task",
@@ -481,6 +494,22 @@ def hardware_problems(wf: Workflow) -> list[str]:
         problems.append(f"the workflow has {len(clocks)} clocks, not one (ClockFromTimestampGenerator or ClockFromBoard)")
     problems += [f"the workflow includes {p.split(':')[1].removesuffix('.bonsai')} more than once"
                  for p in ONE_EACH if paths.count(p) > 1]
+    problems += [f"the workflow includes {' and '.join(p.split(':')[1].removesuffix('.bonsai') for p in group)}: one or the other"
+                 for group in EXCLUSIVE if all(p in paths for p in group)]
+    for p, prop in DEVICE_DECLARERS.items():
+        devices = [props.get(prop, "") for q, props in pieces if q == p]
+        problems += [f"two {p.split(':')[1].removesuffix('.bonsai')} name {prop} {d}" for d in sorted({d for d in devices if devices.count(d) > 1})]
+    for p, props in pieces:
+        name = props.get("Name", "")
+        if p == LICKETY_SPLIT and name.startswith(KINDS[p] + "-"):
+            want = LICK_STATE + name.removeprefix(KINDS[p] + "-")
+            if props.get("LickStateSubjectName") != want:
+                problems.append(f"LicketySplit {name}'s LickStateSubjectName is {props.get('LickStateSubjectName') or 'not set'}, not {want}")
+    wheels = [props.get("WheelDistanceSubjectName", "") for p, props in pieces if p == RUNNING_WHEEL]
+    problems += ["RunningWheel's WheelDistanceSubjectName is not set" for w in wheels if not w]
+    problems += [f"two RunningWheels publish WheelDistanceSubjectName {w}" for w in sorted({w for w in wheels if w and wheels.count(w) > 1})]
+    problems += [f"the workflow includes {path.split(':')[1].removesuffix('.bonsai')}, which a lab workflow does not use: each camera "
+                 f"piece logs itself ({use})" for path, use in RETIRED_LOGS.items() if f'Path="{path}"' in wf.text]
     gate = paths.index(READY_GATE) if READY_GATE in paths else len(paths)
     if READ_LAB_RIG in paths[gate:]:
         problems.append("ReadLabRig comes after ReadyGate")
@@ -527,7 +556,7 @@ def hardware_problems(wf: Workflow) -> list[str]:
         problems.append("ClockFromBoard's SetClock is false, so the board's clock is never set: only a workflow with "
                         "NoExperimentFolder (one that records nothing) may read it unset")
     announced = list(dict.fromkeys(CLOCK_READ if p == CLOCK_FROM_BOARD and reads else READY_STAGES[p]
-                                   for p in (*CLOCKS, LICK_SPOUT_STAGE) if p in always)) \
+                                   for p in (*CLOCKS, PULSE_OUTPUTS, LICK_SPOUT_STAGE) if p in always)) \
         + [props.get("Name", "") for p, props, conditional in walked if p == CAMERA and not conditional] \
         + ([READY_STAGES[SPEAKER_MIXER]] if SPEAKER_MIXER in always else [])
     gate_props = next((props for p, props in pieces if p == READY_GATE), {})
@@ -940,8 +969,9 @@ def included_roots(wf: Workflow) -> list[ET.Element]:
 
 def control_declarations(wf: Workflow) -> list[tuple[str, str, str]]:
     """Every parameter and command the running workflow would declare, as (declarer, "parameter" or "command",
-    name): ExperimentControl's own (declarer "ExperimentControl") and each DeclareControls in the pieces it includes
-    (declarer its Piece), as ControlServer gathers them."""
+    name): ExperimentControl's own (declarer "ExperimentControl"), each DeclareControls in the pieces it includes
+    (declarer its Piece) and each device declarer's (DEVICE_DECLARERS: DeclareDeviceControls, declarer its device, each
+    name <device>.<name>), as ControlServer gathers them."""
     found = []
     for root in included_roots(wf):
         for n in root.iter(W + "Expression"):
@@ -953,6 +983,13 @@ def control_declarations(wf: Workflow) -> list[tuple[str, str, str]]:
                 piece = c.findtext(CONTROL + "Piece") or ""
                 found += [(piece, kind, e.findtext(CONTROL + "Name") or "") for kind, tag in (("parameter", "Parameters/" + CONTROL + "Parameter"), ("command", "Commands/" + CONTROL + "Command"))
                           for e in c.iterfind(CONTROL + tag)]
+    for path, props in hardware(wf):
+        if path in DEVICE_DECLARERS:
+            device = props.get(DEVICE_DECLARERS[path], "")
+            for c in package_include(wf, path).iter(W + "Combinator"):
+                if (c.get(XSI) or "").endswith(":DeclareDeviceControls"):
+                    found += [(device, kind, f"{device}.{e.findtext(CONTROL + 'Name') or ''}") for kind, tag in (("parameter", "Parameters/" + CONTROL + "Parameter"), ("command", "Commands/" + CONTROL + "Command"))
+                              for e in c.iterfind(CONTROL + tag)]
     return found
 
 
@@ -1182,10 +1219,11 @@ def filled_rig(wf: Workflow, root: PurePath, machine: str) -> tuple[str, list[st
 
 
 def main() -> None:
-    """check-workflow's step 3: `python -m open_rigs.rigs.workflow_lint <repo> <config root> <machine>` writes the
-    filled rig.yml at <config root>\\<machine>\\rig.yml and prints what the build should make, as JSON."""
+    """check-workflow's step 3: `python -m open_rigs.rigs.workflow_lint <repo> <config root> <machine> [<workflow>]` writes
+    the filled rig.yml for src\\<workflow> (main.bonsai unless named) at <config root>\\<machine>\\rig.yml and prints what
+    the build should make, as JSON."""
     repo, config_root, machine = sys.argv[1:4]
-    wf = Workflow(Path(repo))
+    wf = Workflow(Path(repo), sys.argv[4] if len(sys.argv) > 4 else "main.bonsai")
     problems = hardware_problems(wf) + declared_twice(wf)
     text, records, files = filled_rig(wf, Path(config_root).parent, machine)
     folder = Path(config_root) / machine

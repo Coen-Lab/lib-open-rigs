@@ -147,6 +147,11 @@ def named(path: str, name: str) -> str:
     return piece(path, Name=name, CommandsSubjectName=f"{name}.Commands", DataSubjectName=f"{name}.Data")
 
 
+def lick(name: str) -> str:
+    return piece(lint.LICKETY_SPLIT, Name=name, CommandsSubjectName=f"{name}.Commands", DataSubjectName=f"{name}.Data",
+                 LickStateSubjectName="LickState" + name.removeprefix("LicketySplit-"))
+
+
 def camera(name: str) -> str:
     return piece(lint.CAMERA, Name=name, Board="BehaviorBoard-Main", BoardDataSubjectName="BehaviorBoard-Main.Data",
                  DataSubjectName=f"{name}.Data")
@@ -156,8 +161,8 @@ def camera(name: str) -> str:
 # and spout stage, made of the lab's pieces with no hardware code of its own.
 MIXED = (include(lint.READ_LAB_RIG) + piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead")
          + named(lint.BOARD, "BehaviorBoard-Main") + board_line(lint.CLOCK_FROM_BOARD)
-         + board_line(lint.DEVICES + "BehaviorBoard.RunningWheel.bonsai")
-         + named(lint.LICKETY_SPLIT, "LicketySplit-Left") + named(lint.LICKETY_SPLIT, "LicketySplit-Right")
+         + board_line(lint.RUNNING_WHEEL).replace("</Expression>", "<WheelDistanceSubjectName>WheelDistanceCm</WheelDistanceSubjectName></Expression>")
+         + lick("LicketySplit-Left") + lick("LicketySplit-Right")
          + include(lint.LICK_SPOUT_STAGE) + camera("Camera-Overhead")
          + piece(lint.CAMERA_TRIGGERS, Board="BehaviorBoard-Main", BoardCommandsSubjectName="BehaviorBoard-Main.Commands",
                  BoardDataSubjectName="BehaviorBoard-Main.Data", CamerasExpected="Camera-Overhead"))
@@ -863,20 +868,68 @@ def test_each_clock_publishes_timestamp_from_its_fast_register():
     assert register_into_timestamp("ClockFromTimestampGenerator.bonsai") == "tsg:TimestampedTimer"
 
 
-def test_camera_live_controls_declares_its_own_parameters_and_a_workflow_has_one(tmp_path):
+def test_camera_live_controls_declares_each_camera_s_own_parameters(tmp_path):
+    # Exposure and gain per camera (audit B4): <Camera>.ExposureUs and <Camera>.GainDb, the piece the camera.
+    face = piece(lint.CAMERA_LIVE_CONTROLS, Camera="Camera-Face", Board="BehaviorBoard-Main")
+    body = piece(lint.CAMERA_LIVE_CONTROLS, Camera="Camera-Body", Board="BehaviorBoard-Main")
+    two = workflow(tmp_path / "two", include(lint.READ_LAB_RIG) + face + body + include(lint.EXPERIMENT_CONTROL))
+    assert {(who, name) for who, kind, name in lint.control_declarations(two) if kind == "parameter"} == {
+        ("Camera-Face", "Camera-Face.ExposureUs"), ("Camera-Face", "Camera-Face.GainDb"),
+        ("Camera-Body", "Camera-Body.ExposureUs"), ("Camera-Body", "Camera-Body.GainDb")}
+    assert lint.declared_twice(two) == []
+    copy = "<Parameters><Parameter><Name>Camera-Face.GainDb</Name></Parameter></Parameters>"
+    task = workflow(tmp_path / "task", include(lint.READ_LAB_RIG) + face + include(lint.EXPERIMENT_CONTROL, copy))
+    assert lint.declared_twice(task) == ["the parameter Camera-Face.GainDb is declared by ExperimentControl and by Camera-Face"]
     live = piece(lint.CAMERA_LIVE_CONTROLS, Camera="Camera-Overhead", Board="BehaviorBoard-Main")
-    one = workflow(tmp_path / "one", include(lint.READ_LAB_RIG) + live + include(lint.EXPERIMENT_CONTROL))
-    # What status lists, each with the piece's name: the parameters are fixed, so the include has no property for them.
-    assert {(who, name) for who, kind, name in lint.control_declarations(one) if kind == "parameter"} == {
-        ("CameraLiveControls", "CameraExposureUs"), ("CameraLiveControls", "CameraGainDb")}
-    assert lint.declared_twice(one) == []
-    copy = "<Parameters><Parameter><Name>CameraExposureUs</Name></Parameter><Parameter><Name>CameraGainDb</Name></Parameter></Parameters>"
-    task = workflow(tmp_path / "task", include(lint.READ_LAB_RIG) + live + include(lint.EXPERIMENT_CONTROL, copy))
-    assert lint.declared_twice(task) == ["the parameter CameraExposureUs is declared by ExperimentControl and by CameraLiveControls",
-                                         "the parameter CameraGainDb is declared by ExperimentControl and by CameraLiveControls"]
-    twice = workflow(tmp_path / "twice", include(lint.READ_LAB_RIG) + live + live)
-    assert "the workflow includes CameraLiveControls more than once" in lint.hardware_problems(twice)
+    assert lint.hardware_problems(workflow(tmp_path / "one", MIXED + live)) == []
+    assert lint.hardware_problems(workflow(tmp_path / "twice", MIXED + live + live)) == [
+        "two CameraLiveControls name Camera Camera-Overhead"]
 
+
+def test_camera_live_controls_names_every_control_from_its_camera():
+    # One externalized Camera reaches every device-named control, so no node keeps an empty device.
+    root = lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / "CameraLiveControls.bonsai").read_bytes())
+    nodes, edges = lint.nodes_and_edges(lint.child(root, lint.W + "Workflow"))
+    camera = next(i for i, n in enumerate(nodes) if n.get(lint.XSI) == "ExternalizedMapping"
+                  and any(p.get("DisplayName") == "Camera" for p in n.iter(lint.W + "Property")))
+    device_named = {i for i, n in enumerate(nodes) if lint.kind(n).split(":")[-1] in
+                    ("DeclareDeviceControls", "OnDeviceParameterSet", "DeviceParameterDefault", "DeviceParameterMaximum", "CameraLiveSetting")}
+    assert len(device_named) == 8
+    assert device_named <= {b for a, b, _ in edges if a == camera}
+
+def test_camera_live_controls_takes_a_pupil_camera_s_gain_of_20_db():
+    # Pupil cameras run at gain 20 in rig.yml: the live control must neither clamp nor refuse it.
+    root = lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / "CameraLiveControls.bonsai").read_bytes())
+    gain = next(p for p in root.iter(lint.CONTROL + "Parameter") if p.findtext(lint.CONTROL + "Name") == "GainDb")
+    assert float(gain.findtext(lint.CONTROL + "Minimum")) <= 0 and float(gain.findtext(lint.CONTROL + "Maximum")) >= 20
+
+def test_each_lick_detector_and_wheel_publishes_its_own_subject(tmp_path):
+    # Audit B6: two detectors both on LickStateRight, or two wheels on one subject, passed the lint.
+    swapped = MIXED.replace("<LickStateSubjectName>LickStateLeft<", "<LickStateSubjectName>LickStateRight<")
+    assert lint.hardware_problems(workflow(tmp_path / "a", swapped)) == [
+        "LicketySplit LicketySplit-Left's LickStateSubjectName is LickStateRight, not LickStateLeft"]
+    wheel = board_line(lint.RUNNING_WHEEL)
+    assert lint.hardware_problems(workflow(tmp_path / "b", MIXED + wheel)) == ["RunningWheel's WheelDistanceSubjectName is not set"]
+    same = wheel.replace("</Expression>", "<WheelDistanceSubjectName>WheelDistanceCm</WheelDistanceSubjectName></Expression>")
+    assert lint.hardware_problems(workflow(tmp_path / "c", MIXED + same)) == ["two RunningWheels publish WheelDistanceSubjectName WheelDistanceCm"]
+
+
+def test_the_raw_projector_display_is_a_piece_of_its_own(tmp_path):
+    # Audit B7: RawProjectorDisplay opens the projector's window as ProjectorDisplay does.
+    raw = include(lint.RAW_PROJECTOR_DISPLAY)
+    assert lint.hardware_problems(workflow(tmp_path / "a", MIXED + raw)) == []
+    assert lint.hardware_problems(workflow(tmp_path / "b", MIXED + raw + raw)) == ["the workflow includes RawProjectorDisplay more than once"]
+    both = lint.hardware_problems(workflow(tmp_path / "c", MIXED + raw + include(lint.PROJECTOR_DISPLAY)))
+    assert both == ["the workflow includes ProjectorDisplay and RawProjectorDisplay: one or the other"]
+    early = workflow(tmp_path / "d", include(lint.READ_LAB_RIG) + raw + MIXED.replace(include(lint.READ_LAB_RIG), "", 1))
+    assert lint.hardware_problems(early) == ["RawProjectorDisplay comes before ReadyGate"]
+
+
+@pytest.mark.parametrize("log", ["LogVideo", "LogRawVideo"])
+def test_upstream_s_video_logs_are_refused(tmp_path, log):
+    # Audit B14: the files stay for upstream merges; a lab camera logs itself.
+    wf = workflow(tmp_path, MIXED + include(f"OpenRigs.Logging:{log}.bonsai"))
+    assert lint.hardware_problems(wf) == [f"the workflow includes {log}, which a lab workflow does not use: each camera piece logs itself (LogVideoFfmpeg)"]
 
 def test_rewards_declares_the_requests_and_delivers_each_with_the_manual_drops():
     text = (ROOT / "src" / "OpenRigs.Devices" / "BehaviorBoard" / "Rewards.bonsai").read_text(encoding="utf-8-sig")

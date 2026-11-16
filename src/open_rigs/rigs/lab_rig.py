@@ -93,7 +93,7 @@ class LabRig(Rig):
 
     @model_validator(mode="after")
     def _wired_lines(self):
-        zapit_boards = []
+        zapit_boards, valve_boards = [], []
         for name, board in self.behavior_board.items():
             lines = {alias: getattr(board.wiring, field) for field, alias in _ALIASES.items()} if board.wiring else {}
             lines = {alias: line for alias, line in lines.items() if line is not None}
@@ -120,6 +120,8 @@ class LabRig(Rig):
                 )
             if zapit:
                 zapit_boards.append(name)
+            if valves:
+                valve_boards.append(name)
             outputs = board.pulse_controller.outputs if board.pulse_controller else None
             for alias in sorted(valves):
                 output = getattr(outputs, alias.lower(), None) if outputs else None
@@ -142,6 +144,13 @@ class LabRig(Rig):
             raise ValueError(
                 f"behaviorBoard {' and '.join(zapit_boards)} each wire a ZapitTrigger, and a rig has one {WHERE}. "
                 "Keep the line Zapit's trigger is plugged into and change the others."
+            )
+        if len(valve_boards) > 1:
+            # DeliverReward and ManualRewards fire every valve through one board's TriggerCalibratedPulse, so a valve on
+            # a second board would open on the first board's line of the same number (audit B2, 16 Nov 2026).
+            raise ValueError(
+                f"behaviorBoard {' and '.join(valve_boards)} each wire a RewardValve, and a rig's reward valves are on one board {WHERE}. "
+                "Plug every valve into one board and wire them there."
             )
         if self.zapit is not None and not zapit_boards:
             board = next(iter(self.behavior_board), "main")

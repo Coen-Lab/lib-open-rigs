@@ -1,4 +1,4 @@
-"""The rig OpenRigs.Devices.Tests' PiecesSubscribeTests run every piece against: filled_rig's rig for the domes' rig list
+"""The rig OpenRigs.Devices.Tests' PiecesSubscribeTests run every piece against: filled_rig's rig for DomeHardware's rig list
 (every piece's device), with every port COM97, which no machine has. Regenerate it after a template change with
 `uv run python tests/rigs/test_pieces_rig.py`."""
 

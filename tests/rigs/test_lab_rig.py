@@ -120,6 +120,18 @@ def test_one_valve_is_enough():
     LabRig.model_validate(rig)
 
 
+def test_reward_valves_on_two_boards_are_refused():
+    # Audit B2: every valve fires through one board's TriggerCalibratedPulse, so the second board's valve never opened.
+    rig = copy.deepcopy(RIG)
+    main = rig["behaviorBoard"]["main"]
+    second = copy.deepcopy(main)
+    del main["wiring"]["DO2"]
+    second.update(portName="COM9", wiring={"DO2": {"device": "RewardValve", "side": "right"}})
+    rig["behaviorBoard"]["second"] = second
+    with pytest.raises(ValidationError, match="behaviorBoard main and second each wire a RewardValve, and a rig's reward valves are on one board"):
+        LabRig.model_validate(rig)
+
+
 def test_zapit_needs_its_trigger_line():
     rig = copy.deepcopy(RIG)
     rig["behaviorBoard"]["main"]["wiring"] = {**CAMERA_LINE, "DO1": {"device": "RewardValve", "side": "left"}}

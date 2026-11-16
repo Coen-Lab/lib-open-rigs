@@ -121,6 +121,20 @@ def test_optogenetics_lead_and_reply_margin_fit_in_the_shortest_interval(lead, f
             opto.check_lead_fits(3.4)
 
 
+def test_zapit_must_be_free_before_the_next_trigger_less_the_reply_margin():
+    # Audit B1: a 3 s hold, a 2 s shortest interval and a 0.5 s lead passed every task check and stopped at trial 2.
+    on = Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5, "useZapit": True, "zapitConfigPath": "z.yml", "laserPowerMw": 2})
+    with pytest.raises(ValueError, match=r"trigger_hold_seconds \(3.0 s\) must be at most 1.3 s"):
+        on.check_zapit_free_in_time(2.0, trigger_hold_seconds=3.0)
+    on.check_zapit_free_in_time(2.0, trigger_hold_seconds=1.3)
+    with pytest.raises(ValueError, match=r"laser_duration_seconds \(2.0 s\) must be at most 1.8 s"):
+        on.check_zapit_free_in_time(2.0, laser_duration_seconds=2.0, ramp_down_seconds=0.5, response_delay_seconds=0.5)
+    on.check_zapit_free_in_time(2.0, laser_duration_seconds=1.8, ramp_down_seconds=0.5, response_delay_seconds=0.5)
+    Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5}).check_zapit_free_in_time(2.0, trigger_hold_seconds=30)  # Zapit off
+    with pytest.raises(TypeError):
+        on.check_zapit_free_in_time(2.0)
+
+
 def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
     # Each buffer's peak is checked as it is built; two sounds playing at once on one speaker add up.
     help_text = StimulusSound.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]

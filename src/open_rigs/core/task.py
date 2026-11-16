@@ -122,6 +122,42 @@ class Optogenetics(TaskBlock):
                 f"trial_structure.iti_min_seconds ({iti_min_seconds} s), the shortest interval"
             )
 
+    def check_zapit_free_in_time(
+        self,
+        iti_min_seconds: float,
+        *,
+        trigger_hold_seconds: float | None = None,
+        laser_duration_seconds: float | None = None,
+        ramp_down_seconds: float = 0.0,
+        response_delay_seconds: float = 0.0,
+    ) -> None:
+        """Refuses laser timing that leaves Zapit busy at the next trial's trigger, less its reply margin (OpenRigs.Devices
+        TrialLoop stops there naming the last laser: the same rule). Off without use_zapit. A task gives its laser's end,
+        one of: trigger_hold_seconds (the laser until the outcome, the line held this long past it: LaserTiming.UntilOutcome),
+        or laser_duration_seconds with ramp_down_seconds (LaserTiming.ForDuration) and response_delay_seconds, the soonest
+        an outcome follows the stimulus. The next trigger comes at the soonest iti_min_seconds - laser_to_stimulus_seconds
+        after an outcome, so (lead + response delay + iti_min - lead) after a trigger."""
+        if (trigger_hold_seconds is None) == (laser_duration_seconds is None):
+            raise TypeError("check_zapit_free_in_time takes one of trigger_hold_seconds and laser_duration_seconds")
+        if not self.use_zapit:
+            return
+        iti, lead, margin = iti_min_seconds, self.laser_to_stimulus_seconds, ZAPIT_REPLY_MARGIN_SECONDS
+        if trigger_hold_seconds is not None:
+            longest = iti - lead - margin
+            if trigger_hold_seconds > longest + 1e-9:
+                raise ValueError(
+                    f"optogenetics.trigger_hold_seconds ({trigger_hold_seconds} s) must be at most {longest:g} s (trial_structure.iti_min_seconds - "
+                    f"laser_to_stimulus_seconds - Zapit's {margin} s reply margin): the next trial's StartStimulus goes once the line falls"
+                )
+            return
+        longest = response_delay_seconds + iti - ramp_down_seconds - margin
+        if laser_duration_seconds > longest + 1e-9:
+            raise ValueError(
+                f"optogenetics.laser_duration_seconds ({laser_duration_seconds} s) must be at most {longest:g} s (response_delay_seconds + "
+                f"trial_structure.iti_min_seconds - the {ramp_down_seconds} s ramp-down - Zapit's {margin} s reply margin): the next trial's "
+                "StartStimulus goes once the laser and its ramp-down are done"
+            )
+
 
 # The lab's sound levels, in dBFS RMS: the RMS of a sound over its whole length as the task gives it (before the
 # speaker's equalisation), against full scale (OpenRigs.Audio SoundLevel, the same numbers). Defaults only: each

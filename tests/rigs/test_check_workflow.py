@@ -15,13 +15,15 @@ def environment(root: Path, packages: dict[str, str], folders: list[str]) -> Pat
     (root / ".bonsai" / "Packages").mkdir(parents=True)
     (root / ".bonsai" / "Bonsai.config").write_text(
         f'<?xml version="1.0" encoding="utf-8"?><PackageConfiguration><Packages>{config}</Packages></PackageConfiguration>', encoding="utf-8")
+    (root / "src").mkdir()
+    (root / "src" / "main.bonsai").write_text("<WorkflowBuilder />", encoding="utf-8")
     for folder in folders:
         (root / ".bonsai" / "Packages" / folder).mkdir(parents=True)
     return root
 
 
-def check(repo: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(POWERSHELL + ["-File", str(SCRIPT), "-Repo", str(repo)], capture_output=True, text=True, timeout=300)
+def check(repo: Path, *workflow: str) -> subprocess.CompletedProcess:
+    return subprocess.run(POWERSHELL + ["-File", str(SCRIPT), "-Repo", str(repo), *workflow], capture_output=True, text=True, timeout=300)
 
 
 def lacks(id: str, version: str, found: str) -> str:
@@ -91,3 +93,14 @@ def test_the_resolver_takes_an_assembly_bonsai_config_does_not_locate_from_the_v
     run = subprocess.run(POWERSHELL + ["-Command", command], capture_output=True, text=True, timeout=120)
     assert run.stderr == ""
     assert run.stdout.strip() == str(libs[1] / "OpenRigs.Core.dll")
+
+
+@windows_only
+def test_a_workflow_other_than_main_is_checked_when_named(tmp_path):
+    # Audit D3: a QC repo's workflows other than main.bonsai were never built against the filled template.
+    repo = environment(tmp_path, {"OpenRigs.Core": "0.1.1-fork-lab.14"}, ["OpenRigs.Core.0.1.1-fork-lab.14"])
+    missing = check(repo, "-Workflow", "box.bonsai")
+    assert missing.returncode == 1
+    assert missing.stdout.splitlines() == [f"check-workflow: {repo} has no src\\box.bonsai."]
+    (repo / "src" / "box.bonsai").write_text("<WorkflowBuilder />", encoding="utf-8")
+    assert "1. Compiling src\\Extensions as C# 5..." in check(repo, "-Workflow", "box.bonsai").stdout

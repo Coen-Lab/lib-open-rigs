@@ -7,6 +7,8 @@ from open_rigs.rigs import workflow_lint as lint
 
 SRC = Path(__file__).parents[2] / "src"
 STAGE = "{clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core}Stage"
+# A piece that announces from a file it includes: PulseOutputs once PulseController's setup has gone out.
+ANNOUNCED_IN = {lint.PULSE_OUTPUTS: "OpenRigs.Devices:BehaviorBoard.PulseController.bonsai"}
 
 
 def source(path: str) -> Path:
@@ -35,13 +37,13 @@ def announcements(file: Path) -> list[tuple[str, str]]:
 def test_each_piece_announces_the_stage_ready_waits_for():
     for path, stage in lint.READY_STAGES.items():
         read = [("ReadyStages", lint.CLOCK_READ)] if path == lint.CLOCK_FROM_BOARD else []
-        assert announcements(source(path)) == [("ReadyStages", stage)] + read, path
+        assert announcements(source(ANNOUNCED_IN.get(path, path))) == [("ReadyStages", stage)] + read, path
     # A camera announces its own Name, mapped from its rig.yml entry's.
     assert announcements(source(lint.CAMERA)) == [("ReadyStages", "<mapped from Name>")]
 
 
 def test_no_other_piece_announces_into_ready_stages():
-    pieces = set(lint.READY_STAGES) | {lint.CAMERA}
+    pieces = set(lint.READY_STAGES) | {lint.CAMERA} | set(ANNOUNCED_IN.values())
     for file in SRC.glob("OpenRigs.*/**/*.bonsai"):
         if file.relative_to(SRC).parts[0].endswith(".Tests") or file in {source(p) for p in pieces}:
             continue
