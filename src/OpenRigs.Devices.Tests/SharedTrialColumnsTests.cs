@@ -125,5 +125,35 @@ namespace OpenRigs.Devices.Tests
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOpto(), Laser(), Times(1), 0, false, false, 0, false)), "not all of laserCondition, laserPowerMw, laserTriggerTime");
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new FloatTimes(), Laser(), Times(1), 0, false, false, 0, false)), "itiSeconds is a Single, not a Double");
         }
+
+        [TestMethod]
+        public void AnOutcomeIsBuiltFromItsFilledRow()
+        {
+            var rewarded = new TrialOutcome<OptoRow>(SharedTrialColumns.Fill(new OptoRow { outcome = TrialOutcomes.Correct }, Laser(), Times(1), 3, true, false, 6, true), "right");
+            Assert.AreEqual(13.5, rewarded.Row.Seconds, "stamped with its outcomeTime");
+            Assert.IsTrue(rewarded.Rewarded);
+            Assert.AreEqual(Tuple.Create("right", 3.0), rewarded.Reward);
+            Assert.IsFalse(rewarded.PenaltySound);
+            Assert.AreEqual(0, rewarded.PenaltyTimeoutSeconds);
+
+            var penalised = new TrialOutcome<OptoRow>(SharedTrialColumns.Fill(new OptoRow { outcome = TrialOutcomes.Incorrect }, Laser(), Times(1), 3, false, true, 6, true), "left");
+            Assert.IsNull(penalised.Reward, "no reward unless rewarded, in every task");
+            Assert.IsTrue(penalised.PenaltySound);
+            Assert.AreEqual(6, penalised.PenaltyTimeoutSeconds);
+        }
+
+        [TestMethod]
+        public void AnOutcomeOutsideTheLabsIsRefused()
+        {
+            try
+            {
+                new TrialOutcome<OptoRow>(SharedTrialColumns.Fill(new OptoRow { outcome = "Hit" }, Laser(), Times(1), 3, true, false, 6, true), "left");
+                Assert.Fail("no refusal");
+            }
+            catch (InvalidOperationException e)
+            {
+                StringAssert.Contains(e.Message, "outcome is Hit, not one of Correct, Incorrect, NoResponse, Probe");
+            }
+        }
     }
 }

@@ -3,12 +3,14 @@
 import csv
 import json
 import math
+import re
 import sys
+from pathlib import Path
 
 import pytest
 
 from open_rigs.rigs import trials as trials_module
-from open_rigs.rigs.trials import CORE_COLUMNS, shared_block_problems, shared_columns, summarise
+from open_rigs.rigs.trials import CORE_COLUMNS, OUTCOMES, shared_block_problems, shared_columns, summarise
 
 COLUMNS = ["harpTime", "trialNumber", "trialType", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds",
            "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds",
@@ -396,3 +398,9 @@ def test_summarise_reads_the_trial_log_as_open_rigs_trial_log_does(tmp_path):
         f.write("1,3,auditory")  # no newline: still being written
     s = summarise(folder)
     assert (s.trials, s.problems) == (2, [])
+
+
+def test_the_csharp_outcomes_are_outcomes():
+    source = (Path(__file__).parents[2] / "src/OpenRigs.Devices/Trials/TrialOutcome.cs").read_text(encoding="utf-8")
+    constants = re.findall(r'public const string (\w+) = "(\w+)";', source)
+    assert constants == [(o, o) for o in OUTCOMES]
