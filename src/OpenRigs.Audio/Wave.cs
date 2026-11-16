@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace OpenRigs.Audio
 {
-    /// <summary>Mono 16-bit PCM WAV files, the form a task's sounds are kept in.</summary>
+    /// <summary>Mono WAV files, 16-bit PCM or 32-bit float, the form a task's sounds are kept in.</summary>
     public static class Wave
     {
         /// <summary>A WAV file's sample rate, from its fmt chunk.</summary>
@@ -15,8 +15,8 @@ namespace OpenRigs.Audio
         }
 
         /// <summary>
-        /// A mono 16-bit PCM WAV as one row of floats in -1 to 1 (-32768 to 32767 onto -1 to 1, as production's
-        /// Rescale); stops unless it is at the audio device's rate, as nothing converts a rate.
+        /// A mono WAV as one row of floats: 16-bit PCM in -1 to 1 (-32768 to 32767 onto -1 to 1, as production's
+        /// Rescale), 32-bit float as stored; stops unless it is at the audio device's rate, as nothing converts a rate.
         /// </summary>
         public static Mat Read(string path, int sampleRate)
         {
@@ -57,17 +57,18 @@ namespace OpenRigs.Audio
                 }
                 else if (id == "data")
                 {
-                    if (format != 1 || channels != 1 || bits != 16)
+                    bool pcm = format == 1 && bits == 16, ieee = format == 3 && bits == 32;
+                    if (channels != 1 || !(pcm || ieee))
                     {
-                        throw new InvalidDataException("must be mono 16-bit PCM (it is format " + format + ", " + channels + " channel(s), " + bits + " bit): " + name);
+                        throw new InvalidDataException("must be mono 16-bit PCM or 32-bit float (it is format " + format + ", " + channels + " channel(s), " + bits + " bit): " + name);
                     }
                     if (rate != sampleRate)
                     {
                         throw new InvalidDataException("is " + rate + " Hz, but the audio device runs at " + sampleRate + " Hz: resample it (duration and level kept): " + name);
                     }
-                    int count = size / 2;
+                    int count = size / (bits / 8);
                     var values = new float[count];
-                    for (int i = 0; i < count; i++) values[i] = (reader.ReadInt16() + 32768f) * (2f / 65535f) - 1f;
+                    for (int i = 0; i < count; i++) values[i] = ieee ? reader.ReadSingle() : (reader.ReadInt16() + 32768f) * (2f / 65535f) - 1f;
                     var sound = new Mat(1, count, Depth.F32, 1);
                     Marshal.Copy(values, 0, sound.Data, count);
                     return Tuple.Create(rate, sound);

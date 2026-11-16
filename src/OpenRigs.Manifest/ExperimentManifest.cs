@@ -32,7 +32,12 @@ namespace OpenRigs.Manifest
         /// <summary>Initializes a new instance of the <see cref="ExperimentManifest"/> class.</summary>
         public ExperimentManifest()
         {
+            GroupNode.Externalize(Workflow, Settings, Externalized);
         }
+
+        // Its settings, externalized in its inner workflow so an include can map a property onto them
+        // (OpenRigs.Logging's ExperimentRecords: IngestScript, ExpectedFiles).
+        static readonly string[] Externalized = { "IngestScript", "ConfigFiles", "ExpectedFiles", "TrialColumns" };
 
         /// <summary>
         /// Initializes a copy with the given inner workflow. Bonsai copies a group by this
@@ -44,6 +49,7 @@ namespace OpenRigs.Manifest
         public ExperimentManifest(ExpressionBuilderGraph workflow)
             : base(workflow)
         {
+            GroupNode.Externalize(Workflow, Settings, Externalized);
         }
 
         /// <summary>Gets or sets the name of the server's ingest script for this kind of data.</summary>
@@ -167,7 +173,7 @@ namespace OpenRigs.Manifest
         }
     }
 
-    // ExperimentManifest's own settings in the Properties panel: its inner workflow externalizes nothing.
+    // ExperimentManifest's own settings in the Properties panel.
     class ExperimentManifestTypeDescriptionProvider : ShownPropertiesProvider
     {
         public ExperimentManifestTypeDescriptionProvider()

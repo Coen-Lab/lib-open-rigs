@@ -89,5 +89,45 @@ namespace OpenRigs.Audio.Tests
             var sound = Wave.Read(Riff(Chunk("fmt ", Fmt(40)), Chunk("data", Samples(0, 0, 0))), "test", 48000);
             Assert.AreEqual(3, sound.Cols);
         }
+
+        static byte[] FloatFmt()
+        {
+            var fmt = new MemoryStream();
+            var writer = new BinaryWriter(fmt);
+            writer.Write((short)3);       // IEEE float
+            writer.Write((short)1);
+            writer.Write(48000);
+            writer.Write(192000);
+            writer.Write((short)4);
+            writer.Write((short)32);
+            return fmt.ToArray();
+        }
+
+        // A 32-bit float WAV is read as stored, sample for sample (a task's noise kept as float32).
+        [TestMethod]
+        public void ReadsMonoFloatAsStored()
+        {
+            var stored = new[] { -0.75f, 0.000123f, 1.5f };
+            var sound = Wave.Read(Riff(Chunk("fmt ", FloatFmt()), Chunk("data", stored.SelectMany(BitConverter.GetBytes).ToArray())), "test", 48000);
+            CollectionAssert.AreEqual(stored, Values(sound));
+        }
+
+        [TestMethod]
+        public void ReadWaveReadsTheFileAtTheDeviceRateAndRefusesAnother()
+        {
+            var path = Path.Combine(Path.GetTempPath(), "ReadWaveTest.wav");
+            File.WriteAllBytes(path, Riff(Chunk("fmt ", Fmt()), Chunk("data", Samples(0, 32767))).ToArray());
+            try
+            {
+                var read = new ReadWave { FileName = path };
+                Assert.AreEqual(2, System.Reactive.Linq.Observable.Wait(read.Process(System.Reactive.Linq.Observable.Return(48000))).Cols);
+                var error = Assert.ThrowsException<InvalidDataException>(() => System.Reactive.Linq.Observable.Wait(read.Process(System.Reactive.Linq.Observable.Return(44100))));
+                StringAssert.Contains(error.Message, "48000 Hz, but the audio device runs at 44100 Hz");
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
     }
 }
