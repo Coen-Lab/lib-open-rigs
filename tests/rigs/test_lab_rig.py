@@ -294,3 +294,17 @@ def test_the_mixer_boot_delay_is_in_seconds():
 def test_the_reward_valve_lines_are_wiring_s():
     assert LabRig.model_validate(RIG).reward_valve_lines() == {1, 2}
     assert LabRig.model_validate(rig_with(DO2={"device": "RewardValve", "side": "right"}, DO3={"device": "ZapitTrigger"})).reward_valve_lines() == {2}
+
+
+def test_the_preflight_kinds_are_one_list_the_c_sharp_holds_too():
+    # Round 3 QF5: the preflight's device kinds were listed three times. PREFLIGHT_KINDS is the one; each is a rig.yml key.
+    import re
+    from pathlib import Path
+
+    from open_rigs.rigs.lab_rig import PREFLIGHT_KINDS
+
+    source = (Path(__file__).parents[2] / "src" / "OpenRigs.Devices" / "Preflight" / "PreflightChecks.cs").read_text(encoding="utf-8")
+    found = re.search(r"string\[\] AllKinds = \{([^}]*)\}", source)
+    assert found and tuple(re.findall(r'"(\w+)"', found.group(1))) == PREFLIGHT_KINDS
+    keys = {info.alias for info in LabRig.model_fields.values()}
+    assert set(PREFLIGHT_KINDS) <= keys

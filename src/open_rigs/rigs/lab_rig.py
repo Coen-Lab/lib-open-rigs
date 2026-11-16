@@ -30,6 +30,10 @@ CAMERA_TRIGGER = "CameraTrigger"
 SIDES = ("left", "right")
 WHERE = "(lab rig model, open_rigs.rigs.lab_rig)"
 PLACEHOLDER = "CHANGE-ME"  # rig-template.yml's mark on each value a rig fills in
+# The rig.yml kinds a preflight lists, in its order (OpenRigs.Devices PreflightDevices.AllKinds, held equal by a test): each
+# device whose data the preflight counts. Not zapit: Zapit answers only when commanded, so a preflight has no data to count.
+PREFLIGHT_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera", "speakerArray",
+                   "projectionCalibration")
 # The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, DeliverReward's MaxRewardUl).
 MAX_REWARD_UL = 20
 
