@@ -312,3 +312,17 @@ def test_a_task_without_a_stimulus_state_log_has_no_unfinished_trial(tmp_path):
     trials = _chain(1)
     s = summarise(_experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)], outcome="stopped"))
     assert s.unfinished is None and s.interval_seconds == [] and s.problems == []
+
+
+def test_the_c_sharp_helper_fills_the_shared_block_these_name():
+    # Audit B5: each task filled the shared block by hand, and two had diverged. OpenRigs.Devices SharedTrialColumns fills
+    # every column of it but the ones each task describes (trialType, outcome, rewardSizeUl) and harpTime, the row's time.
+    import re
+    from pathlib import Path
+
+    source = (Path(__file__).parents[2] / "src" / "OpenRigs.Devices" / "Trials" / "SharedTrialColumns.cs").read_text(encoding="utf-8")
+    named = {block: re.findall(r'"(\w+)"', re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source).group(1)) for block in ("Core", "QuietWait", "Opto")}
+    task_s_own = {"harpTime", "trialType", "outcome", "rewardSizeUl"}
+    assert named["Core"] == [c[0] for c in CORE_COLUMNS if c[0] not in task_s_own]
+    assert named["QuietWait"] == [c[0] for c in trials_module.QUIET_WAIT_COLUMNS]
+    assert named["Opto"] == [c[0] for c in trials_module.OPTO_COLUMNS]

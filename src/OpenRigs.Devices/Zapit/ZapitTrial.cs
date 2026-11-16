@@ -148,12 +148,9 @@ namespace OpenRigs.Devices.Zapit
         }
     }
 
-    /// <summary>What <see cref="ZapitTrialCommand"/> reads from a task's trial.</summary>
-    public interface IZapitTrial
+    /// <summary>What <see cref="ZapitTrialCommand"/> reads from a task's trial: the trial's number (ITrial) and its laser.</summary>
+    public interface IZapitTrial : ITrial
     {
-        /// <summary>Gets the trial's number.</summary>
-        int TrialNumber { get; }
-
         /// <summary>Gets the trial's condition in the conditions file, 1 to 254.</summary>
         int LaserCondition { get; }
 

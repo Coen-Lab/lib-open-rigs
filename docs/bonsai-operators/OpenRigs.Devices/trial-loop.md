@@ -8,24 +8,24 @@
 
 | Phase | When | Event |
 |---|---|---|
-| Interval | the last outcome plus its timeout, exactly; trial 1 the first tick | `Interval` (the trial just drawn) |
+| Iti | the last outcome plus its timeout, exactly; trial 1 the first tick | `Iti` (the trial just drawn) |
 | Arm | a laser trial on a hardware-triggered rig: the interval's start, or once the last laser is done (`LaserTiming`) | `Arm`: send the trial's StartStimulus |
 | Start | the interval's end less the lead, `max(laserToStimulusSeconds, 0)`, or later until the quiet waits hold (`QuietWait`) | `Start` (exact time) |
-| Trigger | `laserToStimulusSeconds` before the stimulus, if no outcome yet; the workflow stops if Zapit has not armed the trial | `Trigger`: raise the trigger line (and, without hardware triggering, send the StartStimulus) |
+| Trigger | `laserToStimulusSeconds` before the stimulus, if no outcome yet; the workflow stops if Zapit has not armed the trial, naming the last laser when it held Zapit past the trigger or freed it less than the reply margin before it | `Trigger`: raise the trigger line (and, without hardware triggering, send the StartStimulus) |
 | Stimulus | the first tick at or after the start plus the lead | `Stimulus`, then the rules' `Update`s |
 | Response | from `ResponseDelaySeconds` after the stimulus for `ResponseWindowSeconds` (infinity: no limit) | the rules' `Update`s; `LaserCap` once the laser has run `LaserMaxSeconds` |
 | Outcome | the tick (or lick or wheel sample, timed at the latest tick) the rules return an outcome, or the window's end | `Outcome`; `TriggerOff` when the line falls |
-| Cues | the task's `TrialCue`s, from the stimulus or the next interval's start, outcome or not | `Cue` |
+| Cues | the task's `TrialCue`s, from the stimulus or the next interval's start (`CueAnchor.Stimulus`, `NextIti`), outcome or not; a stimulus cue made with `droppedAtOutcome` never comes once the trial has its outcome (the spouts in after an early answer) | `Cue` |
 
-`TrialTimes` gives the rules the trial's times as its row logs them (`itiStartTime`, `itiSeconds`, `quietWaitSeconds`, `trialStartTime`, `stimulusOnsetTime`, `laserTriggerTime`, and `Now` for `outcomeTime`); `LaserFired` is false on a trial answered before its trigger, which logs 0 mW.
+`TrialTimes` gives the rules the trial's times as its row logs them (`ItiStartTime` for `itiStartTime`, `ItiSeconds` for `itiSeconds`, `quietWaitSeconds`, `trialStartTime`, `stimulusOnsetTime`, `laserTriggerTime`, and `Now` for `outcomeTime`); `LaserFired` is false on a trial answered before its trigger, which logs 0 mW. `SharedTrialColumns.Fill` fills a row's shared block from them, so every task logs it one way.
 
 ## The laser
 
-`LaserTiming.UntilOutcome(hardwareTriggered, triggerHoldSeconds, laserMaxSeconds)`: the laser runs until the outcome (the workflow stops Zapit at `Outcome` or `LaserCap`), the trigger line falls `triggerHoldSeconds` after the outcome, and the next trial is armed then. `LaserTiming.ForDuration(hardwareTriggered, laserDurationSeconds, rampDownSeconds)`: the line falls `laserDurationSeconds` after the trigger, outcome or not, and the next trial is armed `rampDownSeconds` later (a trial answered before its trigger frees Zapit at its trigger's moment). Zapit's reply to each StartStimulus is checked by `ZapitTrial.CheckArmed`; a StartStimulus still unanswered when the next is due stops the workflow.
+`LaserTiming.UntilOutcome(hardwareTriggered, triggerHoldSeconds, laserMaxSeconds)`: the laser runs until the outcome (the workflow stops Zapit at `Outcome` or `LaserCap`), the trigger line falls `triggerHoldSeconds` after the outcome, and the next trial is armed then. `LaserTiming.ForDuration(hardwareTriggered, laserDurationSeconds, rampDownSeconds)`: the line falls `laserDurationSeconds` after the trigger, outcome or not, and the next trial is armed `rampDownSeconds` later (a trial answered before its trigger frees Zapit at its trigger's moment). Zapit's reply to each StartStimulus is checked by `ZapitTrial.CheckArmed`; a StartStimulus still unanswered when the next is due stops the workflow. A trigger before the last laser frees Zapit stops it naming that laser and when it frees Zapit; `open_rigs.core.task` `Optogenetics.check_zapit_free_in_time` refuses such a task file first.
 
 ## In a workflow
 
-A task's `src\Extensions` implements `ITrialRules<Trial, TUpdate, TOutcome>` (its `Trial` an `IZapitTrial`, its outcome an `ITrialOutcome`) and declares:
+A task's `src\Extensions` implements `ITrialRules<Trial, TUpdate, TOutcome>` (its `Trial` an `ITrial`, and an `IZapitTrial` if its trials are laser trials; its outcome an `ITrialOutcome`, `PenaltyTimeoutSeconds`) and declares:
 
 ```csharp
 [Combinator]

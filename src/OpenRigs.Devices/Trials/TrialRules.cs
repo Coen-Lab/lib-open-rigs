@@ -7,8 +7,8 @@ namespace OpenRigs.Devices
     /// <summary>What a <see cref="TrialLoop{TTrial, TUpdate, TOutcome}"/> event is.</summary>
     public enum TrialEventKind
     {
-        /// <summary>The trial was drawn and its interval began; Seconds is the interval's start, exactly.</summary>
-        Interval,
+        /// <summary>The trial was drawn and its inter-trial interval began; Seconds is the interval's start (itiStartTime), exactly.</summary>
+        Iti,
         /// <summary>On a hardware-triggered rig, a laser trial's StartStimulus goes now, during its interval.</summary>
         Arm,
         /// <summary>The trial starts; Seconds is the start, exactly: the interval's end less the lead, or later until the quiet waits hold.</summary>
@@ -110,21 +110,37 @@ namespace OpenRigs.Devices
         /// <summary>The stimulus as it was due (the trial start plus the lead); a trial whose stimulus never came has none of these.</summary>
         Stimulus,
         /// <summary>The start of the interval after the trial's outcome (the outcome plus its timeout).</summary>
-        NextInterval
+        NextIti
     }
 
-    /// <summary>A moment of a trial the task names, such as the grating off or the spouts in: a Cue event at the first tick at or past it, outcome or not.</summary>
+    /// <summary>
+    /// A moment of a trial the task names, such as the grating off or the spouts in: a Cue event at the first tick at or
+    /// past it, outcome or not, unless it is dropped at the outcome (DroppedAtOutcome).
+    /// </summary>
     public sealed class TrialCue
     {
-        /// <summary>A cue named <paramref name="name"/>, <paramref name="seconds"/> after its anchor.</summary>
-        public TrialCue(string name, CueAnchor anchor, double seconds)
+        /// <summary>A cue named <paramref name="name"/>, <paramref name="seconds"/> after its anchor, outcome or not.</summary>
+        public TrialCue(string name, CueAnchor anchor, double seconds) : this(name, anchor, seconds, false)
+        {
+        }
+
+        /// <summary>
+        /// A cue named <paramref name="name"/>, <paramref name="seconds"/> after its anchor; with
+        /// <paramref name="droppedAtOutcome"/>, a cue still to come at the trial's outcome never comes (a Stimulus cue only).
+        /// </summary>
+        public TrialCue(string name, CueAnchor anchor, double seconds, bool droppedAtOutcome)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("TrialCue: a cue needs a name.");
             if (!(seconds >= 0) || double.IsInfinity(seconds)) throw new ArgumentException(string.Format("TrialCue: cue {0} is {1} s after its anchor; it must be a finite number from 0.", name, seconds));
+            if (droppedAtOutcome && anchor != CueAnchor.Stimulus) throw new ArgumentException(string.Format("TrialCue: cue {0} is timed from the next interval, which starts after the outcome, so it cannot be dropped at the outcome.", name));
             Name = name;
             Anchor = anchor;
             Seconds = seconds;
+            DroppedAtOutcome = droppedAtOutcome;
         }
+
+        /// <summary>Gets whether the cue, if still to come at the trial's outcome, never comes (a cue that belongs to the response, such as the spouts in).</summary>
+        public bool DroppedAtOutcome { get; private set; }
 
         /// <summary>Gets the cue's name, as a Cue event carries it.</summary>
         public string Name { get; private set; }
@@ -145,8 +161,8 @@ namespace OpenRigs.Devices
             ResponseWindowSeconds = double.PositiveInfinity;
         }
 
-        /// <summary>Gets or sets the interval drawn for the trial (itiSeconds): its start to the stimulus with a quiet mouse.</summary>
-        public double IntervalSeconds { get; set; }
+        /// <summary>Gets or sets the inter-trial interval drawn for the trial (itiSeconds): its start to the stimulus with a quiet mouse.</summary>
+        public double ItiSeconds { get; set; }
 
         /// <summary>Gets or sets the signed lead (laserToStimulusSeconds): the trigger this long before the stimulus, after it if negative. The trial starts max(lead, 0) before the stimulus in every experiment.</summary>
         public double LaserToStimulusSeconds { get; set; }
@@ -179,11 +195,11 @@ namespace OpenRigs.Devices
     /// </summary>
     public sealed class TrialTimes
     {
-        /// <summary>Gets or sets when the interval before the trial began (itiStartTime).</summary>
-        public double IntervalStartTime { get; set; }
+        /// <summary>Gets or sets when the inter-trial interval before the trial began (itiStartTime).</summary>
+        public double ItiStartTime { get; set; }
 
-        /// <summary>Gets or sets the interval drawn for the trial (itiSeconds).</summary>
-        public double IntervalSeconds { get; set; }
+        /// <summary>Gets or sets the inter-trial interval drawn for the trial (itiSeconds).</summary>
+        public double ItiSeconds { get; set; }
 
         /// <summary>Gets or sets how long the quiet waits held the start past the interval's end less the lead (quietWaitSeconds).</summary>
         public double QuietWaitSeconds { get; set; }
@@ -216,21 +232,28 @@ namespace OpenRigs.Devices
         public bool Responding { get { return Now >= ResponseStartTime - TrialLoop.Tolerance; } }
     }
 
+    /// <summary>A trial as the loop needs it: its number. A laser trial's is also an <see cref="IZapitTrial"/>.</summary>
+    public interface ITrial
+    {
+        /// <summary>Gets the trial's number, from 1.</summary>
+        int TrialNumber { get; }
+    }
+
     /// <summary>A trial's outcome as a task's rules give it: the loop needs only its timeout.</summary>
     public interface ITrialOutcome
     {
         /// <summary>Gets the timeout after the trial, in seconds (penaltyTimeoutSeconds): the next interval starts at the outcome plus this.</summary>
-        double TimeoutSeconds { get; }
+        double PenaltyTimeoutSeconds { get; }
     }
 
     /// <summary>
     /// A task's own part of its trials, which <see cref="TrialLoop{TTrial, TUpdate, TOutcome}"/> runs: the draw, each
     /// trial's timing, and the response rule, called with each input from the trial's start to its outcome. A method
     /// returns the outcome when the trial ends, else null; changes the task shows (TUpdate) go into updates, in order.
-    /// Called under the loop's lock, one call at a time.
+    /// Called under the loop's lock, one call at a time. A laser trial (TrialTiming.Laser) must be an IZapitTrial.
     /// </summary>
     public interface ITrialRules<TTrial, TUpdate, TOutcome>
-        where TTrial : class, IZapitTrial
+        where TTrial : class, ITrial
         where TOutcome : class, ITrialOutcome
     {
         /// <summary>Gets the experiment's laser timing; null in an experiment without a laser.</summary>
