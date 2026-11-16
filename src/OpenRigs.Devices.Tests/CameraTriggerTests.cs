@@ -66,5 +66,20 @@ namespace OpenRigs.Devices.Tests
             var times = new CameraTriggerPulses { Output = 0 }.Process(new[] { dump, pulse, other }.ToObservable()).Select(t => t.Seconds).ToArray().Wait();
             CollectionAssert.AreEqual(new[] { 2.5 }, times);
         }
+
+        // A PropertyMapping sets Output after the node is built and before it is subscribed: the pulses are of the
+        // output it has then, as a DO1-wired camera's must be trigger 1's.
+        [TestMethod]
+        public void PulsesAreOfTheOutputSetBeforeSubscription()
+        {
+            var node = new CameraTriggerPulses();
+            var pulses = node.Process(new[]
+            {
+                HarpMessage.FromByte(Camera0Frame.Address, 1.0, MessageType.Event, 1),
+                HarpMessage.FromByte(Camera1Frame.Address, 2.0, MessageType.Event, 1)
+            }.ToObservable());
+            node.Output = 1;
+            CollectionAssert.AreEqual(new[] { 2.0 }, pulses.Select(t => t.Seconds).ToArray().Wait());
+        }
     }
 }

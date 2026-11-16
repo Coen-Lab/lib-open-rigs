@@ -129,11 +129,16 @@ namespace OpenRigs.Devices
         /// <summary>Each pulse of the trigger, timestamped.</summary>
         public IObservable<Timestamped<HarpMessage>> Process(IObservable<HarpMessage> source)
         {
-            if (Output != 0 && Output != 1) throw new InvalidOperationException("CameraTriggerPulses' Output is " + Output + "; it must be 0 or 1.");
-            var address = Output == 0 ? Camera0Frame.Address : Camera1Frame.Address;
-            return source
-                .Where(message => message.MessageType == MessageType.Event && message.Address == address)
-                .Select(message => Timestamped.Create(message, message.GetTimestamp()));
+            // Output is read at subscription, after a mapping has set it, not when the workflow is built.
+            return Observable.Defer(() =>
+            {
+                var output = Output;
+                if (output != 0 && output != 1) throw new InvalidOperationException("CameraTriggerPulses' Output is " + output + "; it must be 0 or 1.");
+                var address = output == 0 ? Camera0Frame.Address : Camera1Frame.Address;
+                return source
+                    .Where(message => message.MessageType == MessageType.Event && message.Address == address)
+                    .Select(message => Timestamped.Create(message, message.GetTimestamp()));
+            });
         }
     }
 }
