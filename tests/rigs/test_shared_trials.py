@@ -202,6 +202,10 @@ def test_a_change_to_the_shared_block_is_named():
         "itiSeconds's description is not the shared block's (open_rigs.rigs.trials)",
         "laserCondition is double, not int",
     ]
+    # Round 3 F12: penaltySound was each task's own words, and two tasks' differed.
+    sound = _block()
+    sound["penaltySound"]["description"] = "True when the penalty sound played."
+    assert shared_block_problems(sound, BOTH) == ["penaltySound's description is not the shared block's (open_rigs.rigs.trials)"]
     reordered = dict(reversed(list(_block().items())))
     assert shared_block_problems(reordered, BOTH)[0].startswith("the first 18 columns are")
 

@@ -4,8 +4,8 @@ Every task's schemas/trial-columns.yml starts with the shared block, in order, w
 word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
 (QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, opto (OPTO_COLUMNS: laserCondition, laserPowerMw,
-laserTriggerTime) after penalised. trialType, outcome and penaltySound are in the core by name, type and place, each
-described by its task. A task's own columns follow the block.
+laserTriggerTime) after penalised. trialType and outcome are in the core by name, type and place, each described by its
+task. A task's own columns follow the block.
 
 summarise reads one experiment's BonsaiData/BonsaiData_Trial_*.csv, BonsaiData/BonsaiData_Async_*.csv (each
 RewardDelivered row, Value the microlitres delivered and Detail the microlitres requested=), Settings/Settings_Task_*.json
@@ -94,7 +94,7 @@ CORE_COLUMNS: List[Column] = [
     ("rewarded", "bool", None,
      "True when the trial's outcome delivered its reward (rewardOfferedUl, at outcomeTime): the value the workflow's "
      "reward command is made from. Which outcomes are rewarded is the task's (its note)."),
-    ("penaltySound", "bool", None, None),
+    ("penaltySound", "bool", None, "True when the trial was penalised and the task's penalty sound is enabled."),
     ("penaltyTimeoutSeconds", "double", "s",
      "The timeout after this trial: the task's penalty.timeoutSeconds when the trial was penalised, else 0. The next "
      "interval starts after it (itiStartTime)."),
