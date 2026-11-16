@@ -80,6 +80,27 @@ namespace OpenRigs.Logging.Tests
     }
 
     /// <summary>
+    /// LogRngSeed logs only the first seed it is given, as the RngSeed row, and leaves AsyncEvents
+    /// open: a Take(1) before its multicast would close AsyncEvents and lose every later row.
+    /// </summary>
+    [TestClass]
+    public class LogRngSeedTests : LoggingTestBase
+    {
+        static readonly string[] ExpectedHeader = { "harpTime", "Event", "Detail", "Value" };
+
+        protected override string WorkflowFileName => "LogRngSeedTest.bonsai";
+
+        [TestMethod]
+        public void LogRngSeed_LogsTheFirstSeedOnce_AndLaterEventsStillArrive()
+        {
+            var result = RunWorkflow(new Dictionary<string, string>());
+            var rows = ReadCsvLog(GetSingleLogFile("*.csv", result), ExpectedHeader, 4, result);
+            Assert.AreEqual("RngSeed", rows[0][1], result.Describe());
+            Assert.AreEqual(0, ParseIntegerColumn(rows[0], 3, ExpectedHeader, 0, result), result.Describe());
+            CollectionAssert.AreEqual(new[] { "Later", "Later", "Later" }, rows.Skip(1).Select(r => r[1]).ToArray(), result.Describe());
+        }
+    }
+    /// <summary>
     /// CreateAsyncEvent and AsyncEvent without Bonsai: what each kind of element becomes.
     /// </summary>
     [TestClass]
