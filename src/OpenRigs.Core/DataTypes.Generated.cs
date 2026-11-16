@@ -9,11 +9,13 @@ namespace OpenRigs.Core.DataTypes
 {
     #pragma warning disable // Disable all warnings
 
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0)")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class DataTypes
     {
+    
+        private TimestampSource _timestampSource;
     
         private Vector2 _vector2;
     
@@ -21,26 +23,36 @@ namespace OpenRigs.Core.DataTypes
     
         private SoftwareEvent _softwareEvent;
     
-        private SpoutRigPosition _spoutRigPosition;
-    
         public DataTypes()
         {
             _vector2 = new Vector2();
             _vector3 = new Vector3();
             _softwareEvent = new SoftwareEvent();
-            _spoutRigPosition = new SpoutRigPosition();
         }
     
         protected DataTypes(DataTypes other)
         {
+            _timestampSource = other._timestampSource;
             _vector2 = other._vector2;
             _vector3 = other._vector3;
             _softwareEvent = other._softwareEvent;
-            _spoutRigPosition = other._spoutRigPosition;
+        }
+    
+        [Newtonsoft.Json.JsonPropertyAttribute("TimestampSource", Required=Newtonsoft.Json.Required.Always)]
+        public TimestampSource TimestampSource
+        {
+            get
+            {
+                return _timestampSource;
+            }
+            set
+            {
+                _timestampSource = value;
+            }
         }
     
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("vector2", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("Vector2", Required=Newtonsoft.Json.Required.Always)]
         public Vector2 Vector2
         {
             get
@@ -54,7 +66,7 @@ namespace OpenRigs.Core.DataTypes
         }
     
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("vector3", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("Vector3", Required=Newtonsoft.Json.Required.Always)]
         public Vector3 Vector3
         {
             get
@@ -68,7 +80,7 @@ namespace OpenRigs.Core.DataTypes
         }
     
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("softwareEvent", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("SoftwareEvent", Required=Newtonsoft.Json.Required.Always)]
         public SoftwareEvent SoftwareEvent
         {
             get
@@ -78,20 +90,6 @@ namespace OpenRigs.Core.DataTypes
             set
             {
                 _softwareEvent = value;
-            }
-        }
-    
-        [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("spoutRigPosition", Required=Newtonsoft.Json.Required.Always)]
-        public SpoutRigPosition SpoutRigPosition
-        {
-            get
-            {
-                return _spoutRigPosition;
-            }
-            set
-            {
-                _spoutRigPosition = value;
             }
         }
     
@@ -107,10 +105,10 @@ namespace OpenRigs.Core.DataTypes
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
+            stringBuilder.Append("TimestampSource = " + _timestampSource + ", ");
             stringBuilder.Append("Vector2 = " + _vector2 + ", ");
             stringBuilder.Append("Vector3 = " + _vector3 + ", ");
-            stringBuilder.Append("SoftwareEvent = " + _softwareEvent + ", ");
-            stringBuilder.Append("SpoutRigPosition = " + _spoutRigPosition);
+            stringBuilder.Append("SoftwareEvent = " + _softwareEvent);
             return true;
         }
     
@@ -132,7 +130,7 @@ namespace OpenRigs.Core.DataTypes
     /// <summary>
     /// A software event is a generic event that can be used to track any event that occurs in the software.
     /// </summary>
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0)")]
     [System.ComponentModel.DescriptionAttribute("A software event is a generic event that can be used to track any event that occu" +
         "rs in the software.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
@@ -307,233 +305,7 @@ namespace OpenRigs.Core.DataTypes
     }
 
 
-    /// <summary>
-    /// Dictionary of named absolute positions, e.g.:
-    ///  home, both_in, both_out
-    /// </summary>
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("Dictionary of named absolute positions, e.g.:\n  home, both_in, both_out")]
-    [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
-    [Bonsai.CombinatorAttribute(MethodName="Generate")]
-    public partial class SpoutRigPosition
-    {
-    
-        private System.Collections.Generic.Dictionary<string, StepperPositions> _positions;
-    
-        public SpoutRigPosition()
-        {
-        }
-    
-        protected SpoutRigPosition(SpoutRigPosition other)
-        {
-            _positions = other._positions;
-        }
-    
-        /// <summary>
-        /// Named absolute positions of the lick spout stage stepper rig, keyed by a string identifier.
-        /// </summary>
-        [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("positions")]
-        [System.ComponentModel.DescriptionAttribute("Named absolute positions of the lick spout stage stepper rig, keyed by a string i" +
-            "dentifier.")]
-        public System.Collections.Generic.Dictionary<string, StepperPositions> Positions
-        {
-            get
-            {
-                return _positions;
-            }
-            set
-            {
-                _positions = value;
-            }
-        }
-    
-        public System.IObservable<SpoutRigPosition> Generate()
-        {
-            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new SpoutRigPosition(this)));
-        }
-    
-        public System.IObservable<SpoutRigPosition> Generate<TSource>(System.IObservable<TSource> source)
-        {
-            return System.Reactive.Linq.Observable.Select(source, _ => new SpoutRigPosition(this));
-        }
-    
-        protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
-        {
-            stringBuilder.Append("Positions = " + _positions);
-            return true;
-        }
-    
-        public override string ToString()
-        {
-            System.Text.StringBuilder stringBuilder = new System.Text.StringBuilder();
-            stringBuilder.Append(GetType().Name);
-            stringBuilder.Append(" { ");
-            if (PrintMembers(stringBuilder))
-            {
-                stringBuilder.Append(" ");
-            }
-            stringBuilder.Append("}");
-            return stringBuilder.ToString();
-        }
-    }
-
-
-    /// <summary>
-    /// Absolute target position for the 5-axis spout rig, expressed in task-relative axes.
-    /// </summary>
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("Absolute target position for the 5-axis spout rig, expressed in task-relative axe" +
-        "s.")]
-    [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
-    [Bonsai.CombinatorAttribute(MethodName="Generate")]
-    public partial class StepperPositions
-    {
-    
-        private int _leftElevation;
-    
-        private int _rightElevation;
-    
-        private int _rightRadial;
-    
-        private int _leftRadial;
-    
-        private int _baseTransverse;
-    
-        public StepperPositions()
-        {
-        }
-    
-        protected StepperPositions(StepperPositions other)
-        {
-            _leftElevation = other._leftElevation;
-            _rightElevation = other._rightElevation;
-            _rightRadial = other._rightRadial;
-            _leftRadial = other._leftRadial;
-            _baseTransverse = other._baseTransverse;
-        }
-    
-        /// <summary>
-        /// Left spout elevation axis absolute position (steps). Maps to motor 1
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("leftElevation", Required=Newtonsoft.Json.Required.Always)]
-        [System.ComponentModel.DescriptionAttribute("Left spout elevation axis absolute position (steps). Maps to motor 1")]
-        public int LeftElevation
-        {
-            get
-            {
-                return _leftElevation;
-            }
-            set
-            {
-                _leftElevation = value;
-            }
-        }
-    
-        /// <summary>
-        /// Right spout elevation axis absolute position (steps). Maps to motor 2
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("rightElevation", Required=Newtonsoft.Json.Required.Always)]
-        [System.ComponentModel.DescriptionAttribute("Right spout elevation axis absolute position (steps). Maps to motor 2")]
-        public int RightElevation
-        {
-            get
-            {
-                return _rightElevation;
-            }
-            set
-            {
-                _rightElevation = value;
-            }
-        }
-    
-        /// <summary>
-        /// Right spout radial axis (in/out) absolute position (steps). Maps to motor 3
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("rightRadial", Required=Newtonsoft.Json.Required.Always)]
-        [System.ComponentModel.DescriptionAttribute("Right spout radial axis (in/out) absolute position (steps). Maps to motor 3")]
-        public int RightRadial
-        {
-            get
-            {
-                return _rightRadial;
-            }
-            set
-            {
-                _rightRadial = value;
-            }
-        }
-    
-        /// <summary>
-        /// Left spout radial axis (in/out) absolute position (steps). Maps to motor 4
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("leftRadial", Required=Newtonsoft.Json.Required.Always)]
-        [System.ComponentModel.DescriptionAttribute("Left spout radial axis (in/out) absolute position (steps). Maps to motor 4")]
-        public int LeftRadial
-        {
-            get
-            {
-                return _leftRadial;
-            }
-            set
-            {
-                _leftRadial = value;
-            }
-        }
-    
-        /// <summary>
-        /// Base transverse axis absolute position (steps). Maps to motor 5
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("baseTransverse", Required=Newtonsoft.Json.Required.Always)]
-        [System.ComponentModel.DescriptionAttribute("Base transverse axis absolute position (steps). Maps to motor 5")]
-        public int BaseTransverse
-        {
-            get
-            {
-                return _baseTransverse;
-            }
-            set
-            {
-                _baseTransverse = value;
-            }
-        }
-    
-        public System.IObservable<StepperPositions> Generate()
-        {
-            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new StepperPositions(this)));
-        }
-    
-        public System.IObservable<StepperPositions> Generate<TSource>(System.IObservable<TSource> source)
-        {
-            return System.Reactive.Linq.Observable.Select(source, _ => new StepperPositions(this));
-        }
-    
-        protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
-        {
-            stringBuilder.Append("LeftElevation = " + _leftElevation + ", ");
-            stringBuilder.Append("RightElevation = " + _rightElevation + ", ");
-            stringBuilder.Append("RightRadial = " + _rightRadial + ", ");
-            stringBuilder.Append("LeftRadial = " + _leftRadial + ", ");
-            stringBuilder.Append("BaseTransverse = " + _baseTransverse);
-            return true;
-        }
-    
-        public override string ToString()
-        {
-            System.Text.StringBuilder stringBuilder = new System.Text.StringBuilder();
-            stringBuilder.Append(GetType().Name);
-            stringBuilder.Append(" { ");
-            if (PrintMembers(stringBuilder))
-            {
-                stringBuilder.Append(" ");
-            }
-            stringBuilder.Append("}");
-            return stringBuilder.ToString();
-        }
-    }
-
-
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0)")]
     [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum TimestampSource
     {
@@ -552,7 +324,7 @@ namespace OpenRigs.Core.DataTypes
     }
 
 
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0)")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class Vector2
@@ -638,7 +410,7 @@ namespace OpenRigs.Core.DataTypes
     }
 
 
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0)")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class Vector3
@@ -748,7 +520,7 @@ namespace OpenRigs.Core.DataTypes
     /// <summary>
     /// Serializes a sequence of data model objects into JSON strings.
     /// </summary>
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0)")]
     [System.ComponentModel.DescriptionAttribute("Serializes a sequence of data model objects into JSON strings.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Transform)]
     [Bonsai.CombinatorAttribute()]
@@ -773,16 +545,6 @@ namespace OpenRigs.Core.DataTypes
             return Process<SoftwareEvent>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<SpoutRigPosition> source)
-        {
-            return Process<SpoutRigPosition>(source);
-        }
-
-        public System.IObservable<string> Process(System.IObservable<StepperPositions> source)
-        {
-            return Process<StepperPositions>(source);
-        }
-
         public System.IObservable<string> Process(System.IObservable<Vector2> source)
         {
             return Process<Vector2>(source);
@@ -798,14 +560,12 @@ namespace OpenRigs.Core.DataTypes
     /// <summary>
     /// Deserializes a sequence of JSON strings into data model objects.
     /// </summary>
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.7.2.0 (Newtonsoft.Json v13.0.0.0)")]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0)")]
     [System.ComponentModel.DescriptionAttribute("Deserializes a sequence of JSON strings into data model objects.")]
     [System.ComponentModel.DefaultPropertyAttribute("Type")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Transform)]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DataTypes>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SoftwareEvent>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpoutRigPosition>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<StepperPositions>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Vector2>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Vector3>))]
     public partial class DeserializeFromJson : Bonsai.Expressions.SingleArgumentExpressionBuilder

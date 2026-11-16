@@ -15,8 +15,6 @@ lickSpoutDefaultPosition: { baseTransverse: 0, leftRadial: 0, rightRadial: 0, le
 
 A mouse's own positions are `calibration\LickSpoutPositions\<SubjectId>.csv` beside `rig.yml`, one line: `baseTransverse,leftRadial,rightRadial,leftElevation,rightElevation`. The operator saves them with `SaveSpoutPositions`; a mouse without a file gets `lickSpoutDefaultPosition`.
 
-The Arduino-driven stage's Python schema (`LickSpoutStageDriver` in `open_rigs.devices`) has no Bonsai include here.
-
 ---
 
 ## Bonsai workflow

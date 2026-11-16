@@ -1,8 +1,3 @@
-from open_rigs.devices.arduino import (
-    ArduinoDevice,
-    LedController,
-    LedDriver,
-)
 from open_rigs.devices.behavior_board import (
     CameraTriggerController,
     FixedPulse,
@@ -16,13 +11,7 @@ from open_rigs.devices.behavior_board import (
 from open_rigs.devices.serial import SerialDevice
 from open_rigs.devices.serial_balance import SerialBalance
 from open_rigs.devices.lickety_split import LicketySplit
-from open_rigs.devices.lick_spout_stage import (
-    LickSpoutStageDriver,
-    SpoutRigPosition,
-    StepperPositions,
-    MotorAddress,
-    StageAxisMapping,
-)
+from open_rigs.devices.lick_spout_stage import StepperPositions
 from open_rigs.devices.harp import (
     HarpDevice,
     HarpClockSynchronizer,
@@ -34,9 +23,6 @@ from open_rigs.devices.harp import (
 )
 
 __all__ = [
-    "ArduinoDevice",
-    "LedController",
-    "LedDriver",
     "CameraTriggerController",
     "FixedPulse",
     "CalibratedPulse",
@@ -45,14 +31,10 @@ __all__ = [
     "PulseController",
     "RunningWheel",
     "BehaviorBoard",
-    "SpoutRigPosition",
     "StepperPositions",
-    "MotorAddress",
-    "StageAxisMapping",
     "SerialDevice",
     "SerialBalance",
     "LicketySplit",
-    "LickSpoutStageDriver",
     "HarpDevice",
     "HarpClockSynchronizer",
     "HarpTimestampGeneratorGen3",

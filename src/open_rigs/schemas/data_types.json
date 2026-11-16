@@ -2,24 +2,24 @@
   "$defs": {
     "DataTypes": {
       "properties": {
-        "vector2": {
+        "TimestampSource": {
+          "$ref": "#/$defs/TimestampSource"
+        },
+        "Vector2": {
           "$ref": "#/$defs/Vector2"
         },
-        "vector3": {
+        "Vector3": {
           "$ref": "#/$defs/Vector3"
         },
-        "softwareEvent": {
+        "SoftwareEvent": {
           "$ref": "#/$defs/SoftwareEvent"
-        },
-        "spoutRigPosition": {
-          "$ref": "#/$defs/SpoutRigPosition"
         }
       },
       "required": [
-        "vector2",
-        "vector3",
-        "softwareEvent",
-        "spoutRigPosition"
+        "TimestampSource",
+        "Vector2",
+        "Vector3",
+        "SoftwareEvent"
       ],
       "title": "DataTypes",
       "type": "object"
@@ -85,85 +85,6 @@
         "name"
       ],
       "title": "SoftwareEvent",
-      "type": "object"
-    },
-    "SpoutRigPosition": {
-      "description": "Dictionary of named absolute positions, e.g.:\n  home, both_in, both_out",
-      "properties": {
-        "positions": {
-          "additionalProperties": {
-            "$ref": "#/$defs/StepperPositions"
-          },
-          "description": "Named absolute positions of the lick spout stage stepper rig, keyed by a string identifier.",
-          "examples": [
-            {
-              "both_in": {
-                "base_transverse": 500,
-                "left_elevation": 1000,
-                "left_radial": 2000,
-                "right_elevation": 1000,
-                "right_radial": 2000
-              },
-              "both_out": {
-                "base_transverse": 500,
-                "left_elevation": 1000,
-                "left_radial": 1000,
-                "right_elevation": 1000,
-                "right_radial": 1000
-              },
-              "home": {
-                "base_transverse": 0,
-                "left_elevation": 0,
-                "left_radial": 0,
-                "right_elevation": 0,
-                "right_radial": 0
-              }
-            }
-          ],
-          "title": "Positions",
-          "type": "object"
-        }
-      },
-      "title": "SpoutRigPosition",
-      "type": "object"
-    },
-    "StepperPositions": {
-      "description": "Absolute target position for the 5-axis spout rig, expressed in task-relative axes.",
-      "properties": {
-        "leftElevation": {
-          "description": "Left spout elevation axis absolute position (steps). Maps to motor 1",
-          "title": "LeftElevation",
-          "type": "integer"
-        },
-        "rightElevation": {
-          "description": "Right spout elevation axis absolute position (steps). Maps to motor 2",
-          "title": "RightElevation",
-          "type": "integer"
-        },
-        "rightRadial": {
-          "description": "Right spout radial axis (in/out) absolute position (steps). Maps to motor 3",
-          "title": "RightRadial",
-          "type": "integer"
-        },
-        "leftRadial": {
-          "description": "Left spout radial axis (in/out) absolute position (steps). Maps to motor 4",
-          "title": "LeftRadial",
-          "type": "integer"
-        },
-        "baseTransverse": {
-          "description": "Base transverse axis absolute position (steps). Maps to motor 5",
-          "title": "BaseTransverse",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "leftElevation",
-        "rightElevation",
-        "rightRadial",
-        "leftRadial",
-        "baseTransverse"
-      ],
-      "title": "StepperPositions",
       "type": "object"
     },
     "TimestampSource": {

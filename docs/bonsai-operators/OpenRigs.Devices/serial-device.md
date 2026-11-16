@@ -16,7 +16,7 @@
 | `read_buffer_size` | `int` | `4096` | Size, in bytes, of the read buffer |
 | `write_buffer_size` | `int` | `2048` | Size, in bytes, of the write buffer |
 
-Device-specific schemas (Arduino, lick spout stage, etc.) extend `SerialDevice` and add their own fields on top of these.
+Device-specific schemas (a serial balance) extend `SerialDevice` and add their own fields on top of these.
 
 ### Configuration example
 

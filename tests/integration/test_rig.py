@@ -1,15 +1,11 @@
 from open_rigs.core.rig import Rig
-from open_rigs.devices.arduino import LedController, LedDriver
 from open_rigs.devices.behavior_board import BehaviorBoard
-from open_rigs.devices.lick_spout_stage import LickSpoutStageDriver, SpoutRigPosition
 from open_rigs.devices.lickety_split import LicketySplit
 from open_rigs.vision.displays import Screen
 
 
 class DummyRig(Rig):
-    led_driver: LedDriver
     behavior_board: BehaviorBoard
-    lick_spout: LickSpoutStageDriver
     lickety_split: LicketySplit
     screen: Screen
 
@@ -17,11 +13,7 @@ class DummyRig(Rig):
 def test_rig_validate():
     rig = DummyRig(
         root_path="data",
-        led_driver=LedDriver(
-            port_name="COM5", sampling_interval=10, led_controller=LedController(digital_out_pin=8)
-        ),
         behavior_board=BehaviorBoard(port_name="COM3"),
-        lick_spout=LickSpoutStageDriver(port_name="COM2", set_position=SpoutRigPosition()),
         lickety_split=LicketySplit(port_name="COM1"),
         screen=Screen(),
     )
@@ -33,3 +25,15 @@ def test_rig_id():
     rig = Rig.model_validate({"rootPath": "data", "rigId": "B1"})
     assert rig.rig_id == "B1"
     assert rig.model_dump(by_alias=True)["rigId"] == "B1"
+
+
+def test_no_model_nothing_drives_is_kept():
+    # Round 3 LL5: the Arduino LED driver and the Arduino lick spout stage (LickSpoutStageDriver, SpoutRigPosition,
+    # StageAxisMapping) had no workflow, include or rig.yml key; they went, with their example and generated C#.
+    import open_rigs.devices as devices
+    from pathlib import Path
+
+    gone = ("ArduinoDevice", "LedDriver", "LickSpoutStageDriver", "SpoutRigPosition", "StageAxisMapping")
+    assert not [name for name in gone if hasattr(devices, name)]
+    generated = (Path(__file__).parents[2] / "src" / "OpenRigs.Core" / "DataTypes.Generated.cs").read_text(encoding="utf-8")
+    assert "SpoutRigPosition" not in generated
