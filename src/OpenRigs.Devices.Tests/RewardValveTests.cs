@@ -55,7 +55,8 @@ namespace OpenRigs.Devices.Tests
         {
             var writes = new PulseSetupWrites().Process(Observable.Return(DigitalOutputs.DO1 | DigitalOutputs.DOPort1)).ToArray().Wait();
             CollectionAssert.AreEqual(new[] { 35, 45 }, writes.Select(w => w.Address).ToArray());
-            Assert.IsTrue(writes.All(w => Value(w) == 0x802));
+            Assert.AreEqual((ushort)0x3802, Value(writes[0]), "DO1 to DO3 closed as before, the ZapitTrigger's among them, and the port line");
+            Assert.AreEqual((ushort)0x802, Value(writes[1]));
         }
 
         static RewardLine Line(string instance)

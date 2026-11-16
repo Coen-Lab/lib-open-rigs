@@ -38,10 +38,11 @@ namespace OpenRigs.Devices
 
     /// <summary>
     /// A Behavior board's pulsed lines put in pulse mode: each set of lines (PulseEnabledLines) as the writes that
-    /// close them and then pulse-enable them, so a line in pulse mode ends each pulse itself.
+    /// close DO1 to DO3 and those lines (a line left high by a run that died, the ZapitTrigger's among them) and then
+    /// pulse-enable the lines, so a line in pulse mode ends each pulse itself.
     /// </summary>
     [Combinator]
-    [Description("Each set of pulsed lines (PulseEnabledLines) as two writes for the board's Commands subject: the lines closed (OutputClear), then pulse-enabled (OutputPulseEnable).")]
+    [Description("Each set of pulsed lines (PulseEnabledLines) as two writes for the board's Commands subject: DO1 to DO3 and the lines closed (OutputClear), then the lines pulse-enabled (OutputPulseEnable).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PulseSetupWrites
     {
@@ -50,7 +51,7 @@ namespace OpenRigs.Devices
         {
             return source.SelectMany(lines => new[]
             {
-                HarpMessage.FromUInt16(PulseLines.OutputClear, MessageType.Write, (ushort)lines),
+                HarpMessage.FromUInt16(PulseLines.OutputClear, MessageType.Write, (ushort)(lines | DigitalOutputs.DO1 | DigitalOutputs.DO2 | DigitalOutputs.DO3)),
                 HarpMessage.FromUInt16(PulseLines.OutputPulseEnable, MessageType.Write, (ushort)lines),
             });
         }
