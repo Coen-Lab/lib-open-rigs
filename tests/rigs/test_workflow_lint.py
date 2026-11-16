@@ -968,7 +968,7 @@ def test_every_workflow_with_experiment_control_takes_the_launch_id_from_its_top
     assert '<Property Name="LaunchId" DisplayName="LaunchId"' in text and "<p1:LaunchId />" in text
 
 
-def test_a_device_opened_by_hand_is_refused_unless_unpieced_and_allowed(tmp_path):
+def test_a_device_opened_by_hand_is_refused(tmp_path):
     ns = ('xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior" xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video" '
           'xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders" ')
     nodes = ''.join(f'<Expression xsi:type="Combinator" {ns}><Combinator xsi:type="{t}" /></Expression>'
@@ -976,16 +976,14 @@ def test_a_device_opened_by_hand_is_refused_unless_unpieced_and_allowed(tmp_path
     wf = workflow(tmp_path, nodes)
     window = "Bonsai.Shaders.CreateWindow (ProjectorDisplay or RawProjectorDisplay)"
     assert lint.hand_opened_devices(wf) == ["Harp.Behavior.Device (the board's piece)", "OpenRigs.Video.TriggeredSpinnaker (SpinnakerCamera)",
-                                            "OpenRigs.Video.UsbCamera (none yet)", window]
-    # A projector calibration's window is RawProjectorDisplay: no workflow opens a CreateWindow by hand.
-    assert lint.hand_opened_devices(wf, ("UsbCamera", "CreateWindow", "TriggeredSpinnaker")) == [
-        "CreateWindow is not a source UNPIECED lists", "TriggeredSpinnaker is not a source UNPIECED lists",
-        "Harp.Behavior.Device (the board's piece)", "OpenRigs.Video.TriggeredSpinnaker (SpinnakerCamera)", window]
+                                            "OpenRigs.Video.UsbCamera (UsbCamera)", window]
     # A file of the workflow's own counts as the workflow; a lab include's pieces do not.
     (tmp_path / "b" / "src" / "Extensions").mkdir(parents=True)
     (tmp_path / "b" / "src" / "Extensions" / "Camera.bonsai").write_text(HEAD + nodes.split("</Expression>")[2] + "</Expression></Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
     own = workflow(tmp_path / "b", include("Extensions\\Camera.bonsai") + include(lint.BOARD))
-    assert lint.hand_opened_devices(own) == ["OpenRigs.Video.UsbCamera (none yet)"]
+    assert lint.hand_opened_devices(own) == ["OpenRigs.Video.UsbCamera (UsbCamera)"]
+    # Round 3 LM4: the balance camera is a piece too; including it opens nothing by hand.
+    assert lint.hand_opened_devices(workflow(tmp_path / "d", include(lint.DEVICES + "UsbCamera.bonsai"))) == []
     # Round 3 LM4: a serial port opened by hand passed.
     port = 'xmlns:port="clr-namespace:Bonsai.IO.Ports;assembly=Bonsai.System" '
     serial = workflow(tmp_path / "c", ''.join(f'<Expression xsi:type="Combinator" {port}><Combinator xsi:type="port:{t}" /></Expression>'

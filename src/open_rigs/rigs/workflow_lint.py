@@ -773,27 +773,23 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
 # Harp.* namespace, Bonsai.Harp or LicketySplit's) is its kind's piece too. A workflow that opens one itself skips the
 # piece's checks, log and Ready stage.
 PIECED_SOURCES = {("Bonsai.Spinnaker", "SpinnakerCapture"): "SpinnakerCamera", ("OpenRigs.Video", "TriggeredSpinnaker"): "SpinnakerCamera",
-                  ("OpenRigs.Video", "UsbCamera"): "none yet", ("Bonsai.Shaders", "CreateWindow"): "ProjectorDisplay or RawProjectorDisplay",
+                  ("OpenRigs.Video", "UsbCamera"): "UsbCamera", ("Bonsai.Shaders", "CreateWindow"): "ProjectorDisplay or RawProjectorDisplay",
                   # A serial port, opened by name (Bonsai.System's SerialPortManager) by any of these: a balance is
                   # SerialBalance's, every other serial device its kind's piece.
                   **{("Bonsai.IO.Ports", t): "SerialBalance, or the device's piece" for t in ("CreateSerialPort", "SerialReadLine", "SerialStringRead")}}
-# The sources opened by hand today because no piece fits them, each a workflow allows by name (hand_opened_devices'
-# allowed), and only these.
-UNPIECED = {"UsbCamera": "a calibration's balance camera, a USB camera in no rig.yml (no piece yet)"}
 
 
-def hand_opened_devices(wf: Workflow, allowed: tuple[str, ...] = ()) -> list[str]:
+def hand_opened_devices(wf: Workflow) -> list[str]:
     """Every device source the workflow, or a file of its own it includes, opens itself rather than through the lab's
-    piece for it (PIECED_SOURCES, and any Harp board's Device), as "<type> (<piece>)". `allowed` names the UNPIECED
-    sources this workflow opens by hand; a name not in UNPIECED is refused, so the exceptions stay the listed ones."""
-    found = [f"{name} is not a source UNPIECED lists" for name in allowed if name not in UNPIECED]
+    piece for it (PIECED_SOURCES, and any Harp board's Device), as "<type> (<piece>)"."""
+    found = []
     for text in wf.texts:
         namespaces = dict(re.findall(r'xmlns:(\w+)="clr-namespace:([\w.]+);', text))
         for prefix, local in re.findall(r'xsi:type="(\w+):(\w+)"', text):
             ns = namespaces.get(prefix, "")
             harp = local == "Device" and (ns.startswith("Harp.") or ns in ("Bonsai.Harp", "AllenNeuralDynamics.LicketySplit"))
             piece = "the board's piece" if harp else PIECED_SOURCES.get((ns, local))
-            if piece and not (local in allowed and local in UNPIECED):
+            if piece:
                 found.append(f"{ns}.{local} ({piece})")
     return found
 

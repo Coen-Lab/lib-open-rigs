@@ -1,0 +1,102 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A USB camera in no rig.yml, a device piece: Camera-Temporary, such as a calibration's camera on the balance (OpenRigs.Video UsbCamera, the first USB camera that is none of rig.yml's cameras under ConfigRoot), its frames as they come on the BehaviorSubject Camera-Temporary.Data, which the live view streams as a device no rig.yml lists. Its exposure is an experiment parameter the piece declares itself (DeclareDeviceControls, the piece Camera-Temporary): Camera-Temporary.ExposureUs, taken by the open camera at once (OnDeviceParameterSet), starting at ExposureUs and shown at it one second after Start (DeviceParameterDefault). No log and no Ready stage: nothing is recorded from it. At most once in a workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ConfigRoot</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="ConfigRoot" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Value" DisplayName="ExposureUs" Description="The camera's exposure at Start, in microseconds, until the controller sets Camera-Temporary.ExposureUs: the nearest power of two of a second a USB camera allows (15625 is 1/64 s)." />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="DoubleProperty">
+          <Value>15625</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceParameterSet">
+          <orcl:Name>Camera-Temporary</orcl:Name>
+          <orcl:Parameter>ExposureUs</orcl:Parameter>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>Convert.ToDouble(it)</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="ExposureTime" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="vid:UsbCamera">
+          <vid:ConfigRoot>UNMAPPED</vid:ConfigRoot>
+          <vid:DevicePath />
+          <vid:FrameWidth>1920</vid:FrameWidth>
+          <vid:FrameHeight>1080</vid:FrameHeight>
+          <vid:ExposureTime>NaN</vid:ExposureTime>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>Camera-Temporary.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Delay">
+          <rx:DueTime>PT1S</rx:DueTime>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:DeviceParameterDefault">
+          <orcl:Name>Camera-Temporary</orcl:Name>
+          <orcl:Parameter>ExposureUs</orcl:Parameter>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:DeclareDeviceControls">
+          <orcl:Name>Camera-Temporary</orcl:Name>
+          <orcl:Parameters>
+            <orcl:Parameter>
+              <orcl:Name>ExposureUs</orcl:Name>
+              <orcl:Value />
+              <orcl:Description>The USB camera's exposure in microseconds, taken by the camera at once, so what it films can be made readable: the nearest power of two of a second a USB camera allows (15625 is 1/64 s).</orcl:Description>
+              <orcl:Minimum>100</orcl:Minimum>
+              <orcl:Maximum>1000000</orcl:Maximum>
+            </orcl:Parameter>
+          </orcl:Parameters>
+          <orcl:Commands />
+        </Combinator>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="9" Label="Source2" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="7" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source2" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="3" To="11" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
