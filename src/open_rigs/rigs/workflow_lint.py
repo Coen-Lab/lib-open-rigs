@@ -43,6 +43,8 @@ EXPERIMENT_RECORDS = "OpenRigs.Logging:ExperimentRecords.bonsai"
 LAUNCH_SETTINGS = "OpenRigs.Control:LaunchSettings.bonsai"
 LOG_LAB_EXPERIMENT = "OpenRigs.Logging:LogLabExperiment.bonsai"
 NO_EXPERIMENT_FOLDER = "OpenRigs.Logging:NoExperimentFolder.bonsai"
+# The subject every NoExperimentFolder workflow's pieces see: no mouse's, one name for them all.
+NO_EXPERIMENT_SUBJECT = "_no-experiment_"
 EXPERIMENT_CONTROL = "OpenRigs.Control:ExperimentControl.bonsai"
 DELIVER_REWARD = "OpenRigs.Devices:BehaviorBoard.DeliverReward.bonsai"
 PLAY_PENALTY_SOUND = "OpenRigs.Audio:PlayPenaltySound.bonsai"
@@ -898,7 +900,7 @@ def no_experiment_folder_problems(wf: Workflow) -> list[str]:
     """The workflow makes the experiment folder (OpenRigs.Logging's LogLabExperiment, with LaunchSettings) or makes none
     (NoExperimentFolder: a calibration, a preflight), one of the two once, and stands in for neither itself: no own
     PathPrefix declared or published, and with NoExperimentFolder no LaunchSettings, no own SubjectId (in its own
-    included files too), and its SubjectId property set."""
+    included files too), and its SubjectId left at NoExperimentFolder's own, NO_EXPERIMENT_SUBJECT."""
     log, none = (wf.text.count(f'Path="{path}"') for path in (LOG_LAB_EXPERIMENT, NO_EXPERIMENT_FOLDER))
     if log + none != 1:
         return [f"the workflow includes LogLabExperiment {log} and NoExperimentFolder {none} times: one of the two once"]
@@ -911,8 +913,10 @@ def no_experiment_folder_problems(wf: Workflow) -> list[str]:
         if f'Path="{LAUNCH_SETTINGS}"' in wf.text:
             problems.append("the workflow includes LaunchSettings and NoExperimentFolder (both declare SubjectId)")
         node = next(n for n in wf.root.iter(W + "Expression") if n.get("Path") == NO_EXPERIMENT_FOLDER)
-        if not _properties(node).get("SubjectId"):
-            problems.append("NoExperimentFolder has no SubjectId (a name that is no mouse's)")
+        subject = _properties(node).get("SubjectId", NO_EXPERIMENT_SUBJECT)
+        if subject != NO_EXPERIMENT_SUBJECT:
+            problems.append(f"NoExperimentFolder's SubjectId is {subject or 'empty'}, not its own {NO_EXPERIMENT_SUBJECT}: "
+                            "delete the workflow's value")
     return problems
 
 

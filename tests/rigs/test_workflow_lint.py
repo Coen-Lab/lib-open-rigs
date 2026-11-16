@@ -815,7 +815,7 @@ def test_the_launch_s_settings_are_one_include_after_experiment_control(tmp_path
 
 def test_a_workflow_makes_the_experiment_folder_or_uses_no_experiment_folder_never_its_own_stand_ins(tmp_path):
     log = include(lint.LOG_LAB_EXPERIMENT)
-    none = include(lint.NO_EXPERIMENT_FOLDER, "<SubjectId>_valve-calibration_</SubjectId>")
+    none = include(lint.NO_EXPERIMENT_FOLDER)
     assert lint.no_experiment_folder_problems(workflow(tmp_path, log + include(lint.LAUNCH_SETTINGS))) == []
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "b", none)) == []
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "c", log + none)) == [
@@ -831,8 +831,12 @@ def test_a_workflow_makes_the_experiment_folder_or_uses_no_experiment_folder_nev
         "the workflow includes LaunchSettings and NoExperimentFolder (both declare SubjectId)"]
     published = '<Expression xsi:type="MulticastSubject"><Name>PathPrefix</Name></Expression>'
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "f", log + published)) == ["the workflow publishes PathPrefix itself"]
-    assert lint.no_experiment_folder_problems(workflow(tmp_path / "g", include(lint.NO_EXPERIMENT_FOLDER))) == [
-        "NoExperimentFolder has no SubjectId (a name that is no mouse's)"]
+    # Round 3 QF10: three QC workflows named their no-mouse subject three ways; NoExperimentFolder has the one.
+    own = include(lint.NO_EXPERIMENT_FOLDER, "<SubjectId>_valve-calibration_</SubjectId>")
+    assert lint.no_experiment_folder_problems(workflow(tmp_path / "g", own)) == [
+        "NoExperimentFolder's SubjectId is _valve-calibration_, not its own _no-experiment_: delete the workflow's value"]
+    saved = include(lint.NO_EXPERIMENT_FOLDER, "<SubjectId>_no-experiment_</SubjectId>")
+    assert lint.no_experiment_folder_problems(workflow(tmp_path / "h", saved)) == []
 
 
 def test_no_experiment_folder_declares_what_log_lab_experiment_and_launch_settings_give_the_pieces():
@@ -840,6 +844,7 @@ def test_no_experiment_folder_declares_what_log_lab_experiment_and_launch_settin
     declared = re.findall(r'xsi:type="(rx:\w+Subject)"(?: TypeArguments="([\w:]+)")?>\s*<(?:rx:)?Name>(\w+)<', text)
     assert declared == [("rx:AsyncSubject", "", "SubjectId"), ("rx:BehaviorSubject", "sys:String", "PathPrefix")]
     assert "MulticastSubject" not in text
+    assert f"<Value>{lint.NO_EXPERIMENT_SUBJECT}</Value>" in text
 
 
 def test_a_board_not_named_main_is_filled_from_the_template_s_first_board(tmp_path):
