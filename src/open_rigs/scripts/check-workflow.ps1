@@ -26,8 +26,6 @@ $self = $MyInvocation.MyCommand.Path
 $Repo = (Resolve-Path $Repo).Path
 $workflowFile = Join-Path $Repo "src\$Workflow"
 if (-not (Test-Path $workflowFile -PathType Leaf)) { "check-workflow: $Repo has no src\$Workflow."; exit 1 }
-# A workflow that includes NoExperimentFolder makes no experiment folder: no Harp records, manifest or trial log.
-$noRecords = (Get-Content $workflowFile -Raw).Contains('Path="OpenRigs.Logging:NoExperimentFolder.bonsai"')
 $layoutFile = Join-Path $Repo ("config\" + [IO.Path]::GetFileNameWithoutExtension($Workflow) + ".layout")
 $bin = Join-Path ([IO.Path]::GetTempPath()) ('check-workflow-' + (Split-Path $Repo -Leaf))
 $bonsaiDir = Join-Path $Repo '.bonsai'
@@ -95,6 +93,9 @@ function Write-FilledTemplate {
     $out = & { $ErrorActionPreference = 'Continue'; & uv run --project $Repo -q python -m open_rigs.rigs.workflow_lint $Repo (Join-Path $bin 'config') ([Environment]::MachineName) $Workflow 2>&1 | ForEach-Object { "$_" } }
     if ($LASTEXITCODE -ne 0) { throw "check-workflow: workflow_lint could not fill the rig template: $($out -join ' ')" }
     $script:plan = ($out | Select-Object -Last 1) | ConvertFrom-Json
+    # A workflow that includes NoExperimentFolder, itself or in a file of its own it includes, makes no experiment
+    # folder: no Harp records, manifest or trial log (workflow_lint.includes).
+    $script:noRecords = $script:plan.records_nothing
     $rigYml = Join-Path $bin "config\$([Environment]::MachineName)\rig.yml"
     if ([IO.File]::ReadAllText($rigYml).Contains('CHANGE-ME')) { throw "check-workflow: the filled template still holds CHANGE-ME; update workflow_lint.filled_rig." }
     return $rigYml
@@ -171,7 +172,7 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
     $objects = New-Object BuiltObjects
     $null = $objects.Visit($built)
     foreach ($p in $script:plan.problems) { "  FAIL  $p"; $failed++ }
-    if ($noRecords) {
+    if ($script:noRecords) {
         "  ok    NoExperimentFolder: the workflow records nothing, so no RecordHarpDevices, ExperimentManifest or trial log to check"
         exit $(if ($failed) { 1 } else { 0 })
     }
@@ -205,7 +206,7 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
         $schema = @((Get-Content (Join-Path $Repo 'schemas\trial-columns.yml')) | Where-Object { $_ -match '^([A-Za-z]\w*):\s*$' } | ForEach-Object { $Matches[1] })
         if (($columns -join ',') -eq ($schema -join ',')) { "  ok    BonsaiData_Trial's $($columns.Count) columns are schemas\trial-columns.yml's, in its order" }
         else { "  FAIL  BonsaiData_Trial writes $($columns -join ','); schemas\trial-columns.yml lists $($schema -join ',')"; $failed++ }
-    } elseif ((Get-Content $workflowFile -Raw).Contains('OpenRigs.Logging:LogTrial.bonsai')) { "  FAIL  src\Extensions has no TrialRow, the trial log's row"; $failed++ }
+    } elseif ($script:plan.logs_trials) { "  FAIL  src\Extensions has no TrialRow, the trial log's row"; $failed++ }
     else { "  ok    no trial log (the workflow includes no LogTrial)" }
     # config\main.layout's windows, on the nodes as the editor has them: Bonsai loads each group in topological
     # order, not file order, so a node fed from later in the file moves up and shifts the indices after it. A window
@@ -250,13 +251,14 @@ if ($Step -eq 'Checks') {
     # supply YamlDotNet at the version OpenRigs.Devices binds to: then the package's is resolved to it.
     if (Test-Path (Join-Path $bin 'YamlDotNet.dll')) { [AppDomain]::CurrentDomain.remove_AssemblyResolve($script:resolver) }
     $failed = 0
+    $rigYml = Write-FilledTemplate
     # Each task file as the workflow reads it at Go (the generated deserializer: no unknown key).
     $taskType = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq 'Extensions' } |
         ForEach-Object { $_.GetTypes() } | Where-Object { $_.IsPublic -and $_.Name -like '*TaskLogic' -and $_.Namespace -like '*Task' } | Select-Object -First 1
     # A workflow with NoExperimentFolder has no generated TaskLogic: its task file, if any, is read by an include.
-    $taskFiles = if ($noRecords) { @() } else { @(Get-ChildItem (Join-Path $Repo 'config') -Filter 'task*.yml' -ErrorAction SilentlyContinue) }
+    $taskFiles = if ($script:noRecords) { @() } else { @(Get-ChildItem (Join-Path $Repo 'config') -Filter 'task*.yml' -ErrorAction SilentlyContinue) }
     if (-not $taskType -and $taskFiles.Count) { "  FAIL  src\Extensions has no generated <Name>Task.<Name>TaskLogic"; exit 1 }
-    if ($noRecords) { "  ok    NoExperimentFolder: no generated TaskLogic, so no task file read here" }
+    if ($script:noRecords) { "  ok    NoExperimentFolder: no generated TaskLogic, so no task file read here" }
     elseif (-not $taskFiles.Count) { "  ok    no task file (the workflow takes none)" }
     foreach ($file in $taskFiles) {
         try {
@@ -272,7 +274,7 @@ if ($Step -eq 'Checks') {
     $wf = Get-Content $workflowFile -Raw
     if ($wf -match '<Property Name="TaskPath"') { "  ok    $Workflow exposes TaskPath" }
     elseif ($taskFiles.Count) { "  FAIL  $Workflow does not expose TaskPath"; $failed++ }
-    $yaml = [IO.File]::ReadAllText((Write-FilledTemplate))
+    $yaml = [IO.File]::ReadAllText($rigYml)
     $E = [Linq.Expressions.Expression]
     $wait = [System.Reactive.Linq.Observable].GetMethods() | Where-Object { $_.Name -eq 'Wait' -and $_.GetParameters().Count -eq 1 } | Select-Object -First 1
     # The experiment's Settings_Rig JSON is rig.yml as parsed (OpenRigs.Devices.Rigs, the lab rig model's classes),

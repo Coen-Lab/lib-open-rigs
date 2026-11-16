@@ -1220,7 +1220,7 @@ def filled_rig(wf: Workflow, root: PurePath, machine: str) -> tuple[str, list[st
 def main() -> None:
     """check-workflow's step 3: `python -m open_rigs.rigs.workflow_lint <repo> <config root> <machine> [<workflow>]` writes
     the filled rig.yml for src\\<workflow> (main.bonsai unless named) at <config root>\\<machine>\\rig.yml and prints what
-    the build should make, as JSON."""
+    the build should make, with what `includes` says of the workflow, as JSON."""
     repo, config_root, machine = sys.argv[1:4]
     wf = Workflow(Path(repo), sys.argv[4] if len(sys.argv) > 4 else "main.bonsai")
     problems = hardware_problems(wf) + declared_twice(wf)
@@ -1228,7 +1228,14 @@ def main() -> None:
     folder = Path(config_root) / machine
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "rig.yml").write_text(text, encoding="utf-8")
-    print(json.dumps({"problems": problems, "records": records, "files": files}))
+    print(json.dumps({"problems": problems, "records": records, "files": files, **includes(wf)}))
+
+
+def includes(wf: Workflow) -> dict[str, bool]:
+    """What check-workflow asks of the workflow with its own included files: records_nothing (it includes
+    NoExperimentFolder) and logs_trials (it includes LogTrial)."""
+    return {"records_nothing": f'Path="{NO_EXPERIMENT_FOLDER}"' in wf.text,
+            "logs_trials": 'Path="OpenRigs.Logging:LogTrial.bonsai"' in wf.text}
 
 
 if __name__ == "__main__":

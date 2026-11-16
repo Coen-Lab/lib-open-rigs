@@ -990,3 +990,13 @@ def test_the_live_view_is_the_last_top_level_node_fed_by_nothing(tmp_path):
     (tmp_path / "d" / "src").mkdir(parents=True)
     (tmp_path / "d" / "src" / "main.bonsai").write_text(HEAD + RECORDS + LIVE + '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow></WorkflowBuilder>', encoding="utf-8")
     assert lint.live_view_problems(lint.Workflow(tmp_path / "d")) == ["StreamDevices has an edge into or out of it"]
+
+
+def test_check_workflow_asks_whether_a_workflow_records_nothing_or_logs_trials_of_its_own_includes_too(tmp_path):
+    # Round 3 LL1: check-workflow read NoExperimentFolder and LogTrial from the entry file alone, so a workflow that
+    # included either from a file of its own was checked as the other kind.
+    assert lint.includes(workflow(tmp_path / "a", "")) == {"records_nothing": False, "logs_trials": False}
+    wf = own_include(tmp_path / "b", "", include(lint.NO_EXPERIMENT_FOLDER) + include("OpenRigs.Logging:LogTrial.bonsai"))
+    assert lint.includes(wf) == {"records_nothing": True, "logs_trials": True}
+    script = (ROOT / "src" / "open_rigs" / "scripts" / "check-workflow.ps1").read_text(encoding="utf-8")
+    assert "NoExperimentFolder.bonsai" not in script and "LogTrial.bonsai" not in script
