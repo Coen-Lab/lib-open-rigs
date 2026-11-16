@@ -25,11 +25,9 @@ namespace OpenRigs.Devices
     [Description("A person's Pulse and Reset for one Behavior board, as writes for its Commands subject. Inputs: RigConfigs, the Pulse texts, the Reset texts.")]
     public class PulseCommands
     {
-        const int OutputSet = 34;
-        const int OutputClear = 35;
-        const int OutputPulseEnable = 45;
-        const int PulseDOPort0 = 46;
-        const int PulseDO0 = 56;
+        const int OutputSet = PulseLines.OutputSet;
+        const int OutputClear = PulseLines.OutputClear;
+        const int OutputPulseEnable = PulseLines.OutputPulseEnable;
         // DOPort0-2 and DO0-3: every line a Pulse may raise.
         const ushort OutputLines = 0x3C07;
 
@@ -50,14 +48,9 @@ namespace OpenRigs.Devices
             });
         }
 
-        // Harp.Behavior's DigitalOutputs bits: DOPort0-2 are 1, 2, 4; DO0-3 are 0x400 to 0x2000.
         static ushort Mask(string line)
         {
-            int n;
-            var upper = line.ToUpperInvariant();
-            if (upper.StartsWith("DOPORT") && int.TryParse(upper.Substring(6), out n) && n >= 0 && n <= 2) return (ushort)(1 << n);
-            if (upper.StartsWith("DO") && int.TryParse(upper.Substring(2), out n) && n >= 0 && n <= 3) return (ushort)(0x400 << n);
-            return 0;
+            return PulseLines.Mask(line);
         }
 
         static string[] Words(string text)
@@ -135,13 +128,9 @@ namespace OpenRigs.Devices
                 return writes;
             }
 
-            // PulseDOPort0-2 (46-48) for DOPort0-2, PulseDO0-3 (56-59) for DO0-3.
             static int PulseRegister(ushort mask)
             {
-                var first = mask >= 0x400 ? 0x400 : 1;
-                var n = 0;
-                while ((first << n) != mask) n++;
-                return (mask >= 0x400 ? PulseDO0 : PulseDOPort0) + n;
+                return PulseLines.PulseRegister(mask);
             }
 
             static ushort Width(double ms)

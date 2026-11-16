@@ -72,10 +72,10 @@ namespace OpenRigs.Devices
     /// <summary>
     /// Every Behavior board output line rig.yml's <c>wiring</c> gives one device, such as the
     /// RewardValves, from the lab rig model. Stops the workflow, naming the board, unless at least one
-    /// line on it has that device and every such line is DO1, DO2 or DO3.
+    /// line on it has that device and every such line is one the board can pulse, DO0 to DO3 or DOPort0 to DOPort2.
     /// </summary>
     [Combinator]
-    [Description("The board's DO lines rig.yml's wiring gives Device (such as RewardValve), from the lab rig model (RigConfigs), as one set of lines. Stops the workflow unless Board has at least one and every one is DO1, DO2 or DO3.")]
+    [Description("The board's lines rig.yml's wiring gives Device (such as RewardValve), from the lab rig model (RigConfigs), as one set of lines. Stops the workflow unless Board has at least one and every one is a line the board can pulse, DO0 to DO3 or DOPort0 to DOPort2.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class WiredOutputs
     {
@@ -111,10 +111,10 @@ namespace OpenRigs.Devices
             var outputs = default(DigitalOutputs);
             foreach (var line in lines)
             {
-                if (line != "DO1" && line != "DO2" && line != "DO3")
+                if (PulseLines.Mask(line) == 0)
                 {
                     throw new InvalidOperationException(string.Format(
-                        "{0}'s wiring in rig.yml puts a {1} on {2}; it must be on DO1, DO2 or DO3.", board, device, line));
+                        "{0}'s wiring in rig.yml puts a {1} on {2}; it must be on a line the board can pulse, DO0 to DO3 or DOPort0 to DOPort2.", board, device, line));
                 }
                 outputs |= (DigitalOutputs)Enum.Parse(typeof(DigitalOutputs), line);
             }
@@ -125,7 +125,7 @@ namespace OpenRigs.Devices
     /// <summary>
     /// The lines a Behavior board pulses: rig.yml's pulseController.outputPulseEnable without any line
     /// wiring gives the ZapitTrigger (held high by Zapit, and cleared when the workflow stops). Stops the
-    /// workflow, naming the line, when a line wired as a RewardValve is not among them: TriggerPulse would
+    /// workflow, naming the line, when a line wired as a RewardValve is not among them: a reward would
     /// then open the valve and leave it open.
     /// </summary>
     [Combinator]

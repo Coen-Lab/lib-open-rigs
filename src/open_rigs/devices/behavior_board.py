@@ -1,4 +1,4 @@
-from typing import Annotated, Union
+from typing import Annotated, Optional, Union
 
 from pydantic import Field, RootModel
 from pydantic.json_schema import JsonSchemaValue
@@ -71,13 +71,18 @@ class PulseOutput(
 class PulseOutputs(BaseSchema):
     """The pulse source of each behavior board digital output line. Each line appears once.
 
-    All three lines are required: a union has no default that survives code generation, so an
-    unused line is written as a FixedPulse with a width of 0.
+    DO1 to DO3 are required, an unused one written as a FixedPulse with a width of 0; DO0 and
+    DOPort0 to DOPort2, the board's other pulsed lines, are given only when one is used (a reward
+    valve on it).
     """
 
+    do0: Optional[PulseOutput] = Field(default=None, alias="DO0", description="Pulse source for DO0, when it is pulsed.")
     do1: PulseOutput = Field(alias="DO1", description="Pulse source for DO1.")
     do2: PulseOutput = Field(alias="DO2", description="Pulse source for DO2.")
     do3: PulseOutput = Field(alias="DO3", description="Pulse source for DO3; a FixedPulse of width 0 if unused.")
+    do_port0: Optional[PulseOutput] = Field(default=None, alias="DOPort0", description="Pulse source for DOPort0, when it is pulsed.")
+    do_port1: Optional[PulseOutput] = Field(default=None, alias="DOPort1", description="Pulse source for DOPort1, when it is pulsed.")
+    do_port2: Optional[PulseOutput] = Field(default=None, alias="DOPort2", description="Pulse source for DOPort2, when it is pulsed.")
 
 
 class PulseController(BaseSchema):

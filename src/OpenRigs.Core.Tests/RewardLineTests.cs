@@ -18,9 +18,9 @@ namespace OpenRigs.Core.Tests
             "  main:\n" +
             "    portName: COM3\n" +
             "    wiring:\n" +
-            "      DO1: {device: RewardValve, side: left}\n" +
-            "      DO2: {device: RewardValve, side: right}\n" +
-            "      DO3: {device: RewardValve, side: middle}\n" +
+            "      DO1: {device: RewardValve, name: left}\n" +
+            "      DO2: {device: RewardValve, name: right}\n" +
+            "      DO3: {device: RewardValve, name: middle}\n" +
             "    pulseController:\n" +
             "      outputs:\n" +
             "        DO1: {discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json}\n" +
@@ -59,16 +59,16 @@ namespace OpenRigs.Core.Tests
             return Path.Combine(folder, "rig.yml");
         }
 
-        RewardLine Load(string rig, string calibration, string side = "left")
+        RewardLine Load(string rig, string calibration, string valve = "RewardValve-Left", string board = "BehaviorBoard-Main")
         {
-            return LoadRewardLine.Load(Write(rig, calibration), side, "", Machine, LoadRewardLine.DefaultMaxRewardUl);
+            return LoadRewardLine.Load(Write(rig, calibration), valve, board, "", Machine, LoadRewardLine.DefaultMaxRewardUl);
         }
 
-        string Refusal(string rig, string calibration, string side = "left")
+        string Refusal(string rig, string calibration, string valve = "RewardValve-Left", string board = "BehaviorBoard-Main")
         {
             try
             {
-                Load(rig, calibration, side);
+                Load(rig, calibration, valve, board);
             }
             catch (InvalidOperationException ex)
             {
@@ -140,7 +140,9 @@ namespace OpenRigs.Core.Tests
         {
             var line = Calibrated();
             Assert.AreEqual("BehaviorBoard-Main", line.Board);
-            Assert.AreEqual(1, line.Line);
+            Assert.AreEqual("DO1", line.Line);
+            Assert.AreEqual("RewardValve-Left", line.Valve);
+            Assert.AreEqual("left", line.Instance);
             Assert.AreEqual(100, line.PulseGapMs);
             Assert.AreEqual(Fixture, line.CalibrationJson);
             Assert.AreEqual(Path.Combine(folder, "calibration", "valve-DO1.json"), line.CalibrationPath);
@@ -154,7 +156,7 @@ namespace OpenRigs.Core.Tests
             Assert.AreEqual(1, plan.Pulses);
             Assert.AreEqual(38, plan.PulseWidthMs);
             Assert.AreEqual(1.99, plan.DeliveredUl, 1e-9);
-            Assert.AreEqual(1, plan.Line);
+            Assert.AreEqual("DO1", plan.Line);
             Assert.AreEqual(100, plan.PulseGapMs);
             Assert.IsFalse(plan.Clamped);
         }
@@ -197,7 +199,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void RewardsQueuedInOneFirePulsesKeepTheGapBetweenThem()
         {
-            // As DeliverReward wires it: each plan sets FirePulses' properties (its InputMapping) as it goes in.
+            // As a RewardValve piece wires it: each plan sets FirePulses' properties (its InputMapping) as it goes in.
             var fire = new FirePulses();
             var plans = new System.Reactive.Subjects.Subject<RewardPlan>();
             var clock = new System.Reactive.Subjects.Subject<double>();
@@ -240,7 +242,7 @@ namespace OpenRigs.Core.Tests
             foreach (var ul in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity })
             {
                 var ex = Assert.ThrowsException<InvalidOperationException>(() => PlanReward.Plan(Calibrated(), ul));
-                StringAssert.Contains(ex.Message, "reward on the " + Calibrated().Side + " spout, which is not a volume");
+                StringAssert.Contains(ex.Message, "reward from RewardValve-Left, which is not a volume");
             }
         }
 
@@ -250,7 +252,7 @@ namespace OpenRigs.Core.Tests
             foreach (var max in new[] { 0.0, -1.0, double.NaN, double.PositiveInfinity })
             {
                 var ex = Assert.ThrowsException<ArgumentOutOfRangeException>(() =>
-                    LoadRewardLine.Load(Write(Rig, Fixture), "left", "", Machine, max));
+                    LoadRewardLine.Load(Write(Rig, Fixture), "RewardValve-Left", "BehaviorBoard-Main", "", Machine, max));
                 StringAssert.Contains(ex.Message, "MaxRewardUl");
             }
         }
@@ -273,7 +275,7 @@ namespace OpenRigs.Core.Tests
         public void RefusesAMissingCalibration()
         {
             var message = Refusal(Rig, null);
-            StringAssert.Contains(message, "Reward line DO1");
+            StringAssert.Contains(message, "RewardValve-Left (DO1 on BehaviorBoard-Main)");
             StringAssert.Contains(message, "no valve calibration");
         }
 
@@ -302,19 +304,34 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void RefusesALineThatIsNotACalibratedPulse()
         {
-            StringAssert.Contains(Refusal(Rig, Fixture, "right"), "Reward line DO2 (the right RewardValve on BehaviorBoard-Main) is a FixedPulse, not a CalibratedPulse");
-            StringAssert.Contains(Refusal(Rig, Fixture, "middle"), "names no artefact");
+            StringAssert.Contains(Refusal(Rig, Fixture, "RewardValve-Right"), "RewardValve-Right (DO2 on BehaviorBoard-Main) is a FixedPulse, not a CalibratedPulse");
+            StringAssert.Contains(Refusal(Rig, Fixture, "RewardValve-Middle"), "names no artefact");
         }
 
         [TestMethod]
-        public void RefusesASideTheWiringDoesNotGiveExactlyOneValve()
+        public void RefusesAValveTheWiringDoesNotGiveExactlyOnce()
         {
-            StringAssert.Contains(Refusal(Rig, Fixture, "back"), "has no RewardValve with side back");
-            var twice = Rig.Replace("side: right", "side: left");
-            StringAssert.Contains(Refusal(twice, Fixture), "2 RewardValves with side left");
-            var notPulsed = Rig.Replace("DO1: {device", "DO0: {device");
-            StringAssert.Contains(Refusal(notPulsed, Fixture), "is not a pulse line");
+            StringAssert.Contains(Refusal(Rig, Fixture, "RewardValve-Back"), "has no RewardValve named back");
+            StringAssert.Contains(Assert.ThrowsException<ArgumentException>(() => Load(Rig, Fixture, "left")).Message, "it needs the valve's piece, RewardValve- and its name");
+            var twice = Rig.Replace("name: right", "name: left");
+            StringAssert.Contains(Refusal(twice, Fixture), "2 RewardValves named left");
+            StringAssert.Contains(Refusal(Rig, Fixture, "RewardValve-Left", "BehaviorBoard-Second"), "is not on BehaviorBoard-Second, the board its piece fires it through");
+            var notPulsed = Rig.Replace("DO1: {device", "DI3: {device");
+            StringAssert.Contains(Refusal(notPulsed, Fixture), "is not on a line the board can pulse");
             StringAssert.Contains(Refusal("behaviorBoard: [", Fixture), "could not be read");
+        }
+
+        [TestMethod]
+        public void LoadsAValveOnAnyLineTheBoardPulsesOnAnyBoard()
+        {
+            var rig = "behaviorBoard:\n  main:\n    portName: COM3\n  second:\n    portName: COM4\n    wiring:\n" +
+                "      DOPort0: {device: RewardValve, name: centre}\n" +
+                "    pulseController:\n      outputs:\n" +
+                "        DOPort0: {discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json}\n";
+            var line = Load(rig, Fixture, "RewardValve-Centre", "BehaviorBoard-Second");
+            Assert.AreEqual("DOPort0", line.Line);
+            Assert.AreEqual("BehaviorBoard-Second", line.Board);
+            Assert.AreEqual("centre", line.Instance);
         }
     }
 }

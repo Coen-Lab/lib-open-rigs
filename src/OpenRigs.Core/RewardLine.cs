@@ -13,17 +13,20 @@ using YamlDotNet.RepresentationModel;
 
 namespace OpenRigs.Core
 {
-    /// <summary>One side's reward valve line, as rig.yml wires it, and its valve calibration.</summary>
+    /// <summary>One reward valve's line, as rig.yml wires it, and its valve calibration.</summary>
     public class RewardLine
     {
-        /// <summary>Gets or sets the side, as rig.yml's wiring names it, such as left.</summary>
-        public string Side { get; set; }
+        /// <summary>Gets or sets the valve's piece, such as RewardValve-Left.</summary>
+        public string Valve { get; set; }
+
+        /// <summary>Gets or sets the valve's name in rig.yml's wiring, such as left: its instance, what a reward asks for.</summary>
+        public string Instance { get; set; }
 
         /// <summary>Gets or sets the board's device name, such as BehaviorBoard-Main.</summary>
         public string Board { get; set; }
 
-        /// <summary>Gets or sets the board's DO line, 1 to 3.</summary>
-        public int Line { get; set; }
+        /// <summary>Gets or sets the board's line, such as DO1.</summary>
+        public string Line { get; set; }
 
         /// <summary>Gets or sets the full path of the calibration file.</summary>
         public string CalibrationPath { get; set; }
@@ -42,17 +45,17 @@ namespace OpenRigs.Core
     }
 
     /// <summary>
-    /// Loads one side's reward line once, at start: the line rig.yml's wiring gives the side's
-    /// RewardValve, which must be a CalibratedPulse in its board's pulseController.outputs, and that
+    /// Loads one reward valve's line once, at start: the line rig.yml's wiring gives the RewardValve
+    /// of that name on the board, which must be a CalibratedPulse in the board's pulseController.outputs, and that
     /// line's valve calibration with its linearFit. Every reward is planned on that calibration, so a
-    /// line without one stops the workflow. Every refusal names the line and the reason.
+    /// line without one stops the workflow. Every refusal names the valve and the reason.
     /// </summary>
     /// <remarks>
     /// rig.yml is read untyped, so the operator works with any workflow's rig model. The calibration
     /// file's path is the output entry's <c>artefact</c>, relative to <see cref="CalibrationDirectory"/>.
     /// </remarks>
-    [DefaultProperty("Side")]
-    [Description("Loads one side's reward line once, at start: the line rig.yml's wiring gives the side's RewardValve, its CalibratedPulse entry and that valve calibration's linearFit. Stops the workflow, naming the line and the reason, if the calibration is missing or unreadable, has no linearFit, is from another machine, or the line is not a CalibratedPulse. Carries MaxRewardUl, the most one reward may ask for, to PlanReward.")]
+    [DefaultProperty("Name")]
+    [Description("Loads one reward valve's line once, at start: the line rig.yml's wiring gives the RewardValve of that name on Board, its CalibratedPulse entry and that valve calibration's linearFit. Stops the workflow, naming the valve and the reason, if the valve is not wired on Board, the calibration is missing or unreadable, has no linearFit, is from another machine, or the line is not a CalibratedPulse. Carries MaxRewardUl, the most one reward may ask for, to PlanReward.")]
     public class LoadRewardLine : Source<RewardLine>
     {
         /// <summary>The default <see cref="MaxRewardUl"/>, in ul.</summary>
@@ -63,9 +66,13 @@ namespace OpenRigs.Core
         [Editor("Bonsai.Design.OpenFileNameEditor, Bonsai.Design", DesignTypes.UITypeEditor)]
         public string RigFile { get; set; }
 
-        /// <summary>Gets or sets the side whose reward line to load.</summary>
-        [Description("The side whose RewardValve to load, as rig.yml's wiring names it, such as left.")]
-        public string Side { get; set; }
+        /// <summary>Gets or sets the valve's piece, RewardValve-Instance.</summary>
+        [Description("The valve's piece, RewardValve- and its name in rig.yml's wiring: name: left is RewardValve-Left.")]
+        public string Name { get; set; }
+
+        /// <summary>Gets or sets the board the valve must be wired on.</summary>
+        [Description("The Behavior board the valve is wired on, such as BehaviorBoard-Main.")]
+        public string Board { get; set; }
 
         /// <summary>Gets or sets the folder the output entry's artefact path is relative to.</summary>
         [Description("The folder the line's artefact path (such as calibration/valve-DO1.json) is relative to. Empty: rig.yml's folder.")]
@@ -84,15 +91,24 @@ namespace OpenRigs.Core
         public override IObservable<RewardLine> Generate()
         {
             return Observable.Defer(() => Observable.Return(Load(
-                RigFile, Side, CalibrationDirectory,
+                RigFile, Name, Board, CalibrationDirectory,
                 string.IsNullOrEmpty(MachineName) ? Environment.MachineName : MachineName,
                 MaxRewardUl)));
         }
 
-        /// <summary>Loads one side's reward line, or throws naming the line and the reason.</summary>
-        public static RewardLine Load(string rigFile, string side, string calibrationDirectory, string machineName, double maxRewardUl)
+        /// <summary>The Behavior board lines a reward valve may be on: every line the board can pulse.</summary>
+        public static readonly string[] PulseLines = { "DO0", "DO1", "DO2", "DO3", "DOPort0", "DOPort1", "DOPort2" };
+
+        const string ValvePrefix = "RewardValve-";
+
+        /// <summary>Loads one valve's reward line, or throws naming the valve and the reason.</summary>
+        public static RewardLine Load(string rigFile, string valve, string board, string calibrationDirectory, string machineName, double maxRewardUl)
         {
-            if (string.IsNullOrWhiteSpace(side)) throw new ArgumentException("LoadRewardLine needs a Side, as rig.yml's wiring names it, such as left.");
+            if (string.IsNullOrWhiteSpace(valve) || !valve.StartsWith(ValvePrefix, StringComparison.Ordinal) || valve.Length == ValvePrefix.Length)
+            {
+                throw new ArgumentException("LoadRewardLine's Name is '" + valve + "': it needs the valve's piece, RewardValve- and its name in rig.yml's wiring, such as RewardValve-Left.");
+            }
+            var name = valve.Substring(ValvePrefix.Length);
             if (!(maxRewardUl > 0) || double.IsInfinity(maxRewardUl))
             {
                 throw new ArgumentOutOfRangeException(null, "The largest reward allowed (MaxRewardUl) is " + maxRewardUl.ToString(CultureInfo.InvariantCulture) +
@@ -100,7 +116,7 @@ namespace OpenRigs.Core
             }
             string problem;
             var devices = RigDevices.Read(rigFile, out problem);
-            if (devices == null) throw new InvalidOperationException("No " + side + " reward line: " + problem + ".");
+            if (devices == null) throw new InvalidOperationException("No reward line for " + valve + ": " + problem + ".");
 
             var valves = (
                 from device in devices
@@ -111,33 +127,34 @@ namespace OpenRigs.Core
                 let settings = entry.Value as YamlMappingNode
                 where settings != null &&
                       RigDevices.Value(Child(settings, "device")) == "RewardValve" &&
-                      RigDevices.Value(Child(settings, "side")) == side
-                select new { Board = device, Line = RigDevices.Scalar(entry.Key) }).ToList();
+                      string.Equals(RigDevices.Value(Child(settings, "name")), name, StringComparison.OrdinalIgnoreCase)
+                select new { Board = device, Line = RigDevices.Scalar(entry.Key), Name = RigDevices.Value(Child(settings, "name")) }).ToList();
             if (valves.Count == 0)
             {
                 throw new InvalidOperationException(
-                    "No " + side + " reward line: rig.yml's wiring has no RewardValve with side " + side + " on any behaviorBoard (" + rigFile + ").");
+                    "No reward line for " + valve + ": rig.yml's wiring has no RewardValve named " + name.ToLowerInvariant() + " on any behaviorBoard (" + rigFile + ").");
             }
             if (valves.Count > 1)
             {
                 throw new InvalidOperationException(
-                    "No " + side + " reward line: rig.yml's wiring has " + valves.Count + " RewardValves with side " + side + " (" +
-                    string.Join(", ", valves.Select(v => v.Board.Name + " " + v.Line)) + "); give the side one.");
+                    "No reward line for " + valve + ": rig.yml's wiring has " + valves.Count + " RewardValves named " + name.ToLowerInvariant() + " (" +
+                    string.Join(", ", valves.Select(v => v.Board.Name + " " + v.Line)) + "); give each valve its own name.");
             }
 
-            var valve = valves[0];
-            var line = new RewardLine { Side = side, Board = valve.Board.Name, MaxRewardUl = maxRewardUl };
-            var where = "Reward line " + valve.Line + " (the " + side + " RewardValve on " + valve.Board.Name + ")";
-            int number;
-            if (valve.Line == null || !valve.Line.StartsWith("DO", StringComparison.Ordinal) ||
-                !int.TryParse(valve.Line.Substring(2), NumberStyles.None, CultureInfo.InvariantCulture, out number) || number < 1 || number > 3)
+            var wired = valves[0];
+            var where = valve + " (" + wired.Line + " on " + wired.Board.Name + ")";
+            if (!string.IsNullOrEmpty(board) && wired.Board.Name != board)
             {
-                throw new InvalidOperationException(where + " is not a pulse line: a RewardValve goes on DO1, DO2 or DO3.");
+                throw new InvalidOperationException(where + " is not on " + board + ", the board its piece fires it through: set its Board to " + wired.Board.Name + ".");
             }
-            line.Line = number;
+            if (!PulseLines.Contains(wired.Line))
+            {
+                throw new InvalidOperationException(where + " is not on a line the board can pulse: a RewardValve goes on " + string.Join(", ", PulseLines) + ".");
+            }
+            var line = new RewardLine { Valve = valve, Instance = wired.Name, Board = wired.Board.Name, Line = wired.Line, MaxRewardUl = maxRewardUl };
 
-            var output = Child(Child(Child(valve.Board.Settings, "pulseController") as YamlMappingNode, "outputs") as YamlMappingNode, valve.Line) as YamlMappingNode;
-            if (output == null) throw new InvalidOperationException(where + " has no entry in " + valve.Board.Name + "'s pulseController.outputs.");
+            var output = Child(Child(Child(wired.Board.Settings, "pulseController") as YamlMappingNode, "outputs") as YamlMappingNode, wired.Line) as YamlMappingNode;
+            if (output == null) throw new InvalidOperationException(where + " has no entry in " + wired.Board.Name + "'s pulseController.outputs.");
             var type = RigDevices.Value(Child(output, "discriminatorType"));
             if (type != "CalibratedPulse")
             {
@@ -148,7 +165,7 @@ namespace OpenRigs.Core
 
             var directory = string.IsNullOrEmpty(calibrationDirectory) ? Path.GetDirectoryName(Path.GetFullPath(rigFile)) : calibrationDirectory;
             line.CalibrationPath = RigConfigDirectory.FilePath(directory, artefact,
-                "behaviorBoard." + valve.Board.Instance + ".pulseController.outputs." + valve.Line + ".artefact");
+                "behaviorBoard." + wired.Board.Instance + ".pulseController.outputs." + wired.Line + ".artefact");
             if (!File.Exists(line.CalibrationPath))
             {
                 throw new InvalidOperationException(where + " has no valve calibration: there is no " + line.CalibrationPath + ". Calibrate the valve on this machine.");
@@ -229,8 +246,8 @@ namespace OpenRigs.Core
         /// <summary>Gets the volume the pulses deliver, in microlitres.</summary>
         public double DeliveredUl { get { return Pulses * VolumePerPulseUl; } }
 
-        /// <summary>Gets the board's DO line, 1 to 3.</summary>
-        public int Line { get { return RewardLine.Line; } }
+        /// <summary>Gets the board's line, such as DO1.</summary>
+        public string Line { get { return RewardLine.Line; } }
 
         /// <summary>Gets the off-to-on time between pulses, in milliseconds: the calibration's.</summary>
         public int PulseGapMs { get { return RewardLine.PulseGapMs; } }
@@ -259,16 +276,16 @@ namespace OpenRigs.Core
             if (double.IsNaN(requestedUl) || double.IsInfinity(requestedUl))
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
-                    "The task asked for a {0} ul reward on the {1} spout, which is not a volume, so the workflow stopped " +
+                    "The task asked for a {0} ul reward from {1}, which is not a volume, so the workflow stopped " +
                     "without opening the valve. Check the reward size in the task's settings.",
-                    requestedUl, line.Side));
+                    requestedUl, line.Valve));
             }
             if (requestedUl > line.MaxRewardUl)
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
-                    "The task asked for a {0} ul reward on the {1} spout, more than the {2} ul one reward may give, so the workflow stopped " +
-                    "without opening the valve. Check the reward size in the task's settings (30 typed for 3.0?), or raise DeliverReward's MaxRewardUl.",
-                    requestedUl, line.Side, line.MaxRewardUl));
+                    "The task asked for a {0} ul reward from {1}, more than the {2} ul one reward may give, so the workflow stopped " +
+                    "without opening the valve. Check the reward size in the task's settings (30 typed for 3.0?), or raise the valve's MaxRewardUl.",
+                    requestedUl, line.Valve, line.MaxRewardUl));
             }
             if (requestedUl <= 0) return plan;
 
@@ -278,9 +295,9 @@ namespace OpenRigs.Core
             if (!(count <= ushort.MaxValue))
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
-                    "A {0} ul reward on the {1} spout would take {2} pulses of at most {3} ul each, more than {4}; " +
+                    "A {0} ul reward from {1} would take {2} pulses of at most {3} ul each, more than {4}; " +
                     "the valve calibration's linearFit gives too little per pulse. Calibrate the valve again.",
-                    requestedUl, line.Side, count, largestUl, ushort.MaxValue));
+                    requestedUl, line.Valve, count, largestUl, ushort.MaxValue));
             }
             plan.Pulses = Math.Max(1, (int)count);
             var width = (int)Math.Round((requestedUl / plan.Pulses - fit.Intercept) / fit.Slope, MidpointRounding.AwayFromZero);

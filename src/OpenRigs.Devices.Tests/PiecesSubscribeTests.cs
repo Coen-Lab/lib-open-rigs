@@ -25,8 +25,50 @@ namespace OpenRigs.Devices.Tests
         const string Missing = @"port '?COM97'? does not exist|Spinnaker camera with serial number 1 was not found";
         static readonly string Folder = Path.Combine(Path.GetDirectoryName(typeof(PiecesSubscribeTests).Assembly.Location), "Pieces");
 
+        static string Solution
+        {
+            get
+            {
+                var directory = new DirectoryInfo(Folder);
+                while (!File.Exists(Path.Combine(directory.FullName, "OpenRigs.sln"))) directory = directory.Parent;
+                return directory.FullName;
+            }
+        }
+
         [TestMethod]
         public void BehaviorBoardWithItsLines() { Check(Run("BehaviorBoard.bonsai")); }
+
+        // Rewards and both RewardValve pieces with no board: each loads its line and calibration and runs; a reward
+        // asked of a valve fires its calibrated pulse into its board's TriggerCalibratedPulse (2 ul is 38 ms on the
+        // fixture's curve); one asked of a valve no piece fires, or a valve with no calibration, stops the workflow.
+        static List<string> RunValves(string valve, Func<string, string> editRig = null)
+        {
+            return Run("RewardValves.bonsai", editRig, edit: xml => xml.Replace("VALVE", valve)
+                .Replace("SEND_AFTER", valve == null ? "PT1H" : "PT0.5S"));
+        }
+
+        [TestMethod]
+        public void RewardValvesLoadTheirLines() { Assert.AreEqual("", string.Join(" || ", RunValves(null))); }
+
+        [TestMethod]
+        public void ARewardFiresItsValvesCalibratedPulse()
+        {
+            StringAssert.StartsWith(string.Join(" || ", RunValves("left")), "InvalidOperationException: fired DO1 38");
+            StringAssert.StartsWith(string.Join(" || ", RunValves("Right")), "InvalidOperationException: fired DO2 38");
+        }
+
+        [TestMethod]
+        public void ARewardForAValveNoPieceFiresStops()
+        {
+            StringAssert.Contains(string.Join(" || ", RunValves("centre")), "A reward from the valve 'centre', which no RewardValve piece in this workflow fires; its valves are left, right.");
+        }
+
+        [TestMethod]
+        public void ARewardValveWithoutItsCalibrationStops()
+        {
+            var errors = RunValves(null, rig => rig.Replace("calibration/valve-DO2.json", "calibration/missing.json"));
+            StringAssert.Contains(string.Join(" || ", errors), "RewardValve-Right (DO2 on BehaviorBoard-Main) has no valve calibration");
+        }
 
         // ClockFromBoard reading the board's time unset (the valve calibration): its SetClock reaches SetHarpClock, and
         // the piece builds and runs with Ready waiting for HarpClockRead.
@@ -165,6 +207,10 @@ namespace OpenRigs.Devices.Tests
             Directory.CreateDirectory(Path.Combine(root, Environment.MachineName));
             var rig = File.ReadAllText(Path.Combine(Folder, "rig.yml"));
             File.WriteAllText(Path.Combine(root, Environment.MachineName, "rig.yml"), editRig == null ? rig : editRig(rig));
+            // Each valve's calibration, measured on this machine, so a RewardValve piece loads its line (LoadRewardLine).
+            Directory.CreateDirectory(Path.Combine(root, Environment.MachineName, "calibration"));
+            var curve = File.ReadAllText(Path.Combine(Solution, "fixtures", "calibration", "valve-DO1.json")).Replace("RIG-NAME", Environment.MachineName);
+            foreach (var line in new[] { "DO1", "DO2" }) File.WriteAllText(Path.Combine(root, Environment.MachineName, "calibration", "valve-" + line + ".json"), curve);
             var xml = File.ReadAllText(Path.Combine(Folder, file)).Replace("CONFIG_ROOT", SecurityElement.Escape(root));
             if (edit != null) xml = edit(xml);
             WorkflowBuilder builder;

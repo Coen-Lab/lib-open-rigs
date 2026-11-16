@@ -13,7 +13,7 @@ namespace OpenRigs.Core.Tests
         {
             public readonly Subject<int> Input = new Subject<int>();
             public readonly Subject<double> Clock = new Subject<double>();
-            public readonly List<Tuple<double, int, int>> Pulses = new List<Tuple<double, int, int>>();
+            public readonly List<Tuple<double, string, int>> Pulses = new List<Tuple<double, string, int>>();
             public Exception Error;
             public bool Completed;
             double now;
@@ -47,7 +47,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void FiresEachPulseTheGapAfterThePreviousOneCloses()
         {
-            using (var run = new Run(new FirePulses { Line = 2, PulseWidthMs = 30, Pulses = 3, PulseGapMs = 100 }))
+            using (var run = new Run(new FirePulses { Line = "DO2", PulseWidthMs = 30, Pulses = 3, PulseGapMs = 100 }))
             {
                 run.Tick(10.0);
                 run.Input.OnNext(0);
@@ -55,7 +55,7 @@ namespace OpenRigs.Core.Tests
                 Assert.IsNull(run.Error);
                 Assert.AreEqual(3, run.Pulses.Count);
                 CollectionAssert.AreEqual(new[] { 10.0, 10.13, 10.26 }, run.Pulses.ConvertAll(p => Math.Round(p.Item1, 6)));
-                Assert.IsTrue(run.Pulses.TrueForAll(p => p.Item2 == 2 && p.Item3 == 30));
+                Assert.IsTrue(run.Pulses.TrueForAll(p => p.Item2 == "DO2" && p.Item3 == 30));
             }
         }
 

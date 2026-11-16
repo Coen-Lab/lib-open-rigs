@@ -89,7 +89,7 @@ namespace OpenRigs.Core.Calibration
     /// one is due is that burst's reading; one typed at any other time is refused, saying why.
     /// </summary>
     [Combinator]
-    [Description("A balance read by eye. Follows the procedure's bursts by the pulses fired (first input: the settings when the run starts; second: the (channel, pulse width) pulse requests) and, once each burst has landed, asks for a weight in its Prompt: the baseline after priming, then each sample's. The next weight typed (third input: text in grams, such as 20.415 or 20.415 g) is that burst's reading. A weight typed when none is due, or text that is not a weight, is refused in the Prompt.")]
+    [Description("A balance read by eye. Follows the procedure's bursts by the pulses fired (first input: the settings when the run starts; second: the (line, pulse width) pulse requests) and, once each burst has landed, asks for a weight in its Prompt: the baseline after priming, then each sample's. The next weight typed (third input: text in grams, such as 20.415 or 20.415 g) is that burst's reading. A weight typed when none is due, or text that is not a weight, is refused in the Prompt.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class ManualWeighing
     {
@@ -104,7 +104,7 @@ namespace OpenRigs.Core.Calibration
         /// <summary>Asks for and takes each weight of the runs the settings start.</summary>
         public IObservable<ManualWeighingEvent> Process(
             IObservable<DispenseCalibration> start,
-            IObservable<Tuple<int, int>> pulses,
+            IObservable<Tuple<string, int>> pulses,
             IObservable<string> typed)
         {
             return Observable.Create<ManualWeighingEvent>(observer =>

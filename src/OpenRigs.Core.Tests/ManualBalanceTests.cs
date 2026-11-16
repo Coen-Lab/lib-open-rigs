@@ -64,7 +64,7 @@ namespace OpenRigs.Core.Tests
         public void ManualWeighing_AsksAfterEachBurstAndTakesOnlyDueWeights()
         {
             var start = new Subject<DispenseCalibration>();
-            var pulses = new Subject<Tuple<int, int>>();
+            var pulses = new Subject<Tuple<string, int>>();
             var typed = new Subject<string>();
             var events = new List<ManualWeighingEvent>();
             var due = new AutoResetEvent(false);
@@ -76,17 +76,17 @@ namespace OpenRigs.Core.Tests
             {
                 typed.OnNext("5");
                 start.OnNext(Settings());
-                pulses.OnNext(Tuple.Create(1, 20));
+                pulses.OnNext(Tuple.Create("DO1", 20));
                 typed.OnNext("1.0");
-                pulses.OnNext(Tuple.Create(1, 20));
+                pulses.OnNext(Tuple.Create("DO1", 20));
                 Assert.IsTrue(due.WaitOne(5000), "the baseline was never asked for");
                 typed.OnNext("heavy");
                 typed.OnNext("20.5 g");
                 due.Reset(); // the refusal above asked again
                 for (int sample = 0; sample < 2; sample++)
                 {
-                    pulses.OnNext(Tuple.Create(1, 10));
-                    pulses.OnNext(Tuple.Create(1, 10));
+                    pulses.OnNext(Tuple.Create("DO1", 10));
+                    pulses.OnNext(Tuple.Create("DO1", 10));
                     Assert.IsTrue(due.WaitOne(5000), "sample " + (sample + 1) + " was never asked for");
                     typed.OnNext(sample == 0 ? "20.6" : "20.8");
                 }

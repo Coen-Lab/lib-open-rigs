@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A Behavior board's pulsed output lines (Board), for a rig with reward valves: pulse-enables the lines rig.yml's pulseController.outputPulseEnable names, without the ZapitTrigger's line (PulseEnabledLines), and fires a pulse on a line from TriggerPulse (its DO line, 1 to 3, at the line's set width) or TriggerCalibratedPulse (its line and width). Announces PulsesEnabled into ReadyStages once its lines' pulse mode and widths have gone to the board (0.5 s after the board's first message), so Ready (ReadyGate PieceStages) waits for it and no pulse can go to a line not yet in pulse mode. Stops the workflow at start if a line wiring gives a RewardValve is not pulse-enabled, as a reward would then open the valve and leave it open.</Description>
+  <Description>A Behavior board's pulsed output lines (Board), for a rig with reward valves on it: closes and pulse-enables the lines rig.yml's pulseController.outputPulseEnable names, without the ZapitTrigger's line (PulseEnabledLines, PulseSetupWrites), 0.5 s after the board's first message, then announces PulsesEnabled into ReadyStages, so Ready (ReadyGate PieceStages) waits for it and no pulse can go to a line not yet in pulse mode. Declares the board's Board.TriggerCalibratedPulse (BoardTriggerCalibratedPulseSubjectName), a BehaviorSubject of (line, width in ms) such as (DO1, 38), and fires each on the board: the line's width, then the line set (CalibratedPulseWrites), on any line the board can pulse, DO0 to DO3 or DOPort0 to DOPort2. Stops the workflow at start if a line wiring gives a RewardValve is not pulse-enabled, as a reward would then open the valve and leave it open.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -14,35 +17,79 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:PulseEnabledLines">
-          <dev:Board />
+          <dev:Board>UNMAPPED</dev:Board>
         </Combinator>
       </Expression>
-      <Expression xsi:type="PropertyMapping">
-        <PropertyMappings>
-          <Property Name="OutputPulseEnable" />
-        </PropertyMappings>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PulseSetupWrites" />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="BehaviorCommandsSubjectName" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the board's command subject." />
-        <Property Name="BehaviorEventsSubjectName" DisplayName="BoardDataSubjectName" Description="Board.Data: the board's message subject." />
+        <Property Name="Name" DisplayName="BoardDataSubjectName" Description="Board.Data: the board's message subject." Category="Subjects" />
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.PulseController.bonsai">
-        <BehaviorCommandsSubjectName />
-        <OutputPulseEnable>DO1 DO2</OutputPulseEnable>
-        <PulseDO1>1</PulseDO1>
-        <PulseDO2>1</PulseDO2>
-        <PulseDO3>1</PulseDO3>
-        <BehaviorEventsSubjectName />
-        <TriggerPulseSubjectName>TriggerPulse</TriggerPulseSubjectName>
-        <TriggerCalibratedPulseSubjectName>TriggerCalibratedPulse</TriggerCalibratedPulseSubjectName>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>1</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Delay">
+          <rx:DueTime>PT0.5S</rx:DueTime>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the board's command subject." Category="Subjects" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage>PulsesEnabled</core:Stage>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="BoardTriggerCalibratedPulseSubjectName" Description="Board.TriggerCalibratedPulse: the subject each (line, width in ms) pulse for this board is sent into." Category="Subjects" />
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Tuple(sys:String,sys:Int32)">
+        <rx:Name>UNMAPPED</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:CalibratedPulseWrites" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>UNMAPPED</Name>
       </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="2" Label="Source2" />
       <Edge From="1" To="2" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
-      <Edge From="3" To="5" Label="Source1" />
-      <Edge From="4" To="5" Label="Source2" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="3" To="8" Label="Source1" />
+      <Edge From="7" To="8" Label="Source2" />
+      <Edge From="8" To="10" Label="Source1" />
+      <Edge From="9" To="10" Label="Source2" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
+      <Edge From="13" To="15" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="9" To="17" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

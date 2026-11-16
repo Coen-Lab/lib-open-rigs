@@ -33,12 +33,12 @@ behaviorBoard:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
         DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
-    # What each line drives (lab rig model, open_rigs.rigs.lab_rig): one RewardValve per side and one
-    # ZapitTrigger. The workflow reads the reward and Zapit lines from here.
+    # What each line drives (lab rig model, open_rigs.rigs.lab_rig): each RewardValve by its name
+    # (name: left is the piece RewardValve-Left) and one ZapitTrigger. The workflow reads the reward and Zapit lines from here.
     wiring:
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
-      DO1: { device: RewardValve, side: left }
-      DO2: { device: RewardValve, side: right }
+      DO1: { device: RewardValve, name: left }
+      DO2: { device: RewardValve, name: right }
       DO3: { device: ZapitTrigger, note: also the masking light }
     cameraTriggerController:
       trigger0Enabled: true     # camera trigger 0 shares the DO0 pin

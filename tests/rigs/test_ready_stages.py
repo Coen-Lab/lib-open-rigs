@@ -7,8 +7,8 @@ from open_rigs.rigs import workflow_lint as lint
 
 SRC = Path(__file__).parents[2] / "src"
 STAGE = "{clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core}Stage"
-# A piece that announces from a file it includes: PulseOutputs once PulseController's setup has gone out.
-ANNOUNCED_IN = {lint.PULSE_OUTPUTS: "OpenRigs.Devices:BehaviorBoard.PulseController.bonsai"}
+# A piece that announces from a file it includes, by the piece (none today).
+ANNOUNCED_IN: dict[str, str] = {}
 
 
 def source(path: str) -> Path:

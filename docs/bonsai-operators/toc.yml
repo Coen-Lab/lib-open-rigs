@@ -11,8 +11,8 @@
   - name: Behavior Board
     href: OpenRigs.Devices/behavior-board.md
     items:
-    - name: PulseController and PulseOutputs
-      href: OpenRigs.Devices/behavior-board.md#pulsecontroller-and-pulseoutputs
+    - name: PulseOutputs
+      href: OpenRigs.Devices/behavior-board.md#pulseoutputs
     - name: CameraTriggerController
       href: OpenRigs.Devices/behavior-board.md#cameratriggercontroller
     - name: RunningWheel

@@ -2627,17 +2627,22 @@ namespace OpenRigs.Devices.Rigs
     /// <summary>
     /// The pulse source of each behavior board digital output line. Each line appears once.
     ///
-    ///All three lines are required: a union has no default that survives code generation, so an
-    ///unused line is written as a FixedPulse with a width of 0.
+    ///DO1 to DO3 are required, an unused one written as a FixedPulse with a width of 0; DO0 and
+    ///DOPort0 to DOPort2, the board's other pulsed lines, are given only when one is used (a reward
+    ///valve on it).
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("The pulse source of each behavior board digital output line. Each line appears on" +
-        "ce.\n\nAll three lines are required: a union has no default that survives code gen" +
-        "eration, so an\nunused line is written as a FixedPulse with a width of 0.")]
+    [System.ComponentModel.DescriptionAttribute(@"The pulse source of each behavior board digital output line. Each line appears once.
+
+    DO1 to DO3 are required, an unused one written as a FixedPulse with a width of 0; DO0 and
+    DOPort0 to DOPort2, the board's other pulsed lines, are given only when one is used (a reward
+    valve on it).")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class PulseOutputs
     {
+    
+        private PulseOutput _dO0;
     
         private PulseOutput _dO1;
     
@@ -2645,15 +2650,44 @@ namespace OpenRigs.Devices.Rigs
     
         private PulseOutput _dO3;
     
+        private PulseOutput _dOPort0;
+    
+        private PulseOutput _dOPort1;
+    
+        private PulseOutput _dOPort2;
+    
         public PulseOutputs()
         {
         }
     
         protected PulseOutputs(PulseOutputs other)
         {
+            _dO0 = other._dO0;
             _dO1 = other._dO1;
             _dO2 = other._dO2;
             _dO3 = other._dO3;
+            _dOPort0 = other._dOPort0;
+            _dOPort1 = other._dOPort1;
+            _dOPort2 = other._dOPort2;
+        }
+    
+        /// <summary>
+        /// Pulse source for DO0, when it is pulsed.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("DO0")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="DO0")]
+        [System.ComponentModel.DescriptionAttribute("Pulse source for DO0, when it is pulsed.")]
+        public PulseOutput DO0
+        {
+            get
+            {
+                return _dO0;
+            }
+            set
+            {
+                _dO0 = value;
+            }
         }
     
         /// <summary>
@@ -2713,6 +2747,63 @@ namespace OpenRigs.Devices.Rigs
             }
         }
     
+        /// <summary>
+        /// Pulse source for DOPort0, when it is pulsed.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("DOPort0")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="DOPort0")]
+        [System.ComponentModel.DescriptionAttribute("Pulse source for DOPort0, when it is pulsed.")]
+        public PulseOutput DOPort0
+        {
+            get
+            {
+                return _dOPort0;
+            }
+            set
+            {
+                _dOPort0 = value;
+            }
+        }
+    
+        /// <summary>
+        /// Pulse source for DOPort1, when it is pulsed.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("DOPort1")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="DOPort1")]
+        [System.ComponentModel.DescriptionAttribute("Pulse source for DOPort1, when it is pulsed.")]
+        public PulseOutput DOPort1
+        {
+            get
+            {
+                return _dOPort1;
+            }
+            set
+            {
+                _dOPort1 = value;
+            }
+        }
+    
+        /// <summary>
+        /// Pulse source for DOPort2, when it is pulsed.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("DOPort2")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="DOPort2")]
+        [System.ComponentModel.DescriptionAttribute("Pulse source for DOPort2, when it is pulsed.")]
+        public PulseOutput DOPort2
+        {
+            get
+            {
+                return _dOPort2;
+            }
+            set
+            {
+                _dOPort2 = value;
+            }
+        }
+    
         public System.IObservable<PulseOutputs> Generate()
         {
             return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new PulseOutputs(this)));
@@ -2725,9 +2816,13 @@ namespace OpenRigs.Devices.Rigs
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
+            stringBuilder.Append("DO0 = " + _dO0 + ", ");
             stringBuilder.Append("DO1 = " + _dO1 + ", ");
             stringBuilder.Append("DO2 = " + _dO2 + ", ");
-            stringBuilder.Append("DO3 = " + _dO3);
+            stringBuilder.Append("DO3 = " + _dO3 + ", ");
+            stringBuilder.Append("DOPort0 = " + _dOPort0 + ", ");
+            stringBuilder.Append("DOPort1 = " + _dOPort1 + ", ");
+            stringBuilder.Append("DOPort2 = " + _dOPort2);
             return true;
         }
     
@@ -3795,12 +3890,12 @@ namespace OpenRigs.Devices.Rigs
 
     /// <summary>
     /// What is plugged into one line of the board. Nothing compares it with a workflow at Start; a
-    ///rig's reward and Zapit lines are read from it. part and note are for people.
+    ///rig's reward valves and Zapit line are read from it. part and note are for people.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
     [System.ComponentModel.DescriptionAttribute("What is plugged into one line of the board. Nothing compares it with a workflow a" +
-        "t Start; a\nrig\'s reward and Zapit lines are read from it. part and note are for " +
-        "people.")]
+        "t Start; a\nrig\'s reward valves and Zapit line are read from it. part and note ar" +
+        "e for people.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class WiredLine
@@ -3809,6 +3904,8 @@ namespace OpenRigs.Devices.Rigs
         private string _device;
     
         private Side? _side;
+    
+        private string _name;
     
         private System.Collections.Generic.List<string> _targets;
     
@@ -3824,6 +3921,7 @@ namespace OpenRigs.Devices.Rigs
         {
             _device = other._device;
             _side = other._side;
+            _name = other._name;
             _targets = other._targets;
             _part = other._part;
             _note = other._note;
@@ -3849,11 +3947,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The side it serves, where that matters (a reward valve).
+        /// The side it serves, where that matters (a lick spout stage's motor).
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("side")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="side")]
-        [System.ComponentModel.DescriptionAttribute("The side it serves, where that matters (a reward valve).")]
+        [System.ComponentModel.DescriptionAttribute("The side it serves, where that matters (a lick spout stage\'s motor).")]
         public Side? Side
         {
             get
@@ -3863,6 +3961,25 @@ namespace OpenRigs.Devices.Rigs
             set
             {
                 _side = value;
+            }
+        }
+    
+        /// <summary>
+        /// The device's own name where it is a piece of its own: a reward valve's, its piece RewardValve-<Name> (left: RewardValve-Left), one valve to a name on the rig.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("name")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="name")]
+        [System.ComponentModel.DescriptionAttribute("The device\'s own name where it is a piece of its own: a reward valve\'s, its piece" +
+            " RewardValve-<Name> (left: RewardValve-Left), one valve to a name on the rig.")]
+        public string Name
+        {
+            get
+            {
+                return _name;
+            }
+            set
+            {
+                _name = value;
             }
         }
     
@@ -3937,6 +4054,7 @@ namespace OpenRigs.Devices.Rigs
         {
             stringBuilder.Append("Device = " + _device + ", ");
             stringBuilder.Append("Side = " + _side + ", ");
+            stringBuilder.Append("Name = " + _name + ", ");
             stringBuilder.Append("Targets = " + _targets + ", ");
             stringBuilder.Append("Part = " + _part + ", ");
             stringBuilder.Append("Note = " + _note);

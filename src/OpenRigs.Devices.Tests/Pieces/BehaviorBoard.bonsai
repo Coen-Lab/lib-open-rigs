@@ -32,6 +32,7 @@
         <Board>BehaviorBoard-Main</Board>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
+        <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.RunningWheel.bonsai">
         <Board>BehaviorBoard-Main</Board>

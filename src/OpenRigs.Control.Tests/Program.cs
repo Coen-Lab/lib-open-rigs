@@ -311,6 +311,14 @@ namespace OpenRigs.Control.Tests
                 };
                 var heard = new OnDeviceParameterSet { Name = "Camera-Body", Parameter = "GainDb" }.Process(cameraSets.ToObservable()).ToList().Wait();
                 Check("OnDeviceParameterSet passes its device's parameter alone", heard.SequenceEqual(new[] { "2" }), string.Join(",", heard));
+                var valveCommands = new[]
+                {
+                    new ControlEvent { Kind = ControlEventKind.Command, Name = "RewardValve-Left.Reward", Arguments = "" },
+                    new ControlEvent { Kind = ControlEventKind.Command, Name = "RewardValve-Right.Reward", Arguments = "x" },
+                    new ControlEvent { Kind = ControlEventKind.Set, Name = "RewardValve-Left.Reward", Arguments = "y" },
+                };
+                var rewards = new OnDeviceCommand { Name = "RewardValve-Left", Command = "Reward" }.Process(valveCommands.ToObservable()).ToList().Wait();
+                Check("OnDeviceCommand passes its device's command alone", rewards.SequenceEqual(new[] { "" }), string.Join(",", rewards));
                 Exception unnamed = null;
                 try { new DeclareDeviceControls { Parameters = { new Parameter { Name = "GainDb" } } }.Generate(); }
                 catch (InvalidOperationException e) { unnamed = e; }

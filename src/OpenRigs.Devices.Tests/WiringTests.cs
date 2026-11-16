@@ -18,7 +18,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void FindsTheOneLineWiredToTheDevice()
         {
-            var rig = Rig("      DO1: { device: RewardValve, side: left }\n      DO3: { device: ZapitTrigger }\n");
+            var rig = Rig("      DO1: { device: RewardValve, name: left }\n      DO3: { device: ZapitTrigger }\n");
             Assert.AreEqual(DigitalOutputs.DO3, WiredOutput.Find(rig, "BehaviorBoard-Main", "ZapitTrigger"));
         }
 
@@ -40,13 +40,20 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void FindsEveryLineWiredToTheDevice()
         {
-            var rig = LabRig("      DO1: { device: RewardValve, side: left }\n      DO2: { device: RewardValve, side: right }\n      DO3: { device: ZapitTrigger }\n");
+            var rig = LabRig("      DO1: { device: RewardValve, name: left }\n      DO2: { device: RewardValve, name: right }\n      DO3: { device: ZapitTrigger }\n");
             Assert.AreEqual(DigitalOutputs.DO1 | DigitalOutputs.DO2, WiredOutputs.Find(rig, "BehaviorBoard-Main", "RewardValve"));
+        }
+
+        [TestMethod]
+        public void FindsAValveOnAnyLineTheBoardPulses()
+        {
+            var rig = LabRig("      DO0: { device: RewardValve, name: left }\n      DOPort2: { device: RewardValve, name: right }\n");
+            Assert.AreEqual(DigitalOutputs.DO0 | DigitalOutputs.DOPort2, WiredOutputs.Find(rig, "BehaviorBoard-Main", "RewardValve"));
         }
 
         [DataTestMethod]
         [DataRow("      DO3: { device: ZapitTrigger }\n", "has no line with device RewardValve")]
-        [DataRow("      DO0: { device: RewardValve, side: left }\n", "puts a RewardValve on DO0")]
+        [DataRow("      DI3: { device: RewardValve, name: left }\n", "puts a RewardValve on DI3")]
         public void RefusesNoLineOrALineOffThePulseLines(string wiring, string message)
         {
             var ex = Assert.ThrowsException<InvalidOperationException>(() => WiredOutputs.Find(LabRig(wiring), "BehaviorBoard-Main", "RewardValve"));
@@ -57,7 +64,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void AnUnsetBoardIsRefused()
         {
-            var rig = LabRig("      DO1: { device: RewardValve, side: left }\n");
+            var rig = LabRig("      DO1: { device: RewardValve, name: left }\n");
             var ex = Assert.ThrowsException<ArgumentException>(() => System.Reactive.Linq.Observable.Wait(
                 new WiredOutputs { Device = "RewardValve" }.Process(System.Reactive.Linq.Observable.Return(rig))));
             StringAssert.Contains(ex.Message, "RigDevice's Name is ''");
@@ -77,22 +84,22 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void PulseLinesLoseTheZapitTriggerLine()
         {
-            var rig = PulsedRig("DO1, DO2, DO3", "      DO1: { device: RewardValve, side: left }\n      DO2: { device: RewardValve, side: right }\n      DO3: { device: ZapitTrigger }\n");
+            var rig = PulsedRig("DO1, DO2, DO3", "      DO1: { device: RewardValve, name: left }\n      DO2: { device: RewardValve, name: right }\n      DO3: { device: ZapitTrigger }\n");
             Assert.AreEqual(DigitalOutputs.DO1 | DigitalOutputs.DO2, PulseEnabledLines.Find(rig, "BehaviorBoard-Main"));
         }
 
         [TestMethod]
         public void PulseLinesNeedNoZapitTrigger()
         {
-            var rig = PulsedRig("DO1", "      DO1: { device: RewardValve, side: left }\n");
+            var rig = PulsedRig("DO1", "      DO1: { device: RewardValve, name: left }\n");
             Assert.AreEqual(DigitalOutputs.DO1, PulseEnabledLines.Find(rig, "BehaviorBoard-Main"));
         }
 
-        // A valve on a line the board does not pulse would be opened by TriggerPulse and left open.
+        // A valve on a line the board does not pulse would be opened by a reward and left open.
         [TestMethod]
         public void RefusesAValveLineThatIsNotPulsed()
         {
-            var rig = PulsedRig("DO1", "      DO1: { device: RewardValve, side: left }\n      DO2: { device: RewardValve, side: right }\n");
+            var rig = PulsedRig("DO1", "      DO1: { device: RewardValve, name: left }\n      DO2: { device: RewardValve, name: right }\n");
             var ex = Assert.ThrowsException<InvalidOperationException>(() => PulseEnabledLines.Find(rig, "BehaviorBoard-Main"));
             StringAssert.Contains(ex.Message, "puts a RewardValve on DO2");
         }

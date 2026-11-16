@@ -20,7 +20,7 @@ from open_rigs.rigs.workflow_lint import (
     upstream,
 )
 
-MANUAL_REWARD_DROP_UL = 2.5  # RewardLeft and RewardRight each give this, before and during a run
+MANUAL_REWARD_DROP_UL = 2.5  # each valve's manual drop (RewardValve-Left.Reward) gives this, before and during a run
 
 
 def mixer_boot_delay_problems(root: ET.Element) -> list[str]:
@@ -102,9 +102,9 @@ def zapit_for_task_problems(root: ET.Element) -> list[str]:
 
 
 def manual_rewards_drop_problems(root: ET.Element) -> list[str]:
-    """ManualRewards gives MANUAL_REWARD_DROP_UL on each side. `root` is OpenRigs.Devices' BehaviorBoard/ManualRewards.bonsai."""
+    """A valve's manual drop is MANUAL_REWARD_DROP_UL. `root` is OpenRigs.Devices' BehaviorBoard/RewardValve.bonsai."""
     drops = [float(_value(n)) for n in root.iter(W + "Expression") if kind(n) == "DoubleProperty"]
-    return [] if drops == [MANUAL_REWARD_DROP_UL] * 2 else [f"ManualRewards gives {drops} ul, not {MANUAL_REWARD_DROP_UL} on each side"]
+    return [] if drops == [MANUAL_REWARD_DROP_UL] else [f"RewardValve's manual drop is {drops} ul, not {MANUAL_REWARD_DROP_UL}"]
 
 
 def background_noise_include_problems(root: ET.Element) -> list[str]:

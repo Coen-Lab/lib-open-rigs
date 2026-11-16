@@ -17,7 +17,7 @@ The Behavior Board (`who_am_i = 1216`) is a Harp board commonly used as an I/O h
 
 Sub-modules:
 
-- `PulseController`: `output_pulse_enable` (the `DO1`/`DO2`/`DO3` lines enabled) and `outputs`, one entry per line saying what drives its pulse width: a `FixedPulse` with `pulse_width_ms` set in the rig configuration, or a `CalibratedPulse` naming the calibration curve that converts a requested quantity, such as a reward volume, to a width at run time. All three lines are listed; an unused line is a `FixedPulse` of width 0. A line left out of `output_pulse_enable` stays high once set until it is cleared, as a Zapit trigger line must (`open_rigs.rigs.lab_rig` refuses it pulse-enabled).
+- `PulseController`: `output_pulse_enable` (the lines enabled) and `outputs`, one entry per line saying what drives its pulse width: a `FixedPulse` with `pulse_width_ms` set in the rig configuration, or a `CalibratedPulse` naming the calibration curve that converts a requested quantity, such as a reward volume, to a width at run time. DO1 to DO3 are always listed, an unused line a `FixedPulse` of width 0; DO0 and DOPort0 to DOPort2 only when used (a reward valve on one). A line left out of `output_pulse_enable` stays high once set until it is cleared, as a Zapit trigger line must (`open_rigs.rigs.lab_rig` refuses it pulse-enabled).
 - `CameraTriggerController`: `trigger0_frequency` and `trigger1_frequency` (Hz) for `CameraOutput0` and `CameraOutput1`.
 - `RunningWheel`: `counts_per_rev` and `wheel_diameter_mm`.
 
@@ -38,8 +38,8 @@ behaviorBoard:
         DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
     wiring:
       DO0: { device: CameraTrigger, targets: [Camera-Face] }
-      DO1: { device: RewardValve, side: left }
-      DO2: { device: RewardValve, side: right }
+      DO1: { device: RewardValve, name: left }
+      DO2: { device: RewardValve, name: right }
       DO3: { device: ZapitTrigger }
     cameraTriggerController:
       trigger0Enabled: true
@@ -65,22 +65,13 @@ In Python the same board is `LabRig(behavior_board={"main": BehaviorBoard(port_n
 
 ## Line pieces
 
-### PulseController and PulseOutputs
+### PulseOutputs
 
 :::workflow
-![PulseController](~/assets/workflows/devices/BehaviorBoard/PulseController.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/PulseController.bonsai"}
+![PulseOutputs](~/assets/workflows/devices/BehaviorBoard/PulseOutputs.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/PulseOutputs.bonsai"}
 :::
 
-Generates pulses on the digital output lines listed in `output_pulse_enable`. Used to drive valves and other on/off actuators in response to commands on its input subjects.
-
-Two trigger subjects, one per kind of line:
-
-- `TriggerPulse` (`int`, the DO line) for a `FixedPulse` line. Its width is written once at startup from the `PulseDO1`, `PulseDO2` and `PulseDO3` properties, which the rig maps from its configuration, and each trigger only sets the line.
-- `TriggerCalibratedPulse` (`Tuple<int, int>`, the DO line 1 to 3 and the width in milliseconds) for a `CalibratedPulse` line. Each trigger writes the width to that line's `PulseDO` register and then sets the line, in that order on the same command subject, so the board applies the new width before it fires. The width comes from the calibration curve lookup in `OpenRigs.Core` at trial time; nothing about it is stored in the rig configuration or the workflow.
-
-Both subject names are externalized properties of `PulseController`; `PulseOutputs` fixes them to `TriggerPulse` and `TriggerCalibratedPulse`, so a rig that wants other names includes `PulseController` itself.
-
-`PulseOutputs` (`BehaviorBoard.PulseOutputs.bonsai`) is the piece around it: it pulse-enables the lines `rig.yml`'s `outputPulseEnable` names without the ZapitTrigger's (`PulseEnabledLines`), and stops the workflow at Start if a line `wiring` gives a `RewardValve` is not pulse-enabled, as a reward would then open the valve and leave it open. `DeliverReward` and `ManualRewards` send rewards through it ([Building Blocks](../../articles/building-blocks.md#task-side-includes)).
+`PulseOutputs` (`BehaviorBoard.PulseOutputs.bonsai`) is a board's pulsed lines: 0.5 s after the board's first message it closes and pulse-enables the lines `rig.yml`'s `outputPulseEnable` names without the ZapitTrigger's (`PulseEnabledLines`, `PulseSetupWrites`), then announces `PulsesEnabled`. It declares the board's `<Board>.TriggerCalibratedPulse` (`Tuple<string, int>`: a line such as `DO1` and the width in milliseconds) and fires each pulse sent into it (`CalibratedPulseWrites`): the width to that line's `PulseDO` or `PulseDOPort` register, then the line set, in that order on the board's command subject, so the board applies the new width before it fires. Any line the board can pulse takes one: DO0 to DO3 and DOPort0 to DOPort2. It stops the workflow at Start if a line `wiring` gives a `RewardValve` is not pulse-enabled, as a reward would then open the valve and leave it open. Each `RewardValve` piece sends its rewards through its own board's subject ([Building Blocks](../../articles/building-blocks.md#task-side-includes)); a calibration fires its own `FirePulses` into it.
 
 ### ZapitTriggerLine
 

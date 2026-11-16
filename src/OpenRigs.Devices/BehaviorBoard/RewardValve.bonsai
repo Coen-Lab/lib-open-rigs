@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>One reward valve, Name (RewardValve-Left for the RewardValve rig.yml's wiring names left), on its Behavior board, Board, included once per valve after BehaviorBoard.Rewards. Loads the valve's line and calibration once at start (LoadRewardLine: the line wiring gives it on Board, its CalibratedPulse and that calibration's linearFit), so a valve with no calibration stops the workflow at start, and publishes it as the AsyncSubject Name; announces the valve's rig.yml name into RewardValves. Each reward for it on RewardRequests ((left, microlitres): a reward asks for its valve by that name) is planned (PlanReward; one above MaxRewardUl, 20 ul by default, or one that is not a number or infinite, stops the workflow), multicast into RewardDelivered, and fired with FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, a reward that comes while one fires starting pulseGapMs after its last pulse closes, into the board's Board.TriggerCalibratedPulse (BoardTriggerCalibratedPulseSubjectName, PulseOutputs). Declares its manual drop, Name.Reward (DeclareDeviceControls), a 2.5 ul reward through its calibration, before and during a run. Writes its calibration file into the experiment under Name\ (LogDataSchema).</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" Description="The valve's piece: RewardValve- and its name in rig.yml's wiring, such as RewardValve-Left." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Board" Description="The Behavior board the valve is wired on, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="CalibrationDirectory" />
+        <Property Name="MaxRewardUl" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="RigFile" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:LoadRewardLine">
+          <core:RigFile>UNMAPPED</core:RigFile>
+          <core:Name>UNMAPPED</core:Name>
+          <core:Board>UNMAPPED</core:Board>
+          <core:CalibrationDirectory />
+          <core:MaxRewardUl>20</core:MaxRewardUl>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:AnnounceRewardValve" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>RewardValves</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardRequests</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:RewardForValve" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:PlanReward" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>RewardDelivered</Name>
+      </Expression>
+      <Expression xsi:type="InputMapping">
+        <PropertyMappings>
+          <Property Name="Line" Selector="Line" />
+          <Property Name="PulseWidthMs" Selector="PulseWidthMs" />
+          <Property Name="Pulses" Selector="Pulses" />
+          <Property Name="PulseGapMs" Selector="PulseGapMs" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:FirePulses">
+          <core:Line>DO1</core:Line>
+          <core:PulseWidthMs>1</core:PulseWidthMs>
+          <core:Pulses>0</core:Pulses>
+          <core:PulseGapMs>0</core:PulseGapMs>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="BoardTriggerCalibratedPulseSubjectName" Description="Board.TriggerCalibratedPulse: the board's calibrated pulse subject (PulseOutputs)." Category="Subjects" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>UNMAPPED</orcl:Name>
+          <orcl:Command>Reward</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Item2.Instance</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="DoubleProperty">
+          <Value>2.5</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>RewardRequests</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:DeclareDeviceControls">
+          <orcl:Name>UNMAPPED</orcl:Name>
+          <orcl:Parameters />
+          <orcl:Commands>
+            <orcl:Command>
+              <orcl:Name>Reward</orcl:Name>
+              <orcl:Description>Give 2.5 ul from this valve, through its calibration.</orcl:Description>
+            </orcl:Command>
+          </orcl:Commands>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>CalibrationJson</Selector>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogDataSchema.bonsai">
+        <Name>UNMAPPED</Name>
+        <Extension>json</Extension>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="0" To="5" Label="Source2" />
+      <Edge From="1" To="5" Label="Source3" />
+      <Edge From="2" To="5" Label="Source4" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="0" To="6" Label="Source2" />
+      <Edge From="0" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="0" To="11" Label="Source1" />
+      <Edge From="10" To="12" Label="Source1" />
+      <Edge From="11" To="12" Label="Source2" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="18" Label="Source1" />
+      <Edge From="17" To="18" Label="Source2" />
+      <Edge From="18" To="20" Label="Source1" />
+      <Edge From="19" To="20" Label="Source2" />
+      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="0" To="22" Label="Source2" />
+      <Edge From="0" To="23" Label="Source1" />
+      <Edge From="22" To="24" Label="Source1" />
+      <Edge From="23" To="24" Label="Source2" />
+      <Edge From="24" To="25" Label="Source1" />
+      <Edge From="25" To="27" Label="Source1" />
+      <Edge From="26" To="27" Label="Source2" />
+      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="0" To="29" Label="Source1" />
+      <Edge From="0" To="30" Label="Source1" />
+      <Edge From="30" To="31" Label="Source1" />
+      <Edge From="31" To="32" Label="Source1" />
+      <Edge From="0" To="32" Label="Source2" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

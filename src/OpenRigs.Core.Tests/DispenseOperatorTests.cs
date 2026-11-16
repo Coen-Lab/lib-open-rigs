@@ -76,7 +76,7 @@ namespace OpenRigs.Core.Tests
                 Samples = new List<DispenseSample> { Sample(20), Sample(40), Sample(60) },
                 PrimingPulses = 2, SettleWindow = 2, WeighTimeoutSeconds = 10,
             };
-            var requests = new Subject<Tuple<int, int>>();
+            var requests = new Subject<Tuple<string, int>>();
             var grams = new double[1];
             var readings = new BehaviorSubject<WeightMeasurement>(new WeightMeasurement(0, 0, 1));
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();

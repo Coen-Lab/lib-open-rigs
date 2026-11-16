@@ -23,18 +23,20 @@ from open_rigs.components.wiring import BoardWiring
 from open_rigs.components.zapit import ZapitServer
 from open_rigs.core.rig import Rig
 from open_rigs.devices import CalibratedPulse, HarpTimestampGeneratorGen3, LicketySplit, StepperPositions
+from open_rigs.devices.behavior_board import PulseOutputs
 
 REWARD_VALVE = "RewardValve"
 ZAPIT_TRIGGER = "ZapitTrigger"
 CAMERA_TRIGGER = "CameraTrigger"
-SIDES = ("left", "right")
+# The Behavior board lines that can pulse, so can carry a reward valve (OpenRigs.Devices PulseLines).
+PULSE_LINES = ("DO0", "DO1", "DO2", "DO3", "DOPort0", "DOPort1", "DOPort2")
 WHERE = "(lab rig model, open_rigs.rigs.lab_rig)"
 PLACEHOLDER = "CHANGE-ME"  # rig-template.yml's mark on each value a rig fills in
 # The rig.yml kinds a preflight lists, in its order (OpenRigs.Devices PreflightDevices.AllKinds, held equal by a test): each
 # device whose data the preflight counts. Not zapit: Zapit answers only when commanded, so a preflight has no data to count.
 PREFLIGHT_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera", "speakerArray",
                    "projectionCalibration")
-# The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, DeliverReward's MaxRewardUl).
+# The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, a RewardValve piece's MaxRewardUl).
 MAX_REWARD_UL = 20
 
 
@@ -94,34 +96,38 @@ class LabRig(Rig):
             _refuse_unknown(list(_unknown_keys(given, rig.model_dump(by_alias=True, exclude_unset=True))))
         return rig
 
-    def reward_valve_lines(self) -> set[int]:
-        """The DO lines (1 to 3) wiring names as a RewardValve, on every board (for
-        workflow_lint.fixed_width_pulses_on_reward_valves)."""
-        return {int(alias.removeprefix("DO")) for board in self.behavior_board.values() if board.wiring
+    def reward_valves(self) -> dict[str, tuple[str, str]]:
+        """Each reward valve's piece name (RewardValve-Left) with its board's (BehaviorBoard-Main) and its line (DO1)."""
+        return {"RewardValve-" + _title(line.name): ("BehaviorBoard-" + _title(name), alias)
+                for name, board in self.behavior_board.items() if board.wiring
                 for field, alias in _ALIASES.items()
-                if (line := getattr(board.wiring, field)) is not None and line.device == REWARD_VALVE}
+                if (line := getattr(board.wiring, field)) is not None and line.device == REWARD_VALVE and line.name}
+
+    def reward_valve_lines(self) -> set[str]:
+        """The lines (DO1) wiring names as a RewardValve, on any board (for
+        workflow_lint.fixed_width_pulses_on_reward_valves)."""
+        return {line for _, line in self.reward_valves().values()}
 
     @model_validator(mode="after")
     def _wired_lines(self):
-        zapit_boards, valve_boards = [], []
+        zapit_boards, valve_names = [], Counter()
         for name, board in self.behavior_board.items():
             lines = {alias: getattr(board.wiring, field) for field, alias in _ALIASES.items()} if board.wiring else {}
             lines = {alias: line for alias, line in lines.items() if line is not None}
             valves = {alias: line for alias, line in lines.items() if line.device == REWARD_VALVE}
-            unsided = sorted(alias for alias, line in valves.items() if line.side is None)
-            if unsided:
+            unnamed = sorted(alias for alias, line in valves.items() if line.name is None)
+            if unnamed:
                 raise ValueError(
-                    f"behaviorBoard {name}: RewardValve on {', '.join(unsided)} has no side in wiring {WHERE}. "
-                    f"Give it one, as in `{unsided[0]}: {{ device: RewardValve, side: left }}`."
+                    f"behaviorBoard {name}: RewardValve on {', '.join(unnamed)} has no name in wiring {WHERE}. "
+                    f"Give it the name its piece is called by, as in `{unnamed[0]}: {{ device: RewardValve, name: left }}` (RewardValve-Left); a valve's side is not its name."
                 )
-            sides = Counter(line.side.value for line in valves.values() if line.side is not None)
-            for side in SIDES:
-                if sides[side] > 1:
-                    raise ValueError(
-                        f"behaviorBoard {name}: wiring has {sides[side]} {side} RewardValves, and a side has one {WHERE}. "
-                        f"Keep the line the {side} valve is plugged into, as in `DO1: {{ device: RewardValve, side: {side} }}`, "
-                        "and change the others."
-                    )
+            unpulsed = sorted(alias for alias in valves if alias not in PULSE_LINES)
+            if unpulsed:
+                raise ValueError(
+                    f"behaviorBoard {name}: RewardValve on {', '.join(unpulsed)}, a line the board cannot pulse {WHERE}. "
+                    f"Plug it into one of {', '.join(PULSE_LINES)} and wire it there."
+                )
+            valve_names.update(line.name for line in valves.values())
             zapit = [alias for alias, line in lines.items() if line.device == ZAPIT_TRIGGER]
             if len(zapit) > 1:
                 raise ValueError(
@@ -130,11 +136,9 @@ class LabRig(Rig):
                 )
             if zapit:
                 zapit_boards.append(name)
-            if valves:
-                valve_boards.append(name)
             outputs = board.pulse_controller.outputs if board.pulse_controller else None
             for alias in sorted(valves):
-                output = getattr(outputs, alias.lower(), None) if outputs else None
+                output = getattr(outputs, _OUTPUT_FIELDS[alias], None) if outputs else None
                 if output is None or not isinstance(output.root, CalibratedPulse):
                     raise ValueError(
                         f"behaviorBoard {name}: RewardValve {alias} needs a CalibratedPulse in pulseController.outputs {WHERE}. "
@@ -155,12 +159,12 @@ class LabRig(Rig):
                 f"behaviorBoard {' and '.join(zapit_boards)} each wire a ZapitTrigger, and a rig has one {WHERE}. "
                 "Keep the line Zapit's trigger is plugged into and change the others."
             )
-        if len(valve_boards) > 1:
-            # DeliverReward and ManualRewards fire every valve through one board's TriggerCalibratedPulse, so a valve on
-            # a second board would open on the first board's line of the same number (audit B2, 16 Nov 2026).
+        twice = sorted(valve for valve, count in valve_names.items() if count > 1)
+        if twice:
+            # Each valve is a piece of its own, RewardValve-<Name>, and a reward asks for its valve by that name.
             raise ValueError(
-                f"behaviorBoard {' and '.join(valve_boards)} each wire a RewardValve, and a rig's reward valves are on one board {WHERE}. "
-                "Plug every valve into one board and wire them there."
+                f"rig.yml's wiring has more than one RewardValve named {', '.join(twice)}, and each valve's name is its own {WHERE}. "
+                "Give each valve its own name, as in `name: left` and `name: right`."
             )
         if self.zapit is not None and not zapit_boards:
             board = next(iter(self.behavior_board), "main")
@@ -185,7 +189,13 @@ class LabRig(Rig):
         return self
 
 
-_ALIASES ={field: info.alias for field, info in BoardWiring.model_fields.items()}
+_ALIASES = {field: info.alias for field, info in BoardWiring.model_fields.items()}
+_OUTPUT_FIELDS = {info.alias: field for field, info in PulseOutputs.model_fields.items()}
+
+
+def _title(entry: str) -> str:
+    """A rig.yml name as a piece's instance: left is Left."""
+    return entry[:1].upper() + entry[1:]
 
 
 def _unknown_keys(given: Any, kept: Any, path: str = "") -> Iterator[str]:

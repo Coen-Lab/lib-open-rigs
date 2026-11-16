@@ -20,8 +20,8 @@ RIG = {
         }},
         "wiring": {
             **CAMERA_LINE,
-            "DO1": {"device": "RewardValve", "side": "left"},
-            "DO2": {"device": "RewardValve", "side": "right"},
+            "DO1": {"device": "RewardValve", "name": "left"},
+            "DO2": {"device": "RewardValve", "name": "right"},
             "DO3": {"device": "ZapitTrigger"},
         },
     }},
@@ -155,25 +155,40 @@ def test_a_rig_built_by_field_name():
 def test_one_valve_is_enough():
     rig = copy.deepcopy(RIG)
     del rig["zapit"]
-    rig["behaviorBoard"]["main"]["wiring"] = {**CAMERA_LINE, "DO1": {"device": "RewardValve", "side": "left"}}
+    rig["behaviorBoard"]["main"]["wiring"] = {**CAMERA_LINE, "DO1": {"device": "RewardValve", "name": "left"}}
     LabRig.model_validate(rig)
 
 
-def test_reward_valves_on_two_boards_are_refused():
-    # Audit B2: every valve fires through one board's TriggerCalibratedPulse, so the second board's valve never opened.
+def test_three_valves_on_any_pulsed_line():
+    # The arena: each valve is its own piece, by its name, on any line the board can pulse (DO0 to DO3, DOPort0 to 2).
+    rig = copy.deepcopy(RIG)
+    main = rig["behaviorBoard"]["main"]
+    main["wiring"]["DOPort0"] = {"device": "RewardValve", "name": "centre"}
+    main["pulseController"]["outputs"]["DOPort0"] = {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DOPort0.json"}
+    main["pulseController"]["outputPulseEnable"] = "DO1, DO2, DOPort0"
+    valves = LabRig.model_validate(rig).reward_valves()
+    assert valves == {"RewardValve-Left": ("BehaviorBoard-Main", "DO1"), "RewardValve-Right": ("BehaviorBoard-Main", "DO2"),
+                      "RewardValve-Centre": ("BehaviorBoard-Main", "DOPort0")}
+
+
+def test_reward_valves_on_two_boards():
+    # Each valve fires through its own board's TriggerCalibratedPulse (audit B2 refused this while one board fired them all).
     rig = copy.deepcopy(RIG)
     main = rig["behaviorBoard"]["main"]
     second = copy.deepcopy(main)
     del main["wiring"]["DO2"]
-    second.update(portName="COM9", wiring={"DO2": {"device": "RewardValve", "side": "right"}})
+    second.update(portName="COM9", wiring={"DO2": {"device": "RewardValve", "name": "right"}})
     rig["behaviorBoard"]["second"] = second
-    with pytest.raises(ValidationError, match="behaviorBoard main and second each wire a RewardValve, and a rig's reward valves are on one board"):
+    model = LabRig.model_validate(rig)
+    assert model.reward_valves() == {"RewardValve-Left": ("BehaviorBoard-Main", "DO1"), "RewardValve-Right": ("BehaviorBoard-Second", "DO2")}
+    second["wiring"]["DO2"]["name"] = "left"
+    with pytest.raises(ValidationError, match="rig.yml's wiring has more than one RewardValve named left, and each valve's name is its own"):
         LabRig.model_validate(rig)
 
 
 def test_zapit_needs_its_trigger_line():
     rig = copy.deepcopy(RIG)
-    rig["behaviorBoard"]["main"]["wiring"] = {**CAMERA_LINE, "DO1": {"device": "RewardValve", "side": "left"}}
+    rig["behaviorBoard"]["main"]["wiring"] = {**CAMERA_LINE, "DO1": {"device": "RewardValve", "name": "left"}}
     with pytest.raises(ValidationError, match="rig.yml has zapit, so a board's wiring needs its ZapitTrigger line") as refused:
         LabRig.model_validate(rig)
     assert "`DO3: { device: ZapitTrigger }`" in str(refused.value)
@@ -189,14 +204,16 @@ def test_one_zapit_trigger_per_rig():
 @pytest.mark.parametrize(
     "wiring, message, example",
     [
-        ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "side": "left"},
-          "DO3": {"device": "ZapitTrigger"}}, "has 2 left RewardValves", "`DO1: { device: RewardValve, side: left }`"),
-        ({"DO1": {"device": "RewardValve"}, "DO2": {"device": "RewardValve", "side": "right"},
-          "DO3": {"device": "ZapitTrigger"}}, "DO1 has no side", "`DO1: { device: RewardValve, side: left }`"),
-        ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "side": "right"},
+        ({"DO1": {"device": "RewardValve", "name": "left"}, "DO2": {"device": "RewardValve", "name": "left"},
+          "DO3": {"device": "ZapitTrigger"}}, "more than one RewardValve named left", "`name: left` and `name: right`"),
+        ({"DO1": {"device": "RewardValve", "side": "left"}, "DO2": {"device": "RewardValve", "name": "right"},
+          "DO3": {"device": "ZapitTrigger"}}, "DO1 has no name", "`DO1: { device: RewardValve, name: left }` (RewardValve-Left); a valve's side is not its name"),
+        ({"DI3": {"device": "RewardValve", "name": "left"}, "DO2": {"device": "RewardValve", "name": "right"},
+          "DO3": {"device": "ZapitTrigger"}}, "RewardValve on DI3, a line the board cannot pulse", "DO0, DO1, DO2, DO3, DOPort0, DOPort1, DOPort2"),
+        ({"DO1": {"device": "RewardValve", "name": "left"}, "DO2": {"device": "RewardValve", "name": "right"},
           "DO3": {"device": "ZapitTrigger"}, "DO0": {"device": "ZapitTrigger"}}, "has 2 ZapitTriggers",
          "`DO3: { device: ZapitTrigger }`"),
-        ({"DO1": {"device": "RewardValve", "side": "left"}, "DO3": {"device": "RewardValve", "side": "right"},
+        ({"DO1": {"device": "RewardValve", "name": "left"}, "DO3": {"device": "RewardValve", "name": "right"},
           "DO2": {"device": "ZapitTrigger"}}, "RewardValve DO3 needs a CalibratedPulse",
          "`DO3: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO3.json }`"),
     ],
@@ -292,8 +309,8 @@ def test_the_mixer_boot_delay_is_in_seconds():
 
 
 def test_the_reward_valve_lines_are_wiring_s():
-    assert LabRig.model_validate(RIG).reward_valve_lines() == {1, 2}
-    assert LabRig.model_validate(rig_with(DO2={"device": "RewardValve", "side": "right"}, DO3={"device": "ZapitTrigger"})).reward_valve_lines() == {2}
+    assert LabRig.model_validate(RIG).reward_valve_lines() == {"DO1", "DO2"}
+    assert LabRig.model_validate(rig_with(DO2={"device": "RewardValve", "name": "right"}, DO3={"device": "ZapitTrigger"})).reward_valve_lines() == {"DO2"}
 
 
 def test_the_preflight_kinds_are_one_list_the_c_sharp_holds_too():

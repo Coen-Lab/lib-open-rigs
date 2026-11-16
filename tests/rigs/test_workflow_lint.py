@@ -20,6 +20,15 @@ def include(path: str, inner: str = "") -> str:
     return f'<Expression xsi:type="IncludeWorkflow" Path="{path}">{inner}</Expression>'
 
 
+def valve(instance: str, board: str = "BehaviorBoard-Main") -> str:
+    """A RewardValve piece, as a task includes one per valve after Rewards."""
+    return include(lint.REWARD_VALVE, f"<Name>RewardValve-{instance}</Name><Board>{board}</Board>"
+                   f"<BoardTriggerCalibratedPulseSubjectName>{board}.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>")
+
+
+VALVES = valve("Left") + valve("Right")
+
+
 def test_the_block_subjects_are_what_each_block_declares():
     for path, subjects in lint.BLOCK_SUBJECTS.items():
         package, resource = path.split(":")
@@ -418,32 +427,23 @@ def pulse_workflow(tmp_path: Path, nodes: str, edges: str) -> lint.Workflow:
 
 
 def test_a_fixed_width_pulse_on_a_reward_valve_is_refused_and_a_calibrated_one_is_not(tmp_path):
-    line = '<Expression xsi:type="Combinator"><Combinator xsi:type="IntProperty"><Value>{}</Value></Combinator></Expression>'
     send = '<Expression xsi:type="MulticastSubject"><Name>{}</Name></Expression>'
     edge = '<Edge From="0" To="1" Label="Source1" />'
-    valves = {1, 2}
-    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "a", line.format(3) + send.format("TriggerPulse"), edge), valves) == []
-    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "b", line.format(2) + send.format("TriggerPulse"), edge), valves) == [
-        "TriggerPulse fires a fixed-width pulse on DO2, a RewardValve"]
-    computed = '<Expression xsi:type="SubscribeSubject"><Name>RewardValveLines</Name></Expression>' + send.format("TriggerPulse")
-    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "c", computed, edge), valves) == [
-        "TriggerPulse is sent a line no IntProperty gives, so it may be a RewardValve's"]
+    valves = {"DO1", "DO2", "DOPort0"}
     written = ('<Expression xsi:type="beh:CreateMessage"><harp:MessageType>Write</harp:MessageType>'
                '<harp:Payload xsi:type="beh:CreateOutputSetPayload"><beh:OutputSet>DO1</beh:OutputSet></harp:Payload></Expression>'
                '<Expression xsi:type="beh:CreateMessage"><harp:MessageType>Write</harp:MessageType>'
                '<harp:Payload xsi:type="beh:CreatePulseDO2Payload"><beh:PulseDO2>10</beh:PulseDO2></harp:Payload></Expression>'
                '<Expression xsi:type="beh:CreateMessage"><harp:MessageType>Write</harp:MessageType>'
-               '<harp:Payload xsi:type="beh:CreateOutputSetPayload"><beh:OutputSet>DO3</beh:OutputSet></harp:Payload></Expression>')
+               '<harp:Payload xsi:type="beh:CreateOutputSetPayload"><beh:OutputSet>DO3</beh:OutputSet></harp:Payload></Expression>'
+               '<Expression xsi:type="beh:CreateMessage"><harp:MessageType>Write</harp:MessageType>'
+               '<harp:Payload xsi:type="beh:CreatePulseDOPort0Payload"><beh:PulseDOPort0>10</beh:PulseDOPort0></harp:Payload></Expression>')
     assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "d", written, ""), valves) == [
-        "CreateOutputSetPayload writes DO1, a RewardValve, itself", "CreatePulseDO2Payload writes DO2, a RewardValve, itself"]
+        "CreateOutputSetPayload writes DO1, a RewardValve, itself", "CreatePulseDO2Payload writes DO2, a RewardValve, itself",
+        "CreatePulseDOPort0Payload writes DOPort0, a RewardValve, itself"]
     calibrated = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orc:FirePulses" /></Expression>'
-                  + send.format("TriggerCalibratedPulse"))
+                  + send.format("BehaviorBoard-Main.TriggerCalibratedPulse"))
     assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "e", calibrated, edge), valves) == []
-    renamed = ('<Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.PulseController.bonsai">'
-               '<TriggerPulseSubjectName>TriggerValve</TriggerPulseSubjectName></Expression>'
-               + line.format(1) + send.format("TriggerValve"))
-    assert lint.fixed_width_pulses_on_reward_valves(pulse_workflow(tmp_path / "f", renamed, '<Edge From="1" To="2" Label="Source1" />'), valves) == [
-        "TriggerValve fires a fixed-width pulse on DO1, a RewardValve"]
 
 
 MF = 'xmlns:mf="clr-namespace:OpenRigs.Manifest;assembly=OpenRigs.Manifest"'
@@ -636,13 +636,14 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     def root(resource: str) -> lint.ET.Element:
         return lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
     assert rules.zapit_for_task_problems(root("Zapit/ConnectForTask.bonsai")) == []
-    assert rules.manual_rewards_drop_problems(root("BehaviorBoard/ManualRewards.bonsai")) == []
+    assert rules.manual_rewards_drop_problems(root("BehaviorBoard/RewardValve.bonsai")) == []
     group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
-    wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.REWARDS) + group)
-    # Rewards' ManualRewards declares RewardLeft and RewardRight itself (DeclareControls): the task declares neither.
+    wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.REWARDS) + VALVES + group)
+    # Each RewardValve declares its own manual drop (DeclareDeviceControls, RewardValve-Left.Reward): the task declares none.
     assert lint.zapit_include_problems(wf) == [] and lint.reward_problems(wf) == [] and lint.undeclared_commands(wf) == []
-    copy = workflow(tmp_path / "b", include(lint.REWARDS) + include(lint.EXPERIMENT_CONTROL, "<Commands><Command><Name>RewardLeft</Name></Command></Commands>"))
-    assert lint.declared_twice(copy) == ["the command RewardLeft is declared by ExperimentControl and by ManualRewards"]
+    assert {name for _, kind, name in lint.control_declarations(wf) if kind == "command"} == {"RewardValve-Left.Reward", "RewardValve-Right.Reward"}
+    copy = workflow(tmp_path / "b", include(lint.REWARDS) + VALVES + include(lint.EXPERIMENT_CONTROL, "<Commands><Command><Name>RewardValve-Left.Reward</Name></Command></Commands>"))
+    assert lint.declared_twice(copy) == ["the command RewardValve-Left.Reward is declared by ExperimentControl and by RewardValve-Left"]
     # ConnectZapit declares both of Zapit's subjects: a task's copy of either is refused.
     replies = '<Expression xsi:type="rx:PublishSubject"><rx:Name>ZapitReplies</rx:Name></Expression>'
     assert lint.zapit_include_problems(workflow(tmp_path / "c", include(lint.ZAPIT_FOR_TASK) + replies)) == [
@@ -686,7 +687,7 @@ def test_the_spout_step_size_is_the_lick_spout_stage_s_and_the_workflow_declares
 def test_a_task_without_its_pieces_copies_passes_and_one_with_them_does_not(tmp_path, monkeypatch):
     # As a workflow repo reads them: from the OpenRigs.Devices package Bonsai.config pins, the rig list's pieces inside it.
     dll = b"MZ"
-    for resource in ("DomeHardware.bonsai", "LickSpoutStage.bonsai", "BehaviorBoard/ManualRewards.bonsai"):
+    for resource in ("DomeHardware.bonsai", "LickSpoutStage.bonsai", "BehaviorBoard/RewardValve.bonsai"):
         dll += b"\x00\x10" + (ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes()
     (tmp_path / ".bonsai").mkdir()
     (tmp_path / ".bonsai" / "Bonsai.config").write_text('<Packages><Package id="OpenRigs.Devices" version="0.1.1-x.2" /></Packages>')
@@ -694,11 +695,11 @@ def test_a_task_without_its_pieces_copies_passes_and_one_with_them_does_not(tmp_
     with zipfile.ZipFile(tmp_path / "local_packages" / "OpenRigs.Devices.0.1.1-x.2.nupkg", "w") as z:
         z.writestr("lib/net472/OpenRigs.Devices.dll", dll + b"\x00")
     monkeypatch.setattr(lint, "LIB_SRC", tmp_path / "nowhere")
-    pieces = include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + include(lint.MANUAL_REWARDS)
+    pieces = include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + VALVES
     task = "<Parameters><Parameter><Name>TrainingStage</Name></Parameter></Parameters>"
     without = workflow(tmp_path, pieces + include(lint.EXPERIMENT_CONTROL, task))
     assert lint.undeclared_commands(without) == [] and lint.declared_twice(without) == [] and lint.spout_step_size_problems(without) == []
-    assert {(who, name) for who, kind, name in lint.control_declarations(without) if kind == "command"} >= {("LickSpoutStage", "SpoutsHome"), ("ManualRewards", "RewardRight")}
+    assert {(who, name) for who, kind, name in lint.control_declarations(without) if kind == "command"} >= {("LickSpoutStage", "SpoutsHome"), ("RewardValve-Right", "RewardValve-Right.Reward")}
     (tmp_path / "src" / "main.bonsai").unlink()
     (tmp_path / "src").rmdir()
     copies = "<Commands><Command><Name>SpoutsHome</Name></Command></Commands>"
@@ -773,24 +774,32 @@ def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_pat
     logs = include("OpenRigs.Logging:LogLabExperiment.bonsai") + include(lint.BOARD)
     wf = workflow(tmp_path, logs + RECORDS + LIVE)
     assert lint.experiment_records_problems(wf) == [] and lint.experiment_log_problems(wf) == [] and lint.expected_files_problems(wf) == []
-    late = workflow(tmp_path / "b", logs + RECORDS + include(lint.REWARDS) + LIVE)
+    late = workflow(tmp_path / "b", logs + RECORDS + include(lint.REWARDS) + VALVES + LIVE)
     assert lint.experiment_records_problems(late) == ["ExperimentRecords is not the last top-level node (StreamDevices alone may follow)"]
     assert lint.reward_problems(late) == ["Rewards comes after ExperimentRecords"]
     # Rewards are not records: a workflow that gives them includes Rewards itself, before it sends one and before ExperimentRecords.
     sends = '<Expression xsi:type="MulticastSubject"><Name>RewardRequests</Name></Expression>'
-    rewards = workflow(tmp_path / "e", logs + include(lint.REWARDS) + sends + RECORDS + LIVE)
+    rewards = workflow(tmp_path / "e", logs + include(lint.REWARDS) + VALVES + sends + RECORDS + LIVE)
     assert lint.experiment_records_problems(rewards) == [] and lint.reward_problems(rewards) == []
     assert lint.reward_problems(workflow(tmp_path / "g", logs + sends + RECORDS + LIVE)) == ["the workflow includes Rewards 0 times, not once"]
-    assert lint.reward_problems(workflow(tmp_path / "h", logs + sends + include(lint.REWARDS) + RECORDS + LIVE)) == [
+    assert lint.reward_problems(workflow(tmp_path / "h", logs + sends + include(lint.REWARDS) + VALVES + RECORDS + LIVE)) == [
         "Rewards comes after a reward is sent into RewardRequests"]
-    # A task's own copies of what Rewards holds: the subject declared or read, DeliverReward, ManualRewards, a manual drop.
+    # Every valve after Rewards, which declares what they send into; Rewards with no valve gives no reward.
+    assert lint.reward_problems(workflow(tmp_path / "j", logs + VALVES + include(lint.REWARDS) + RECORDS + LIVE)) == [
+        "Rewards comes after a RewardValve piece"]
+    assert lint.reward_problems(workflow(tmp_path / "k", logs + VALVES + RECORDS + LIVE)) == ["the workflow includes Rewards 0 times, not once"]
+    assert lint.reward_problems(workflow(tmp_path / "l", logs + include(lint.REWARDS) + sends + RECORDS + LIVE)) == [
+        "the workflow includes Rewards and no RewardValve piece, so no reward can be given"]
+    # A task's own copies of what Rewards and the valves hold: the requests declared or read, a delivery or valve sent.
     own = ('<Expression xsi:type="rx:BehaviorSubject"><rx:Name>RewardRequests</rx:Name></Expression>'
-           '<Expression xsi:type="SubscribeSubject"><Name>RewardRequests</Name></Expression>' + include(lint.DELIVER_REWARD) + include(lint.MANUAL_REWARDS)
-           + f'<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:OnCommand" {CONTROL}><orcl:Name>RewardLeft</orcl:Name></Combinator></Expression>')
-    assert lint.reward_problems(workflow(tmp_path / "i", logs + include(lint.REWARDS) + own + sends + RECORDS + LIVE)) == [
-        "the workflow declares RewardRequests itself (Rewards does)", "the workflow reads RewardRequests itself (Rewards delivers each reward)",
-        "the workflow includes DeliverReward itself (Rewards does)", "the workflow includes ManualRewards itself (Rewards does)",
-        "the workflow handles RewardLeft itself (Rewards' ManualRewards does)"]
+           '<Expression xsi:type="SubscribeSubject"><Name>RewardRequests</Name></Expression>'
+           '<Expression xsi:type="MulticastSubject"><Name>RewardValves</Name></Expression>'
+           '<Expression xsi:type="MulticastSubject"><Name>RewardDelivered</Name></Expression>')
+    assert lint.reward_problems(workflow(tmp_path / "i", logs + include(lint.REWARDS) + VALVES + own + sends + RECORDS + LIVE)) == [
+        "the workflow declares RewardRequests itself (Rewards does)",
+        "the workflow reads RewardRequests itself (each RewardValve piece delivers its rewards)",
+        "the workflow sends into RewardValves itself (Rewards and the RewardValve pieces do)",
+        "the workflow sends into RewardDelivered itself (Rewards and the RewardValve pieces do)"]
     # A rig without reward valves (no sender) includes none.
     assert lint.reward_problems(wf) == []
     own = workflow(tmp_path / "c", logs + include("OpenRigs.Logging:LogControlEvents.bonsai") + manifest_node("auto")
@@ -936,15 +945,30 @@ def test_upstream_s_video_logs_are_refused(tmp_path, log):
     wf = workflow(tmp_path, MIXED + include(f"OpenRigs.Logging:{log}.bonsai"))
     assert lint.hardware_problems(wf) == [f"the workflow includes {log}, which a lab workflow does not use: each camera piece logs itself (LogVideoFfmpeg)"]
 
-def test_rewards_declares_the_requests_and_delivers_each_with_the_manual_drops():
+def test_rewards_checks_each_request_against_the_valves_and_logs_each_delivery():
     text = (ROOT / "src" / "OpenRigs.Devices" / "BehaviorBoard" / "Rewards.bonsai").read_text(encoding="utf-8-sig")
     root = lint.ET.fromstring(text.encode("utf-8"))
     nodes, edges = lint.nodes_and_edges(lint.child(root, lint.W + "Workflow"))
-    deliver = next(i for i, n in enumerate(nodes) if n.get("Path") == lint.DELIVER_REWARD)
-    inputs = {label: lint._name(nodes[a]) or lint.kind(nodes[a]) for a, b, label in edges if b == deliver}  # pyright: ignore[reportPrivateUsage]
-    assert inputs == {"Source1": "RewardRequests", "Source2": "PropertyMapping"}
-    assert any(n.get("Path") == lint.MANUAL_REWARDS for n in nodes)
+    check = next(i for i, n in enumerate(nodes) if lint.kind(n) == "dev:RequireRewardValve")
+    inputs = {label: lint._name(nodes[a]) for a, b, label in edges if b == check}  # pyright: ignore[reportPrivateUsage]
+    assert inputs == {"Source1": "RewardRequests", "Source2": "RewardValves"}
     assert lint.shared_mapping_problems(root) == []
+
+
+def test_a_reward_valve_is_a_piece_named_by_its_valve_on_its_board(tmp_path):
+    wf = workflow(tmp_path, MIXED + include(lint.REWARDS) + VALVES)
+    assert lint.hardware_problems(wf) == [] and lint.reward_problems(wf) == []
+    wrong = (include(lint.REWARD_VALVE, "<Name>Valve-Left</Name><Board>BehaviorBoard-Main</Board>"
+                     "<BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>")
+             + include(lint.REWARD_VALVE, "<Name>RewardValve-Right</Name><Board>BehaviorBoard-Second</Board>"
+                       "<BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>"))
+    assert lint.hardware_problems(workflow(tmp_path / "b", MIXED + include(lint.REWARDS) + wrong)) == [
+        "RewardValve Valve-Left is not named RewardValve-<Instance>",
+        "RewardValve's Board BehaviorBoard-Second is not a BehaviorBoard piece's Name",
+        "RewardValve BehaviorBoard-Second's BoardTriggerCalibratedPulseSubjectName is BehaviorBoard-Main.TriggerCalibratedPulse, "
+        "not BehaviorBoard-Second.TriggerCalibratedPulse"]
+    twice = workflow(tmp_path / "c", MIXED + include(lint.REWARDS) + VALVES + VALVES)
+    assert "two pieces are named RewardValve-Left" in lint.hardware_problems(twice)
 
 
 def test_every_workflow_with_experiment_control_takes_the_launch_id_from_its_top_level(tmp_path):

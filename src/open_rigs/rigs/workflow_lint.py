@@ -35,7 +35,6 @@ SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
 SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
 ZAPIT_FOR_TASK = "OpenRigs.Devices:Zapit.ConnectForTask.bonsai"
-MANUAL_REWARDS = "OpenRigs.Devices:BehaviorBoard.ManualRewards.bonsai"
 REWARDS = "OpenRigs.Devices:BehaviorBoard.Rewards.bonsai"
 MANUAL_PULSES = "OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai"
 BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
@@ -46,7 +45,6 @@ NO_EXPERIMENT_FOLDER = "OpenRigs.Logging:NoExperimentFolder.bonsai"
 # The subject every NoExperimentFolder workflow's pieces see: no mouse's, one name for them all.
 NO_EXPERIMENT_SUBJECT = "_no-experiment_"
 EXPERIMENT_CONTROL = "OpenRigs.Control:ExperimentControl.bonsai"
-DELIVER_REWARD = "OpenRigs.Devices:BehaviorBoard.DeliverReward.bonsai"
 PLAY_PENALTY_SOUND = "OpenRigs.Audio:PlayPenaltySound.bonsai"
 SET_ZAPIT_TRIGGER_LINE = "OpenRigs.Devices:BehaviorBoard.SetZapitTriggerLine.bonsai"
 LOG_RNG_SEED = "OpenRigs.Logging:LogRngSeed.bonsai"
@@ -69,13 +67,15 @@ PROJECTOR_DISPLAY = "OpenRigs.Vision:ProjectorDisplay.bonsai"
 RAW_PROJECTOR_DISPLAY = "OpenRigs.Vision:RawProjectorDisplay.bonsai"  # the same window unmapped: one or the other
 PULSE_OUTPUTS = DEVICES + "BehaviorBoard.PulseOutputs.bonsai"
 RUNNING_WHEEL = DEVICES + "BehaviorBoard.RunningWheel.bonsai"
+REWARD_VALVE = DEVICES + "BehaviorBoard.RewardValve.bonsai"
 # What each piece takes: Name, Board and Camera name a device; X.Commands / X.Data are the subject properties
 # (CommandsSubjectName, BoardDataSubjectName, ...) that must equal that device's name plus the suffix.
 PIECES = {
     CLOCK_FROM_GENERATOR: ("Name", "Name.Commands", "Name.Data"),
     CLOCK_FROM_BOARD: ("Board", "Board.Commands", "Board.Data"),
     BOARD: ("Name", "Name.Commands", "Name.Data"),
-    PULSE_OUTPUTS: ("Board", "Board.Commands", "Board.Data"),
+    PULSE_OUTPUTS: ("Board", "Board.Commands", "Board.Data", "Board.TriggerCalibratedPulse"),
+    REWARD_VALVE: ("Name", "Board", "Board.TriggerCalibratedPulse"),
     DEVICES + "BehaviorBoard.ZapitTriggerLine.bonsai": ("Board",),
     RUNNING_WHEEL: ("Board", "Board.Commands", "Board.Data"),
     LICKETY_SPLIT: ("Name", "Name.Commands", "Name.Data"),
@@ -90,13 +90,15 @@ PIECES = {
 }
 # The Kind each named piece's Name starts with (Kind-Instance): RigDevice finds the entry by the Instance alone, in the
 # piece's own rig.yml group, so a BehaviorBoard piece named Camera-Main would open the board main and log as a camera.
-KINDS = {CLOCK_FROM_GENERATOR: "TimestampGeneratorGen3", BOARD: "BehaviorBoard", LICKETY_SPLIT: "LicketySplit", CAMERA: "Camera"}
+KINDS = {CLOCK_FROM_GENERATOR: "TimestampGeneratorGen3", BOARD: "BehaviorBoard", LICKETY_SPLIT: "LicketySplit", CAMERA: "Camera",
+         REWARD_VALVE: "RewardValve"}
 ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY, RAW_PROJECTOR_DISPLAY)  # pieces a workflow has at most once
 # Pieces of which a workflow has one or the other, never both: each opens the projector's window.
 EXCLUSIVE = ((PROJECTOR_DISPLAY, RAW_PROJECTOR_DISPLAY),)
 # Each piece that declares its controls named from its device (OpenRigs.Control DeclareDeviceControls), by the property
-# naming the device: a workflow has at most one per device (CameraLiveControls declares <Camera>.ExposureUs).
-DEVICE_DECLARERS = {CAMERA_LIVE_CONTROLS: "Camera"}
+# naming the device: a workflow has at most one per device (CameraLiveControls declares <Camera>.ExposureUs, a
+# RewardValve its manual drop <Name>.Reward).
+DEVICE_DECLARERS = {CAMERA_LIVE_CONTROLS: "Camera", REWARD_VALVE: "Name"}
 # The stage each piece announces into ReadyStages (its AnnounceStage's Stage), which ReadyGate must wait for; a camera
 # announces its own Name. test_ready_stages checks each piece's file (or the file it announces from) says the same.
 READY_STAGES = {CLOCK_FROM_GENERATOR: "HarpClockSet", CLOCK_FROM_BOARD: "HarpClockSet", LICK_SPOUT_STAGE: "SpoutsHomed",
@@ -119,7 +121,7 @@ RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The hardware of a two-spout rig w
 PREFLIGHT_CHECKS = DEVICES + "PreflightChecks.bonsai"
 # Each rig list's taps: its devices' data as a preflight's ticks (PreflightTap into DeviceTicks), so a preflight names none.
 RIG_LIST_TAPS = {path: path.removesuffix(".bonsai") + "Taps.bonsai" for path in RIG_LISTS}
-SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task",
+SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", REWARD_VALVE: "One reward valve, Name",
                           REWARDS: "Every reward a task gives",
                           MANUAL_PULSES: "A person's pulses on a Behavior board's lines",
                           CAMERA_LIVE_CONTROLS: "Optional live controls for one SpinnakerCamera piece",
@@ -128,7 +130,7 @@ SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", M
 LIB_SRC = Path(__file__).parents[2]
 BLOCK_SUBJECTS = {
     ZAPIT_INCLUDE: {"ZapitCommands": "rx:BehaviorSubject", "ZapitReplies": "rx:PublishSubject"},
-    REWARDS: {"RewardRequests": "rx:BehaviorSubject"},
+    REWARDS: {"RewardRequests": "rx:BehaviorSubject", "RewardValves": "rx:ReplaySubject", "RewardDelivered": "rx:BehaviorSubject"},
     SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
     READY_GATE: {"ReadyStages": "rx:ReplaySubject", "HarpClockSet": "rx:AsyncSubject", "Ready": "rx:AsyncSubject"},
     LICK_SPOUT_STAGE: {"LickSpoutStage.Commands": "rx:BehaviorSubject","LickSpoutStage.Homed": "rx:BehaviorSubject",
@@ -140,8 +142,6 @@ BLOCK_SUBJECTS = {
 CARRIED_BLOCKS = {ZAPIT_FOR_TASK: ZAPIT_INCLUDE}
 # A piece's command subject is a BehaviorSubject, its data subject a PublishSubject (named by its properties).
 PIECE_SUBJECTS = {"CommandsSubjectName": "rx:BehaviorSubject", "DataSubjectName": "rx:PublishSubject"}
-# The PulseController's subject that fires a pulse of the line's set width (the DO line, 1 to 3, as an int).
-FIXED_WIDTH_PULSE = "TriggerPulse"
 # The lab's Bonsai setup, one copy that each workflow's .bonsai\Setup.ps1 runs from the open-rigs it pins.
 SETUP_BONSAI = Path(__file__).parents[1] / "scripts" / "setup-bonsai.ps1"
 SETUP_BONSAI_RUN = "open_rigs\\scripts\\setup-bonsai.ps1"
@@ -616,32 +616,24 @@ def ready_announcer_problems(root: ET.Element) -> list[str]:
     return problems
 
 
-def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[int]) -> list[str]:
-    """Every fixed-width pulse the workflow may fire on a RewardValve line (`valve_lines`, rig.yml's, from
-    LabRig.reward_valve_lines). A valve gives water only in pulses sized for it: a reward's by DeliverReward
-    (LoadRewardLine, PlanReward), a calibration's by its own FirePulses, both on TriggerCalibratedPulse. Refused: a
-    value multicast into the PulseController's TriggerPulse (a pulse of whatever width the line's register holds)
-    unless an IntProperty gives it a line that is not a valve's, and a board message that pulses, sets or sizes a
-    valve's line itself (OutputSet, OutputPulseEnable, PulseDO<n>)."""
-    subjects = {FIXED_WIDTH_PULSE} | set(re.findall(r"<TriggerPulseSubjectName>(\w+)</TriggerPulseSubjectName>", wf.text))
+def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[str]) -> list[str]:
+    """Every fixed-width pulse the workflow may fire on a RewardValve line (`valve_lines`, rig.yml's, such as DO1, from
+    LabRig.reward_valve_lines). A valve gives water only in pulses sized for it: a reward's by its RewardValve piece
+    (LoadRewardLine, PlanReward), a calibration's by its own FirePulses, both on its board's TriggerCalibratedPulse,
+    which writes each pulse's width before it sets the line. Refused: a board message that pulses, sets or sizes a
+    valve's line itself (OutputSet, OutputPulseEnable, PulseDO<n>, PulseDOPort<n>)."""
     found = []
     for nodes, edges in _scopes(wf.root):
         for i, node in enumerate(nodes):
-            if node.get(XSI) == "MulticastSubject" and _name(node) in subjects:
-                feeds = [nodes[a] for a, b, _ in edges if b == i]
-                if len(feeds) != 1 or kind(feeds[0]) != "IntProperty":
-                    found.append(f"{_name(node)} is sent a line no IntProperty gives, so it may be a RewardValve's")
-                elif int(_value(feeds[0])) in valve_lines:
-                    found.append(f"{_name(node)} fires a fixed-width pulse on DO{_value(feeds[0])}, a RewardValve")
             payload = next((e for e in node if e.tag.endswith("}Payload")), None)
             if payload is None:
                 continue
             ptype = payload.get(XSI) or ""
             written = " ".join(payload.itertext())
             for line in sorted(valve_lines):
-                if ptype.endswith(f":CreatePulseDO{line}Payload") or (
-                        re.search(r":Create(OutputSet|OutputPulseEnable)Payload$", ptype) and re.search(rf"\bDO{line}\b", written)):
-                    found.append(f"{_name(node) or ptype.split(':')[-1]} writes DO{line}, a RewardValve, itself")
+                if ptype.endswith(f":CreatePulse{line}Payload") or (
+                        re.search(r":Create(OutputSet|OutputPulseEnable)Payload$", ptype) and re.search(rf"\b{line}\b", written)):
+                    found.append(f"{_name(node) or ptype.split(':')[-1]} writes {line}, a RewardValve, itself")
     return found
 
 
@@ -828,28 +820,34 @@ def live_view_problems(wf: Workflow) -> list[str]:
 
 
 def reward_problems(wf: Workflow) -> list[str]:
-    """Every reward is OpenRigs.Devices' BehaviorBoard.Rewards': it declares RewardRequests, gives the controller's
-    manual drops (ManualRewards: RewardLeft, RewardRight) and delivers each reward through DeliverReward. A workflow that
-    sends a reward (a multicast into RewardRequests) includes it once, before it sends any and before ExperimentRecords
-    (rewards are not records). No workflow declares or reads RewardRequests, includes DeliverReward or ManualRewards, or
-    handles RewardLeft or RewardRight itself: a second DeliverReward would open each valve twice, and RewardRequests is a
-    BehaviorSubject (a per-trial sender's completion would close a PublishSubject), so a reader subscribed per trial
-    would be handed the last reward again. A rig without reward valves (the behaviour box) includes none."""
+    """Every reward is OpenRigs.Devices' BehaviorBoard.Rewards' and one BehaviorBoard.RewardValve piece's per valve:
+    Rewards declares RewardRequests, RewardValves and RewardDelivered, refuses a reward for a valve no piece fires and
+    logs each delivery; each valve's piece loads its calibration, gives its own manual drop (<Name>.Reward) and fires the
+    rewards asked of it. A workflow that sends a reward (a multicast into RewardRequests) or has a valve includes Rewards
+    once, before it sends any, before every valve and before ExperimentRecords (rewards are not records), and has at
+    least one valve. No workflow declares or reads RewardRequests itself, or sends into RewardValves or RewardDelivered:
+    RewardRequests is a BehaviorSubject (a per-trial sender's completion would close a PublishSubject), so a reader
+    subscribed per trial would be handed the last reward again. A rig without reward valves (the behaviour box) includes
+    none."""
     count = wf.text.count(f'Path="{REWARDS}"')
     sent = _order(wf.root, lambda n: n.get(XSI) == "MulticastSubject" and _name(n) == "RewardRequests")
-    problems = [f"the workflow includes Rewards {count} times, not once"] if count > 1 or (sent is not None and count != 1) else []
+    valves = _order(wf.root, lambda n: n.get("Path") == REWARD_VALVE)
+    problems = [f"the workflow includes Rewards {count} times, not once"] if count > 1 or ((sent, valves) != (None, None) and count != 1) else []
+    if count and valves is None:
+        problems.append("the workflow includes Rewards and no RewardValve piece, so no reward can be given")
     nodes = list(wf.root.iter(W + "Expression"))
     if any(_declares("RewardRequests")(n) for n in nodes):
         problems.append("the workflow declares RewardRequests itself (Rewards does)")
     if any(n.get(XSI) == "SubscribeSubject" and _name(n) == "RewardRequests" for n in nodes):
-        problems.append("the workflow reads RewardRequests itself (Rewards delivers each reward)")
-    problems += [f"the workflow includes {path.split('.')[-2]} itself (Rewards does)" for path in (DELIVER_REWARD, MANUAL_REWARDS)
-                 if f'Path="{path}"' in wf.text]
-    problems += [f"the workflow handles {name} itself (Rewards' ManualRewards does)" for name in sorted(_on_commands(wf.root) & {"RewardLeft", "RewardRight"})]
+        problems.append("the workflow reads RewardRequests itself (each RewardValve piece delivers its rewards)")
+    problems += [f"the workflow sends into {name} itself (Rewards and the RewardValve pieces do)" for name in ("RewardValves", "RewardDelivered")
+                 if any(n.get(XSI) == "MulticastSubject" and _name(n) == name for n in nodes)]
     at = _order(wf.root, lambda n: n.get("Path") == REWARDS)
     records = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_RECORDS)
     if at is not None and sent is not None and sent < at:
         problems.append("Rewards comes after a reward is sent into RewardRequests")
+    if at is not None and valves is not None and valves < at:
+        problems.append("Rewards comes after a RewardValve piece")
     if at is not None and records is not None and at > records:
         problems.append("Rewards comes after ExperimentRecords")
     return problems
@@ -1123,7 +1121,7 @@ FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is
 FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrial.bonsai"], *FIXED_LOGS["OpenRigs.Devices:Zapit.ZapitLogs.bonsai"]]
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
-               *DEVICE_GROUPS, LICK_SPOUT_STAGE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)
+               *DEVICE_GROUPS, LICK_SPOUT_STAGE, REWARD_VALVE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)
 NO_FILES = ("OpenRigs.Logging:LogController.bonsai", "OpenRigs.Logging:FormatFileName.bonsai", "OpenRigs.Logging:LogControlEvents.bonsai",
             LOG_RNG_SEED)
 # Writers whose file the workflow's XML cannot name: a workflow logs through the blocks above instead.

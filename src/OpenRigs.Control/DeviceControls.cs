@@ -55,6 +55,27 @@ namespace OpenRigs.Control
         }
     }
 
+    /// <summary>OnCommand for a device's command Name.Command.</summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    [Description("Passes the arguments of the device's command <Name>.<Command> through, each time a controller sends it.")]
+    public class OnDeviceCommand
+    {
+        /// <summary>Gets or sets the device.</summary>
+        [Description("The device, such as RewardValve-Left.")]
+        public string Name { get; set; }
+
+        /// <summary>Gets or sets the command, named without the device.</summary>
+        [Description("The command, named without the device (Reward).")]
+        public string Command { get; set; }
+
+        /// <summary>Passes the arguments of each sending of Name.Command through.</summary>
+        public IObservable<string> Process(IObservable<ControlEvent> source)
+        {
+            return new OnCommand { Name = DeviceControls.FullName(Name, Command) }.Process(source);
+        }
+    }
+
     /// <summary>OnParameterSet for a device's parameter Name.Parameter.</summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Transform)]

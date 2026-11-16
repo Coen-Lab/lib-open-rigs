@@ -34,7 +34,6 @@ namespace OpenRigs.Devices.Tests
         // so no workflow declares them for it.
         [DataTestMethod]
         [DataRow("LickSpoutStage.bonsai", "LickSpoutStage")]
-        [DataRow("BehaviorBoard.ManualRewards.bonsai", "ManualRewards")]
         [DataRow("BehaviorBoard.ManualPulses.bonsai", "ManualPulses")]
         public void ThePieceDeclaresWhatItTakes(string file, string piece)
         {

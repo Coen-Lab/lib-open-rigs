@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Reactive.Linq;
 using System.Reflection;
+using Harp.Behavior;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Devices.Rigs;
 
@@ -43,6 +44,24 @@ namespace OpenRigs.Devices.Tests
             {
                 Assert.AreEqual(codec, Deserialize(Template().Replace("codec: h264_nvenc", "codec: " + codec)).VideoEncoder.Codec);
             }
+        }
+
+        // A third valve on a port line, and a valve on a second board: each valve's name and its line's calibrated output
+        // read by the generated C#, as at Start (DO0 and DOPort0 to 2 are outputs only when given).
+        [TestMethod]
+        public void ValvesOnAnyPulsedLineOfAnyBoardDeserialize()
+        {
+            var rig = Deserialize(Template()
+                .Replace("      DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }",
+                         "      DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }\n        DOPort0: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DOPort0.json }")
+                .Replace("      DO2: { device: RewardValve, name: right }",
+                         "      DO2: { device: RewardValve, name: right }\n      DOPort0: { device: RewardValve, name: centre }"));
+            var main = rig.BehaviorBoard["main"];
+            Assert.AreEqual("centre", main.Wiring.DOPort0.Name);
+            Assert.AreEqual("left", main.Wiring.DO1.Name);
+            Assert.IsInstanceOfType(main.PulseController.Outputs.DOPort0, typeof(CalibratedPulse));
+            Assert.IsNull(main.PulseController.Outputs.DO0);
+            Assert.AreEqual(DigitalOutputs.DOPort0, WiredOutputs.Find(rig, "BehaviorBoard-Main", "RewardValve") & DigitalOutputs.DOPort0);
         }
 
         [TestMethod]

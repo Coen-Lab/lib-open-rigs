@@ -15,13 +15,19 @@ class Side(str, Enum):
 
 class WiredLine(BaseSchema):
     """What is plugged into one line of the board. Nothing compares it with a workflow at Start; a
-    rig's reward and Zapit lines are read from it. part and note are for people."""
+    rig's reward valves and Zapit line are read from it. part and note are for people."""
 
     device: str = Field(
         examples=["RewardValve", "CameraTrigger", "Photodiode", "ZapitTrigger"],
         description=r"What is on the line: one of the wiredDevices in the lab's device dictionary (config\device-dictionary.json on its share). Nothing checks it against that list.",
     )
-    side: Optional[Side] = Field(default=None, description="The side it serves, where that matters (a reward valve).")
+    side: Optional[Side] = Field(default=None, description="The side it serves, where that matters (a lick spout stage's motor).")
+    name: Optional[str] = Field(
+        default=None,
+        pattern=r"^[a-z][a-z0-9]*$",
+        examples=["left", "right", "centre"],
+        description="The device's own name where it is a piece of its own: a reward valve's, its piece RewardValve-<Name> (left: RewardValve-Left), one valve to a name on the rig.",
+    )
     targets: Optional[List[str]] = Field(
         default=None,
         examples=[["Camera-Face", "Camera-Pupil", "Camera-Body"]],

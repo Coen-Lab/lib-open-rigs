@@ -1053,8 +1053,21 @@
       "title": "PulseOutput"
     },
     "PulseOutputs": {
-      "description": "The pulse source of each behavior board digital output line. Each line appears once.\n\nAll three lines are required: a union has no default that survives code generation, so an\nunused line is written as a FixedPulse with a width of 0.",
+      "description": "The pulse source of each behavior board digital output line. Each line appears once.\n\nDO1 to DO3 are required, an unused one written as a FixedPulse with a width of 0; DO0 and\nDOPort0 to DOPort2, the board's other pulsed lines, are given only when one is used (a reward\nvalve on it).",
       "properties": {
+        "DO0": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PulseOutput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pulse source for DO0, when it is pulsed.",
+          "title": "Do0"
+        },
         "DO1": {
           "$ref": "#/$defs/PulseOutput",
           "description": "Pulse source for DO1.",
@@ -1069,6 +1082,45 @@
           "$ref": "#/$defs/PulseOutput",
           "description": "Pulse source for DO3; a FixedPulse of width 0 if unused.",
           "title": "Do3"
+        },
+        "DOPort0": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PulseOutput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pulse source for DOPort0, when it is pulsed.",
+          "title": "DoPort0"
+        },
+        "DOPort1": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PulseOutput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pulse source for DOPort1, when it is pulsed.",
+          "title": "DoPort1"
+        },
+        "DOPort2": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PulseOutput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pulse source for DOPort2, when it is pulsed.",
+          "title": "DoPort2"
         }
       },
       "required": [
@@ -1437,7 +1489,7 @@
       "type": "object"
     },
     "WiredLine": {
-      "description": "What is plugged into one line of the board. Nothing compares it with a workflow at Start; a\nrig's reward and Zapit lines are read from it. part and note are for people.",
+      "description": "What is plugged into one line of the board. Nothing compares it with a workflow at Start; a\nrig's reward valves and Zapit line are read from it. part and note are for people.",
       "properties": {
         "device": {
           "description": "What is on the line: one of the wiredDevices in the lab's device dictionary (config\\device-dictionary.json on its share). Nothing checks it against that list.",
@@ -1460,8 +1512,27 @@
             }
           ],
           "default": null,
-          "description": "The side it serves, where that matters (a reward valve).",
+          "description": "The side it serves, where that matters (a lick spout stage's motor).",
           "title": "Side"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The device's own name where it is a piece of its own: a reward valve's, its piece RewardValve-<Name> (left: RewardValve-Left), one valve to a name on the rig.",
+          "examples": [
+            "left",
+            "right",
+            "centre"
+          ],
+          "title": "Name"
         },
         "targets": {
           "anyOf": [
