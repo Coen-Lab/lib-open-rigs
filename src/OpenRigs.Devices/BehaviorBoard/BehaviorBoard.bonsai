@@ -88,8 +88,11 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:ClearOutputsOnStop">
           <dev:PortName>UNMAPPED</dev:PortName>
-          <dev:Outputs>DO3</dev:Outputs>
+          <dev:Outputs>None</dev:Outputs>
         </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
       </Expression>
     </Nodes>
     <Edges>
@@ -107,8 +110,9 @@
       <Edge From="9" To="10" Label="Source1" />
       <Edge From="10" To="19" Label="Source1" />
       <Edge From="0" To="15" Label="Source1" />
+      <Edge From="0" To="20" Label="Source1" />
       <Edge From="15" To="16" Label="Source1" />
-      <Edge From="15" To="17" Label="Source1" />
+      <Edge From="20" To="17" Label="Source1" />
       <Edge From="16" To="19" Label="Source2" />
       <Edge From="17" To="18" Label="Source1" />
       <Edge From="18" To="19" Label="Source3" />

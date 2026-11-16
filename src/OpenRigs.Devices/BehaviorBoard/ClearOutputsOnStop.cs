@@ -18,7 +18,7 @@ namespace OpenRigs.Devices
     /// so disposing it closes the board first, then it opens the port itself and writes OutputClear.
     /// </summary>
     [Combinator]
-    [Description("Passes the Behavior board's events through. When the workflow stops, however it stops, it lets the board close its port, then opens the port and writes OutputClear for Outputs. Best effort: a port that cannot be opened is passed over.")]
+    [Description("Passes the Behavior board's events through. When the workflow stops, however it stops, it lets the board close its port, then opens the port and writes OutputClear for Outputs. Best effort: a port that cannot be opened, or no longer exists, is passed over.")]
     [WorkflowElementCategory(ElementCategory.Sink)]
     public class ClearOutputsOnStop
     {
@@ -29,22 +29,21 @@ namespace OpenRigs.Devices
         [Description("The Behavior board's serial port.")]
         public string PortName { get; set; }
 
-        /// <summary>Gets or sets the lines cleared when the workflow stops.</summary>
-        [Description("The lines cleared when the workflow stops.")]
-        public DigitalOutputs Outputs { get; set; } = DigitalOutputs.DO3;
+        /// <summary>Gets or sets the lines cleared when the workflow stops; none until mapped.</summary>
+        [Description("The lines cleared when the workflow stops. None until mapped, so a lost mapping clears nothing.")]
+        public DigitalOutputs Outputs { get; set; }
 
         /// <summary>Passes the events through and clears the lines when unsubscribed.</summary>
         public IObservable<HarpMessage> Process(IObservable<HarpMessage> source)
         {
             return Observable.Create<HarpMessage>(observer =>
             {
-                var portName = PortName;
-                var outputs = Outputs;
                 var subscription = source.SubscribeSafe(observer);
                 return Disposable.Create(() =>
                 {
                     subscription.Dispose();
-                    Clear(portName, outputs);
+                    // Read now, not at subscription: a mapping that arrives after Start still counts.
+                    Clear(PortName, Outputs);
                 });
             });
         }
@@ -73,9 +72,9 @@ namespace OpenRigs.Devices
                 {
                     Thread.Sleep(RetryMs); // the board's port is released a moment after its close returns
                 }
-                catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException)
+                catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException || ex is ArgumentException)
                 {
-                    return false; // no such port: nothing to clear
+                    return false; // no such port (a board unplugged mid-run, or no valid name): nothing to clear
                 }
             }
             return false;
