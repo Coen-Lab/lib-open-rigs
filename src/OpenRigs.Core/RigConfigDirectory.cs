@@ -40,6 +40,24 @@ namespace OpenRigs.Core
         /// </summary>
         public static string ResolveFile(string directory, string relativePath, string setting = null)
         {
+            var path = FilePath(directory, relativePath, setting);
+            if (!File.Exists(path))
+            {
+                throw new InvalidOperationException(string.IsNullOrEmpty(setting)
+                    ? "No rig file '" + relativePath + "'. Expected: " + path
+                    : "rig.yml's " + setting + " names " + relativePath + ", and there is no such file: " + path);
+            }
+
+            return path;
+        }
+
+        /// <summary>
+        /// The full path of a file rig.yml names relative to its folder (or <paramref name="directory"/>), whether or
+        /// not it exists: every rig.yml file path goes through here, so each is relative. Throws if it is empty or a full
+        /// path, naming <paramref name="setting"/> when given.
+        /// </summary>
+        public static string FilePath(string directory, string relativePath, string setting = null)
+        {
             var named = string.IsNullOrEmpty(setting) ? "The rig file path" : "rig.yml's " + setting;
             if (string.IsNullOrEmpty(relativePath))
             {
@@ -60,15 +78,7 @@ namespace OpenRigs.Core
                     "No rig configuration directory was given to resolve '" + relativePath + "'.");
             }
 
-            var path = Path.GetFullPath(Path.Combine(directory, relativePath));
-            if (!File.Exists(path))
-            {
-                throw new InvalidOperationException(string.IsNullOrEmpty(setting)
-                    ? "No rig file '" + relativePath + "'. Expected: " + path
-                    : named + " names " + relativePath + ", and there is no such file: " + path);
-            }
-
-            return path;
+            return Path.GetFullPath(Path.Combine(directory, relativePath));
         }
     }
 }

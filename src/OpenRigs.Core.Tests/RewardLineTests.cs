@@ -90,6 +90,15 @@ namespace OpenRigs.Core.Tests
             return Load(Rig, Fixture);
         }
 
+        // Round 3 LM2: a valve artefact given as a full path was read; every rig.yml file is relative to its folder.
+        [TestMethod]
+        public void AFullPathArtefactIsRefusedNamingItsKey()
+        {
+            var full = Path.Combine(folder, "calibration", "valve-DO1.json");
+            var message = Refusal(Rig.Replace("artefact: calibration/valve-DO1.json", "artefact: '" + full + "'"), Fixture);
+            StringAssert.Contains(message, "rig.yml's behaviorBoard.main.pulseController.outputs.DO1.artefact is a full path, " + full);
+        }
+
         [TestMethod]
         public void TheFixtureRoundTrips()
         {

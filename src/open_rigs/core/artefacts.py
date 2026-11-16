@@ -8,9 +8,10 @@ them with `rig_artefacts` instead.
 
 import types
 import typing
+from pathlib import PureWindowsPath
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import AfterValidator, BaseModel, Field, RootModel
 from pydantic.fields import FieldInfo
 
 __all__ = ["ArtefactPath", "rig_artefacts"]
@@ -27,11 +28,20 @@ class _ArtefactMarker:
 
 _MARKER = _ArtefactMarker()
 
-ArtefactPath = Annotated[str, _MARKER, Field(json_schema_extra={SCHEMA_TAG: True})]
-"""A file path relative to the rig configuration directory, such as `calibration/valve-DO1.json`.
+def _relative(value: str) -> str:
+    # OpenRigs.Core RigConfigDirectory.FilePath refuses a full path at Start, for every file rig.yml names.
+    path = PureWindowsPath(value)
+    if path.drive or path.root:
+        raise ValueError(f"{value} is a full path: give it relative to rig.yml's folder, as `calibration/{path.name}`")
+    return value
+
+
+ArtefactPath = Annotated[str, _MARKER, AfterValidator(_relative), Field(json_schema_extra={SCHEMA_TAG: True})]
+"""A file path relative to the rig configuration directory, such as `calibration/valve-DO1.json`; a full path is
+refused, here and at Start.
 
 It stays a plain string in generated code; rig workflows resolve it with OpenRigs.Core's
-ResolveRigFile against the directory ResolveRigConfigDirectory returns.
+ResolveRigFile (or RigConfigDirectory.FilePath) against the directory ResolveRigConfigDirectory returns.
 """
 
 

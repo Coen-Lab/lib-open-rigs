@@ -83,9 +83,22 @@ def test_projector_files_are_relative_to_rig_yml(key, path):
     rig = copy.deepcopy(RIG)
     rig["projectionCalibration"][key] = path
     name = path.replace("\\", "/").rsplit("/", 1)[1]
-    with pytest.raises(ValidationError, match=f"projectionCalibration.{key} is a full path") as refused:
+    with pytest.raises(ValidationError, match=f"projectionCalibration.{key}\n.* is a full path") as refused:
         LabRig.model_validate(rig)
-    assert f"`{key}: calibration/{name}`" in str(refused.value)
+    assert f"`calibration/{name}`" in str(refused.value)
+
+
+@pytest.mark.parametrize("edit", [
+    lambda rig: rig["behaviorBoard"]["main"]["pulseController"]["outputs"]["DO1"].update(artefact="C:\\RigConfigs\\RIG\\calibration\\valve-DO1.json"),
+    lambda rig: rig["speakerArray"]["speakers"]["centre"].update(filter="/calibration/speaker-centre.json"),
+    lambda rig: rig["speakerArray"].update(backgroundNoise="D:/shared/sounds/background_noise.wav"),
+])
+def test_every_rig_file_is_relative_to_rig_yml(edit):
+    # Round 3 LM2: only the projector's files refused a full path; the valves', the speakers' and the noise's passed.
+    rig = copy.deepcopy(RIG)
+    edit(rig)
+    with pytest.raises(ValidationError, match="is a full path: give it relative to rig.yml's folder"):
+        LabRig.model_validate(rig)
 
 
 def test_old_keys_gone():

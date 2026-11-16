@@ -82,6 +82,21 @@ namespace OpenRigs.Audio.Tests
             }
         }
 
+        // Round 3 LM2: a filter or the background noise given as a full path was read; every rig.yml file is relative to
+        // its folder (OpenRigs.Core RigConfigDirectory.FilePath), as the projector's and the valves' are.
+        [TestMethod]
+        public void AFullPathFilterOrBackgroundNoiseIsRefusedNamingItsKey()
+        {
+            var rig = Rig();
+            var full = Path.Combine(Path.GetDirectoryName(rig), "calibration", "speaker-left.json");
+            var filter = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(
+                "    left:\n      channel: 0\n      filter: " + full + "\n"), "TEST-RIG"));
+            StringAssert.Contains(filter.Message, "rig.yml's speakerArray.speakers.left.filter is a full path, " + full);
+            var noise = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(
+                extra: "  syncChannel: 31\n  penaltySoundChannel: 2\n  backgroundNoise: " + full + "\n"), "TEST-RIG"));
+            StringAssert.Contains(noise.Message, "rig.yml's speakerArray.backgroundNoise is a full path");
+        }
+
         // The lab's one background noise is rig.yml's speakerArray.backgroundNoise (16 Nov 2026), relative to rig.yml's
         // folder (../shared/sounds/background_noise.wav on a rig), read as stored; refused, naming the file, when rig.yml
         // names none, it is missing or it is at another rate.

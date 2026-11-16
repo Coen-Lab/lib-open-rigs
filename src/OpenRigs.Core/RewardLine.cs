@@ -147,7 +147,8 @@ namespace OpenRigs.Core
             if (artefact == null) throw new InvalidOperationException(where + " is a CalibratedPulse that names no artefact.");
 
             var directory = string.IsNullOrEmpty(calibrationDirectory) ? Path.GetDirectoryName(Path.GetFullPath(rigFile)) : calibrationDirectory;
-            line.CalibrationPath = Path.GetFullPath(Path.IsPathRooted(artefact) ? artefact : Path.Combine(directory, artefact));
+            line.CalibrationPath = RigConfigDirectory.FilePath(directory, artefact,
+                "behaviorBoard." + valve.Board.Instance + ".pulseController.outputs." + valve.Line + ".artefact");
             if (!File.Exists(line.CalibrationPath))
             {
                 throw new InvalidOperationException(where + " has no valve calibration: there is no " + line.CalibrationPath + ". Calibrate the valve on this machine.");

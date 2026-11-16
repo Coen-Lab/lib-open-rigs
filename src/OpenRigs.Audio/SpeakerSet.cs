@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using OpenCV.Net;
+using OpenRigs.Core;
 using OpenRigs.Core.Calibration;
 using System;
 using System.Collections.Generic;
@@ -212,7 +213,7 @@ namespace OpenRigs.Audio
             var read = new List<Speaker>();  // every speaker, its filter good or not, for the channel checks
             var folder = Path.GetDirectoryName(path);
             var noise = Text(Child(array, "backgroundNoise"));
-            if (noise != null) set.BackgroundNoiseFile = Path.GetFullPath(Path.IsPathRooted(noise) ? noise : Path.Combine(folder, noise));
+            if (noise != null) set.BackgroundNoiseFile = RigConfigDirectory.FilePath(folder, noise, "speakerArray.backgroundNoise");
             foreach (var entry in entries)
             {
                 var position = Child(entry.Settings, "position") as YamlMappingNode;
@@ -225,7 +226,7 @@ namespace OpenRigs.Audio
                 };
                 read.Add(speaker);
                 var filterPath = Text(Child(entry.Settings, "filter"));
-                var full = Path.GetFullPath(Path.IsPathRooted(filterPath) ? filterPath : Path.Combine(folder, filterPath));
+                var full = RigConfigDirectory.FilePath(folder, filterPath, "speakerArray.speakers." + entry.Name + ".filter");
                 if (!File.Exists(full))
                 {
                     problems.Add("speaker '" + entry.Name + "' filter not found: " + full);

@@ -22,6 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- RigConfigDirectory.FilePath: every rig.yml file path relative to its folder, the speakers' too. -->
+    <InternalsVisibleTo Include="OpenRigs.Audio" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Bonsai.Core" Version="2.9.0" />
     <PackageReference Include="Bonsai.Harp" Version="3.6.1" />
     <PackageReference Include="Bonsai.System" Version="2.9.0" />
