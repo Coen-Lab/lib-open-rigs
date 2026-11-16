@@ -11,8 +11,23 @@
     <PackageReference Include="MSTest.TestFramework" Version="3.6.3" />
   </ItemGroup>
 
+  <!-- PiecesSubscribeTests: each piece built and subscribed here, so every assembly its workflow names -->
+  <ItemGroup>
+    <None Update="Pieces\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bonsai.Scripting.Expressions" Version="2.10.0" />
+    <PackageReference Include="Bonsai.Mixer" Version="0.2.0" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Devices\OpenRigs.Devices.csproj" />
+    <ProjectReference Include="..\OpenRigs.Video\OpenRigs.Video.csproj" />
+    <ProjectReference Include="..\OpenRigs.Logging\OpenRigs.Logging.csproj" />
+    <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
+    <ProjectReference Include="..\OpenRigs.Vision\OpenRigs.Vision.csproj" />
+    <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
   </ItemGroup>
 
 </Project>
