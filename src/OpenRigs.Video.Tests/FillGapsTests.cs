@@ -10,7 +10,7 @@ namespace OpenRigs.Video.Tests
     {
         static IObservable<int?> Frames(params int[] counters)
         {
-            return counters.Select(c => (int?)c).ToObservable().FillGaps(f => f.Value, (previous, current) => current - previous - 1);
+            return counters.Select(c => (int?)c).ToObservable().FillGaps(f => f.Value, (previous, current) => current - previous - 1, "Camera-Face");
         }
 
         // A dropped frame keeps its place as a default, so each later frame still pairs with its own trigger.
@@ -36,6 +36,7 @@ namespace OpenRigs.Video.Tests
             Frames(5, 6, 2, 3).Subscribe(seen.Add, e => error = e);
             CollectionAssert.AreEqual(new int?[] { 5, 6 }, seen);
             Assert.IsInstanceOfType(error, typeof(InvalidOperationException));
+            StringAssert.StartsWith(error.Message, "Camera-Face: the frame counter went back, from 6 to 2");
         }
 
         // The camera's own error (not found, unplugged) reaches the workflow instead of being thrown on its thread.
@@ -44,7 +45,7 @@ namespace OpenRigs.Video.Tests
         {
             var failure = new InvalidOperationException("Spinnaker camera with serial number 1 was not found.");
             Exception error = null;
-            Observable.Throw<int>(failure).FillGaps((previous, current) => current - previous - 1).Subscribe(_ => { }, e => error = e);
+            Observable.Throw<int>(failure).FillGaps((previous, current) => current - previous - 1, "Camera-Face").Subscribe(_ => { }, e => error = e);
             Assert.AreSame(failure, error);
         }
 

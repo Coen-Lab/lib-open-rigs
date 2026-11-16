@@ -17,6 +17,15 @@ namespace OpenRigs.Core.Tests
         }
 
         [TestMethod]
+        public void NamesTheDeviceBeforeTheMessage()
+        {
+            // RunningWheel and CameraTriggers map their Board here, so a board without the section is named.
+            var require = new RequireValue { Name = "BehaviorBoard-Main", Message = "rig.yml's entry for this board has no runningWheel." };
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => require.Process(Observable.Return((object)null)).Wait());
+            Assert.AreEqual("BehaviorBoard-Main: rig.yml's entry for this board has no runningWheel.", ex.Message);
+        }
+
+        [TestMethod]
         public void RefusesNoMessage()
         {
             Assert.ThrowsException<InvalidOperationException>(() => new RequireValue().Process(Observable.Return("x")));

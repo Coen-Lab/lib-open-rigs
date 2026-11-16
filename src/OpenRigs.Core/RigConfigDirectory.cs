@@ -10,19 +10,19 @@ namespace OpenRigs.Core
     internal static class RigConfigDirectory
     {
         /// <summary>
-        /// The configuration root used when none is specified.
-        /// </summary>
-        public const string DefaultConfigRoot = @"C:\RigConfigs";
-
-        /// <summary>
         /// Returns the full path of the configuration directory for the current machine,
-        /// or throws if it does not exist.
+        /// or throws if no root is given or the directory does not exist.
         /// </summary>
         public static string Resolve(string configRoot)
         {
-            var root = string.IsNullOrEmpty(configRoot) ? DefaultConfigRoot : configRoot;
+            if (string.IsNullOrWhiteSpace(configRoot))
+            {
+                throw new InvalidOperationException(
+                    "ConfigRoot is not set: give ReadLabRig's ConfigRoot, the folder holding each machine's <MACHINE-NAME>\\rig.yml.");
+            }
+
             var machineName = Environment.MachineName;
-            var path = Path.GetFullPath(Path.Combine(root, machineName));
+            var path = Path.GetFullPath(Path.Combine(configRoot, machineName));
             if (!Directory.Exists(path))
             {
                 throw new InvalidOperationException(

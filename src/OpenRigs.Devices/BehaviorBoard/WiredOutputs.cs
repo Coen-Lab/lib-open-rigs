@@ -26,7 +26,7 @@ namespace OpenRigs.Devices
 
         /// <summary>Gets or sets the board's name, Kind-Instance.</summary>
         [Description("The board's name, such as BehaviorBoard-Main.")]
-        public string Board { get; set; } = "BehaviorBoard-Main";
+        public string Board { get; set; }
 
         /// <summary>Gets or sets the device wired to the line.</summary>
         [Description("The device on the line, as wiring names it, such as ZapitTrigger.")]
@@ -81,7 +81,7 @@ namespace OpenRigs.Devices
     {
         /// <summary>Gets or sets the board's name, Kind-Instance.</summary>
         [Description("The board's name, such as BehaviorBoard-Main.")]
-        public string Board { get; set; } = "BehaviorBoard-Main";
+        public string Board { get; set; }
 
         /// <summary>Gets or sets the device wired to the lines.</summary>
         [Description("The device on the lines, as wiring names it, such as RewardValve.")]

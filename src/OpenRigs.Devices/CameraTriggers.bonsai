@@ -15,10 +15,10 @@
       </Expression>
       <Expression xsi:type="PropertyMapping">
         <PropertyMappings>
-          <Property Name="EnableTrigger0" Selector="Settings.CameraTriggerController.Trigger0Enabled" />
-          <Property Name="EnableTrigger1" Selector="Settings.CameraTriggerController.Trigger1Enabled" />
-          <Property Name="Trigger0Frequency" Selector="Settings.CameraTriggerController.Trigger0Frequency" />
-          <Property Name="Trigger1Frequency" Selector="Settings.CameraTriggerController.Trigger1Frequency" />
+          <Property Name="EnableTrigger0" Selector="Trigger0Enabled" />
+          <Property Name="EnableTrigger1" Selector="Trigger1Enabled" />
+          <Property Name="Trigger0Frequency" Selector="Trigger0Frequency" />
+          <Property Name="Trigger1Frequency" Selector="Trigger1Frequency" />
         </PropertyMappings>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
@@ -54,10 +54,21 @@
       <Expression xsi:type="MulticastSubject">
         <Name>StartCameras</Name>
       </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Settings.CameraTriggerController</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RequireValue">
+          <core:Message>rig.yml's entry for this board has no cameraTriggerController: give its trigger0Enabled, trigger0Frequency, trigger1Enabled and trigger1Frequency (CameraTriggers).</core:Message>
+        </Combinator>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
-      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="0" To="11" Label="Source2" />
+      <Edge From="1" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="11" To="2" Label="Source1" />
       <Edge From="2" To="4" Label="Source1" />
       <Edge From="3" To="4" Label="Source2" />
       <Edge From="5" To="7" Label="Source1" />

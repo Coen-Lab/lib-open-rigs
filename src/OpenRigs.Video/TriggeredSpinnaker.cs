@@ -151,7 +151,7 @@ namespace OpenRigs.Video
                 // and gain each frame was taken with, as the camera reports them.
                 .Select(frame => new VideoDataFrame(frame.Image, new VideoChunkData(
                     frame.ChunkData.FrameID, frame.ChunkData.Timestamp, frame.ChunkData.ExposureTime, frame.ChunkData.Gain)))
-                .FillGaps(frame => frame.ChunkData.FrameID, (previous, current) => (int)(current - previous - 1))
+                .FillGaps(frame => frame.ChunkData.FrameID, (previous, current) => (int)(current - previous - 1), name)
                 .Zip(source, (frame, payload) => Timestamped.Create(frame, payload.Seconds))
                 .Where(timestamped => timestamped.Value != null);
         }

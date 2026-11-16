@@ -18,7 +18,7 @@ One directory per machine under a configurable root:
       <artefact>.json
 ```
 
-`<MACHINE-NAME>` is the Windows computer name (`Environment.MachineName`). The root defaults to `C:\RigConfigs` and can be a local folder or a network share. Paths inside `rig.yml` that point at calibration artefacts are relative to the machine directory. This allows the same YAML to work whichever root a deployment uses.
+`<MACHINE-NAME>` is the Windows computer name (`Environment.MachineName`). The root has no default (`ReadLabRig`'s `ConfigRoot` sets it; unset, the workflow stops at start saying so) and can be a local folder or a network share. Paths inside `rig.yml` that point at calibration artefacts are relative to the machine directory. This allows the same YAML to work whichever root a deployment uses.
 
 If the machine directory does not exist, the workflow fails at startup with an error naming the machine and the full path it expected. That is deliberate: a rig that refuses to start is better than a rig silently running with the wrong or a missing configuration.
 
@@ -30,7 +30,7 @@ A source that emits the machine's configuration directory once.
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `ConfigRoot` | `C:\RigConfigs` | The root under which each machine has its own configuration directory. |
+| `ConfigRoot` | none | The root under which each machine has its own configuration directory. |
 
 Emits `<ConfigRoot>\<MACHINE-NAME>` as an absolute path, or fails at startup if the directory does not exist.
 

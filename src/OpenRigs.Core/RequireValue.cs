@@ -20,11 +20,15 @@ namespace OpenRigs.Core
         [Description("The error the workflow stops with: what is missing and what needs it, such as 'rig.yml has no zapit section, which ConnectZapit needs.'")]
         public string Message { get; set; } = string.Empty;
 
+        /// <summary>Gets or sets the device the value belongs to, such as a board's name, put before Message; blank for none.</summary>
+        [Description("The device the value belongs to, such as a board's name (BehaviorBoard-Main), put before Message so one message serves every instance of a device. Blank for none.")]
+        public string Name { get; set; }
+
         /// <summary>Passes each value on, failing at a null one.</summary>
         public IObservable<TSource> Process<TSource>(IObservable<TSource> source)
         {
-            var message = Message;
-            if (string.IsNullOrWhiteSpace(message)) throw new InvalidOperationException("RequireValue has no Message: say what is missing and what needs it.");
+            if (string.IsNullOrWhiteSpace(Message)) throw new InvalidOperationException("RequireValue has no Message: say what is missing and what needs it.");
+            var message = string.IsNullOrWhiteSpace(Name) ? Message : Name.Trim() + ": " + Message;
             return source.Select(value =>
             {
                 if (value == null) throw new InvalidOperationException(message);

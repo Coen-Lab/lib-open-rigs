@@ -6,6 +6,7 @@
                  xmlns:p2="clr-namespace:Bonsai.Dsp;assembly=Bonsai.Dsp"
                  xmlns:p3="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Description>The running wheel on a Behavior board's encoder port 2, for a rig with a wheel: once the board (Board) sends its first message, enables the encoder on port 2 in position mode and zeroes it, in that order, then publishes the distance run, in cm, on WheelDistanceSubjectName from the encoder's counts, the board's rig.yml runningWheel.countsPerRev and runningWheel.wheelDiameterMm.</Description>
   <Workflow>
@@ -87,8 +88,8 @@
       <Expression xsi:type="rx:Accumulate" />
       <Expression xsi:type="PropertyMapping">
         <PropertyMappings>
-          <Property Name="CountsPerRev" Selector="Settings.RunningWheel.CountsPerRev" />
-          <Property Name="WheelDiameterMm" Selector="Settings.RunningWheel.WheelDiameterMm" />
+          <Property Name="CountsPerRev" Selector="CountsPerRev" />
+          <Property Name="WheelDiameterMm" Selector="WheelDiameterMm" />
         </PropertyMappings>
       </Expression>
       <Expression xsi:type="GroupWorkflow">
@@ -155,6 +156,14 @@
       <Expression xsi:type="SubscribeSubject">
         <Name />
       </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Settings.RunningWheel</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RequireValue">
+          <core:Message>rig.yml's entry for this board has no runningWheel: give its countsPerRev and wheelDiameterMm (RunningWheel).</core:Message>
+        </Combinator>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -180,7 +189,10 @@
       <Edge From="20" To="22" Label="Source1" />
       <Edge From="21" To="22" Label="Source2" />
       <Edge From="23" To="24" Label="Source1" />
-      <Edge From="24" To="19" Label="Source1" />
+      <Edge From="23" To="26" Label="Source2" />
+      <Edge From="24" To="25" Label="Source1" />
+      <Edge From="25" To="26" Label="Source1" />
+      <Edge From="26" To="19" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

@@ -6,9 +6,9 @@ namespace OpenRigs.Video
 {
     internal static class ObservableExtensions
     {
-        public static IObservable<TSource> FillGaps<TSource>(this IObservable<TSource> source, Func<TSource, TSource, int> gapSelector)
+        public static IObservable<TSource> FillGaps<TSource>(this IObservable<TSource> source, Func<TSource, TSource, int> gapSelector, string name)
         {
-            return FillGaps(source, value => value, gapSelector);
+            return FillGaps(source, value => value, gapSelector, name);
         }
 
         /// <summary>
@@ -16,12 +16,13 @@ namespace OpenRigs.Video
         /// counters (a dropped frame keeps its place, so later frames still pair with their own trigger), and passes
         /// the source's error and completion on. Nothing is filled before the first value: with no earlier counter, a
         /// first value that came late (the first frames dropped) cannot be told from one on time, so it is taken as
-        /// the first. A counter that goes back stops the sequence with an error.
+        /// the first. A counter that goes back stops the sequence with an error naming <paramref name="name"/>, the camera.
         /// </summary>
         public static IObservable<TSource> FillGaps<TSource, TCounter>(
             this IObservable<TSource> source,
             Func<TSource, TCounter> counterSelector,
-            Func<TCounter, TCounter, int> gapSelector)
+            Func<TCounter, TCounter, int> gapSelector,
+            string name)
         {
             return Observable.Create<TSource>(observer =>
             {
@@ -36,7 +37,7 @@ namespace OpenRigs.Video
                         if (missing < 0)
                         {
                             observer.OnError(new InvalidOperationException(
-                                $"Negative gap sizes are not allowed.\n  Previous counter: {previousCounter}\n  Current counter: {counter}"));
+                                $"{name}: the frame counter went back, from {previousCounter} to {counter}, so its frames can no longer be paired with their triggers."));
                             return;
                         }
 

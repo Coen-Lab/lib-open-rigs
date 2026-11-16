@@ -53,6 +53,16 @@ namespace OpenRigs.Devices.Tests
             StringAssert.Contains(ex.Message, message);
         }
 
+        // No board by default: a workflow names the board, so an unset one stops at start rather than reading main's.
+        [TestMethod]
+        public void AnUnsetBoardIsRefused()
+        {
+            var rig = LabRig("      DO1: { device: RewardValve, side: left }\n");
+            var ex = Assert.ThrowsException<ArgumentException>(() => System.Reactive.Linq.Observable.Wait(
+                new WiredOutputs { Device = "RewardValve" }.Process(System.Reactive.Linq.Observable.Return(rig))));
+            StringAssert.Contains(ex.Message, "RigDevice's Name is ''");
+        }
+
         [TestMethod]
         public void RefusesABoardRigYmlLacks()
         {
