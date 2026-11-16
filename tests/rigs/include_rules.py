@@ -5,17 +5,15 @@ import xml.etree.ElementTree as ET
 from open_rigs.rigs.workflow_lint import (
     AUDIO,
     MANUAL_REWARD_DROP_UL,
-    Path,
     RX,
     SCRIPT,
     SPEAKER_MIXER_SOUNDS,
     W,
-    Workflow,
     XSI,
     ZAPIT_INCLUDE,
-    _name,
-    _named,
-    _value,
+    _name,  # pyright: ignore[reportPrivateUsage]
+    _named,  # pyright: ignore[reportPrivateUsage]
+    _value,  # pyright: ignore[reportPrivateUsage]
     child,
     kind,
     nodes_and_edges,

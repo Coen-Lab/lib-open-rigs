@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from open_rigs.core.calibration import CalibrationCurve, CalibrationPoint, DispenseProcedure, LinearFit
+from open_rigs.core.calibration import CalibrationCurve, CalibrationPoint, LinearFit
 
 FIXTURE = Path(__file__).parents[2] / "fixtures" / "calibration" / "valve-DO1.json"
 

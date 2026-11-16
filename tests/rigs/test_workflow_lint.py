@@ -705,7 +705,6 @@ def test_camera_live_controls_declares_its_own_parameters_and_a_workflow_has_one
     assert {(who, name) for who, kind, name in lint.control_declarations(one) if kind == "parameter"} == {
         ("CameraLiveControls", "CameraExposureUs"), ("CameraLiveControls", "CameraGainDb")}
     assert lint.declared_twice(one) == []
-    text = (ROOT / "src" / "OpenRigs.Devices" / "CameraLiveControls.bonsai").read_text(encoding="utf-8-sig")
     copy = "<Parameters><Parameter><Name>CameraExposureUs</Name></Parameter><Parameter><Name>CameraGainDb</Name></Parameter></Parameters>"
     task = workflow(tmp_path / "task", include(lint.READ_LAB_RIG) + live + include(lint.EXPERIMENT_CONTROL, copy))
     assert lint.declared_twice(task) == ["the parameter CameraExposureUs is declared by ExperimentControl and by CameraLiveControls",

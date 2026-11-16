@@ -36,6 +36,7 @@ SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
 ZAPIT_FOR_TASK = "OpenRigs.Devices:Zapit.ConnectForTask.bonsai"
 MANUAL_REWARDS = "OpenRigs.Devices:BehaviorBoard.ManualRewards.bonsai"
+MANUAL_PULSES = "OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai"
 BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
 EXPERIMENT_RECORDS = "OpenRigs.Logging:ExperimentRecords.bonsai"
 LAUNCH_SETTINGS = "OpenRigs.Control:LaunchSettings.bonsai"
@@ -94,6 +95,7 @@ RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The domes' hardware", DEVICES + "
 # A preflight's check, the same for every rig kind: it declares the Confirm command (DeclareControls).
 PREFLIGHT_CHECKS = DEVICES + "PreflightChecks.bonsai"
 SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task",
+                          MANUAL_PULSES: "A person's pulses on a Behavior board's lines",
                           CAMERA_LIVE_CONTROLS: "Optional live controls for one SpinnakerCamera piece",
                           PREFLIGHT_CHECKS: "A preflight's check, the same for every rig kind"}
 # lib-open-rigs' own source, when this module runs from it (its tests); a workflow's lint reads its package instead.
