@@ -162,8 +162,8 @@ namespace OpenRigs.LiveView
     {
         public string RigId;
         public bool HasExperimentFolder;
-        // Whether the workflow's OpenRigs.Logging has LoggedRows (0.1.0-bbox.5 on): every row a
-        // log with PublishRows writes (LogTrial, LogAsync) is then streamed as `logs`.
+        // Whether every row a log with PublishRows writes (LogTrial, LogAsync) is streamed as `logs`:
+        // a workflow with an experiment folder.
         public bool StreamsLoggedRows;
 
         public const string LoggedRowsType = "OpenRigs.Logging.LoggedRows";
@@ -180,7 +180,7 @@ namespace OpenRigs.LiveView
         /// </summary>
         public const string TemporaryInstance = "Temporary";
 
-        public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType, Func<string, Type> loadedType = null)
+        public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType)
         {
             var plan = new LiveViewPlan();
             foreach (var recipe in DeviceRecipe.All.Where(r => !r.Harp))
@@ -190,10 +190,6 @@ namespace OpenRigs.LiveView
                 plan.Consider(new RigDevice { Kind = recipe.Kind, Instance = TemporaryInstance, Name = name, Settings = new YamlMappingNode() },
                     publishedType);
             }
-            // Looked for among the assemblies already loaded rather than referenced: LiveView
-            // depends on no other lab package, and a workflow with an older Logging, or none,
-            // streams what it did before.
-            plan.StreamsLoggedRows = (loadedType ?? LoadedType)(LoggedRowsType) != null;
             // The machine name, not rig.yml's two-letter rigId, on purpose: the live-view windows
             // find a rig's streams by the machine they connect to, and rig.yml is read by it too.
             plan.RigId = Environment.GetEnvironmentVariable("COMPUTERNAME") ?? Environment.MachineName;
@@ -201,8 +197,8 @@ namespace OpenRigs.LiveView
             plan.HasExperimentFolder = pathPrefix == typeof(string);
             if (pathPrefix != null && pathPrefix != typeof(string))
                 plan.Notes.Add("PathPrefix is " + pathPrefix.Name + ", not a path: the session key stays ready and elapsed is not sent");
-            if (plan.HasExperimentFolder && !plan.StreamsLoggedRows)
-                plan.Notes.Add("OpenRigs.Logging has no LoggedRows (before 0.1.0-bbox.5): the experiment's trial and event rows are not streamed");
+            // An experiment folder is OpenRigs.Logging's LogLabExperiment, whose logs publish their rows (LoggedRows).
+            plan.StreamsLoggedRows = plan.HasExperimentFolder;
 
             if (string.IsNullOrWhiteSpace(configRoot))
             {
@@ -223,19 +219,6 @@ namespace OpenRigs.LiveView
                 plan.Consider(device, publishedType);
             }
             return plan;
-        }
-
-        // A type by full name from the assemblies this process has loaded; null if none has it.
-        static Type LoadedType(string fullName)
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                Type type;
-                try { type = assembly.GetType(fullName, false); }
-                catch (Exception) { continue; }  // a dynamic or half-loaded assembly: not this one
-                if (type != null) return type;
-            }
-            return null;
         }
 
         void Consider(RigDevice rigDevice, Func<string, Type> publishedType)

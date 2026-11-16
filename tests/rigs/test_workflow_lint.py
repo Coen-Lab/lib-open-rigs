@@ -1010,3 +1010,11 @@ def test_check_workflow_asks_whether_a_workflow_records_nothing_or_logs_trials_o
     assert lint.includes(wf) == {"records_nothing": True, "logs_trials": True}
     script = (ROOT / "src" / "open_rigs" / "scripts" / "check-workflow.ps1").read_text(encoding="utf-8")
     assert "NoExperimentFolder.bonsai" not in script and "LogTrial.bonsai" not in script
+
+
+def test_a_rig_list_s_description_says_what_rig_it_is_not_its_own_name():
+    # Round 3 LL7: DomeHardware's read "The hardware of a DomeHardware rig", worded round the lab-free test.
+    for path, signature in lint.RIG_LISTS.items():
+        stem = path.split(":")[1].removesuffix(".bonsai")
+        text = (ROOT / "src" / "OpenRigs.Devices" / f"{stem}.bonsai").read_text(encoding="utf-8-sig")
+        assert stem not in signature and f"<Description>{signature}" in text

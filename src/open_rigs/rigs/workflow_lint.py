@@ -114,7 +114,7 @@ WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDrive
 LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage's C# drives drivers a and b
 # Lab includes read from the package (never from the workflow), found in OpenRigs.Devices.dll by the start of their
 # Description: a rig list holds only pieces, and is expanded in place.
-RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The hardware of a DomeHardware rig", DEVICES + "BehaviorBoxHardware.bonsai": "The behaviour boxes' hardware"}
+RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The hardware of a two-spout rig with a lick spout stage, projector and speakers", DEVICES + "BehaviorBoxHardware.bonsai": "The behaviour boxes' hardware"}
 # A preflight's check, the same for every rig kind: it declares the Confirm command (DeclareControls).
 PREFLIGHT_CHECKS = DEVICES + "PreflightChecks.bonsai"
 SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task",
