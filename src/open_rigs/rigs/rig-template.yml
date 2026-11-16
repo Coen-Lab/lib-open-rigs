@@ -88,7 +88,7 @@ camera:
   pupil:
     serialNumber: "00000000"
     exposureTime: 19000    # microseconds
-    gain: 20
+    gain: 0
     binning: 1
     pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   body:
