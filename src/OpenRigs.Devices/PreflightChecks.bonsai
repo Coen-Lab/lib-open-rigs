@@ -7,7 +7,7 @@
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A preflight's check, the same for every rig kind, after the rig list: its rows are rig.yml's devices (RigConfigs: PreflightDevices), so a device rig.yml has and the run does not open still has a row, its error. Each device the run opens is counted from its piece's own data through a PreflightTap the workflow multicasts into DeviceTicks (declared here), and the devices metric gives each one's rate once a second once all are open. At Go: Recording, the task file TaskPath read (countSeconds, questions by rig.yml kind: ReadPreflightTask), each device counted in turn for countSeconds (step metric), then each device of a kind the task asks about asked in turn (prompt metric) until the controller's Confirm (declared here: DeclareControls), a speaker array's test sounds (SpeakerSounds, which the workflow multicasts) given before the person's answer. The rows (device,measure,value,detail) go to RawFile, closed before Finished. Needs RigConfigs, ExperimentGo and ControlEvents from the workflow.</Description>
+  <Description>A preflight's check, the same for every rig kind, after the rig list: its rows are rig.yml's devices (RigConfigs: PreflightDevices), so a device rig.yml has and the run does not open still has a row, its error. Each device the run opens is counted from its piece's own data through a PreflightTap the workflow multicasts into DeviceTicks (declared here), and the devices metric gives each one's rate once a second once all are open. At Go: Recording, the task file TaskPath read (countSeconds, questions by rig.yml kind: ReadPreflightTask), each device counted in turn for countSeconds (step metric), then each device of a kind the task asks about asked in turn (prompt metric) until the controller's Confirm (declared here: DeclareControls; each also on Confirms, for the workflow's own), a speaker array's test sounds (SpeakerSounds, which the workflow multicasts) given before the person's answer. The rows (device,measure,value,detail) go to RawFile, closed before Finished. Needs RigConfigs, ExperimentGo and ControlEvents from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -91,6 +91,9 @@
         <Combinator xsi:type="orcl:OnCommand">
           <orcl:Name>Confirm</orcl:Name>
         </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>Confirms</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>PreflightDevices</Name>
@@ -211,24 +214,25 @@
       <Edge From="18" To="19" Label="Source1" />
       <Edge From="1" To="19" Label="Source2" />
       <Edge From="20" To="21" Label="Source1" />
-      <Edge From="22" To="25" Label="Source1" />
-      <Edge From="23" To="25" Label="Source2" />
-      <Edge From="19" To="25" Label="Source3" />
-      <Edge From="21" To="25" Label="Source4" />
-      <Edge From="24" To="25" Label="Source5" />
-      <Edge From="25" To="26" Label="Source1" />
-      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="23" To="26" Label="Source1" />
+      <Edge From="24" To="26" Label="Source2" />
+      <Edge From="19" To="26" Label="Source3" />
+      <Edge From="22" To="26" Label="Source4" />
+      <Edge From="25" To="26" Label="Source5" />
+      <Edge From="26" To="27" Label="Source1" />
       <Edge From="28" To="29" Label="Source1" />
       <Edge From="29" To="30" Label="Source1" />
-      <Edge From="31" To="32" Label="Source1" />
+      <Edge From="30" To="31" Label="Source1" />
       <Edge From="32" To="33" Label="Source1" />
       <Edge From="33" To="34" Label="Source1" />
-      <Edge From="35" To="36" Label="Source1" />
+      <Edge From="34" To="35" Label="Source1" />
       <Edge From="36" To="37" Label="Source1" />
-      <Edge From="0" To="37" Label="Source2" />
-      <Edge From="38" To="39" Label="Source1" />
+      <Edge From="37" To="38" Label="Source1" />
+      <Edge From="0" To="38" Label="Source2" />
       <Edge From="39" To="40" Label="Source1" />
       <Edge From="40" To="41" Label="Source1" />
+      <Edge From="41" To="42" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
