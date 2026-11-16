@@ -72,6 +72,10 @@ PIECES = {
     PROJECTOR_DISPLAY: (),
 }
 ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY)  # pieces a workflow has at most once
+# The stage each piece announces into ReadyStages (its AnnounceStage's Stage), which ReadyGate must wait for; a camera
+# announces its own Name. test_ready_stages checks each piece's file says the same.
+READY_STAGES = {CLOCK_FROM_GENERATOR: "HarpClockSet", CLOCK_FROM_BOARD: "HarpClockSet", LICK_SPOUT_STAGE: "SpoutsHomed",
+                SPEAKER_MIXER: "MixerStarted"}
 # The rig.yml group of each piece that is a device of its own, and the Harp WhoAmI of those that are Harp boards.
 DEVICE_GROUPS = {CLOCK_FROM_GENERATOR: "timestampGeneratorGen3", BOARD: "behaviorBoard", LICKETY_SPLIT: "licketySplit", CAMERA: "camera"}
 WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDriver": 1130, "licketySplit": 1400}
@@ -466,15 +470,38 @@ def hardware_problems(wf: Workflow) -> list[str]:
         problems.append(f"the workflow has {len(cameras)} camera(s) and {len(triggers)} CameraTriggers: one when there is a camera, else none")
     elif triggers and set(_stages(triggers[0].get("CamerasExpected"))) != set(cameras):
         problems.append(f"CameraTriggers' CamerasExpected is {triggers[0].get('CamerasExpected') or 'not set'}, not {', '.join(cameras)}")
-    announced = (["HarpClockSet"] if clocks else []) + (["SpoutsHomed"] if LICK_SPOUT_STAGE in paths else []) + cameras \
-        + (["MixerStarted"] if SPEAKER_MIXER in paths else [])
+    announced = list(dict.fromkeys(READY_STAGES[p] for p in (*CLOCKS, LICK_SPOUT_STAGE) if p in paths)) + cameras \
+        + ([READY_STAGES[SPEAKER_MIXER]] if SPEAKER_MIXER in paths else [])
     waits = next((props.get("ReadyWaitsFor") for p, props in pieces if p == READY_GATE), None)
     if READY_GATE in paths and set(_stages(waits)) != set(announced):
         problems.append(f"ReadyGate's ReadyWaitsFor is {waits or 'not set'}, not {', '.join(announced)}")
     problems += [f"the workflow has its own {what}" for what, found in (
         ("Ready report", re.search(r"<\w+:Phase>Ready</\w+:Phase>", wf.text)),
         ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
-    return problems + ready_announcer_problems(wf.root)
+    return problems + ready_announcer_problems(wf.root) + shared_mapping_problems(wf.root)
+
+
+def shared_mapping_problems(root: ET.Element) -> list[str]:
+    """No PropertyMapping is fed by a node with another successor. Bonsai shares such a node's output once every
+    successor has subscribed, and a PropertyMapping subscribes just before its target, so a value ready at Start (a
+    completed AsyncSubject's) reaches the target only after it has read its properties: it keeps its XML default
+    (SpinnakerCamera's Stage, 16 Nov 2026). Give each mapping its own source. Allowed: a node that feeds only the
+    mapping and the mapping's own targets (the value comes with each element), and WorkflowInput (an include's input
+    arrives from its caller). `root` is a workflow or a lab include."""
+    problems = []
+    for nodes, edges in _scopes(root):
+        for i, node in enumerate(nodes):
+            if node.get(XSI) != "PropertyMapping":
+                continue
+            targets = {b for a, b, _ in edges if a == i}
+            for source in {a for a, b, _ in edges if b == i and nodes[a].get(XSI) not in ("ExternalizedMapping", "WorkflowInput")}:
+                others = {b for a, b, _ in edges if a == source} - {i} - targets
+                if others:
+                    props = ", ".join(p.get("Name", "") for p in node.iter(W + "Property"))
+                    problems.append(f"the PropertyMapping of {props} onto {', '.join(sorted(kind(nodes[t]).split(':')[-1] for t in targets))} "
+                                    f"shares its source ({kind(nodes[source]).split(':')[-1]} {_name(nodes[source])}".rstrip()
+                                    + ") with another node: give it its own")
+    return problems
 
 
 def ready_announcer_problems(root: ET.Element) -> list[str]:
