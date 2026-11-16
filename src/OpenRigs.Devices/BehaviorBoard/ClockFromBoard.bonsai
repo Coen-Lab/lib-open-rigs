@@ -7,11 +7,12 @@
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The rig's clock from a Behavior board's own Harp clock, for a rig with no timestamp generator; a workflow has exactly one clock. The board is a BehaviorBoard piece, Board. Sets the board's clock to the PC's UTC time, again at each heartbeat until one agrees (SetHarpClock: a write is lost about one start in four), and publishes Timestamp (the time of each of the board's AnalogData events, 1 kHz, in Harp seconds, as before the device pieces: every pulse width, wait and event time reads it, so a heartbeat clock would round them to 1 s) and HarpClockSet (the first heartbeat within 2 s of UTC), announcing HarpClockSet into ReadyStages. HarpClockSet is declared by ReadyGate, which comes before every device: the board's own log waits for it, so a definition here, built from the board's messages, would depend on itself. Without it the board counts from power-on, and every Harp time and file name follows that count (1904). Stops the workflow, naming the board, if its clock is not set within 10 s of its first heartbeat, it sends no heartbeat within 30 s, or its heartbeats stop for 3 s.</Description>
+  <Description>The rig's clock from a Behavior board's own Harp clock, for a rig with no timestamp generator; a workflow has exactly one clock. The board is a BehaviorBoard piece, Board. Sets the board's clock to the PC's UTC time, again at each heartbeat until one agrees (SetHarpClock: a write is lost about one start in four), and publishes Timestamp (the time of each of the board's AnalogData events, 1 kHz, in Harp seconds, as before the device pieces: every pulse width, wait and event time reads it, so a heartbeat clock would round them to 1 s) and HarpClockSet (the first heartbeat within 2 s of UTC), announcing HarpClockSet into ReadyStages. HarpClockSet is declared by ReadyGate, which comes before every device: the board's own log waits for it, so a definition here, built from the board's messages, would depend on itself. Without it the board counts from power-on, and every Harp time and file name follows that count (1904). Announces HarpClockRead into ReadyStages at the board's first heartbeat. Stops the workflow, naming the board, if its clock is not set within 10 s of its first heartbeat, it sends no heartbeat within 30 s, or its heartbeats stop for 3 s. SetClock false (a calibration, which times pulses only against each other and records nothing) never writes the board's clock: on a rig with a timestamp generator the board follows the generator, on one without it runs on its own. Timestamp is then the board's time as it runs, Ready waits for HarpClockRead in place of HarpClockSet, HarpClockSet comes only if the board already agrees with UTC, and only the 30 s and 3 s heartbeat stops remain.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Name" DisplayName="Board" Description="The Behavior board that keeps the rig's time, such as BehaviorBoard-Main." />
+        <Property Name="SetClock" Description="Whether to set the board's clock to the PC's UTC time (true, every session). False reads the board's time without writing it, for a workflow that records nothing: Ready then waits for HarpClockRead, not HarpClockSet." />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Name" DisplayName="BoardDataSubjectName" Description="Board.Data: the subject the board's messages are published on." />
@@ -22,6 +23,7 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:SetHarpClock">
           <dev:Name />
+          <dev:SetClock>true</dev:SetClock>
           <dev:ToleranceSeconds>2</dev:ToleranceSeconds>
           <dev:TimeoutSeconds>10</dev:TimeoutSeconds>
           <dev:GapSeconds>3</dev:GapSeconds>
@@ -73,6 +75,14 @@
       <Expression xsi:type="rx:BehaviorSubject">
         <Name>Timestamp</Name>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage>HarpClockRead</core:Stage>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="3" Label="Source2" />
@@ -91,6 +101,8 @@
       <Edge From="7" To="14" Label="Source1" />
       <Edge From="14" To="15" Label="Source1" />
       <Edge From="15" To="16" Label="Source1" />
+      <Edge From="9" To="17" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

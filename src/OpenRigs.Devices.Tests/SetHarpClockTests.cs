@@ -108,5 +108,58 @@ namespace OpenRigs.Devices.Tests
             }
             StringAssert.Contains(error.Message, "TimestampGeneratorGen3-Main's Harp clock stopped: no heartbeat for 0.3 s");
         }
+
+        // A valve calibration on any rig: the board's time is read, never set.
+        [TestMethod]
+        public void SetClockFalse_NeverWrites_AndWaitsForNoAgreement()
+        {
+            var device = new Subject<HarpMessage>();
+            var writes = new List<HarpMessage>();
+            Exception error = null;
+            var clock = Clock(timeout: 0.3);
+            clock.SetClock = false;
+            using (clock.Process(device).Subscribe(writes.Add, e => error = e))
+            {
+                for (var i = 0; i < 6; i++)
+                {
+                    device.OnNext(Heartbeat(-3600));  // counting from power-on, and left so
+                    Thread.Sleep(100);
+                }
+            }
+            Assert.AreEqual(0, writes.Count, "a write");
+            Assert.IsNull(error, "stopped: " + error);
+        }
+
+        [TestMethod]
+        public void SetClockFalse_StillStopsNamingTheDevice_WhenItSendsNoHeartbeat()
+        {
+            var device = new Subject<HarpMessage>();
+            var failed = new ManualResetEventSlim();
+            Exception error = null;
+            var clock = Clock();
+            clock.SetClock = false;
+            clock.FirstHeartbeatSeconds = 0.3;
+            using (clock.Process(device).Subscribe(_ => { }, e => { error = e; failed.Set(); }))
+            {
+                Assert.IsTrue(failed.Wait(TimeSpan.FromSeconds(5)), "no error");
+            }
+            StringAssert.Contains(error.Message, "TimestampGeneratorGen3-Main sent no heartbeat within 0.3 s");
+        }
+
+        [TestMethod]
+        public void SetClockFalse_StillStopsNamingTheDevice_WhenHeartbeatsStopMidRun()
+        {
+            var device = new Subject<HarpMessage>();
+            var failed = new ManualResetEventSlim();
+            Exception error = null;
+            var clock = Clock(gap: 0.3);
+            clock.SetClock = false;
+            using (clock.Process(device).Subscribe(_ => { }, e => { error = e; failed.Set(); }))
+            {
+                device.OnNext(Heartbeat(-3600));
+                Assert.IsTrue(failed.Wait(TimeSpan.FromSeconds(5)), "no error");
+            }
+            StringAssert.Contains(error.Message, "TimestampGeneratorGen3-Main's Harp clock stopped: no heartbeat for 0.3 s");
+        }
     }
 }

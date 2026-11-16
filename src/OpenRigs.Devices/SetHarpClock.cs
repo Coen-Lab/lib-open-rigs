@@ -14,15 +14,21 @@ namespace OpenRigs.Devices
     /// behaviour box). Stops the workflow, naming the device, if the clock is not set within
     /// <see cref="TimeoutSeconds"/> of its first heartbeat, if it sends none within
     /// <see cref="FirstHeartbeatSeconds"/>, or if its heartbeats stop for <see cref="GapSeconds"/> mid-run.
+    /// With <see cref="SetClock"/> false it only watches: it never writes, so nothing waits for the clock to
+    /// agree with UTC, and the two heartbeat watchdogs still run.
     /// </summary>
     [Combinator]
-    [Description("Writes UTC to the clock device (the input is its messages, the output its commands) at start and at each heartbeat until a heartbeat agrees with UTC. Stops the workflow, naming the device, if that takes longer than TimeoutSeconds from its first heartbeat, it sends none within FirstHeartbeatSeconds, or its heartbeats stop for GapSeconds.")]
+    [Description("Writes UTC to the clock device (the input is its messages, the output its commands) at start and at each heartbeat until a heartbeat agrees with UTC. Stops the workflow, naming the device, if that takes longer than TimeoutSeconds from its first heartbeat, it sends none within FirstHeartbeatSeconds, or its heartbeats stop for GapSeconds. With SetClock false it writes nothing and only watches the heartbeats.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class SetHarpClock
     {
         /// <summary>Gets or sets the clock device's name in the data, for the error messages.</summary>
         [Description("The clock device's name in the data, such as TimestampGeneratorGen3-Main.")]
         public string Name { get; set; }
+
+        /// <summary>Gets or sets whether to set the clock to UTC; false only watches its heartbeats.</summary>
+        [Description("Whether to set the device's clock to the PC's UTC time. False never writes it (its time is read as it runs) and keeps only the heartbeat watchdogs.")]
+        public bool SetClock { get; set; } = true;
 
         /// <summary>Gets or sets how far a heartbeat may be from UTC for the clock to count as set, in seconds.</summary>
         [Description("How far a heartbeat may be from the PC's UTC clock for the clock to count as set, in seconds.")]
@@ -49,6 +55,7 @@ namespace OpenRigs.Devices
                 var tolerance = ToleranceSeconds;
                 if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException("SetHarpClock has no Name, the clock device's name in the data.");
                 var heartbeats = source.Where(m => m.MessageType == MessageType.Event && m.Address == TimestampSeconds.Address).Publish().RefCount();
+                var setClock = SetClock;
                 var set = heartbeats.Where(m => HarpClockSet.Agrees(m.GetTimestamp(), DateTime.UtcNow, tolerance)).Take(1);
 
                 var writes = Observable.Return(0L).Concat(heartbeats.Select(_ => 0L))
@@ -65,7 +72,7 @@ namespace OpenRigs.Devices
                 var firstHeartbeat = TimeSpan.FromSeconds(FirstHeartbeatSeconds);
                 var silent = Observable.Timer(firstHeartbeat)
                     .SelectMany(_ => Observable.Throw<HarpMessage>(new TimeoutException(string.Format(
-                        "{0} sent no heartbeat within {1} s of the start, so its Harp clock was not set. Check its USB cable and power.", name, firstHeartbeat.TotalSeconds))))
+                        "{0} sent no heartbeat within {1} s of the start, so its Harp clock cannot be read. Check its USB cable and power.", name, firstHeartbeat.TotalSeconds))))
                     .TakeUntil(heartbeats);
                 // From the first heartbeat on (the port may take a while to open), on a thread of its own:
                 // a busy thread pool can hold a deadline past it.
@@ -78,7 +85,8 @@ namespace OpenRigs.Devices
                         Observable.Defer(() => Observable.Throw<HarpMessage>(new TimeoutException(string.Format(
                             "{0}'s Harp clock stopped: no heartbeat for {1} s. Check its USB cable and power.", name, gap.TotalSeconds)))))
                         .IgnoreElements());
-                return writes.Merge(notSet).Merge(silent).Merge(stopped);
+                var watched = silent.Merge(stopped);
+                return setClock ? writes.Merge(notSet).Merge(watched) : watched;
             });
         }
 

@@ -28,6 +28,29 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void BehaviorBoardWithItsLines() { Check(Run("BehaviorBoard.bonsai")); }
 
+        // ClockFromBoard reading the board's time unset (the valve calibration): its SetClock reaches SetHarpClock, and
+        // the piece builds and runs with Ready waiting for HarpClockRead.
+        [TestMethod]
+        public void ClockFromBoardWithSetClockFalse()
+        {
+            var path = "OpenRigs.Devices:BehaviorBoard.ClockFromBoard.bonsai";
+            Func<string, string> unset = xml => xml
+                .Replace("Path=\"" + path + "\">", "Path=\"" + path + "\"><SetClock>false</SetClock>")
+                .Replace("<PieceStages>HarpClockSet</PieceStages>", "<PieceStages>HarpClockRead</PieceStages>");
+            var given = unset(File.ReadAllText(Path.Combine(Folder, "BehaviorBoard.bonsai")));
+            StringAssert.Contains(given, "<SetClock>false</SetClock>");
+            StringAssert.Contains(given, "<PieceStages>HarpClockRead</PieceStages>");
+            WorkflowBuilder builder;
+            using (var reader = XmlReader.Create(new StringReader(given)))
+            {
+                builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            }
+            builder.Workflow.Build();
+            var clock = Included(builder.Workflow, path).Workflow.Select(node => ExpressionBuilder.GetWorkflowElement(node.Value)).OfType<SetHarpClock>().Single();
+            Assert.IsFalse(clock.SetClock);
+            Check(Run("BehaviorBoard.bonsai", edit: unset));
+        }
+
         [TestMethod]
         public void ClockFromTimestampGenerator() { Check(Run("ClockFromTimestampGenerator.bonsai")); }
 
@@ -136,13 +159,14 @@ namespace OpenRigs.Devices.Tests
         }
 
         /// <summary>Subscribes the workflow for up to <paramref name="seconds"/>, then tears it down; every error, in order.</summary>
-        static List<string> Run(string file, Func<string, string> editRig = null, double seconds = 4)
+        static List<string> Run(string file, Func<string, string> editRig = null, double seconds = 4, Func<string, string> edit = null)
         {
             var root = Path.Combine(Path.GetTempPath(), "PiecesSubscribeTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path.Combine(root, Environment.MachineName));
             var rig = File.ReadAllText(Path.Combine(Folder, "rig.yml"));
             File.WriteAllText(Path.Combine(root, Environment.MachineName, "rig.yml"), editRig == null ? rig : editRig(rig));
             var xml = File.ReadAllText(Path.Combine(Folder, file)).Replace("CONFIG_ROOT", SecurityElement.Escape(root));
+            if (edit != null) xml = edit(xml);
             WorkflowBuilder builder;
             using (var reader = XmlReader.Create(new StringReader(xml)))
             {

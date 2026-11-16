@@ -90,6 +90,9 @@ ONE_EACH = (LICK_SPOUT_STAGE, SPEAKER_MIXER, PROJECTOR_DISPLAY, CAMERA_LIVE_CONT
 # announces its own Name. test_ready_stages checks each piece's file says the same.
 READY_STAGES = {CLOCK_FROM_GENERATOR: "HarpClockSet", CLOCK_FROM_BOARD: "HarpClockSet", LICK_SPOUT_STAGE: "SpoutsHomed",
                 SPEAKER_MIXER: "MixerStarted"}
+# ClockFromBoard also announces HarpClockRead at the board's first heartbeat. With SetClock false it never sets the
+# board's clock, so Ready waits for that in place of HarpClockSet, and the workflow records nothing (NoExperimentFolder).
+CLOCK_READ = "HarpClockRead"
 # The rig.yml group of each piece that is a device of its own, and the Harp WhoAmI of those that are Harp boards.
 DEVICE_GROUPS = {CLOCK_FROM_GENERATOR: "timestampGeneratorGen3", BOARD: "behaviorBoard", LICKETY_SPLIT: "licketySplit", CAMERA: "camera"}
 WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDriver": 1130, "licketySplit": 1400}
@@ -460,7 +463,8 @@ def hardware_problems(wf: Workflow) -> list[str]:
     LogLabExperiment reads RigConfigs), ReadyGate before every piece (a board's log waits for HarpClockSet, which ReadyGate
     declares); exactly one clock; each piece's Name unique and its subject properties that Name's .Commands and .Data;
     every Board a Behavior board piece and every Camera a camera piece; one CameraTriggers exactly when there is a
-    camera, expecting every camera; ReadyGate's PieceStages exactly the stages the pieces announce (HarpClockSet,
+    camera, expecting every camera; ReadyGate's PieceStages exactly the stages the pieces announce (HarpClockSet, or
+    HarpClockRead for a ClockFromBoard with SetClock false, which only a NoExperimentFolder workflow may have,
     SpoutsHomed for the lick spout stage, each camera's Name, MixerStarted for SpeakerMixer) and its WorkflowStages
     exactly those the workflow announces itself (its own AnnounceStage nodes, such as a calibration's CalibrationReady);
     and the workflow makes no Ready report or StartCameras of its own. A named piece's Name starts with its Kind
@@ -518,7 +522,12 @@ def hardware_problems(wf: Workflow) -> list[str]:
         problems += [f"SpinnakerCamera {name}'s Board {board} is not CameraTriggers' Board {triggers[0].get('Board') or '(not set)'}"
                      for name, board in camera_boards.items() if board != triggers[0].get("Board")]
     always = [p for p, _, conditional in walked if not conditional]
-    announced = list(dict.fromkeys(READY_STAGES[p] for p in (*CLOCKS, LICK_SPOUT_STAGE) if p in always)) \
+    reads = [props for p, props in pieces if p == CLOCK_FROM_BOARD and props.get("SetClock", "").lower() == "false"]
+    if reads and f'Path="{NO_EXPERIMENT_FOLDER}"' not in wf.text:
+        problems.append("ClockFromBoard's SetClock is false, so the board's clock is never set: only a workflow with "
+                        "NoExperimentFolder (one that records nothing) may read it unset")
+    announced = list(dict.fromkeys(CLOCK_READ if p == CLOCK_FROM_BOARD and reads else READY_STAGES[p]
+                                   for p in (*CLOCKS, LICK_SPOUT_STAGE) if p in always)) \
         + [props.get("Name", "") for p, props, conditional in walked if p == CAMERA and not conditional] \
         + ([READY_STAGES[SPEAKER_MIXER]] if SPEAKER_MIXER in always else [])
     gate_props = next((props for p, props in pieces if p == READY_GATE), {})

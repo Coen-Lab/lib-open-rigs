@@ -281,6 +281,24 @@ def test_a_piece_behind_a_condition_is_driven_but_not_waited_for(tmp_path):
     assert ("StepperDriver-A", "stepperDriver") in lint.required_devices(wf)
 
 
+def test_a_board_clock_read_unset_waits_for_harp_clock_read_and_records_nothing(tmp_path):
+    # A valve calibration on any rig: the board's time read, never set, and nothing recorded.
+    gate = piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead")
+    clock = board_line(lint.CLOCK_FROM_BOARD)
+    unset = MIXED.replace(clock, clock.replace("</Expression>", "<SetClock>false</SetClock></Expression>"))
+    read = unset.replace(gate, piece(lint.READY_GATE, PieceStages="HarpClockRead, SpoutsHomed, Camera-Overhead"))
+    no_folder = include(lint.NO_EXPERIMENT_FOLDER)
+    assert lint.hardware_problems(workflow(tmp_path, no_folder + read)) == []
+    assert lint.hardware_problems(workflow(tmp_path / "b", no_folder + unset)) == [
+        "ReadyGate's PieceStages is HarpClockSet, SpoutsHomed, Camera-Overhead, not HarpClockRead, SpoutsHomed, Camera-Overhead"]
+    assert lint.hardware_problems(workflow(tmp_path / "c", read)) == [
+        "ClockFromBoard's SetClock is false, so the board's clock is never set: only a workflow with NoExperimentFolder "
+        "(one that records nothing) may read it unset"]
+    # SetClock true is the default, as written by Bonsai.
+    set_ = MIXED.replace(clock, clock.replace("</Expression>", "<SetClock>true</SetClock></Expression>"))
+    assert lint.hardware_problems(workflow(tmp_path / "d", set_)) == []
+
+
 def test_a_stage_the_workflow_announces_itself_is_one_of_ready_gate_s_workflow_stages(tmp_path):
     own = ('<Expression xsi:type="Combinator"><Combinator xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core" '
            'xsi:type="orc:AnnounceStage"><orc:Stage>CalibrationReady</orc:Stage></Combinator></Expression>')
