@@ -1000,7 +1000,8 @@ FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
                *DEVICE_GROUPS, LICK_SPOUT_STAGE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)
-NO_FILES = ("OpenRigs.Logging:LogController.bonsai", "OpenRigs.Logging:FormatFileName.bonsai", "OpenRigs.Logging:LogControlEvents.bonsai")
+NO_FILES = ("OpenRigs.Logging:LogController.bonsai", "OpenRigs.Logging:FormatFileName.bonsai", "OpenRigs.Logging:LogControlEvents.bonsai",
+            LOG_RNG_SEED)
 # Writers whose file the workflow's XML cannot name: a workflow logs through the blocks above instead.
 OTHER_WRITERS = {"CsvWriter", "MatrixWriter", "VideoWriter", "ImageWriter", "TextWriter", "BinaryWriter", "FileCapture",
                  "MessageWriter", "ObjectWriter", "JsonWriter", "BinaryLogWriter", "FfmpegVideoWriter"}
