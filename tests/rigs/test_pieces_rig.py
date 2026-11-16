@@ -10,7 +10,7 @@ from open_rigs.rigs import workflow_lint as lint
 
 ROOT = Path(__file__).parents[2]
 FIXTURE = ROOT / "src" / "OpenRigs.Devices.Tests" / "Pieces" / "rig.yml"
-DOME = ('<WorkflowBuilder Version="2.9.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+RIG_LIST = ('<WorkflowBuilder Version="2.9.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
         'xmlns="https://bonsai-rx.org/2018/workflow"><Workflow><Nodes>'
         f'<Expression xsi:type="IncludeWorkflow" Path="{lint.READ_LAB_RIG}" />'
         f'<Expression xsi:type="IncludeWorkflow" Path="{lint.DEVICES}DomeHardware.bonsai" />'
@@ -19,7 +19,7 @@ DOME = ('<WorkflowBuilder Version="2.9.0" xmlns:xsi="http://www.w3.org/2001/XMLS
 
 def pieces_rig(tmp: Path) -> str:
     (tmp / "src").mkdir(parents=True, exist_ok=True)
-    (tmp / "src" / "main.bonsai").write_text(DOME, encoding="utf-8")
+    (tmp / "src" / "main.bonsai").write_text(RIG_LIST, encoding="utf-8")
     text, _, _ = lint.filled_rig(lint.Workflow(tmp), Path("C:/nowhere"), "PIECES")
     return re.sub(r"portName: COM\d+", "portName: COM97", text)
 

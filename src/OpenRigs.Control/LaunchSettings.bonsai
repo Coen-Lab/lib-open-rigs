@@ -8,7 +8,7 @@
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Value" DisplayName="SubjectId" Description="The mouse's lab ID; the launch's own, from rig-control." />
+        <Property Name="Value" DisplayName="SubjectId" Description="The mouse's lab ID; the launch's own, from the experiment launcher." />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="StringProperty">
@@ -24,7 +24,7 @@
         <Name>SubjectId</Name>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Value" DisplayName="TaskPath" Description="The task file: rig-control's copy of the one chosen at launch; from the editor, the workflow's own default." />
+        <Property Name="Value" DisplayName="TaskPath" Description="The task file: the launcher's copy of the one chosen at launch; from the editor, the workflow's own default." />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="StringProperty">

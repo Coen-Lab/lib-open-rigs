@@ -677,7 +677,7 @@ def background_noise_problems(wf: Workflow) -> list[str]:
         at = _order(wf.root, lambda n: n.get("Path") == BACKGROUND_NOISE)
         for name in ("LaunchTaskConfig", "TaskConfig"):
             declared = _order(wf.root, _declares(name))
-            if declared is None or declared > at:
+            if declared is None or at is None or declared > at:
                 problems.append(f"BackgroundNoise comes before {name} is declared")
     return problems
 
@@ -738,7 +738,7 @@ def launch_settings_problems(wf: Workflow) -> list[str]:
                 if _order(wf.root, _declares(name)) is not None]
     at = _order(wf.root, lambda n: n.get("Path") == LAUNCH_SETTINGS)
     control = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_CONTROL)
-    if control is None or control > at:
+    if control is None or at is None or control > at:
         problems.append("LaunchSettings comes before ExperimentControl")
     node = next(n for n in wf.root.iter(W + "Expression") if n.get("Path") == LAUNCH_SETTINGS)
     if not _properties(node).get("TaskPath"):
