@@ -4,7 +4,7 @@
 
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from open_rigs.rigs import workflow_lint as lint
 
@@ -20,7 +20,8 @@ RIG_LIST = ('<WorkflowBuilder Version="2.9.0" xmlns:xsi="http://www.w3.org/2001/
 def pieces_rig(tmp: Path) -> str:
     (tmp / "src").mkdir(parents=True, exist_ok=True)
     (tmp / "src" / "main.bonsai").write_text(RIG_LIST, encoding="utf-8")
-    text, _, _ = lint.filled_rig(lint.Workflow(tmp), Path("C:/nowhere"), "PIECES")
+    # A Windows path on every OS: CI's Linux runners write rootPath as the rigs do.
+    text, _, _ = lint.filled_rig(lint.Workflow(tmp), PureWindowsPath("C:/nowhere"), "PIECES")
     return re.sub(r"portName: COM\d+", "portName: COM97", text)
 
 

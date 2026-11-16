@@ -17,7 +17,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePath
 
 W = "{https://bonsai-rx.org/2018/workflow}"
 XSI = "{http://www.w3.org/2001/XMLSchema-instance}type"
@@ -910,7 +910,7 @@ def expected_files_problems(wf: Workflow) -> list[str]:
 TEMPLATE = Path(__file__).parent / "rig-template.yml"
 
 
-def filled_rig(wf: Workflow, root: Path, machine: str) -> tuple[str, list[str], list[str]]:
+def filled_rig(wf: Workflow, root: PurePath, machine: str) -> tuple[str, list[str], list[str]]:
     """The lab's rig template filled in as a rig with exactly the workflow's devices (required_devices), for
     check-workflow's build: (rig.yml's text, each Harp record RecordHarpDevices should make as "<Name> <port> <serial>
     <WhoAmI>", each device folder and Harp record file ExperimentManifest should expect). An entry the template lacks
