@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
@@ -6,7 +6,7 @@
                  xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit for every workflow using it, from its input on: the input is the task's Zapit conditions file path, sent once when the experiment uses Zapit. Connects to rig.yml's zapit host and port (ZapitClient), sends every ZapitCommands value and publishes every reply on ZapitReplies (declared by the workflow), and asks IsStimConfigLoaded and GetNumConditions at once. Stops the workflow on any error reply or no conditions file loaded (CheckZapitReply), a number of conditions other than the file's or a ramp-down out of range (CheckZapitConditionCount), and for a real mouse on a rig without hardware triggering (RequireZapitHardwareTrigger, from rig.yml's zapit.hardwareTriggered and SubjectId). Declares ZapitCommands, a BehaviorSubject: a task multicasts each trial's StartStimulus into it from a graph per trial, and a PublishSubject would be closed by the first trial's graph completing. Stops the workflow at start, saying so, if rig.yml has no zapit section. Needs RigConfigs, SubjectId and ZapitReplies from the workflow.</Description>
+  <Description>Zapit for every workflow using it, from its input on: the input is the task's Zapit conditions file path, sent once when the experiment uses Zapit. Connects to rig.yml's zapit host and port (ZapitClient), sends every ZapitCommands value and publishes every reply on ZapitReplies, and asks IsStimConfigLoaded and GetNumConditions at once. Stops the workflow on any error reply or no conditions file loaded (CheckZapitReply), a number of conditions other than the file's or a ramp-down out of range (CheckZapitConditionCount), and for a real mouse on a rig without hardware triggering (RequireZapitHardwareTrigger, from rig.yml's zapit.hardwareTriggered and SubjectId). Declares ZapitCommands, a BehaviorSubject: a task multicasts each trial's StartStimulus into it from a graph per trial, and a PublishSubject would be closed by the first trial's graph completing. Declares ZapitReplies, a PublishSubject: a trial's graph that subscribes to check its arming reply must not be handed the last trial's. Stops the workflow at start, saying so, if rig.yml has no zapit section. Needs RigConfigs and SubjectId from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -156,6 +156,9 @@
       <Expression xsi:type="WorkflowOutput" />
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="zap:ZapitCommand">
         <rx:Name>ZapitCommands</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="zap:ZapitReply">
+        <rx:Name>ZapitReplies</rx:Name>
       </Expression>
     </Nodes>
     <Edges>

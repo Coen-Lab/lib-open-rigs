@@ -36,6 +36,7 @@ SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
 ZAPIT_FOR_TASK = "OpenRigs.Devices:Zapit.ConnectForTask.bonsai"
 MANUAL_REWARDS = "OpenRigs.Devices:BehaviorBoard.ManualRewards.bonsai"
+REWARDS = "OpenRigs.Devices:BehaviorBoard.Rewards.bonsai"
 MANUAL_PULSES = "OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai"
 BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
 EXPERIMENT_RECORDS = "OpenRigs.Logging:ExperimentRecords.bonsai"
@@ -99,13 +100,15 @@ RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The domes' hardware", DEVICES + "
 # A preflight's check, the same for every rig kind: it declares the Confirm command (DeclareControls).
 PREFLIGHT_CHECKS = DEVICES + "PreflightChecks.bonsai"
 SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task",
+                          REWARDS: "Every reward a task gives",
                           MANUAL_PULSES: "A person's pulses on a Behavior board's lines",
                           CAMERA_LIVE_CONTROLS: "Optional live controls for one SpinnakerCamera piece",
                           PREFLIGHT_CHECKS: "A preflight's check, the same for every rig kind"}
 # lib-open-rigs' own source, when this module runs from it (its tests); a workflow's lint reads its package instead.
 LIB_SRC = Path(__file__).parents[2]
 BLOCK_SUBJECTS = {
-    ZAPIT_INCLUDE: {"ZapitCommands": "rx:BehaviorSubject"},
+    ZAPIT_INCLUDE: {"ZapitCommands": "rx:BehaviorSubject", "ZapitReplies": "rx:PublishSubject"},
+    REWARDS: {"RewardRequests": "rx:BehaviorSubject"},
     SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
     READY_GATE: {"ReadyStages": "rx:ReplaySubject", "HarpClockSet": "rx:AsyncSubject", "Ready": "rx:AsyncSubject"},
     LICK_SPOUT_STAGE: {"LickSpoutStage-Main.Commands": "rx:BehaviorSubject","LickSpoutStage-Main.Homed": "rx:BehaviorSubject",
@@ -595,14 +598,15 @@ def experiment_log_problems(wf: Workflow) -> list[str]:
 
 def zapit_include_problems(wf: Workflow) -> list[str]:
     """Zapit is lib-open-rigs' Zapit.ConnectForTask, included once (ConnectZapit given the task's conditions file in an
-    optogenetics experiment), and nothing of its connect, check and refusal chain is built in the workflow."""
+    optogenetics experiment), and nothing of its connect, check and refusal chain is built in the workflow, nor its
+    subjects ZapitCommands and ZapitReplies declared."""
     problems = [] if wf.text.count(f'Path="{ZAPIT_FOR_TASK}"') == 1 else ["the workflow does not include Zapit.ConnectForTask once"]
     if f'Path="{ZAPIT_INCLUDE}"' in wf.text:
         problems.append("the workflow includes Zapit.ConnectZapit itself (Zapit.ConnectForTask does)")
     kinds = {kind(n) for n in wf.root.iter(W + "Expression")}
     problems += [f"the workflow builds {local} itself" for local in ("zap:ZapitClient", "zap:CheckZapitConditionCount") if local in kinds]
-    problems += ["the workflow declares ZapitCommands, which ConnectZapit declares"
-                 for n in wf.root.iter(W + "Expression") if n.get(XSI, "").startswith("rx:") and _name(n) == "ZapitCommands"]
+    problems += [f"the workflow declares {name}, which ConnectZapit declares" for name in ("ZapitCommands", "ZapitReplies")
+                 if _order(wf.root, _declares(name)) is not None]
     if _order(wf.root, _declares("Optogenetics")) is not None:
         problems.append("the workflow declares Optogenetics itself (Zapit.ConnectForTask does)")
     if "zap:ZapitLineMessage" in kinds:
@@ -616,15 +620,6 @@ def zapit_include_problems(wf: Workflow) -> list[str]:
             if props.get("BoardCommandsSubjectName") not in commands:
                 problems.append(f"a SetZapitTriggerLine's BoardCommandsSubjectName is {props.get('BoardCommandsSubjectName') or 'not set'}, "
                                 f"not a BehaviorBoard piece's <Name>.Commands ({', '.join(sorted(commands)) or 'no board'})")
-    return problems
-
-
-def manual_reward_problems(wf: Workflow) -> list[str]:
-    """RewardLeft and RewardRight are BehaviorBoard.ManualRewards', included once: 2.5 ul at that side, no setting, and
-    the workflow handles neither itself."""
-    problems = [] if wf.text.count(f'Path="{MANUAL_REWARDS}"') == 1 else ["the workflow does not include BehaviorBoard.ManualRewards once"]
-    own = _on_commands(wf.root) & {"RewardLeft", "RewardRight"}
-    problems += [f"the workflow handles {name} itself (ManualRewards does)" for name in sorted(own)]
     return problems
 
 
@@ -681,7 +676,7 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
     """The experiment's records are OpenRigs.Logging's ExperimentRecords (LogControlEvents, RecordHarpDevices,
     ExperimentManifest), included once with ConfigRoot, IngestScript and ExpectedFiles set, as the last top-level node
     but StreamDevices: RecordHarpDevices and ExperimentManifest find each device by the subjects published before them.
-    The workflow has none of the three of its own. Rewards are not records: DeliverReward is the workflow's own include."""
+    The workflow has none of the three of its own. Rewards are not records: Rewards is the workflow's own include."""
     count = wf.text.count(f'Path="{EXPERIMENT_RECORDS}"')
     if count != 1:
         return [f"the workflow includes ExperimentRecords {count} times, not once"]
@@ -699,19 +694,86 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
     return problems
 
 
-def reward_delivery_problems(wf: Workflow) -> list[str]:
-    """A workflow that asks for rewards (ManualRewards, or its own RewardRequests) includes OpenRigs.Devices'
-    BehaviorBoard.DeliverReward once, ahead of ExperimentRecords: rewards are not records, so ExperimentRecords holds
-    none, and a second DeliverReward would open each valve twice."""
-    asks = f'Path="{MANUAL_REWARDS}"' in wf.text or "<Name>RewardRequests</Name>" in wf.text
-    count = wf.text.count(f'Path="{DELIVER_REWARD}"')
-    if count != (1 if asks else 0):
-        return [f"the workflow includes DeliverReward {count} times, " + ("not once" if asks else "and asks for no reward")]
-    if not count:
-        return []
-    at = _order(wf.root, lambda n: n.get("Path") == DELIVER_REWARD)
+# Device sources only a lab include opens, (CLR namespace, type): the piece that opens each. A Harp board (a Device in a
+# Harp.* namespace, Bonsai.Harp or LicketySplit's) is its kind's piece too. A workflow that opens one itself skips the
+# piece's checks, log and Ready stage.
+PIECED_SOURCES = {("Bonsai.Spinnaker", "SpinnakerCapture"): "SpinnakerCamera", ("OpenRigs.Video", "TriggeredSpinnaker"): "SpinnakerCamera",
+                  ("OpenRigs.Video", "UsbCamera"): "none yet", ("Bonsai.Shaders", "CreateWindow"): "ProjectorDisplay"}
+# The sources opened by hand today because no piece fits them, each a workflow allows by name (hand_opened_devices'
+# allowed), and only these.
+UNPIECED = {"UsbCamera": "a calibration's balance camera, a USB camera in no rig.yml (no piece yet)",
+            "CreateWindow": "a projector calibration's own window, which ProjectorDisplay's mesh map and gamma table would distort"}
+
+
+def _own_texts(wf: Workflow) -> list[str]:
+    """The text of the workflow's file and of each workflow file of its own it includes, at any depth."""
+    texts, todo, seen = [], [wf.repo / "src" / wf.file], set()
+    while todo:
+        path = todo.pop()
+        text = path.read_text(encoding="utf-8-sig")
+        texts.append(text)
+        for included in re.findall(r'xsi:type="IncludeWorkflow" Path="([^":]+)"', text):
+            target = (path.parent / included.replace("\\", "/")).resolve()
+            if target not in seen and target.is_file():
+                seen.add(target)
+                todo.append(target)
+    return texts
+
+
+def hand_opened_devices(wf: Workflow, allowed: tuple[str, ...] = ()) -> list[str]:
+    """Every device source the workflow, or a file of its own it includes, opens itself rather than through the lab's
+    piece for it (PIECED_SOURCES, and any Harp board's Device), as "<type> (<piece>)". `allowed` names the UNPIECED
+    sources this workflow opens by hand; a name not in UNPIECED is refused, so the exceptions stay the listed ones."""
+    found = [f"{name} is not a source UNPIECED lists" for name in allowed if name not in UNPIECED]
+    for text in _own_texts(wf):
+        namespaces = dict(re.findall(r'xmlns:(\w+)="clr-namespace:([\w.]+);', text))
+        for prefix, local in re.findall(r'xsi:type="(\w+):(\w+)"', text):
+            ns = namespaces.get(prefix, "")
+            harp = local == "Device" and (ns.startswith("Harp.") or ns in ("Bonsai.Harp", "AllenNeuralDynamics.LicketySplit"))
+            piece = "the board's piece" if harp else PIECED_SOURCES.get((ns, local))
+            if piece and not (local in allowed and local in UNPIECED):
+                found.append(f"{ns}.{local} ({piece})")
+    return found
+
+
+def live_view_problems(wf: Workflow) -> list[str]:
+    """The live view is one OpenRigs.LiveView StreamDevices, the workflow's last top-level node, with no edge into or
+    out of it: it streams only the subjects built before it, and an edge into it builds it before them, so it streams
+    nothing (a task shipped that way)."""
+    nodes, edges = nodes_and_edges(child(wf.root, W + "Workflow"))
+    live = [i for i, n in enumerate(nodes) if kind(n).endswith(":StreamDevices")]
+    if len(live) != 1 or len(list(e for e in wf.root.iter(W + "Expression") if kind(e).endswith(":StreamDevices"))) != 1:
+        return ["the workflow does not have one StreamDevices, at its top level"]
+    problems = [] if live[0] == len(nodes) - 1 else ["StreamDevices is not the last top-level node"]
+    return problems + (["StreamDevices has an edge into or out of it"] if any(live[0] in e[:2] for e in edges) else [])
+
+
+def reward_problems(wf: Workflow) -> list[str]:
+    """Every reward is OpenRigs.Devices' BehaviorBoard.Rewards': it declares RewardRequests, gives the controller's
+    manual drops (ManualRewards: RewardLeft, RewardRight) and delivers each reward through DeliverReward. A workflow that
+    sends a reward (a multicast into RewardRequests) includes it once, before it sends any and before ExperimentRecords
+    (rewards are not records). No workflow declares or reads RewardRequests, includes DeliverReward or ManualRewards, or
+    handles RewardLeft or RewardRight itself: a second DeliverReward would open each valve twice, and RewardRequests is a
+    BehaviorSubject (a per-trial sender's completion would close a PublishSubject), so a reader subscribed per trial
+    would be handed the last reward again. A rig without reward valves (the behaviour box) includes none."""
+    count = wf.text.count(f'Path="{REWARDS}"')
+    sent = _order(wf.root, lambda n: n.get(XSI) == "MulticastSubject" and _name(n) == "RewardRequests")
+    problems = [f"the workflow includes Rewards {count} times, not once"] if count > 1 or (sent is not None and count != 1) else []
+    nodes = [n for root in _local_roots(wf) for n in root.iter(W + "Expression")]
+    if any(_declares("RewardRequests")(n) for n in nodes):
+        problems.append("the workflow declares RewardRequests itself (Rewards does)")
+    if any(n.get(XSI) == "SubscribeSubject" and _name(n) == "RewardRequests" for n in nodes):
+        problems.append("the workflow reads RewardRequests itself (Rewards delivers each reward)")
+    problems += [f"the workflow includes {path.split('.')[-2]} itself (Rewards does)" for path in (DELIVER_REWARD, MANUAL_REWARDS)
+                 if f'Path="{path}"' in wf.text]
+    problems += [f"the workflow handles {name} itself (Rewards' ManualRewards does)" for name in sorted(_on_commands(wf.root) & {"RewardLeft", "RewardRight"})]
+    at = _order(wf.root, lambda n: n.get("Path") == REWARDS)
     records = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_RECORDS)
-    return ["DeliverReward comes after ExperimentRecords"] if records is not None and at is not None and at > records else []
+    if at is not None and sent is not None and sent < at:
+        problems.append("Rewards comes after a reward is sent into RewardRequests")
+    if at is not None and records is not None and at > records:
+        problems.append("Rewards comes after ExperimentRecords")
+    return problems
 
 
 def launch_settings_problems(wf: Workflow) -> list[str]:
@@ -730,6 +792,29 @@ def launch_settings_problems(wf: Workflow) -> list[str]:
     if not _properties(node).get("TaskPath"):
         problems.append("LaunchSettings has no TaskPath (the task file run from the editor)")
     return problems
+
+
+def launch_id_problems(wf: Workflow) -> list[str]:
+    """A workflow with ExperimentControl exposes LaunchId at its top level, mapped down through each group to
+    ExperimentControl's LaunchId: a launcher passes --property:LaunchId=<run> only to a workflow that exposes it,
+    and after a crash finds the experiment folder by the manifest's control.launch_id."""
+    def mapped(nodes: list[ET.Element], edges: list[tuple[int, int, str]], j: int) -> bool:
+        return any(p.get("Name") == "LaunchId" and (p.get("DisplayName") or "LaunchId") == "LaunchId"
+                   for a, b, _ in edges if b == j and nodes[a].get(XSI) == "ExternalizedMapping" for p in nodes[a].iter(W + "Property"))
+
+    def walk(workflow: ET.Element) -> list[str]:
+        nodes, edges = nodes_and_edges(workflow)
+        for j, node in enumerate(nodes):
+            if not any(e.get("Path") == EXPERIMENT_CONTROL for e in node.iter(W + "Expression")):
+                continue
+            if not mapped(nodes, edges, j):
+                where = "ExperimentControl" if node.get("Path") == EXPERIMENT_CONTROL else f"the group {_name(node) or kind(node)}"
+                return [f"{where} is not given LaunchId by an ExternalizedMapping (map the top-level LaunchId down to ExperimentControl)"]
+            inner = node.find(W + "Workflow")
+            return walk(inner) if inner is not None and node.get("Path") != EXPERIMENT_CONTROL else []
+        return []
+
+    return walk(child(wf.root, W + "Workflow"))
 
 
 def _local_roots(wf: Workflow) -> list[ET.Element]:

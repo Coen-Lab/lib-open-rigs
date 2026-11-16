@@ -551,11 +551,15 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     assert rules.zapit_for_task_problems(root("Zapit/ConnectForTask.bonsai")) == []
     assert rules.manual_rewards_drop_problems(root("BehaviorBoard/ManualRewards.bonsai")) == []
     group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
-    wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.MANUAL_REWARDS) + group)
-    # ManualRewards declares RewardLeft and RewardRight itself (DeclareControls): the task declares neither.
-    assert lint.zapit_include_problems(wf) == [] and lint.manual_reward_problems(wf) == [] and lint.undeclared_commands(wf) == []
-    copy = workflow(tmp_path / "b", include(lint.MANUAL_REWARDS) + include(lint.EXPERIMENT_CONTROL, "<Commands><Command><Name>RewardLeft</Name></Command></Commands>"))
+    wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.REWARDS) + group)
+    # Rewards' ManualRewards declares RewardLeft and RewardRight itself (DeclareControls): the task declares neither.
+    assert lint.zapit_include_problems(wf) == [] and lint.reward_problems(wf) == [] and lint.undeclared_commands(wf) == []
+    copy = workflow(tmp_path / "b", include(lint.REWARDS) + include(lint.EXPERIMENT_CONTROL, "<Commands><Command><Name>RewardLeft</Name></Command></Commands>"))
     assert lint.declared_twice(copy) == ["the command RewardLeft is declared by ExperimentControl and by ManualRewards"]
+    # ConnectZapit declares both of Zapit's subjects: a task's copy of either is refused.
+    replies = '<Expression xsi:type="rx:PublishSubject"><rx:Name>ZapitReplies</rx:Name></Expression>'
+    assert lint.zapit_include_problems(workflow(tmp_path / "c", include(lint.ZAPIT_FOR_TASK) + replies)) == [
+        "the workflow declares ZapitReplies, which ConnectZapit declares"]
 
 
 def test_the_shared_experiment_logs_are_the_lab_s_two_includes(tmp_path):
@@ -682,18 +686,26 @@ def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_pat
     logs = include("OpenRigs.Logging:LogLabExperiment.bonsai") + include(lint.BOARD)
     wf = workflow(tmp_path, logs + RECORDS + LIVE)
     assert lint.experiment_records_problems(wf) == [] and lint.experiment_log_problems(wf) == [] and lint.expected_files_problems(wf) == []
-    late = workflow(tmp_path / "b", logs + RECORDS + include(lint.MANUAL_REWARDS) + LIVE)
+    late = workflow(tmp_path / "b", logs + RECORDS + include(lint.REWARDS) + LIVE)
     assert lint.experiment_records_problems(late) == ["ExperimentRecords is not the last top-level node (StreamDevices alone may follow)"]
-    # Rewards are not records: a workflow that gives them includes DeliverReward itself, before ExperimentRecords.
-    rewards = workflow(tmp_path / "e", logs + include(lint.DELIVER_REWARD) + RECORDS + LIVE)
-    assert lint.experiment_records_problems(rewards) == []
-    asks = include(lint.MANUAL_REWARDS)
-    assert lint.reward_delivery_problems(workflow(tmp_path / "f", logs + asks + include(lint.DELIVER_REWARD) + RECORDS + LIVE)) == []
-    assert lint.reward_delivery_problems(workflow(tmp_path / "g", logs + asks + RECORDS + LIVE)) == [
-        "the workflow includes DeliverReward 0 times, not once"]
-    assert lint.reward_delivery_problems(workflow(tmp_path / "h", logs + asks + RECORDS + include(lint.DELIVER_REWARD) + LIVE)) == [
-        "DeliverReward comes after ExperimentRecords"]
-    assert lint.reward_delivery_problems(wf) == []
+    assert lint.reward_problems(late) == ["Rewards comes after ExperimentRecords"]
+    # Rewards are not records: a workflow that gives them includes Rewards itself, before it sends one and before ExperimentRecords.
+    sends = '<Expression xsi:type="MulticastSubject"><Name>RewardRequests</Name></Expression>'
+    rewards = workflow(tmp_path / "e", logs + include(lint.REWARDS) + sends + RECORDS + LIVE)
+    assert lint.experiment_records_problems(rewards) == [] and lint.reward_problems(rewards) == []
+    assert lint.reward_problems(workflow(tmp_path / "g", logs + sends + RECORDS + LIVE)) == ["the workflow includes Rewards 0 times, not once"]
+    assert lint.reward_problems(workflow(tmp_path / "h", logs + sends + include(lint.REWARDS) + RECORDS + LIVE)) == [
+        "Rewards comes after a reward is sent into RewardRequests"]
+    # A task's own copies of what Rewards holds: the subject declared or read, DeliverReward, ManualRewards, a manual drop.
+    own = ('<Expression xsi:type="rx:BehaviorSubject"><rx:Name>RewardRequests</rx:Name></Expression>'
+           '<Expression xsi:type="SubscribeSubject"><Name>RewardRequests</Name></Expression>' + include(lint.DELIVER_REWARD) + include(lint.MANUAL_REWARDS)
+           + f'<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:OnCommand" {CONTROL}><orcl:Name>RewardLeft</orcl:Name></Combinator></Expression>')
+    assert lint.reward_problems(workflow(tmp_path / "i", logs + include(lint.REWARDS) + own + sends + RECORDS + LIVE)) == [
+        "the workflow declares RewardRequests itself (Rewards does)", "the workflow reads RewardRequests itself (Rewards delivers each reward)",
+        "the workflow includes DeliverReward itself (Rewards does)", "the workflow includes ManualRewards itself (Rewards does)",
+        "the workflow handles RewardLeft itself (Rewards' ManualRewards does)"]
+    # A rig without reward valves (no sender) includes none.
+    assert lint.reward_problems(wf) == []
     own = workflow(tmp_path / "c", logs + include("OpenRigs.Logging:LogControlEvents.bonsai") + manifest_node("auto")
                    + include(lint.EXPERIMENT_RECORDS, "<ExpectedFiles>auto</ExpectedFiles>"))
     assert lint.experiment_records_problems(own) == [
@@ -784,3 +796,61 @@ def test_camera_live_controls_declares_its_own_parameters_and_a_workflow_has_one
                                          "the parameter CameraGainDb is declared by ExperimentControl and by CameraLiveControls"]
     twice = workflow(tmp_path / "twice", include(lint.READ_LAB_RIG) + live + live)
     assert "the workflow includes CameraLiveControls more than once" in lint.hardware_problems(twice)
+
+
+def test_rewards_declares_the_requests_and_delivers_each_with_the_manual_drops():
+    text = (ROOT / "src" / "OpenRigs.Devices" / "BehaviorBoard" / "Rewards.bonsai").read_text(encoding="utf-8-sig")
+    root = lint.ET.fromstring(text.encode("utf-8"))
+    nodes, edges = lint.nodes_and_edges(lint.child(root, lint.W + "Workflow"))
+    deliver = next(i for i, n in enumerate(nodes) if n.get("Path") == lint.DELIVER_REWARD)
+    inputs = {label: lint._name(nodes[a]) or lint.kind(nodes[a]) for a, b, label in edges if b == deliver}  # pyright: ignore[reportPrivateUsage]
+    assert inputs == {"Source1": "RewardRequests", "Source2": "PropertyMapping"}
+    assert any(n.get("Path") == lint.MANUAL_REWARDS for n in nodes)
+    assert lint.shared_mapping_problems(root) == []
+
+
+def test_every_workflow_with_experiment_control_takes_the_launch_id_from_its_top_level(tmp_path):
+    mapping = '<Expression xsi:type="ExternalizedMapping"><Property Name="LaunchId" /></Expression>'
+    edge = '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow>'
+    group = (f'{mapping}<Expression xsi:type="GroupWorkflow"><Name>Initialization</Name><Workflow><Nodes>{mapping}'
+             f'{include(lint.EXPERIMENT_CONTROL)}{edge}</Expression>')
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.bonsai").write_text(HEAD + group + edge + "</WorkflowBuilder>", encoding="utf-8")
+    assert lint.launch_id_problems(lint.Workflow(tmp_path)) == []
+    assert lint.launch_id_problems(workflow(tmp_path / "b", include(lint.EXPERIMENT_CONTROL))) == [
+        "ExperimentControl is not given LaunchId by an ExternalizedMapping (map the top-level LaunchId down to ExperimentControl)"]
+    inner = group.replace(mapping + include(lint.EXPERIMENT_CONTROL), "<Expression xsi:type=\"WorkflowInput\" />" + include(lint.EXPERIMENT_CONTROL), 1)
+    (tmp_path / "c" / "src").mkdir(parents=True)
+    (tmp_path / "c" / "src" / "main.bonsai").write_text(HEAD + inner + edge + "</WorkflowBuilder>", encoding="utf-8")
+    assert lint.launch_id_problems(lint.Workflow(tmp_path / "c")) == [
+        "ExperimentControl is not given LaunchId by an ExternalizedMapping (map the top-level LaunchId down to ExperimentControl)"]
+    assert lint.launch_id_problems(workflow(tmp_path / "d", include(lint.NO_EXPERIMENT_FOLDER))) == []
+    # The include exposes it, mapped onto ControlServer's LaunchId, which status reports and the manifest records.
+    text = (ROOT / "src" / "OpenRigs.Control" / "ExperimentControl.bonsai").read_text(encoding="utf-8-sig")
+    assert '<Property Name="LaunchId" DisplayName="LaunchId"' in text and "<p1:LaunchId />" in text
+
+
+def test_a_device_opened_by_hand_is_refused_unless_unpieced_and_allowed(tmp_path):
+    ns = ('xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior" xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video" '
+          'xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders" ')
+    nodes = ''.join(f'<Expression xsi:type="Combinator" {ns}><Combinator xsi:type="{t}" /></Expression>'
+                    for t in ("beh:Device", "vid:TriggeredSpinnaker", "vid:UsbCamera", "gl:CreateWindow"))
+    wf = workflow(tmp_path, nodes)
+    assert lint.hand_opened_devices(wf) == ["Harp.Behavior.Device (the board's piece)", "OpenRigs.Video.TriggeredSpinnaker (SpinnakerCamera)",
+                                            "OpenRigs.Video.UsbCamera (none yet)", "Bonsai.Shaders.CreateWindow (ProjectorDisplay)"]
+    assert lint.hand_opened_devices(wf, ("UsbCamera", "CreateWindow", "TriggeredSpinnaker")) == [
+        "TriggeredSpinnaker is not a source UNPIECED lists", "Harp.Behavior.Device (the board's piece)", "OpenRigs.Video.TriggeredSpinnaker (SpinnakerCamera)"]
+    # A file of the workflow's own counts as the workflow; a lab include's pieces do not.
+    own = workflow(tmp_path / "b", include("Extensions\\Camera.bonsai") + include(lint.BOARD))
+    (tmp_path / "b" / "src" / "Extensions").mkdir()
+    (tmp_path / "b" / "src" / "Extensions" / "Camera.bonsai").write_text(HEAD + nodes.split("</Expression>")[2] + "</Expression></Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
+    assert lint.hand_opened_devices(own) == ["OpenRigs.Video.UsbCamera (none yet)"]
+
+
+def test_the_live_view_is_the_last_top_level_node_fed_by_nothing(tmp_path):
+    assert lint.live_view_problems(workflow(tmp_path, RECORDS + LIVE)) == []
+    assert lint.live_view_problems(workflow(tmp_path / "b", LIVE + RECORDS)) == ["StreamDevices is not the last top-level node"]
+    assert lint.live_view_problems(workflow(tmp_path / "c", RECORDS)) == ["the workflow does not have one StreamDevices, at its top level"]
+    (tmp_path / "d" / "src").mkdir(parents=True)
+    (tmp_path / "d" / "src" / "main.bonsai").write_text(HEAD + RECORDS + LIVE + '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow></WorkflowBuilder>', encoding="utf-8")
+    assert lint.live_view_problems(lint.Workflow(tmp_path / "d")) == ["StreamDevices has an edge into or out of it"]

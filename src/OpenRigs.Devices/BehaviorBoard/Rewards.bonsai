@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Every reward a task gives, the same in every task with reward valves: declares RewardRequests, a BehaviorSubject of (side, microlitres) with the side as rig.yml's wiring names it (left, right), which the task multicasts each reward into (a BehaviorSubject, so a per-trial graph that sends one and completes leaves it open; its one reader is here, subscribed at Start, so no reward is replayed to it); the controller's manual drops (BehaviorBoard.ManualRewards, which sends into it); and each reward delivered through its valve's calibration (BehaviorBoard.DeliverReward, rig.yml's RigFile). Place it after the hardware and LogLabExperiment (DeliverReward reads Timestamp, TriggerCalibratedPulse, AsyncEvents and PathPrefix), before the task that sends rewards and before ExperimentRecords. A rig without reward valves does not include it.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Tuple(sys:String,sys:Double)">
+        <rx:Name>RewardRequests</rx:Name>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ManualRewards.bonsai" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardRequests</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="RigFile" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.DeliverReward.bonsai">
+        <RigFile>UNMAPPED</RigFile>
+        <CalibrationDirectory />
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="2" To="5" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source2" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

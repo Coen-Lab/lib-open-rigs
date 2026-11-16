@@ -143,6 +143,14 @@ namespace OpenRigs.Devices.Tests
         }
 
         [TestMethod]
+        public void StopZapitSendsOneStopStimulusPerInput()
+        {
+            var sent = new StopZapit().Process(Observable.Range(0, 2)).ToList().Wait();
+            Assert.AreEqual(2, sent.Count);
+            foreach (var command in sent) CollectionAssert.AreEqual(new byte[16], command.ToBytes());
+        }
+
+        [TestMethod]
         public void ConditionOutsideOneTo254IsRefused()
         {
             Assert.ThrowsException<ArgumentOutOfRangeException>(() =>
@@ -312,11 +320,14 @@ namespace OpenRigs.Devices.Tests
                 workflow = XDocument.Load(stream);
             }
             // The client sits inside the SelectMany, so nothing connects before the input says the experiment uses Zapit;
-            // ZapitCommands is declared beside it, a BehaviorSubject, so no per-trial multicast into it closes it.
+            // ZapitCommands is declared beside it, a BehaviorSubject, so no per-trial multicast into it closes it; ZapitReplies
+            // too, a PublishSubject, so a trial's graph that subscribes to check its reply is not handed the last trial's.
             var nodes = workflow.Root.Element(bonsai + "Workflow").Element(bonsai + "Nodes").Elements().ToList();
             var top = nodes.Select(e => (string)e.Attribute(xsi + "type")).ToList();
-            CollectionAssert.AreEqual(new[] { "WorkflowInput", "rx:SelectMany", "WorkflowOutput", "rx:BehaviorSubject" }, top);
-            Assert.AreEqual("ZapitCommands", (string)nodes[3].Element(XNamespace.Get("clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core") + "Name"));
+            CollectionAssert.AreEqual(new[] { "WorkflowInput", "rx:SelectMany", "WorkflowOutput", "rx:BehaviorSubject", "rx:PublishSubject" }, top);
+            XNamespace rx = "clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core";
+            Assert.AreEqual("ZapitCommands", (string)nodes[3].Element(rx + "Name"));
+            Assert.AreEqual("ZapitReplies", (string)nodes[4].Element(rx + "Name"));
             var types = workflow.Descendants().Select(e => (string)e.Attribute(xsi + "type")).Where(t => t != null).ToList();
             foreach (var check in new[] { "zap:ZapitClient", "zap:CheckZapitReply", "zap:CheckZapitConditionCount", "zap:RequireZapitHardwareTrigger" })
             {

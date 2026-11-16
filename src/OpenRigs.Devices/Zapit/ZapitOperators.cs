@@ -25,6 +25,20 @@ namespace OpenRigs.Devices.Zapit
         }
     }
 
+    /// <summary>Emits a Zapit StopStimulus per input: a trial's laser stopped at its cap, before the
+    /// workflow ends (ZapitClient sends one only as it disconnects).</summary>
+    [Combinator]
+    [Description("Emits a Zapit StopStimulus per input, into ZapitCommands: the laser stopped mid-run (ZapitClient stops it only as the workflow ends).")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class StopZapit
+    {
+        /// <summary>Emits StopStimulus for each input.</summary>
+        public IObservable<ZapitCommand> Process<TSource>(IObservable<TSource> source)
+        {
+            return source.Select(input => ZapitCommand.Stop());
+        }
+    }
+
     /// <summary>
     /// Stops the workflow at start unless Zapit has loaded as many conditions as the conditions file
     /// the task names, and that file passes <see cref="ZapitConditions.Check"/>: Zapit presents
