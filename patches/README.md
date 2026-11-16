@@ -79,6 +79,7 @@ Until 5 Nov 2026 these were `0.1.0-bbox.N` (first built for coen-behaviour-box) 
 | `f333a91` | Devices (.31) | `PreflightTap` ticks only on its device's data: its once-a-second "open" tick made every tapped device settled, sending or not. A device settles on its first item and until then has its error (`DeviceReports`), which `RunCheck` drops once it sends; `DeviceTick` loses `Data`. A headless test runs `PreflightChecks` from Go through `Confirm` to `Finished` with its file closed | Lab-only |
 | `a53c785` | Core (.23) | `QuietWait.GoTime` is `TrialStartTime`: the moment a trial starts, not the experimenter's Go | Lab-only |
 | `cf44a04` | Core (.24), Devices (.32) | `OnNextTick` starts a trial loop on the Harp clock's thread with no lock held, and `ZapitTrialCommand` sends a trial's StartStimulus (`IZapitTrial`) at arming on a hardware-triggered rig and at the trigger otherwise: both were copied in two tasks | Lab-only |
+| `5063f60` | Devices (.33) | `BehaviorBoard.ManualPulses` declares Pulse and Reset and writes them on the board's command subject (`PulseCommands`), every pulse timed by the board: a rig check had pulsed lines with its own register writes | Lab-only |
 
 OpenRigs.yml's publish job also pushes each green build's packages, versioned `0.0.0-ciN`, to Coen-Lab's GitHub Packages feed. No workflow installs from that feed: workflows install the `-coen-lab.N` builds in this repository's `local_packages\`, which app-rig-setup's `workflows\update-workflows.ps1` copies into each one.
 
