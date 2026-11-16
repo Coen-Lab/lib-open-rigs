@@ -409,6 +409,19 @@ def test_the_task_logs_are_the_lab_s_include_given_the_task_file_as_json(tmp_pat
     assert lint.expected_files_problems(workflow(tmp_path / "d", include(lint.TASK_LOGS) + manifest_node(expected))) == []
 
 
+def test_no_include_ends_its_logs_when_a_one_shot_write_completes():
+    for path in sorted((ROOT / "src").glob("OpenRigs.*/**/*.bonsai")):
+        if not path.relative_to(ROOT / "src").parts[0].endswith(".Tests"):
+            assert lint.output_ends_logs_problems(lint.ET.fromstring(path.read_bytes())) == [], path
+    # TaskLogs as it was (16 Nov 2026): its WorkflowOutput fed by Settings_Task, which completes at Go.
+    old = block_text(lint.TASK_LOGS).replace('<Edge From="0" To="1" Label="Source1" />',
+                                            '<Edge From="0" To="1" Label="Source1" /><Edge From="1" To="4" Label="Source1" />')
+    old = old.replace('</Expression>\n    </Nodes>', '</Expression>\n      <Expression xsi:type="WorkflowOutput" />\n    </Nodes>')
+    old = old.replace('</Expression>\r\n    </Nodes>', '</Expression>\r\n      <Expression xsi:type="WorkflowOutput" />\r\n    </Nodes>')
+    assert lint.output_ends_logs_problems(lint.ET.fromstring(old.encode("utf-8"))) == [
+        "TrialAndZapitLogs logs beside a WorkflowOutput fed by a one-shot LogDataSchema, which ends it when the write completes"]
+
+
 def test_the_training_stage_is_the_lab_s_include_after_experiment_control(tmp_path):
     control = include(lint.EXPERIMENT_CONTROL, "<Parameters><Parameter><Name>TrainingStage</Name></Parameter></Parameters>")
     assert lint.training_stage_problems(workflow(tmp_path, control + include(lint.TRAINING_STAGE))) == []

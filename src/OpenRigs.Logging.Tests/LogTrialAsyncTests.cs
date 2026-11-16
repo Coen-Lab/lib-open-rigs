@@ -100,6 +100,27 @@ namespace OpenRigs.Logging.Tests
             CollectionAssert.AreEqual(new[] { "Later", "Later", "Later" }, rows.Skip(1).Select(r => r[1]).ToArray(), result.Describe());
         }
     }
+
+    /// <summary>
+    /// TaskLogs keeps logging trials after Settings_Task is written: its input (the task file at Go) sends
+    /// once and completes, and an include whose output completes disposes its side branches, so a
+    /// WorkflowOutput fed by Settings_Task ended LogTrial and Zapit's logs before trial 1.
+    /// </summary>
+    [TestClass]
+    public class TaskLogsTests : LoggingTestBase
+    {
+        const int Count = 10;
+
+        protected override string WorkflowFileName => "TaskLogsTest.bonsai";
+
+        [TestMethod]
+        public void TaskLogs_LogsEveryTrial_AfterSettingsTaskCompletes()
+        {
+            var result = RunWorkflow(new Dictionary<string, string> { { "Count", Count.ToString(CultureInfo.InvariantCulture) } });
+            Assert.AreEqual(1, FindLogFiles("Settings_Task_*.json", result).Length, result.Describe());
+            ReadCsvLog(GetSingleLogFile("BonsaiData_Trial_*.csv", result), new[] { "harpTime", "Trial" }, Count, result);
+        }
+    }
     /// <summary>
     /// CreateAsyncEvent and AsyncEvent without Bonsai: what each kind of element becomes.
     /// </summary>

@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A task's logs, the same in every task: the input, the task file read at Go as JSON (TaskConfig through the task's own SerializeToJson), as Settings_Task; and, once the experiment folder exists (PathPrefix), BonsaiData_Trial (LogTrial of TrialRow, one row per trial) and Zapit's logs (OpenRigs.Devices Zapit.ZapitLogs: BonsaiData_ZapitReplies and Settings_ZapitConditions, in an optogenetics experiment). A task's other logs stay in the task. Needs TrialRow, TaskConfig, ZapitReplies, Timestamp and PathPrefix from the workflow.</Description>
+  <Description>A task's logs, the same in every task: the input, the task file read at Go as JSON (TaskConfig through the task's own SerializeToJson), as Settings_Task; and, once the experiment folder exists (PathPrefix), BonsaiData_Trial (LogTrial of TrialRow, one row per trial) and Zapit's logs (OpenRigs.Devices Zapit.ZapitLogs: BonsaiData_ZapitReplies and Settings_ZapitConditions, in an optogenetics experiment). A task's other logs stay in the task. It has no output: an include ends its side branches when its output completes, and Settings_Task completes at Go, which ended the trial and Zapit logs before trial 1. Needs TrialRow, TaskConfig, ZapitReplies, Timestamp and PathPrefix from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -31,11 +31,9 @@
           </Edges>
         </Workflow>
       </Expression>
-      <Expression xsi:type="WorkflowOutput" />
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
-      <Edge From="1" To="4" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
     </Edges>
   </Workflow>

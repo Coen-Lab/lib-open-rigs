@@ -967,6 +967,22 @@ def task_logs_problems(wf: Workflow) -> list[str]:
     return problems
 
 
+def output_ends_logs_problems(root: ET.Element) -> list[str]:
+    """No scope's WorkflowOutput is fed by a one-shot settings write (LogDataSchema) while a branch beside it logs: the
+    scope ends its side branches when its output completes, so the write that completes at Go ended the logs (TaskLogs
+    until 16 Nov 2026: no trial rows). `root` is an include's or a workflow's."""
+    problems = []
+    for nodes, edges in _scopes(root):
+        for out in (i for i, n in enumerate(nodes) if n.get(XSI) == "WorkflowOutput"):
+            feed = upstream(edges, out) | {out}
+            if not any(nodes[i].get("Path") == "OpenRigs.Logging:LogDataSchema.bonsai" for i in feed):
+                continue
+            problems += [f"{n.findtext(W + 'Name') or kind(n)} logs beside a WorkflowOutput fed by a one-shot LogDataSchema, "
+                         "which ends it when the write completes" for i, n in enumerate(nodes)
+                         if i not in feed and any("Log" in (e.get("Path") or "") for e in n.iter(W + "Expression"))]
+    return problems
+
+
 def training_stage_problems(wf: Workflow) -> list[str]:
     """The training stage is OpenRigs.Control's TrainingStage, included once after ExperimentControl, which declares
     the parameter TrainingStage; the workflow reads the parameter, declares the subject and reports the metric nowhere
