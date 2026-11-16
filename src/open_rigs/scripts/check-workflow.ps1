@@ -106,22 +106,31 @@ if ($Step -eq 'Build') {
     # ExperimentManifest's ConfigFiles) is typed by hand into the workflow: they must all be the same root, and
     # each is pointed at the filled template for this build.
     $script:roots = New-Object System.Collections.Generic.List[string]
-    function Redirect-ConfigRoots($graph) {
+    function Redirect-ConfigRoots($graph, [bool]$record = $true) {
         foreach ($n in $graph) {
             $b = [Bonsai.Expressions.ExpressionBuilder]::Unwrap($n.Value)
             $owner = if ($b -is [Bonsai.Expressions.CombinatorBuilder]) { $b.Combinator } else { $b }
             # A node's inner Settings node mirrors its ConfigRoot and is already redirected with it.
             if ($owner -and $owner.GetType().Namespace -like 'OpenRigs.*' -and $owner.GetType().Name -notlike '*Settings' -and $owner.PSObject.Properties['ConfigRoot']) {
-                $script:roots.Add("$($owner.GetType().Name)=$($owner.ConfigRoot)"); $owner.ConfigRoot = $configRoot
+                if ($record) { $script:roots.Add("$($owner.GetType().Name)=$($owner.ConfigRoot)") }; $owner.ConfigRoot = $configRoot
             }
             if ($b.GetType().Name -eq 'ExperimentManifest') {
                 foreach ($file in $b.ConfigFiles -split ';') { if ($file -match '^(.*)\\%COMPUTERNAME%\\rig\.yml$') { $script:roots.Add("ExperimentManifest.ConfigFiles=$($Matches[1])") } }
                 $b.ConfigFiles = $rigYml
             }
             # An include's workflow is not loaded before the build: its ConfigRoot is the include's own property, kept as XML until then.
+            # One that takes ConfigRoot is loaded now (an embedded include is not reloaded at the build) and redirected inside,
+            # its nodes' own roots not counted, as they are the include's or set from ReadLabRig's subject: ExperimentRecords'
+            # RecordHarpDevices and ExperimentManifest.
             if ($b -is [Bonsai.Expressions.IncludeWorkflowBuilder]) {
                 $p = [ComponentModel.TypeDescriptor]::GetProperties($b)['ConfigRoot']
-                if ($p) { $v = $p.GetValue($b); if ($v -is [Xml.Linq.XElement]) { $v = $v.Value }; $script:roots.Add("$($b.Path)=$v") }
+                if ($p) {
+                    $v = $p.GetValue($b); if ($v -is [Xml.Linq.XElement]) { $v = $v.Value }
+                    if ($record) { $script:roots.Add("$($b.Path)=$v") }
+                    $null = $b.ArgumentRange
+                    if ($b.Workflow) { Redirect-ConfigRoots $b.Workflow $false }
+                    continue
+                }
             }
             if ($b -is [Bonsai.Expressions.IWorkflowExpressionBuilder] -and $b.Workflow) { Redirect-ConfigRoots $b.Workflow }
         }

@@ -10,6 +10,7 @@ Each check returns what breaks the rule (empty when it holds), so a failing test
 
 from __future__ import annotations
 
+import copy
 import io
 import json
 import re
@@ -34,6 +35,11 @@ SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "
 ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
 ZAPIT_FOR_TASK = "OpenRigs.Devices:Zapit.ConnectForTask.bonsai"
 MANUAL_REWARDS = "OpenRigs.Devices:BehaviorBoard.ManualRewards.bonsai"
+BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
+EXPERIMENT_RECORDS = "OpenRigs.Logging:ExperimentRecords.bonsai"
+LAUNCH_SETTINGS = "OpenRigs.Control:LaunchSettings.bonsai"
+EXPERIMENT_CONTROL = "OpenRigs.Control:ExperimentControl.bonsai"
+DELIVER_REWARD = "OpenRigs.Devices:BehaviorBoard.DeliverReward.bonsai"
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
 DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
@@ -532,10 +538,11 @@ def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[int]) -> 
 
 def experiment_log_problems(wf: Workflow) -> list[str]:
     """The experiment's shared logs are OpenRigs.Logging's LogLabExperiment (folder, BonsaiData_Async, Settings_Rig,
-    Settings_Experiment, Recording) and LogControlEvents (the controller's events), each included once; the workflow
-    builds none of them itself."""
+    Settings_Experiment, Recording) and LogControlEvents (the controller's events, in ExperimentRecords or alone), each
+    included once; the workflow builds none of them itself."""
+    records = wf.text.count(f'Path="{EXPERIMENT_RECORDS}"')
     problems = [f"the workflow does not include {name} once" for name in ("LogLabExperiment", "LogControlEvents")
-                if wf.text.count(f'Path="OpenRigs.Logging:{name}.bonsai"') != 1]
+                if wf.text.count(f'Path="OpenRigs.Logging:{name}.bonsai"') + (records if name == "LogControlEvents" else 0) != 1]
     problems += [f"the workflow includes {name} itself (LogLabExperiment does)" for name in ("LogController", "LogAsync")
                  if f'Path="OpenRigs.Logging:{name}.bonsai"' in wf.text]
     problems += [f"the workflow logs {name} itself (LogLabExperiment does)" for name in ("Settings_Rig", "Settings_Experiment")
@@ -598,6 +605,118 @@ def manual_rewards_drop_problems(root: ET.Element) -> list[str]:
     """ManualRewards gives MANUAL_REWARD_DROP_UL on each side. `root` is OpenRigs.Devices' BehaviorBoard/ManualRewards.bonsai."""
     drops = [float(_value(n)) for n in root.iter(W + "Expression") if kind(n) == "DoubleProperty"]
     return [] if drops == [MANUAL_REWARD_DROP_UL] * 2 else [f"ManualRewards gives {drops} ul, not {MANUAL_REWARD_DROP_UL} on each side"]
+
+
+def _order(root: ET.Element, found) -> int | None:
+    """The document position of the first node `found` accepts, None if none does."""
+    return next((i for i, n in enumerate(root.iter(W + "Expression")) if found(n)), None)
+
+
+def _declares(name: str):
+    return lambda n: (n.get(XSI) or "").startswith("rx:") and (n.get(XSI) or "").endswith("Subject") and _name(n) == name
+
+
+def spout_step_size_problems(wf: Workflow) -> list[str]:
+    """With the lick spout stage, ExperimentControl declares the parameter SpoutStepSize: LickSpoutStage takes it live
+    and shows its default (150) at Start, and ParameterDefault on an undeclared name stops the workflow. The workflow
+    handles SpoutStepSize nowhere itself and sets it on no include."""
+    if not any(p == LICK_SPOUT_STAGE for p, _ in hardware(wf)):
+        return []
+    problems = [] if re.search(r"<Parameter>\s*<Name>SpoutStepSize</Name>", wf.text) else [
+        "ExperimentControl does not declare the parameter SpoutStepSize, which LickSpoutStage takes"]
+    own = [c for c in wf.root.iter(W + "Combinator") if c.get(XSI, "").split(":")[-1] in ("OnParameterSet", "ParameterDefault")
+           and c.findtext(CONTROL + "Name") == "SpoutStepSize"]
+    if own or _order(wf.root, _declares("SpoutStepSize")) is not None:
+        problems.append("the workflow handles SpoutStepSize itself (LickSpoutStage does)")
+    if re.search(r'<SpoutStepSize>|Property Name="SpoutStepSize"', wf.text):
+        problems.append("the workflow sets SpoutStepSize on an include, which takes it from the parameter")
+    return problems
+
+
+def background_noise_problems(wf: Workflow) -> list[str]:
+    """Every task with sound has background noise: OpenRigs.Audio's BackgroundNoise, included once, after the task
+    declares LaunchTaskConfig and TaskConfig, which it reads; the workflow sends nothing into BackgroundNoise and reads
+    no backgroundNoise itself."""
+    count = wf.text.count(f'Path="{BACKGROUND_NOISE}"')
+    mixer = any(p == SPEAKER_MIXER for p, _ in hardware(wf))
+    if count != (1 if mixer else 0):
+        return [f"the workflow includes BackgroundNoise {count} times, " + ("not once" if mixer else "and has no SpeakerMixer")]
+    problems = []
+    if any(n.get(XSI) == "MulticastSubject" and _name(n) == "BackgroundNoise" for n in wf.root.iter(W + "Expression")):
+        problems.append("the workflow sends BackgroundNoise itself (the BackgroundNoise include does)")
+    if "TaskParameters.BackgroundNoise" in wf.text:
+        problems.append("the workflow reads the task file's backgroundNoise itself (BackgroundNoise does)")
+    if count:
+        at = _order(wf.root, lambda n: n.get("Path") == BACKGROUND_NOISE)
+        for name in ("LaunchTaskConfig", "TaskConfig"):
+            declared = _order(wf.root, _declares(name))
+            if declared is None or declared > at:
+                problems.append(f"BackgroundNoise comes before {name} is declared")
+    return problems
+
+
+def background_noise_include_problems(root: ET.Element) -> list[str]:
+    """BackgroundNoise sends into BackgroundNoise only at Ready, the WAV read at the mixer's rate (ReadWave), laid out
+    unequalised at LaunchTaskConfig's backgroundNoise.levelDbfs; and stops at Go on a TaskConfig whose backgroundNoise
+    differs from LaunchTaskConfig's. `root` is OpenRigs.Audio's BackgroundNoise.bonsai."""
+    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+    sends = [i for i, n in enumerate(nodes) if n.get(XSI) == "MulticastSubject" and _name(n) == "BackgroundNoise"]
+    if len(sends) != 1:
+        return ["BackgroundNoise does not send into BackgroundNoise once"]
+    up = [nodes[a] for a in upstream(edges, sends[0])]
+    subjects = {_name(n) for n in up if n.get(XSI) == "SubscribeSubject"}
+    problems = [f"the noise sent does not wait for {s}" for s in ("Ready", "LaunchTaskConfig", "Speakers") if s not in subjects]
+    buffers = [n for n in up if kind(n) == "aud:SpeakerBuffer"]
+    if len(buffers) != 1 or child(buffers[0], W + "Combinator").findtext(AUDIO + "Equalise") != "false":
+        problems.append("the noise is not one SpeakerBuffer, unequalised")
+    if "TaskParameters.BackgroundNoise.LevelDbfs" not in {n.findtext(W + "Selector") for n in up}:
+        problems.append("the noise's level is not the launched task file's backgroundNoise.levelDbfs")
+    if not any(kind(n) == "aud:ReadWave" for n in up):
+        problems.append("the noise is not read by ReadWave, at the mixer's rate")
+    stops = [i for i, n in enumerate(nodes) if kind(n) == "core:ThrowError"]
+    if not any({"TaskConfig", "LaunchTaskConfig"} <= {_name(nodes[a]) for a in upstream(edges, s)} for s in stops):
+        problems.append("Go does not stop on a backgroundNoise changed after launch")
+    return problems
+
+
+def experiment_records_problems(wf: Workflow) -> list[str]:
+    """The experiment's records are OpenRigs.Logging's ExperimentRecords (DeliverReward on RewardRequests,
+    LogControlEvents, RecordHarpDevices, ExperimentManifest), included once with ConfigRoot, IngestScript and
+    ExpectedFiles set, as the last top-level node but StreamDevices: RecordHarpDevices and ExperimentManifest find each
+    device by the subjects published before them. The workflow has none of the four of its own."""
+    count = wf.text.count(f'Path="{EXPERIMENT_RECORDS}"')
+    if count != 1:
+        return [f"the workflow includes ExperimentRecords {count} times, not once"]
+    problems = [f"the workflow has its own {name} (ExperimentRecords does)" for name in ("RecordHarpDevices", "ExperimentManifest")
+                if any(kind(n).endswith(":" + name) for n in wf.root.iter(W + "Expression"))]
+    problems += [f"the workflow has its own {path.split(':')[1].removesuffix('.bonsai').split('.')[-1]} (ExperimentRecords does)"
+                 for path in (DELIVER_REWARD, "OpenRigs.Logging:LogControlEvents.bonsai") if f'Path="{path}"' in wf.text]
+    top = nodes_and_edges(child(wf.root, W + "Workflow"))[0]
+    at = next((i for i, n in enumerate(top) if n.get("Path") == EXPERIMENT_RECORDS), None)
+    if at is None or any(not kind(n).endswith(":StreamDevices") for n in top[at + 1:]):
+        problems.append("ExperimentRecords is not the last top-level node (StreamDevices alone may follow)")
+    else:
+        props = _properties(top[at])
+        problems += [f"ExperimentRecords has no {p}" for p in ("ConfigRoot", "IngestScript", "ExpectedFiles") if not props.get(p)]
+    return problems
+
+
+def launch_settings_problems(wf: Workflow) -> list[str]:
+    """SubjectId, TaskFilePath and RunSettings are OpenRigs.Control's LaunchSettings, included once after
+    ExperimentControl (whose ExperimentGo it reads), with the task file's TaskPath; the workflow declares none itself."""
+    count = wf.text.count(f'Path="{LAUNCH_SETTINGS}"')
+    if count != 1:
+        return [f"the workflow includes LaunchSettings {count} times, not once"]
+    problems = [f"the workflow declares {name} itself (LaunchSettings does)" for name in ("SubjectId", "TaskFilePath", "RunSettings")
+                if _order(wf.root, _declares(name)) is not None]
+    at = _order(wf.root, lambda n: n.get("Path") == LAUNCH_SETTINGS)
+    control = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_CONTROL)
+    if control is None or control > at:
+        problems.append("LaunchSettings comes before ExperimentControl")
+    node = next(n for n in wf.root.iter(W + "Expression") if n.get("Path") == LAUNCH_SETTINGS)
+    if not _properties(node).get("TaskPath"):
+        problems.append("LaunchSettings has no TaskPath (the task file run from the editor)")
+    return problems
 
 
 def penalty_sound_problems(wf: Workflow) -> list[str]:
@@ -711,11 +830,13 @@ def expected_files_problems(wf: Workflow) -> list[str]:
     """Every file the workflow writes is named in ExperimentManifest's ExpectedFiles, one entry per log
     (the start of its path, not its folder: a folder is met by any one file in it), with the condition
     its block writes it under (path?Subject); every named entry is a file the workflow writes; device
-    logs need auto and RecordHarpDevices needs harp. Empty without an ExperimentManifest."""
-    manifest = next((e for e in wf.root.iter(W + "Expression") if (e.get(XSI) or "").endswith(":ExperimentManifest")), None)
+    logs need auto and RecordHarpDevices needs harp. ExperimentRecords' ExpectedFiles is its manifest's (blank by
+    default) and it records the Harp devices. Empty without an ExperimentManifest."""
+    manifest = next((e for e in wf.root.iter(W + "Expression") if (e.get(XSI) or "").endswith(":ExperimentManifest")
+                     or e.get("Path") == EXPERIMENT_RECORDS), None)
     if manifest is None:
         return []
-    raw = next((c.text or "" for c in manifest if c.tag.endswith("}ExpectedFiles")), "auto")
+    raw = next((c.text or "" for c in manifest if c.tag.endswith("}ExpectedFiles")), "" if manifest.get("Path") else "auto")
     entries = {}
     for item in (e.strip() for e in raw.split(";")):
         if item:
@@ -735,7 +856,7 @@ def expected_files_problems(wf: Workflow) -> list[str]:
             writes.update({log_prefix(name): condition for name, condition in FIXED_LOGS[include]})
         elif include in DEVICE_LOGS:
             devices = True
-        elif local == "RecordHarpDevices":
+        elif local == "RecordHarpDevices" or include == EXPERIMENT_RECORDS:
             harp = True
         elif include.startswith("OpenRigs.Logging:") and include not in NO_FILES:
             problems.append(f"{include} writes files this check does not know: add it to workflow_lint's writers")
@@ -765,8 +886,9 @@ TEMPLATE = Path(__file__).parent / "rig-template.yml"
 def filled_rig(wf: Workflow, root: Path, machine: str) -> tuple[str, list[str], list[str]]:
     """The lab's rig template filled in as a rig with exactly the workflow's devices (required_devices), for
     check-workflow's build: (rig.yml's text, each Harp record RecordHarpDevices should make as "<Name> <port> <serial>
-    <WhoAmI>", each device folder and Harp record file ExperimentManifest should expect). A camera's entry is the
-    template's first camera's, and the board's DO0 trigger line names every camera (none: no DO0 line)."""
+    <WhoAmI>", each device folder and Harp record file ExperimentManifest should expect). An entry the template lacks
+    (a board named BehaviorBoard-Arena) is the template's first of its kind, as every camera's is the first camera's, and
+    the board's DO0 trigger line names every camera (none: no DO0 line)."""
     from ruamel.yaml import YAML
 
     yaml = YAML()
@@ -783,11 +905,11 @@ def filled_rig(wf: Workflow, root: Path, machine: str) -> tuple[str, list[str], 
         elif group == "camera":
             rig[group] = {e: dict(camera) for e in wanted}
         else:
+            first = copy.deepcopy(next(iter(rig[group].values())))
             for e in [e for e in rig[group] if e not in wanted]:
                 del rig[group][e]
-            missing = [e for e in wanted if e not in rig[group]]
-            if missing:
-                raise ValueError(f"the rig template has no {group} {', '.join(missing)}: add it to rig-template.yml")
+            for e in [e for e in wanted if e not in rig[group]]:
+                rig[group][e] = copy.deepcopy(first)
     cameras = [name for name, g in devices if g == "camera"]
     for board in rig.get("behaviorBoard", {}).values():
         if cameras:

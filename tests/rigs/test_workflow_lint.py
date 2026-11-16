@@ -182,10 +182,10 @@ def test_a_new_combination_of_the_lab_s_devices_needs_no_hardware_code(tmp_path)
 
 
 def test_the_dome_rig_list_is_expanded_with_the_workflow_s_settings(tmp_path):
-    rig_list = include(lint.DEVICES + "DomeHardware.bonsai", "<SpoutStepSize>99</SpoutStepSize>")
+    rig_list = include(lint.DEVICES + "DomeHardware.bonsai", "<DisplayDevice>Second</DisplayDevice>")
     wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + rig_list)
     assert lint.hardware_problems(wf) == [] and lint.speaker_mixer_problems(wf) == []
-    assert dict(lint.hardware(wf))[lint.LICK_SPOUT_STAGE]["SpoutStepSize"] == "99"
+    assert dict(lint.hardware(wf))[lint.PROJECTOR_DISPLAY]["DisplayDevice"] == "Second"
     assert lint.SPEAKER_MIXER in dict(lint.hardware(wf)) and lint.PROJECTOR_DISPLAY in dict(lint.hardware(wf))
     assert [name for name, _ in lint.required_devices(wf)] == [
         "TimestampGeneratorGen3-Main", "BehaviorBoard-Main", "LicketySplit-Left", "LicketySplit-Right",
@@ -413,3 +413,103 @@ def test_the_shared_experiment_logs_are_the_lab_s_two_includes(tmp_path):
     assert lint.experiment_log_problems(workflow(tmp_path / "e", grouped + gate)) == ["LogLabExperiment is not a top-level node of its own"]
     assert lint.experiment_log_problems(workflow(tmp_path / "f", both + gate)) == []
     assert lint.expected_files_problems(workflow(tmp_path / "c", both + manifest_node("BonsaiData/BonsaiData_Async_;Settings/Settings_Rig_;Settings/Settings_Experiment_"))) == []
+
+
+CONTROL = 'xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"'
+STEP_SIZE = "<Parameters><Parameter><Name>SpoutStepSize</Name></Parameter></Parameters>"
+
+
+def test_the_spout_step_size_is_the_lick_spout_stage_s_and_the_workflow_only_declares_it(tmp_path):
+    stage = include(lint.READ_LAB_RIG) + include(lint.READY_GATE) + include(lint.LICK_SPOUT_STAGE)
+    assert lint.spout_step_size_problems(workflow(tmp_path, stage + include(lint.EXPERIMENT_CONTROL, STEP_SIZE))) == []
+    assert lint.spout_step_size_problems(workflow(tmp_path / "b", stage + include(lint.EXPERIMENT_CONTROL))) == [
+        "ExperimentControl does not declare the parameter SpoutStepSize, which LickSpoutStage takes"]
+    # The domes' copy before 16 Nov 2026: their own subject and live set, mapped onto the rig list.
+    own = (include(lint.EXPERIMENT_CONTROL, STEP_SIZE) + '<Expression xsi:type="rx:BehaviorSubject"><Name>SpoutStepSize</Name></Expression>'
+           f'<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:OnParameterSet" {CONTROL}><orcl:Name>SpoutStepSize</orcl:Name></Combinator></Expression>'
+           '<Expression xsi:type="PropertyMapping"><PropertyMappings><Property Name="SpoutStepSize" /></PropertyMappings></Expression>')
+    assert lint.spout_step_size_problems(workflow(tmp_path / "c", include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + own)) == [
+        "the workflow handles SpoutStepSize itself (LickSpoutStage does)", "the workflow sets SpoutStepSize on an include, which takes it from the parameter"]
+    assert lint.spout_step_size_problems(workflow(tmp_path / "d", include(lint.READ_LAB_RIG))) == []
+
+
+def test_the_lick_spout_stage_takes_the_spout_step_size_live_and_shows_its_default():
+    text = (ROOT / "src" / "OpenRigs.Devices" / "LickSpoutStage.bonsai").read_text(encoding="utf-8-sig")
+    root = lint.ET.fromstring(text.encode("utf-8"))
+    names = {(c.get(lint.XSI), c.findtext(lint.CONTROL + "Name")) for c in root.iter(lint.W + "Combinator")}
+    assert {("orcl:OnParameterSet", "SpoutStepSize"), ("orcl:ParameterDefault", "SpoutStepSize")} <= names
+    assert text.count("<Value>150</Value>") == 1 and "StepSize>150<" not in text
+    assert "SpoutStepSize" not in (ROOT / "src" / "OpenRigs.Devices" / "DomeHardware.bonsai").read_text(encoding="utf-8-sig")
+
+
+def task_files(nodes: str = "") -> str:
+    return ('<Expression xsi:type="rx:AsyncSubject"><Name>TaskConfig</Name></Expression>'
+            '<Expression xsi:type="rx:AsyncSubject"><Name>LaunchTaskConfig</Name></Expression>' + nodes)
+
+
+def test_every_task_with_sound_has_the_lab_s_background_noise_once_after_its_task_files(tmp_path):
+    rig = include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai")
+    noise = include(lint.BACKGROUND_NOISE, "<FileName>waveforms\\background_noise.wav</FileName>")
+    assert lint.background_noise_problems(workflow(tmp_path, rig + task_files() + noise)) == []
+    assert lint.background_noise_problems(workflow(tmp_path / "b", rig + task_files())) == ["the workflow includes BackgroundNoise 0 times, not once"]
+    assert lint.background_noise_problems(workflow(tmp_path / "c", rig + noise + task_files())) == [
+        "BackgroundNoise comes before LaunchTaskConfig is declared", "BackgroundNoise comes before TaskConfig is declared"]
+    own = ('<Expression xsi:type="MemberSelector"><Selector>TaskParameters.BackgroundNoise.LevelDbfs</Selector></Expression>'
+           '<Expression xsi:type="MulticastSubject"><Name>BackgroundNoise</Name></Expression>')
+    assert lint.background_noise_problems(workflow(tmp_path / "d", rig + task_files(own) + noise)) == [
+        "the workflow sends BackgroundNoise itself (the BackgroundNoise include does)",
+        "the workflow reads the task file's backgroundNoise itself (BackgroundNoise does)"]
+    assert lint.background_noise_problems(workflow(tmp_path / "e", include(lint.READ_LAB_RIG) + noise)) == [
+        "the workflow includes BackgroundNoise 1 times, and has no SpeakerMixer"]
+
+
+def test_the_background_noise_plays_from_ready_at_the_launch_s_level_and_go_refuses_a_change():
+    text = (ROOT / "src" / "OpenRigs.Audio" / "BackgroundNoise.bonsai").read_text(encoding="utf-8-sig")
+    assert lint.background_noise_include_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
+    early = text.replace("<Name>Ready</Name>", "<Name>Speakers</Name>")
+    assert lint.background_noise_include_problems(lint.ET.fromstring(early.encode("utf-8"))) == ["the noise sent does not wait for Ready"]
+    at_go = text.replace("<Name>LaunchTaskConfig</Name>", "<Name>TaskConfig</Name>")
+    assert lint.background_noise_include_problems(lint.ET.fromstring(at_go.encode("utf-8"))) == [
+        "the noise sent does not wait for LaunchTaskConfig", "Go does not stop on a backgroundNoise changed after launch"]
+
+
+RECORDS = include(lint.EXPERIMENT_RECORDS, "<ConfigRoot>C:\\Root</ConfigRoot><IngestScript>task</IngestScript><ExpectedFiles>auto;harp;Settings/Settings_Rig_;Settings/Settings_Experiment_;BonsaiData/BonsaiData_Async_</ExpectedFiles>")
+LIVE = '<Expression xsi:type="lv:StreamDevices" xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView" />'
+
+
+def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_path):
+    logs = include("OpenRigs.Logging:LogLabExperiment.bonsai") + include(lint.BOARD)
+    wf = workflow(tmp_path, logs + RECORDS + LIVE)
+    assert lint.experiment_records_problems(wf) == [] and lint.experiment_log_problems(wf) == [] and lint.expected_files_problems(wf) == []
+    late = workflow(tmp_path / "b", logs + RECORDS + include(lint.MANUAL_REWARDS) + LIVE)
+    assert lint.experiment_records_problems(late) == ["ExperimentRecords is not the last top-level node (StreamDevices alone may follow)"]
+    own = workflow(tmp_path / "c", logs + include("OpenRigs.Logging:LogControlEvents.bonsai") + manifest_node("auto")
+                   + include(lint.EXPERIMENT_RECORDS, "<ExpectedFiles>auto</ExpectedFiles>"))
+    assert lint.experiment_records_problems(own) == [
+        "the workflow has its own ExperimentManifest (ExperimentRecords does)", "the workflow has its own LogControlEvents (ExperimentRecords does)",
+        "ExperimentRecords has no ConfigRoot", "ExperimentRecords has no IngestScript"]
+    assert lint.experiment_log_problems(own) == ["the workflow does not include LogControlEvents once"]
+    # Its manifest's ExpectedFiles is the include's, blank by default, and it records the Harp devices.
+    unnamed = workflow(tmp_path / "d", logs + include(lint.EXPERIMENT_RECORDS, "<ExpectedFiles>auto</ExpectedFiles>"))
+    assert "the workflow has RecordHarpDevices but ExpectedFiles has no harp" in lint.expected_files_problems(unnamed)
+
+
+def test_the_launch_s_settings_are_one_include_after_experiment_control(tmp_path):
+    launch = include(lint.LAUNCH_SETTINGS, "<TaskPath>..\\config\\task.yml</TaskPath>")
+    assert lint.launch_settings_problems(workflow(tmp_path, include(lint.EXPERIMENT_CONTROL) + launch)) == []
+    own = '<Expression xsi:type="rx:AsyncSubject"><Name>SubjectId</Name></Expression>'
+    assert lint.launch_settings_problems(workflow(tmp_path / "b", own + include(lint.LAUNCH_SETTINGS) + include(lint.EXPERIMENT_CONTROL))) == [
+        "the workflow declares SubjectId itself (LaunchSettings does)", "LaunchSettings comes before ExperimentControl",
+        "LaunchSettings has no TaskPath (the task file run from the editor)"]
+
+
+def test_a_board_not_named_main_is_filled_from_the_template_s_first_board(tmp_path):
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet")
+                  + named(lint.BOARD, "BehaviorBoard-Arena") + piece(lint.CLOCK_FROM_BOARD, Board="BehaviorBoard-Arena",
+                  BoardCommandsSubjectName="BehaviorBoard-Arena.Commands", BoardDataSubjectName="BehaviorBoard-Arena.Data"))
+    assert lint.hardware_problems(wf) == []
+    text, records, files = lint.filled_rig(wf, tmp_path, "RIG")
+    rig = YAML(typ="safe").load(text)
+    LabRig.model_validate(rig)
+    assert list(rig["behaviorBoard"]) == ["arena"] and records == ["BehaviorBoard-Arena COM1 SERIAL0 1216"]
+    assert files == ["BehaviorBoard-Arena/", "BehaviorBoard-Arena/BehaviorBoard-Arena_device.json", "BehaviorBoard-Arena/BehaviorBoard-Arena.yml"]
