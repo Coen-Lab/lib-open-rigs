@@ -69,7 +69,7 @@ namespace OpenRigs.Devices.Tests
 
         public LoopRig(StubRules rules, double first = 100.001)
         {
-            Loop = new TrialLoop<StubTrial, string, StubOutcome>(rules);
+            Loop = new TrialLoop<StubTrial, string, StubOutcome>(rules, true);
             Now = Math.Round(first - 0.001, 6);
         }
 
@@ -517,7 +517,7 @@ namespace OpenRigs.Devices.Tests
             var events = new List<TrialEvent<StubTrial, string, StubOutcome>>();
             Exception error = null;
             var stub = new StubRules { Plan = n => Timing(0.5, true), Laser = LaserTiming.UntilOutcome(true, 0, double.PositiveInfinity) };
-            using (TrialLoop.Observe(rules, clock, wheel, left, right, replies).Subscribe(events.Add, e => error = e))
+            using (TrialLoop.Observe(rules, clock, new[] { left, right }, replies, wheel).Subscribe(events.Add, e => error = e))
             {
                 rules.OnNext(stub);
                 var now = 50.0;
@@ -533,6 +533,52 @@ namespace OpenRigs.Devices.Tests
                 clock.OnNext(1);
                 StringAssert.Contains(error.Message, "went backwards");
             }
+        }
+
+        [TestMethod]
+        public void AnInputEndingEndsOrStopsTheTrials()
+        {
+            Func<Action<Subject<double>, Subject<bool>, Subject<double>>, Tuple<bool, Exception>> run = end =>
+            {
+                var clock = new Subject<double>();
+                var lick = new Subject<bool>();
+                var wheel = new Subject<double>();
+                var completed = false;
+                Exception error = null;
+                using (TrialLoop.Observe(Observable.Return(new StubRules()), clock, new[] { lick }, Observable.Never<ZapitReply>(), wheel)
+                    .Subscribe(e => { }, e => error = e, () => completed = true))
+                {
+                    clock.OnNext(100);
+                    end(clock, lick, wheel);
+                }
+                return Tuple.Create(completed, error);
+            };
+            var clockEnds = run((c, l, w) => c.OnCompleted());
+            Assert.IsTrue(clockEnds.Item1 && clockEnds.Item2 == null, "the clock ending ends the trials");
+            StringAssert.Contains(run((c, l, w) => l.OnCompleted()).Item2.Message, "lick input 0 ended");
+            StringAssert.Contains(run((c, l, w) => w.OnCompleted()).Item2.Message, "wheel ended");
+        }
+
+        [TestMethod]
+        public void WithoutAWheelAWheelQuietWaitIsRefused()
+        {
+            Exception error = null;
+            var clock = new Subject<double>();
+            var stub = new StubRules { Plan = n => new TrialTiming { ItiSeconds = 2, WheelQuietSeconds = 1, WheelQuietCm = 1, ResponseWindowSeconds = 1.5 } };
+            using (TrialLoop.Observe(Observable.Return(stub), clock, new[] { Observable.Never<bool>() }, Observable.Never<ZapitReply>()).Subscribe(e => { }, e => error = e))
+            {
+                clock.OnNext(100);
+            }
+            StringAssert.Contains(error.Message, "waits 1 s for the wheel to be quiet, but the loop has no wheel");
+
+            var outcomes = 0;
+            stub = new StubRules { Plan = n => Timing() };
+            using (TrialLoop.Observe(Observable.Return(stub), clock, new[] { Observable.Never<bool>() }, Observable.Never<ZapitReply>())
+                .Subscribe(e => { if (e.Kind == TrialEventKind.Outcome) outcomes++; }, e => error = e))
+            {
+                for (var s = 100.0; s < 104; s = Math.Round(s + 0.001, 6)) clock.OnNext(s);
+            }
+            Assert.IsTrue(outcomes > 0, "a trial with no wheel wait runs without a wheel");
         }
 
         [TestMethod]
@@ -659,12 +705,12 @@ namespace OpenRigs.Devices.Tests
         public void ATrialNeedsZapitsFieldsOnlyWhenItIsALaserTrial()
         {
             // Audit B13: a task without a laser need not be an IZapitTrial.
-            var plain = new TrialLoop<PlainTrial, string, StubOutcome>(new PlainRules());
+            var plain = new TrialLoop<PlainTrial, string, StubOutcome>(new PlainRules(), true);
             var events = new List<TrialEvent<PlainTrial, string, StubOutcome>>();
             for (var s = 100.0; s < 104; s = Math.Round(s + 0.001, 6)) events.AddRange(plain.OnClock(s));
             Assert.AreEqual(1, events.Count(e => e.Kind == TrialEventKind.Outcome));
 
-            var laser = new TrialLoop<PlainTrial, string, StubOutcome>(new PlainRules { LaserTrials = true });
+            var laser = new TrialLoop<PlainTrial, string, StubOutcome>(new PlainRules { LaserTrials = true }, true);
             StringAssert.Contains(Refusal(() => laser.OnClock(100)), "is not an IZapitTrial");
         }
     }

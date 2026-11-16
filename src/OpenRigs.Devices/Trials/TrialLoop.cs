@@ -38,6 +38,7 @@ namespace OpenRigs.Devices
 
         readonly ITrialRules<TTrial, TUpdate, TOutcome> rules;
         readonly LaserTiming laser;
+        readonly bool hasWheel;
         readonly List<bool> touched = new List<bool>();
         readonly List<Timer> timers = new List<Timer>();   // by due time, then as scheduled
         Phase phase = Phase.Waiting;
@@ -52,11 +53,14 @@ namespace OpenRigs.Devices
         TTrial awaitingReply;   // the trial whose StartStimulus Zapit has not yet answered
         TTrial armed;           // the last trial Zapit armed
 
-        /// <summary>A loop running <paramref name="rules"/>' trials; the first is drawn at the first clock tick.</summary>
-        public TrialLoop(ITrialRules<TTrial, TUpdate, TOutcome> rules)
+        /// <summary>A loop running <paramref name="rules"/>' trials; the first is drawn at the first clock tick. Without
+        /// a wheel (<paramref name="hasWheel"/> false) the wheel's distance stays NaN and a trial that waits for the wheel
+        /// to be quiet is refused.</summary>
+        public TrialLoop(ITrialRules<TTrial, TUpdate, TOutcome> rules, bool hasWheel)
         {
             if (rules == null) throw new ArgumentNullException("rules");
             this.rules = rules;
+            this.hasWheel = hasWheel;
             laser = rules.Laser;
         }
 
@@ -99,7 +103,7 @@ namespace OpenRigs.Devices
             return events;
         }
 
-        /// <summary>A spout's lick detector changed (spout 0 left, 1 right): touched or released.</summary>
+        /// <summary>A spout's lick detector changed (the spout's index in the loop's lick inputs): touched or released.</summary>
         public List<TrialEvent<TTrial, TUpdate, TOutcome>> OnLick(int spout, bool isTouched)
         {
             if (spout < 0) throw new ArgumentOutOfRangeException("spout", spout, "A spout is numbered from 0.");
@@ -173,6 +177,7 @@ namespace OpenRigs.Devices
             if (t.Laser && laser == null) problems.Add("it is a laser trial, but the rules give no LaserTiming");
             if (t.Laser && !(next is IZapitTrial)) problems.Add(string.Format("it is a laser trial, but its type {0} is not an IZapitTrial (its laser condition, laser on and power)", next.GetType().Name));
             problems.AddRange(QuietWait.SettingsProblems(t.LickQuietSeconds, t.WheelQuietSeconds, t.WheelQuietCm));
+            if (!hasWheel && t.WheelQuietSeconds > 0) problems.Add(string.Format("it waits {0} s for the wheel to be quiet, but the loop has no wheel", t.WheelQuietSeconds));
             if (problems.Count > 0) throw new InvalidOperationException(string.Format("Trial {0} cannot be run: {1}.", next.TrialNumber, string.Join("; ", problems)));
         }
 
@@ -360,20 +365,23 @@ namespace OpenRigs.Devices
 
         /// <summary>
         /// The trials of the first rules to come, as events: the loop is fed the Harp clock (seconds), the wheel (cm),
-        /// the left (spout 0) and right (spout 1) lick detectors' states and Zapit's replies, under one lock; the events
-        /// leave in order, outside it, one thread at a time (sending under the lock deadlocks a clock that ticks under its
-        /// own). The first trial's interval starts at the first tick after the rules come. An error from the loop or the
-        /// rules stops the sequence with it.
+        /// each spout's lick detector's state (<paramref name="licks"/>, spout 0 the first: a two-spout rig's left, then its
+        /// right), Zapit's replies and, on a rig with one, the wheel (cm; null for none), under one lock; the events leave in
+        /// order, outside it, one thread at a time (sending under the lock deadlocks a clock that ticks under its own). The
+        /// first trial's interval starts at the first tick after the rules come. The clock ending ends the sequence; a lick
+        /// detector or the wheel ending stops it naming the input, as its device has stopped sending; Zapit's replies ending
+        /// is left to the laser trial that waits for one. An error from the loop, the rules or an input stops the sequence.
         /// </summary>
         public static IObservable<TrialEvent<TTrial, TUpdate, TOutcome>> Observe<TTrial, TUpdate, TOutcome>(
-            IObservable<ITrialRules<TTrial, TUpdate, TOutcome>> rules, IObservable<double> clock, IObservable<double> wheelCm,
-            IObservable<bool> lickLeft, IObservable<bool> lickRight, IObservable<ZapitReply> zapitReplies)
+            IObservable<ITrialRules<TTrial, TUpdate, TOutcome>> rules, IObservable<double> clock, IObservable<bool>[] licks,
+            IObservable<ZapitReply> zapitReplies, IObservable<double> wheelCm = null)
             where TTrial : class, ITrial
             where TOutcome : class, ITrialOutcome
         {
+            if (licks == null || licks.Length == 0 || Array.IndexOf(licks, null) >= 0) throw new ArgumentException("The trial loop needs a lick input for each spout, none null.", "licks");
             return rules.Take(1).SelectMany(r => Observable.Create<TrialEvent<TTrial, TUpdate, TOutcome>>(observer =>
             {
-                var loop = new TrialLoop<TTrial, TUpdate, TOutcome>(r);
+                var loop = new TrialLoop<TTrial, TUpdate, TOutcome>(r, wheelCm != null);
                 var gate = new object();
                 var outbox = new Queue<Action>();
                 bool sending = false, stopped = false;
@@ -384,7 +392,13 @@ namespace OpenRigs.Devices
                         if (stopped) return;
                         try
                         {
-                            foreach (var e in step())
+                            var events = step();
+                            if (events == null)
+                            {
+                                stopped = true;
+                                outbox.Enqueue(observer.OnCompleted);
+                            }
+                            else foreach (var e in events)
                             {
                                 var value = e;
                                 outbox.Enqueue(() => observer.OnNext(value));
@@ -422,14 +436,19 @@ namespace OpenRigs.Devices
                     }
                 };
                 Action<Exception> fail = error => run(() => { throw error; });
+                Func<string, Action> ended = input => () => fail(new InvalidOperationException(string.Format(
+                    "The trial loop's {0} ended: its device stopped sending, so the trials cannot go on.", input)));
                 var none = new List<TrialEvent<TTrial, TUpdate, TOutcome>>();
-                return new CompositeDisposable(
-                    Disposable.Create(() => { lock (gate) { stopped = true; outbox.Clear(); } }),
-                    wheelCm.Subscribe(cm => run(() => loop.OnWheel(cm)), fail),
-                    lickLeft.Subscribe(lick => run(() => loop.OnLick(0, lick)), fail),
-                    lickRight.Subscribe(lick => run(() => loop.OnLick(1, lick)), fail),
-                    zapitReplies.Subscribe(reply => run(() => { loop.OnZapitReply(reply); return none; }), fail),
-                    clock.Subscribe(seconds => run(() => loop.OnClock(seconds)), fail));
+                var subscriptions = new CompositeDisposable(Disposable.Create(() => { lock (gate) { stopped = true; outbox.Clear(); } }));
+                if (wheelCm != null) subscriptions.Add(wheelCm.Subscribe(cm => run(() => loop.OnWheel(cm)), fail, ended("wheel")));
+                for (var i = 0; i < licks.Length; i++)
+                {
+                    var spout = i;
+                    subscriptions.Add(licks[i].Subscribe(lick => run(() => loop.OnLick(spout, lick)), fail, ended("lick input " + spout)));
+                }
+                subscriptions.Add(zapitReplies.Subscribe(reply => run(() => { loop.OnZapitReply(reply); return none; }), fail));
+                subscriptions.Add(clock.Subscribe(seconds => run(() => loop.OnClock(seconds)), fail, () => run(() => null)));
+                return subscriptions;
             }));
         }
     }

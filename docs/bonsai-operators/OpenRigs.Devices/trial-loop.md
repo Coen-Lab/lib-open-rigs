@@ -25,7 +25,7 @@
 
 ## In a workflow
 
-A task's `src\Extensions` implements `ITrialRules<Trial, TUpdate, TOutcome>` (its `Trial` an `ITrial`, and an `IZapitTrial` if its trials are laser trials; its outcome an `ITrialOutcome`, `PenaltyTimeoutSeconds`) and declares:
+A task's `src\Extensions` implements `ITrialRules<Trial, TUpdate, TOutcome>` (its `Trial` an `ITrial`, and an `IZapitTrial` if its trials are laser trials; its outcome a `TrialOutcome<TrialRow>`, or a class derived from it that adds what else the outcome sets off, such as the spouts) and declares:
 
 ```csharp
 [Combinator]
@@ -36,9 +36,13 @@ public class RunTrials
     public IObservable<TrialEvent<Trial, TUpdate, TOutcome>> Process(IObservable<TaskRules> rules, IObservable<double> clock,
         IObservable<double> wheelCm, IObservable<bool> lickLeft, IObservable<bool> lickRight, IObservable<ZapitReply> zapitReplies)
     {
-        return TrialLoop.Observe(rules, clock, wheelCm, lickLeft, lickRight, zapitReplies);
+        return TrialLoop.Observe(rules, clock, new[] { lickLeft, lickRight }, zapitReplies, wheelCm);
     }
 }
 ```
+
+The lick inputs are one per spout, spout 0 the first (the `spout` the rules' `Lick` is given); the wheel is optional, left out (null) on a rig without one, where a trial with a wheel quiet wait is refused. The clock ending ends the trials; a lick input or the wheel ending stops the workflow naming it.
+
+`TrialOutcome<TRow>` is built from the row `SharedTrialColumns.Fill` filled, with the task's `outcome` one of `TrialOutcomes` (`Correct`, `Incorrect`, `NoResponse`, `Probe`, open_rigs' `OUTCOMES`) and the rewarded spout's name: `Row` (stamped with `outcomeTime`, for `LogTrial`), `Rewarded`, `Reward` (side and microlitres, null unless rewarded, for `RewardRequests`), `PenaltySound` and `PenaltyTimeoutSeconds`, so `TaskLogic` takes `Outcome.Row`, `Outcome.Reward` and `Outcome.PenaltySound` the same way in every task.
 
 `TaskLogic` gives `RunTrials` the rules from `OnNextTick`, multicasts its events into `TrialEvents` (a `PublishSubject`), and picks each kind with `PickTrialEvents` (`Kind`, and `Cue` for one cue by name).
