@@ -8,7 +8,7 @@
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="ConfigRoot" Description="The root under which each machine has its rig.yml (&lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml), the same as ReadLabRig's: read when the workflow is built, so it cannot come from the ConfigRoot subject." />
+        <Property Name="ConfigRoot" Description="The root under which each machine has its rig.yml (&lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml), the same as ReadLabRig's: read by RecordHarpDevices and ExperimentManifest when the workflow is built, so it cannot come from the ConfigRoot subject. Unset, the workflow stops at Start." />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="IngestScript" Description="The workflow's name, which the overnight copy files the experiment under." />
@@ -23,6 +23,7 @@
       <Expression xsi:type="mf:ExperimentManifest">
         <Name>ExperimentManifest</Name>
         <mf:IngestScript />
+        <mf:ConfigRoot />
         <mf:ExpectedFiles />
         <mf:TrialColumns>schemas\trial-columns.yml</mf:TrialColumns>
       </Expression>
@@ -30,6 +31,7 @@
     <Edges>
       <Edge From="0" To="3" Label="Source1" />
       <Edge From="1" To="4" Label="Source1" />
+      <Edge From="0" To="4" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

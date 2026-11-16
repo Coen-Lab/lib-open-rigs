@@ -38,7 +38,7 @@ namespace OpenRigs.Video
 
         /// <summary>Gets or sets the root under which this machine's rig.yml names the encoder.</summary>
         [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml, whose videoEncoder names the codec and ffmpeg.exe.")]
-        public string ConfigRoot { get; set; } = RigDevices.DefaultConfigRoot;
+        public string ConfigRoot { get; set; }
 
         /// <summary>How many frames may wait for ffmpeg; set by tests.</summary>
         internal int QueueCapacity { get; set; } = DefaultQueueCapacity;

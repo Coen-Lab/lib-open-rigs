@@ -57,6 +57,7 @@ namespace OpenRigs.HarpDevices
             if (string.IsNullOrWhiteSpace(configRoot))
             {
                 plan.Notes.Add("ConfigRoot is not set, so no rig.yml was read");
+                plan.StartRefusal = "RecordHarpDevices has no ConfigRoot, the folder holding <MACHINE-NAME>\\rig.yml: set it, as ReadLabRig's.";
                 return plan;
             }
             string problem;

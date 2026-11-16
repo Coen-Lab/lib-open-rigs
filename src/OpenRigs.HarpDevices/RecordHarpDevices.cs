@@ -52,7 +52,7 @@ namespace OpenRigs.HarpDevices
 
         /// <summary>Gets or sets the root under which each machine has its own configuration directory.</summary>
         [Category("Config")]
-        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml. Read when the workflow is built; a missing file records no devices.")]
+        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml. Read when the workflow is built; a missing file records no devices, and unset the workflow stops at Start.")]
         public string ConfigRoot
         {
             get { return Settings.ConfigRoot; }
@@ -165,7 +165,7 @@ namespace OpenRigs.HarpDevices
     public class RecordHarpDevicesSettings : ZeroArgumentExpressionBuilder
     {
         /// <summary>Gets or sets RecordHarpDevices' ConfigRoot.</summary>
-        public string ConfigRoot { get; set; } = RigDevices.DefaultConfigRoot;
+        public string ConfigRoot { get; set; }
 
         /// <summary>Builds to an empty sequence: the node only holds the settings.</summary>
         /// <param name="arguments">None.</param>

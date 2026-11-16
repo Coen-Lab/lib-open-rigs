@@ -35,7 +35,6 @@ namespace OpenRigs.Video
         /// <summary>Initializes a new instance of the <see cref="UsbCamera"/> class.</summary>
         public UsbCamera()
         {
-            ConfigRoot = RigDevices.DefaultConfigRoot;
             FrameWidth = 1920;
             FrameHeight = 1080;
         }
@@ -141,8 +140,9 @@ namespace OpenRigs.Video
                 if (named < 0) throw new InvalidOperationException("No camera is plugged in at " + DevicePath + ".");
                 return named;
             }
+            if (string.IsNullOrWhiteSpace(ConfigRoot)) throw new InvalidOperationException("UsbCamera has no ConfigRoot, the folder holding <MACHINE-NAME>\\rig.yml whose cameras are the rig's own.");
             string problem;
-            var devices = RigDevices.Read(RigDevices.PathFor(ConfigRoot ?? RigDevices.DefaultConfigRoot), out problem) ?? new List<RigDevice>();
+            var devices = RigDevices.Read(RigDevices.PathFor(ConfigRoot), out problem) ?? new List<RigDevice>();
             var serials = RigSerials(devices);
             for (var i = 0; i < cameras.Count; i++)
             {

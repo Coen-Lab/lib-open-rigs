@@ -25,9 +25,6 @@ namespace OpenRigs.Shared
     /// <summary>The devices a rig.yml lists, read the same way by every package here.</summary>
     internal static class RigDevices
     {
-        /// <summary>The folder app-rig-setup keeps each machine's rig.yml under, the ConfigRoot every package here defaults to.</summary>
-        public const string DefaultConfigRoot = @"C:\Coen-Lab-Local\RigConfigs";
-
         /// <summary>This machine's rig.yml under a ConfigRoot: &lt;ConfigRoot&gt;\&lt;MACHINE-NAME&gt;\rig.yml, with environment variables expanded.</summary>
         public static string PathFor(string configRoot)
         {
@@ -97,8 +94,8 @@ namespace OpenRigs.Shared
 
         /// <summary>
         /// A scalar's text, trimmed; null when there is none or it is left empty (null, Null, NULL, ~,
-        /// empty or blank), as a generated rig.yml writes an unset value and as YamlDotNet, PyYAML and
-        /// app-rig-setup read YAML's null (S4-L1).
+        /// empty or blank), as a generated rig.yml writes an unset value and as YamlDotNet and PyYAML read
+        /// YAML's null (S4-L1).
         /// </summary>
         public static string Value(YamlNode node)
         {

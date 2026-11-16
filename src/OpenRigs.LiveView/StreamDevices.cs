@@ -52,7 +52,7 @@ namespace OpenRigs.LiveView
 
         /// <summary>Gets or sets the root under which each machine has its own configuration directory.</summary>
         [Category("Config")]
-        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml. Read when the workflow is built; a missing file streams no devices.")]
+        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml. Read when the workflow is built; a missing file streams no devices, and unset the workflow stops at Start.")]
         public string ConfigRoot
         {
             get { return Settings.ConfigRoot; }
@@ -96,7 +96,11 @@ namespace OpenRigs.LiveView
                 Generate(plan);
                 generatedFrom = signature;
             }
-            return base.Build(arguments);
+            var built = base.Build(arguments);
+            if (plan.StartRefusal == null) return built;
+            // Built, so the editor opens the workflow on any desk; it stops when the workflow starts.
+            return Expression.Call(typeof(Observable), nameof(Observable.Throw), built.Type.GetGenericArguments(),
+                Expression.Constant(new InvalidOperationException(plan.StartRefusal), typeof(Exception)));
         }
 
         // Loads every include in the generated workflow, however deep, before it is built. A
@@ -246,7 +250,7 @@ namespace OpenRigs.LiveView
     public class StreamDevicesSettings : ZeroArgumentExpressionBuilder
     {
         /// <summary>Gets or sets StreamDevices' ConfigRoot.</summary>
-        public string ConfigRoot { get; set; } = RigDevices.DefaultConfigRoot;
+        public string ConfigRoot { get; set; }
 
         /// <summary>Gets or sets StreamDevices' DataPort.</summary>
         public int DataPort { get; set; } = 5556;

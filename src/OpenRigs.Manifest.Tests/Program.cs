@@ -86,7 +86,7 @@ namespace OpenRigs.Manifest.Tests
             // The folder as the patched Logging package names it (ses-<Session>_<DateTime>, badd9ca).
             var folder = Path.Combine(root, "sub-TC002", "ses-" + name + "_2026-10-30T19-57-12");
             var path = new Subject<string>();
-            var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+            var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
             var subscription = recorder.Process(path).Subscribe(_ => { }, _ => { });
             if (control != null) control.SetPhase(ExperimentPhase.Recording);
             path.OnNext(folder);
@@ -163,7 +163,7 @@ namespace OpenRigs.Manifest.Tests
             read = Json.Serialize(TrialColumns.Read("nowhere.yml", root, out note));
             Check("a missing file is noted, not an error", Field(read, "missing") == "true" && note != null, read);
             Check("blank reads nothing", TrialColumns.Read(" ", root, out note) == null && note == null, "read");
-            var snapshot = ManifestWriter.Snapshot("", true, file);
+            var snapshot = ManifestWriter.Snapshot("", null, true, file);
             Check("Snapshot carries the section and its note", snapshot.TrialColumns != null && snapshot.Notes.Cast<string>().Any(n => n.StartsWith("Trial columns not read")), "missing");
             File.Delete(file);
         }
@@ -377,7 +377,7 @@ namespace OpenRigs.Manifest.Tests
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-slow_2026-10-30T19-57-12");
                     var path = new Subject<string>();
-                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
                     using (recorder.Process(path).Subscribe(_ => { }, _ => { }))
                     {
                         control.SetPhase(ExperimentPhase.Recording);
@@ -471,7 +471,7 @@ namespace OpenRigs.Manifest.Tests
                     var folder = Path.Combine(root, "sub-TC002", "ses-f_2026-10-30T19-57-12");
                     var path = new Subject<string>();
                     var run = new Subject<int>();
-                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
                     var completed = false;
                     var subscription = recorder.Process(path, run).Subscribe(_ => { }, _ => { }, () => completed = true);
                     run.OnNext(1); run.OnNext(2); run.OnCompleted();
@@ -487,7 +487,7 @@ namespace OpenRigs.Manifest.Tests
                     var failedPath = new Subject<string>();
                     var failedRun = new Subject<int>();
                     Exception failedWith = null;
-                    var failedRecorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    var failedRecorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
                     var failedSubscription = failedRecorder.Process(failedPath, failedRun).Subscribe(_ => { }, e => failedWith = e, () => { });
                     failedRun.OnError(new InvalidOperationException("camera lost before Go"));
                     Check("a run that fails before the folder exists ends the node with its error at once", failedWith != null && failedWith.Message == "camera lost before Go", failedWith?.ToString() ?? "no OnError");
@@ -503,7 +503,7 @@ namespace OpenRigs.Manifest.Tests
                         var folder = Path.Combine(root, "sub-TC002", "ses-err" + finishedFirst + "_2026-10-30T19-57-12");
                         var path = new Subject<string>();
                         var run = new Subject<int>();
-                        var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                        var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
                         var subscription = recorder.Process(path, run).Subscribe(_ => { }, _ => { });
                         control.SetPhase(ExperimentPhase.Recording);
                         path.OnNext(folder);
@@ -523,7 +523,7 @@ namespace OpenRigs.Manifest.Tests
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-fin_2026-10-30T19-57-12");
                     var path = new Subject<string>();
-                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
                     var subscription = recorder.Process(path).Subscribe(_ => { }, _ => { });
                     control.SetPhase(ExperimentPhase.Recording);
                     path.OnNext(folder);
@@ -555,7 +555,7 @@ namespace OpenRigs.Manifest.Tests
                         {
                             var folder = Path.Combine(root, "sub-TC002", "ses-held" + closes + "_2026-10-30T19-57-12");
                             var path = new Subject<string>();
-                            var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                            var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
                             var subscription = recorder.Process(path).Subscribe(_ => { }, _ => { });
                             path.OnNext(folder);
                             var csv = Path.Combine(folder, "Camera", "Camera.csv");
@@ -596,7 +596,7 @@ namespace OpenRigs.Manifest.Tests
                     var folder = Path.Combine(root, "sub-TC002", "ses-cond_2026-10-30T19-57-12");
                     var path = new Subject<string>();
                     var optogenetics = new BehaviorSubject<bool>(false);
-                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("Settings/Settings_Laser_?Optogenetics", null, n => null));
+                    var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("Settings/Settings_Laser_?Optogenetics", null, n => null));
                     var subscription = recorder.Process(path, ManifestRecorder.Conditions(new[] { "Optogenetics" }, new IObservable<bool>[] { optogenetics })).Subscribe(_ => { }, _ => { });
                     path.OnNext(folder);
                     var manifest = Path.Combine(folder, ManifestWriter.FileName);
@@ -617,7 +617,7 @@ namespace OpenRigs.Manifest.Tests
                     var listed = string.Join(",", ManifestWriter.FilesSection(folder).Cast<JsonObject>().Select(f => (string)f.First(p => p.Key == "path").Value));
                     Check("FilesSection leaves out another writer's .tmp and the three record files", listed == "Board/Board.yml", listed);
                 }
-                Check("ConfigFiles defaults to {RigFiles}, rig.yml under the launch's ConfigRoot and every file it names", new ExperimentManifestSettings().ConfigFiles == ManifestWriter.RigFilesToken, new ExperimentManifestSettings().ConfigFiles);
+                Check("ConfigFiles defaults to {RigFiles}, rig.yml under ConfigRoot and every file it names", new ExperimentManifestSettings().ConfigFiles == ManifestWriter.RigFilesToken, new ExperimentManifestSettings().ConfigFiles);
 
                 Console.WriteLine("A write that fails:");
                 {
@@ -626,7 +626,7 @@ namespace OpenRigs.Manifest.Tests
                     Directory.CreateDirectory(Path.GetDirectoryName(blocked));
                     File.WriteAllText(blocked, "not a folder");
                     var path = new Subject<string>();
-                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
                     Exception error = null;
                     var subscription = recorder.Process(path).Subscribe(_ => { }, e => error = e);
                     Exception thrown = null;
@@ -644,7 +644,7 @@ namespace OpenRigs.Manifest.Tests
                     var folder = Path.Combine(root, "sub-TC002", "ses-held_2026-10-30T19-57-12");
                     var path = new Subject<string>();
                     var run = new Subject<int>();
-                    var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                    var recorder = new ManifestRecorder(null, "", null, ExpectedPlan.Create("", null, n => null));
                     Exception error = null;
                     var errored = new System.Threading.ManualResetEventSlim();
                     var subscription = recorder.Process(path, run).Subscribe(_ => { }, e => { error = e; errored.Set(); }, () => { });
@@ -772,10 +772,11 @@ namespace OpenRigs.Manifest.Tests
                 Check("each expected entry is path, why, condition, required, found", string.Join(",", ((JsonObject)section[0]).Select(p => p.Key)) == "path,why,condition,required,found", string.Join(",", ((JsonObject)section[0]).Select(p => p.Key)));
 
                 Console.WriteLine("ConfigRoot:");
-                var other = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", "--property:ConfigRoot=D:\\Test\\config" });
-                Check("a launch ConfigRoot that is not where rig.yml was read is noted", ManifestWriter.ConfigRootNote(other, @"C:\Coen-Lab-Local\RigConfigs\RIG\rig.yml") != null, "no note");
-                var same = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", "--property:ConfigRoot=C:\\Coen-Lab-Local\\RigConfigs" });
-                Check("... and one that is, is not", ManifestWriter.ConfigRootNote(same, @"C:\Coen-Lab-Local\RigConfigs\RIG\rig.yml") == null, "noted");
+                Check("a ConfigRoot that is not where rig.yml was read is noted", ManifestWriter.ConfigRootNote(@"D:\Test\config", @"D:\Rigs\RIG\rig.yml") != null, "no note");
+                Check("... and one that is, is not", ManifestWriter.ConfigRootNote(@"D:\Rigs", @"D:\Rigs\RIG\rig.yml") == null, "noted");
+                Check("{RigFiles} with no ConfigRoot stops the workflow at Start (round 3 LM3: no lab default)", ManifestWriter.ConfigRootRefusal(ManifestWriter.RigFilesToken, " ") != null, "no refusal");
+                Check("... and neither a ConfigRoot nor ConfigFiles without {RigFiles} does", ManifestWriter.ConfigRootRefusal(ManifestWriter.RigFilesToken, @"D:\Rigs") == null && ManifestWriter.ConfigRootRefusal("a.yml", null) == null, "refused");
+                Check("ConfigRoot has no default", new ExperimentManifestSettings().ConfigRoot == null, new ExperimentManifestSettings().ConfigRoot);
 
                 Console.WriteLine("The editor's copy:");
                 {

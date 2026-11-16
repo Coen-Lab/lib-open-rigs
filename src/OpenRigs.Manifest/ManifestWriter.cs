@@ -61,7 +61,7 @@ namespace OpenRigs.Manifest
         public string ManifestPath { get { return manifestPath; } }
 
         /// <summary>Reads what the manifest takes from Start: the workflow, its repository and commit, the command line, each configuration file and the trial columns file.</summary>
-        public static StartSnapshot Snapshot(string configFiles, bool hasRunInput, string trialColumns = null)
+        public static StartSnapshot Snapshot(string configFiles, string configRoot, bool hasRunInput, string trialColumns = null)
         {
             var snapshot = new StartSnapshot();
             var args = Environment.GetCommandLineArgs();
@@ -72,7 +72,7 @@ namespace OpenRigs.Manifest
             snapshot.Source = SourceSection(workflowFull, root);
             snapshot.Launch = LaunchSection(args);
             var subject = LaunchProperty(snapshot.Launch, "SubjectId");
-            foreach (var configured in ConfigEntries(configFiles))
+            foreach (var configured in ConfigEntries(configFiles, configRoot))
             {
                 foreach (var file in ConfigFiles(configured, root ?? workflowFolder, subject))
                 {
@@ -85,7 +85,7 @@ namespace OpenRigs.Manifest
             snapshot.TrialColumns = Manifest.TrialColumns.Read(trialColumns, root ?? workflowFolder, out trialNote);
             if (trialNote != null) snapshot.Notes.Add(trialNote);
             if (!hasRunInput) snapshot.Notes.Add("No run input: the outcome is read from OpenRigs.Control's phase when the workflow stops.");
-            var note = ConfigRootNote(snapshot.Launch, RigConfigPath(configFiles));
+            var note = ConfigRootNote(configRoot, RigConfigPath(configFiles, configRoot));
             if (note != null) snapshot.Notes.Add(note);
             return snapshot;
         }
@@ -99,35 +99,46 @@ namespace OpenRigs.Manifest
             return "Config file not found at Start: " + path + (unfilled ? " (" + SubjectToken + " not on the command line)" : "") + ".";
         }
 
-        // OpenRigs' RigConfig reads <ConfigRoot>\<MACHINE>\rig.yml, and ConfigRoot is a workflow
-        // property a launch may set; ConfigFiles cannot follow it, so say when the two disagree.
-        public static string ConfigRootNote(JsonObject launch, string rigConfig)
+        // The devices read <ConfigRoot>\<MACHINE>\rig.yml; a ConfigFiles entry naming another rig.yml records a file the
+        // workflow did not run with, so say so.
+        public static string ConfigRootNote(string configRoot, string rigConfig)
         {
-            var properties = (JsonObject)launch.First(p => p.Key == "properties").Value;
-            var configRoot = properties.FirstOrDefault(p => string.Equals(p.Key, "ConfigRoot", StringComparison.OrdinalIgnoreCase)).Value as string;
-            if (configRoot == null || rigConfig == null) return null;
+            if (string.IsNullOrWhiteSpace(configRoot) || rigConfig == null) return null;
             var root = ResolvePath(configRoot, Environment.CurrentDirectory).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
             if (rigConfig.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return null;
-            return "The launch set ConfigRoot to " + configRoot + ", but ConfigFiles read " + rigConfig + ": the rig.yml recorded may not be the one the workflow ran with. Set ConfigFiles to match.";
+            return "ConfigRoot is " + configRoot + ", but ConfigFiles read " + rigConfig + ": the rig.yml recorded may not be the one the workflow ran with. Set ConfigFiles to match.";
         }
 
         /// <summary>
-        /// The ConfigFiles entry that stands for this machine's rig.yml (under the launch's ConfigRoot, else the lab's
-        /// default) and every file it names: each scalar in it that is a path (holding / or \ and ending in an
+        /// The ConfigFiles entry that stands for this machine's rig.yml (under ExperimentManifest's ConfigRoot) and every
+        /// file it names: each scalar in it that is a path (holding / or \ and ending in an
         /// extension), relative ones from rig.yml's folder, such as valve calibrations, speaker filters, the mesh map
         /// and the gamma table; and, on a rig with a lick spout stage (lickSpoutDefaultPosition), the mouse's spout
         /// positions, calibration\LickSpoutPositions\{SubjectId}.csv.
         /// </summary>
         public const string RigFilesToken = "{RigFiles}";
 
-        static IEnumerable<string> ConfigEntries(string configFiles)
+        static IEnumerable<string> ConfigEntries(string configFiles, string configRoot)
         {
-            foreach (var entry in (configFiles ?? "").Split(';').Select(e => e.Trim()).Where(e => e.Length > 0))
+            foreach (var entry in Entries(configFiles))
             {
                 if (entry != RigFilesToken) { yield return entry; continue; }
-                var launch = LaunchSection(Environment.GetCommandLineArgs());
-                foreach (var file in RigFiles(RigDevices.PathFor(LaunchProperty(launch, "ConfigRoot") ?? RigDevices.DefaultConfigRoot))) yield return file;
+                if (string.IsNullOrWhiteSpace(configRoot)) continue;  // refused at Start (ConfigRootRefusal)
+                foreach (var file in RigFiles(RigDevices.PathFor(configRoot))) yield return file;
             }
+        }
+
+        static IEnumerable<string> Entries(string configFiles)
+        {
+            return (configFiles ?? "").Split(';').Select(e => e.Trim()).Where(e => e.Length > 0);
+        }
+
+        /// <summary>Why ExperimentManifest stops at Start, or null: ConfigFiles has {RigFiles} and ConfigRoot is unset.</summary>
+        public static string ConfigRootRefusal(string configFiles, string configRoot)
+        {
+            if (!Entries(configFiles).Contains(RigFilesToken) || !string.IsNullOrWhiteSpace(configRoot)) return null;
+            return "ExperimentManifest has no ConfigRoot, the folder holding <MACHINE-NAME>\\rig.yml, so its ConfigFiles' " + RigFilesToken +
+                   " names no rig.yml: map the workflow's ConfigRoot onto it (OpenRigs.Logging's ExperimentRecords does).";
         }
 
         /// <summary>rig.yml and every file it names, as <see cref="RigFilesToken"/> expands to; just rig.yml if it cannot be read.</summary>
@@ -159,9 +170,9 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>The first of ConfigFiles named rig.yml, its path resolved as at Start; null if none is.</summary>
-        public static string RigConfigPath(string configFiles)
+        public static string RigConfigPath(string configFiles, string configRoot)
         {
-            var configured = ConfigEntries(configFiles)
+            var configured = ConfigEntries(configFiles, configRoot)
                 .FirstOrDefault(e => string.Equals(Path.GetFileName(e.Replace('/', '\\')), "rig.yml", StringComparison.OrdinalIgnoreCase));
             if (configured == null) return null;
             var folder = WorkflowFile.Folder(WorkflowFile.Find(Environment.GetCommandLineArgs(), Environment.CurrentDirectory), Environment.CurrentDirectory);

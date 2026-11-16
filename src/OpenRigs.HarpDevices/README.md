@@ -19,7 +19,7 @@ A Harp device is a device entry in rig.yml (`behaviorBoard: main:`, named `Behav
 
 | Property | Default | |
 |----------|---------|-|
-| `ConfigRoot` | `C:\Coen-Lab-Local\RigConfigs` | The root under which each machine has its own `<MACHINE-NAME>\rig.yml`, as `StreamDevices`' setting (the same default from LiveView 0.1.0-local.9). Can be mapped from a workflow property (0.1.0-local.5 on). In the lab only `check-workflow.ps1` maps it, to a temporary root; app-rig-control refuses a launch naming any other root (app-rig-control 482dd5d). Read when the workflow is built. |
+| `ConfigRoot` | none | The root under which each machine has its own `<MACHINE-NAME>\rig.yml`, as `StreamDevices`' setting; unset, the workflow stops at Start naming it (no default from round 3 LM3). Can be mapped from a workflow property (0.1.0-local.5 on). In the lab only `check-workflow.ps1` maps it, to a temporary root; app-rig-control refuses a launch naming any other root (app-rig-control 482dd5d). Read when the workflow is built. |
 
 ## Things to Know
 

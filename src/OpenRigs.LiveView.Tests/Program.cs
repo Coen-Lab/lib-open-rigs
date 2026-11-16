@@ -180,9 +180,10 @@ namespace OpenRigs.LiveView.Tests
                 // compile in src\Shared\WorkflowFile.cs; Bonsai's bootstrapper adds its own after --no-boot.
                 var relaunched = OpenRigs.Shared.WorkflowFile.Find(new[] { "Bonsai.exe", "--no-editor", "--no-boot", @"C:\other\x.bonsai", "--@pipe", "p" }, src);
                 Check("a workflow named only after the bootstrapper's --no-boot is not the one launched", relaunched == null, relaunched);
-                // RecordHarpDevices' default; a StreamDevices left unset streamed nothing (set C, S4-L2).
-                var settings = new StreamDevicesSettings();
-                Check("ConfigRoot defaults to the folder app-rig-setup keeps each rig.yml under", settings.ConfigRoot == @"C:\Coen-Lab-Local\RigConfigs", settings.ConfigRoot);
+                // No default ConfigRoot (round 3 LM3): unset, the workflow stops at Start naming it, never streams nothing.
+                Check("ConfigRoot has no default", new StreamDevicesSettings().ConfigRoot == null, new StreamDevicesSettings().ConfigRoot);
+                var unset = LiveViewPlan.Create("", name => null);
+                Check("an unset ConfigRoot stops the workflow at Start, naming it", unset.StartRefusal != null && unset.StartRefusal.Contains("has no ConfigRoot"), unset.StartRefusal);
             }
             finally
             {

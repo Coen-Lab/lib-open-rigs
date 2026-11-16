@@ -383,6 +383,9 @@ namespace OpenRigs.HarpDevices.Tests
                     "behaviorBoard:\n  main:\n    portName: COM3\n    usbSerial: AB0M7PLB\n  spare: none\n" +
                     "licketySplit:\n  left:\n    portName: COM4\n    usbSerial: E664C856C3913E37\n  old: off\n  list: []\n");
                 var sparePlan = HarpDevicePlan.Create(spareConfig, published);
+                var unset = HarpDevicePlan.Create("", published);
+                Check("an unset ConfigRoot stops the workflow at Start, naming it (round 3 LM3: no lab default)",
+                    unset.StartRefusal != null && unset.StartRefusal.Contains("has no ConfigRoot") && new RecordHarpDevicesSettings().ConfigRoot == null, unset.StartRefusal);
                 Check("an entry holding none, off or [] beside a board stops the workflow at Start, naming it and what it holds",
                     sparePlan.StartRefusal != null && sparePlan.StartRefusal.Contains("the rig.yml entry behaviorBoard: spare: none has no settings, so every behaviorBoard is passed over")
                     && sparePlan.StartRefusal.Contains("the rig.yml entries licketySplit: old: off, licketySplit: list: [] have no settings, so every licketySplit is passed over")

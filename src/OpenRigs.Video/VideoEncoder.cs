@@ -71,8 +71,8 @@ namespace OpenRigs.Video
         /// <summary>The encoder for this machine's rig.yml under a config root, with ffmpeg.exe found; throws naming what is missing.</summary>
         public static VideoEncoder ForThisRig(string configRoot)
         {
-            return Read(RigDevices.PathFor(string.IsNullOrWhiteSpace(configRoot) ? RigDevices.DefaultConfigRoot : configRoot),
-                Environment.GetEnvironmentVariable("PATH"));
+            if (string.IsNullOrWhiteSpace(configRoot)) throw new InvalidOperationException("The video writer has no ConfigRoot, the folder holding <MACHINE-NAME>\\rig.yml whose videoEncoder it reads.");
+            return Read(RigDevices.PathFor(configRoot), Environment.GetEnvironmentVariable("PATH"));
         }
 
         /// <summary>
