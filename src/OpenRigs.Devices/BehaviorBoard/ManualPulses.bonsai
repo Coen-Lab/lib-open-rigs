@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A person's pulses on a Behavior board's lines (Board), for checking a rig by hand: the controller's Pulse and Reset commands (declared by this piece, DeclareControls, never by the workflow) become Harp writes on the board's command subject (PulseCommands). Every pulse is timed by the board, so it ends however the workflow stops; a CameraTrigger or ZapitTrigger line is never pulsed. Needs ControlEvents and RigConfigs from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>Pulse</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>Reset</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Board" Description="The Behavior board whose lines are pulsed, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PulseCommands">
+          <dev:Board>UNMAPPED</dev:Board>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the board's command subject." Category="Subjects" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>BehaviorCommands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:DeclareControls">
+          <orcl:Piece>ManualPulses</orcl:Piece>
+          <orcl:Parameters />
+          <orcl:Commands>
+            <orcl:Command>
+              <orcl:Name>Pulse</orcl:Name>
+              <orcl:Description>One pulse on a Behavior board line: the text is the board and line, such as BehaviorBoard-Main DO1, and optionally a width in ms, 1 to 60000 (BehaviorBoard-Main DO1 10000 holds a valve open 10 s); else the line's pulseWidthMs in rig.yml, else 50 ms. The board times every line, DO0 to DO3 and DOPort0 to DOPort2, so a pulse ends however the workflow stops. Never on a CameraTrigger or ZapitTrigger line.</orcl:Description>
+            </orcl:Command>
+            <orcl:Command>
+              <orcl:Name>Reset</orcl:Name>
+              <orcl:Description>The Behavior board put back as an experiment expects it: every DO and DOPort line but a camera trigger's closed now, each fixed line's PulseDO width and the pulsed lines as rig.yml has them. The text is empty, or the board's name. Send it before the stop.</orcl:Description>
+            </orcl:Command>
+          </orcl:Commands>
+        </Combinator>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="1" To="3" Label="Source1" />
+      <Edge From="0" To="5" Label="Source1" />
+      <Edge From="2" To="5" Label="Source2" />
+      <Edge From="3" To="5" Label="Source3" />
+      <Edge From="4" To="5" Label="Source4" />
+      <Edge From="5" To="7" Label="Source1" />
+      <Edge From="6" To="7" Label="Source2" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

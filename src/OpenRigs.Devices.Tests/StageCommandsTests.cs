@@ -35,6 +35,7 @@ namespace OpenRigs.Devices.Tests
         [DataTestMethod]
         [DataRow("LickSpoutStage.bonsai", "LickSpoutStage")]
         [DataRow("BehaviorBoard.ManualRewards.bonsai", "ManualRewards")]
+        [DataRow("BehaviorBoard.ManualPulses.bonsai", "ManualPulses")]
         public void ThePieceDeclaresWhatItTakes(string file, string piece)
         {
             var text = Resource(file);
