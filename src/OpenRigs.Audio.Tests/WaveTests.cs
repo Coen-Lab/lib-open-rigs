@@ -111,23 +111,5 @@ namespace OpenRigs.Audio.Tests
             var sound = Wave.Read(Riff(Chunk("fmt ", FloatFmt()), Chunk("data", stored.SelectMany(BitConverter.GetBytes).ToArray())), "test", 48000);
             CollectionAssert.AreEqual(stored, Values(sound));
         }
-
-        [TestMethod]
-        public void ReadWaveReadsTheFileAtTheDeviceRateAndRefusesAnother()
-        {
-            var path = Path.Combine(Path.GetTempPath(), "ReadWaveTest.wav");
-            File.WriteAllBytes(path, Riff(Chunk("fmt ", Fmt()), Chunk("data", Samples(0, 32767))).ToArray());
-            try
-            {
-                var read = new ReadWave { FileName = path };
-                Assert.AreEqual(2, System.Reactive.Linq.Observable.Wait(read.Process(System.Reactive.Linq.Observable.Return(48000))).Cols);
-                var error = Assert.ThrowsException<InvalidDataException>(() => System.Reactive.Linq.Observable.Wait(read.Process(System.Reactive.Linq.Observable.Return(44100))));
-                StringAssert.Contains(error.Message, "48000 Hz, but the audio device runs at 44100 Hz");
-            }
-            finally
-            {
-                File.Delete(path);
-            }
-        }
     }
 }

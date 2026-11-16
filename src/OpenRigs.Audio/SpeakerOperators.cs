@@ -157,21 +157,4 @@ namespace OpenRigs.Audio
             }
         }
     }
-
-    /// <summary>Reads a mono WAV file whole as one row of floats, at the audio device's rate (<see cref="Wave.Read(string, int)"/>).</summary>
-    [Combinator]
-    [Description("Reads a mono WAV file (16-bit PCM onto -1 to 1, or 32-bit float as stored) whole, as one row of floats, for each input, the audio device's sample rate. Stops the workflow, naming the file, if it is at another rate (nothing converts it, so it would play at the wrong pitch and speed) or in another format.")]
-    [WorkflowElementCategory(ElementCategory.Transform)]
-    public class ReadWave
-    {
-        /// <summary>The WAV file, relative to the workflow's folder.</summary>
-        [Description("The WAV file, relative to the workflow's folder (src).")]
-        public string FileName { get; set; }
-
-        /// <summary>Reads the file at each rate.</summary>
-        public IObservable<Mat> Process(IObservable<int> source)
-        {
-            return source.Select(rate => Wave.Read(System.IO.Path.GetFullPath(FileName ?? ""), rate));
-        }
-    }
 }

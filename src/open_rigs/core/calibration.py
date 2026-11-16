@@ -130,6 +130,6 @@ class DispenseProcedure(CalibrationSchema):
     settle_window: int = Field(
         default=10, ge=1, description="Consecutive stable readings, after the last pulse, before a weight is taken."
     )
-    weigh_timeout_s: data_types.Double = Field(
+    weigh_timeout_seconds: data_types.Double = Field(
         default=60.0, gt=0, description="Fail if the balance has not settled within this time, in seconds."
     )

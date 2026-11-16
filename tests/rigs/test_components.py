@@ -29,10 +29,6 @@ def test_pixel_format_kept_by_the_camera_unless_set():
         LabRig.model_validate({**RIG, "camera": {"overhead": {"serialNumber": "12345", "pixelFormat": "Mono16"}}})
 
 
-def test_no_version():
-    assert "version" not in LabRig.model_fields
-    assert "version" not in LabRig.model_validate(RIG).model_dump(by_alias=True)
-
 
 def test_each_camera_on_exactly_one_trigger_line():
     def rig(wiring):

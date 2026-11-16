@@ -33,7 +33,7 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "fixtures/manifest/v3/refuse/version-2.json": 10,
     "fixtures/manifest/v3/running.json": 9,
     "fixtures/manifest/v3/stopped-not-final.json": 10,
-    "patches/README.md": 11,
+    "patches/README.md": 1,
     "src/OpenRigs.Control.Tests/Program.cs": 3,
     "src/OpenRigs.Control/ControlServer.cs": 3,
     "src/OpenRigs.Control/OpenRigs.Control.csproj": 1,

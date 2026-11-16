@@ -69,12 +69,12 @@ def test_balance_port_is_a_placeholder_until_run_time():
 def test_dispense_calibration_round_trips_through_yaml(tmp_path):
     settings = DispenseCalibration(
         procedure=DispenseProcedure(samples=[DispenseSample(pulse_width_ms=20, pulses=5), DispenseSample(pulse_width_ms=40)]),
-        balance=SerialBalance(print_period_s=1.0),
+        balance=SerialBalance(print_period_seconds=1.0),
     )
     path = tmp_path / "valve-calibration.yml"
     rig_yaml.save(settings, path)
     text = path.read_text(encoding="utf-8")
-    assert "pulseGapMs" in text and "printPeriodS" in text
+    assert "pulseGapMs" in text and "printPeriodSeconds" in text
     # swc.aeon's BaseSchema links each child to its container, so nested models are compared by dump.
     restored = rig_yaml.load(DispenseCalibration, path)
     assert restored.model_dump(mode="json") == settings.model_dump(mode="json")

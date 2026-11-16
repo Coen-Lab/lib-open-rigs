@@ -9,7 +9,7 @@
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The two-driver lick spout stage, a device piece: StepperDriver-A and StepperDriver-B from their entries a and b under stepperDriver in rig.yml (RigConfigs), each opened behind its .Data and .Commands subjects and logged under its name once the experiment folder exists and the Harp clock is set. Sets the drivers up, homes all five motors (LickSpoutStage.Homed once done, announced into ReadyStages as SpoutsHomed, then the spouts go in), and moves the stage for the controller's spout commands and for LickSpoutCommand values sent to LickSpoutStage.Commands. Each target is published on LickSpoutStage.Target. The mouse's in positions come from calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml (RigConfigDirectory), else rig.yml's lickSpoutDefaultPosition (RigFile). Stops the workflow at start, naming the entries rig.yml has, if it lacks a or b. A nudge moves the stage by the experiment parameter SpoutStepSize, in motor steps, taken live as the controller sets it (OnParameterSet) and 150 until then; one second after Start, once the controller's server is up, the controller is shown 150 as its value (ParameterDefault). The piece declares its own parameter SpoutStepSize and commands to the controller (DeclareControls), so the workflow declares none of them: SpoutsHome, SpoutsIn, SpoutsOut, SaveSpoutPositions, LeftUp, LeftDown, RightUp, RightDown, LeftFront, LeftBack, RightFront, RightBack, BaseLeft, BaseRight.</Description>
+  <Description>The two-driver lick spout stage, a device piece: StepperDriver-A and StepperDriver-B from their entries a and b under stepperDriver in rig.yml (RigConfigs), each opened behind its .Data and .Commands subjects and logged under its name once the experiment folder exists and the Harp clock is set. Sets the drivers up, homes all five motors (LickSpoutStage-Main.Homed once done, announced into ReadyStages as SpoutsHomed, then the spouts go in), and moves the stage for the controller's spout commands and for LickSpoutCommand values sent to LickSpoutStage-Main.Commands. Each target is published on LickSpoutStage-Main.Target. The mouse's in positions come from calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml (RigConfigDirectory), else rig.yml's lickSpoutDefaultPosition (RigFile). Stops the workflow at start, naming the entries rig.yml has, if it lacks a or b. A nudge moves the stage by the experiment parameter SpoutStepSize, in motor steps, taken live as the controller sets it (OnParameterSet) and 150 until then; one second after Start, once the controller's server is up, the controller is shown 150 as its value (ParameterDefault). The piece declares its own parameter SpoutStepSize and commands to the controller (DeclareControls), so the workflow declares none of them: SpoutsHome, SpoutsIn, SpoutsOut, SaveSpoutPositions, LeftUp, LeftDown, RightUp, RightDown, LeftFront, LeftBack, RightFront, RightBack, BaseLeft, BaseRight.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
@@ -246,10 +246,10 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:BehaviorSubject">
-        <Name>LickSpoutStage.Homed</Name>
+        <Name>LickSpoutStage-Main.Homed</Name>
       </Expression>
       <Expression xsi:type="rx:PublishSubject" TypeArguments="dev:LickSpoutCommand">
-        <rx:Name>LickSpoutStage.Commands</rx:Name>
+        <rx:Name>LickSpoutStage-Main.Commands</rx:Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>ControlEvents</Name>
@@ -395,10 +395,10 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>LickSpoutStage.Commands</Name>
+        <Name>LickSpoutStage-Main.Commands</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>LickSpoutStage.Homed</Name>
+        <Name>LickSpoutStage-Main.Homed</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:ToLickSpoutCommand">
@@ -409,7 +409,7 @@
         <Combinator xsi:type="rx:Merge" />
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>LickSpoutStage.Homed</Name>
+        <Name>LickSpoutStage-Main.Homed</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:SubscribeWhen" />
@@ -420,7 +420,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:BehaviorSubject">
-        <Name>LickSpoutStage.StepSize</Name>
+        <Name>LickSpoutStage-Main.StepSize</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>ControlEvents</Name>
@@ -435,10 +435,10 @@
         <scr:Expression>Convert.ToInt32(it)</scr:Expression>
       </Expression>
       <Expression xsi:type="MulticastSubject">
-        <Name>LickSpoutStage.StepSize</Name>
+        <Name>LickSpoutStage-Main.StepSize</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>LickSpoutStage.StepSize</Name>
+        <Name>LickSpoutStage-Main.StepSize</Name>
       </Expression>
       <Expression xsi:type="PropertyMapping">
         <PropertyMappings>
@@ -453,10 +453,10 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:BehaviorSubject">
-        <Name>LickSpoutStage.Target</Name>
+        <Name>LickSpoutStage-Main.Target</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>LickSpoutStage.Target</Name>
+        <Name>LickSpoutStage-Main.Target</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:MoveLickSpoutDriver">
@@ -467,7 +467,7 @@
         <Name>StepperDriver-A.Commands</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>LickSpoutStage.Target</Name>
+        <Name>LickSpoutStage-Main.Target</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:MoveLickSpoutDriver">
@@ -543,7 +543,7 @@
         </PropertyMappings>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>LickSpoutStage.Homed</Name>
+        <Name>LickSpoutStage-Main.Homed</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="core:AnnounceStage">
@@ -554,7 +554,7 @@
         <Name>ReadyStages</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>LickSpoutStage.StepSize</Name>
+        <Name>LickSpoutStage-Main.StepSize</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Take">

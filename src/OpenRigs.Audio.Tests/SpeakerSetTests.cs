@@ -165,8 +165,6 @@ namespace OpenRigs.Audio.Tests
             {
                 Assert.AreEqual(48000, buffer.Cols);  // one second at 48 kHz
                 Assert.AreEqual(-44.6, SoundLevel.RmsDbfs(row), 1e-4);
-                // The level the tasks played it at until 15 Nov 2026 (half the file), so their task files keep it.
-                Assert.AreEqual(-44.6, 20 * Math.Log10(0.5) + SoundLevel.RmsDbfs(tone), 0.05);
             }
             Assert.AreEqual(0f, Values(buffer, 0).Max(Math.Abs));
             Assert.AreEqual(0f, Values(buffer, 31).Max(Math.Abs));

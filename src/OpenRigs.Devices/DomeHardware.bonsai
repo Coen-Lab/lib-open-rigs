@@ -9,7 +9,7 @@
         <Property Name="DisplayDevice" Description="The display the projector is on." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
-        <ReadyWaitsFor>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted</ReadyWaitsFor>
+        <PieceStages>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body, MixerStarted</PieceStages>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ClockFromTimestampGenerator.bonsai">
         <Name>TimestampGeneratorGen3-Main</Name>

@@ -59,7 +59,7 @@ namespace OpenRigs.Core.Calibration
             {
                 settings.Balance.PortName = BalancePort.Manual;
                 settings.Procedure.SettleWindow = 1;
-                settings.Procedure.WeighTimeoutS = manualTimeoutSeconds;
+                settings.Procedure.WeighTimeoutSeconds = manualTimeoutSeconds;
             }
             else
             {

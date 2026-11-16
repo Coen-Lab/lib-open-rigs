@@ -18,7 +18,7 @@ namespace OpenRigs.Core
     public class AnnounceStage
     {
         /// <summary>Gets or sets the stage this announces.</summary>
-        [Description("The stage this announces, as Ready's ReadyWaitsFor names it, such as SpoutsHomed.")]
+        [Description("The stage this announces, as Ready's PieceStages names it, such as SpoutsHomed.")]
         public string Stage { get; set; }
 
         /// <summary>Announces the stage at the first element of the input.</summary>

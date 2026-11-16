@@ -153,7 +153,7 @@ namespace OpenRigs.Core.Tests
         public void EmitsTheLastStageOnceEveryStageHasArrived()
         {
             var stages = new[] { "Board", "Steppers", "Board" }.ToObservable();
-            var watchdog = new StartupWatchdog { Expected = "Steppers, Board", TimeoutSeconds = 5 };
+            var watchdog = new StartupWatchdog { PieceStages = "Steppers, Board", TimeoutSeconds = 5 };
             var ready = watchdog.Process(stages).ToList().Timeout(TimeSpan.FromSeconds(2)).Wait();
             Assert.AreEqual("Steppers", string.Join(", ", ready));
         }
@@ -161,15 +161,15 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void NamesTheStagesThatNeverArrived()
         {
-            var watchdog = new StartupWatchdog { Expected = "Board, Steppers, Camera", TimeoutSeconds = 0.1, What = "Zeroing" };
+            var watchdog = new StartupWatchdog { PieceStages = "Board, Steppers, Camera", TimeoutSeconds = 0.1, What = "Zeroing" };
             var ex = Assert.ThrowsException<TimeoutException>(() => watchdog.Process(Observable.Return("Board")).Wait());
             Assert.AreEqual("Zeroing did not finish within 0.1 s. Arrived: Board. Never arrived: Steppers, Camera.", ex.Message);
         }
 
         [TestMethod]
-        public void WaitsAlsoForTheStagesOfAlsoExpected()
+        public void WaitsAlsoForTheWorkflowStages()
         {
-            var watchdog = new StartupWatchdog { Expected = "Board", AlsoExpected = "Photodiode", TimeoutSeconds = 0.1 };
+            var watchdog = new StartupWatchdog { PieceStages = "Board", WorkflowStages = "Photodiode", TimeoutSeconds = 0.1 };
             var ex = Assert.ThrowsException<TimeoutException>(() => watchdog.Process(Observable.Return("Board")).Wait());
             StringAssert.EndsWith(ex.Message, "Never arrived: Photodiode.");
         }

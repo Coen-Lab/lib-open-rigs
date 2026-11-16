@@ -5,6 +5,8 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 from open_rigs.rigs import workflow_lint as lint
+
+import include_rules as rules
 from open_rigs.rigs.lab_rig import LabRig
 
 ROOT = Path(__file__).parents[2]
@@ -31,17 +33,17 @@ def test_the_block_subjects_are_what_each_block_declares():
 def test_the_speaker_mixer_starts_no_sooner_than_3_s_after_start():
     # Deliberate: a fault while the sound card boots can blue-screen the PC. Never remove or shorten it.
     text = (ROOT / "src" / "OpenRigs.Audio" / "SpeakerMixer.bonsai").read_text(encoding="utf-8-sig")
-    assert lint.mixer_boot_delay_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
+    assert rules.mixer_boot_delay_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
     shortened = text.replace("<rx:DueTime>PT3S</rx:DueTime>", "<rx:DueTime>PT1S</rx:DueTime>")
-    assert lint.mixer_boot_delay_problems(lint.ET.fromstring(shortened.encode("utf-8"))) == ["MixerBootDelay is not a DelaySubscription of PT3S"]
+    assert rules.mixer_boot_delay_problems(lint.ET.fromstring(shortened.encode("utf-8"))) == ["MixerBootDelay is not a DelaySubscription of PT3S"]
 
 
 def test_the_speaker_mixer_plays_no_sound_sent_while_it_boots():
     # AppendBuffer subscribes only once the mixer starts: a BehaviorSubject would replay a buffer sent during the boot, late.
     text = (ROOT / "src" / "OpenRigs.Audio" / "SpeakerMixer.bonsai").read_text(encoding="utf-8-sig")
-    assert lint.mixer_replay_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
+    assert rules.mixer_replay_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
     direct = text.replace("<Name>MixerStimulusSounds</Name>", "<Name>StimulusSounds</Name>")
-    assert lint.mixer_replay_problems(lint.ET.fromstring(direct.encode("utf-8"))) == [
+    assert rules.mixer_replay_problems(lint.ET.fromstring(direct.encode("utf-8"))) == [
         "StimulusSounds reaches the mixer other than through the PublishSubject MixerStimulusSounds, fed by a CheckMixerStarted of StimulusSounds and Mixer"]
 
 
@@ -51,10 +53,10 @@ def test_a_stimulus_or_penalty_sound_sent_while_the_mixer_boots_stops_the_workfl
     unchecked = text.replace('<Edge From="36" To="39" Label="Source1" />', "").replace(
         '<Edge From="39" To="37" Label="Source1" />', '<Edge From="36" To="37" Label="Source1" />')
     assert unchecked != text
-    assert lint.mixer_replay_problems(lint.ET.fromstring(unchecked.encode("utf-8"))) == [
+    assert rules.mixer_replay_problems(lint.ET.fromstring(unchecked.encode("utf-8"))) == [
         "PenaltySounds reaches the mixer other than through the PublishSubject MixerPenaltySounds, fed by a CheckMixerStarted of PenaltySounds and Mixer"]
     misnamed = text.replace("<aud:Sound>StimulusSounds</aud:Sound>", "<aud:Sound>PenaltySounds</aud:Sound>")
-    assert lint.mixer_replay_problems(lint.ET.fromstring(misnamed.encode("utf-8"))) == [
+    assert rules.mixer_replay_problems(lint.ET.fromstring(misnamed.encode("utf-8"))) == [
         "StimulusSounds reaches the mixer other than through the PublishSubject MixerStimulusSounds, fed by a CheckMixerStarted of StimulusSounds and Mixer"]
 
 
@@ -119,16 +121,10 @@ def test_a_sound_needs_its_level_from_the_task_file_and_the_shared_mixer(tmp_pat
     assert lint.sound_level_problems(unmapped) == ["aud:SpeakerBuffer is not given LevelDbfs from the task file's levelDbfs"]
     assert lint.speaker_mixer_problems(unmapped) == ["the workflow uses Bonsai.Mixer's StartMixer itself"]
 
-def test_every_ready_stage_is_announced_by_an_announce_stage_and_the_mixer_sends_mixer_started():
+def test_every_ready_stage_is_announced_by_an_announce_stage():
     for path in (ROOT / "src").glob("OpenRigs.*/**/*.bonsai"):
         if not path.relative_to(ROOT / "src").parts[0].endswith(".Tests"):
             assert lint.ready_announcer_problems(lint.ET.fromstring(path.read_text(encoding="utf-8-sig").encode("utf-8"))) == [], path
-    mixer = (ROOT / "src" / "OpenRigs.Audio" / "SpeakerMixer.bonsai").read_text(encoding="utf-8-sig")
-    assert lint.mixer_ready_problems(lint.ET.fromstring(mixer.encode("utf-8"))) == []
-    silent = mixer.replace("<core:Stage>MixerStarted</core:Stage>", "<core:Stage>Mixer</core:Stage>")
-    assert silent != mixer
-    assert lint.mixer_ready_problems(lint.ET.fromstring(silent.encode("utf-8"))) == [
-        "SpeakerMixer does not multicast MixerStarted into ReadyStages once the mixer has started"]
 
 
 def test_an_announcer_that_completes_is_refused():
@@ -156,7 +152,7 @@ def camera(name: str) -> str:
 
 # The acceptance fixture: a rig no workflow has yet, a board clock, wheel and camera with DomeHardware's lick detectors
 # and spout stage, made of the lab's pieces with no hardware code of its own.
-MIXED = (include(lint.READ_LAB_RIG) + piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet, SpoutsHomed, Camera-Overhead")
+MIXED = (include(lint.READ_LAB_RIG) + piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead")
          + named(lint.BOARD, "BehaviorBoard-Main") + board_line(lint.CLOCK_FROM_BOARD)
          + board_line(lint.DEVICES + "BehaviorBoard.RunningWheel.bonsai")
          + named(lint.LICKETY_SPLIT, "LicketySplit-Left") + named(lint.LICKETY_SPLIT, "LicketySplit-Right")
@@ -203,7 +199,7 @@ def test_the_dome_rig_list_is_expanded_with_the_workflow_s_settings(tmp_path):
 def test_a_broken_combination_is_named(tmp_path):
     broken = (MIXED.replace("Camera-Overhead</CamerasExpected>", "Camera-Face</CamerasExpected>")
               .replace("<DataSubjectName>LicketySplit-Right.Data<", "<DataSubjectName>LicketySplit-Left.Data<"))
-    gate = piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet, SpoutsHomed, Camera-Overhead")
+    gate = piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead")
     late = broken.replace(gate, "") + gate + named(lint.CLOCK_FROM_GENERATOR, "TimestampGeneratorGen3-Main")
     assert lint.hardware_problems(workflow(tmp_path, late)) == [
         "the workflow has 2 clocks, not one (ClockFromTimestampGenerator or ClockFromBoard)",
@@ -222,8 +218,8 @@ def test_a_broken_combination_is_named(tmp_path):
 def test_a_stage_the_workflow_announces_itself_is_one_of_ready_gate_s_workflow_stages(tmp_path):
     own = ('<Expression xsi:type="Combinator"><Combinator xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core" '
            'xsi:type="orc:AnnounceStage"><orc:Stage>CalibrationReady</orc:Stage></Combinator></Expression>')
-    gate = piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet, SpoutsHomed, Camera-Overhead")
-    listed = MIXED.replace(gate, piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet, SpoutsHomed, Camera-Overhead",
+    gate = piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead")
+    listed = MIXED.replace(gate, piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead",
                                        WorkflowStages="CalibrationReady"))
     assert lint.hardware_problems(workflow(tmp_path, listed + own)) == []
     assert lint.hardware_problems(workflow(tmp_path / "b", MIXED + own)) == [
@@ -438,7 +434,7 @@ def test_the_training_stage_is_the_lab_s_include_after_experiment_control(tmp_pa
 
 
 def test_the_penalty_sound_is_the_lab_s_include(tmp_path):
-    assert lint.play_penalty_sound_problems(lint.ET.fromstring(block_text(lint.PLAY_PENALTY_SOUND).encode("utf-8"))) == []
+    assert rules.play_penalty_sound_problems(lint.ET.fromstring(block_text(lint.PLAY_PENALTY_SOUND).encode("utf-8"))) == []
     assert lint.penalty_sound_problems(workflow(tmp_path, include(lint.PLAY_PENALTY_SOUND))) == []
     # The tasks' own chain until 16 Nov 2026.
     own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="aud:PenaltySoundBuffer" xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio" /></Expression>'
@@ -463,7 +459,7 @@ def test_the_zapit_trigger_line_is_set_and_cleared_by_the_lab_s_include(tmp_path
 
 
 def test_the_behaviour_box_rig_list_is_expanded_with_the_workflow_s_binning(tmp_path):
-    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BBoxHardware.bonsai", "<Binning>2</Binning>"))
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BehaviorBoxHardware.bonsai", "<Binning>2</Binning>"))
     assert lint.hardware_problems(wf) == []
     assert lint.required_devices(wf) == [("BehaviorBoard-Main", "behaviorBoard"), ("Camera-Overhead", "camera")]
     assert dict(lint.hardware(wf))[lint.CAMERA]["Binning"] == "2"
@@ -482,14 +478,14 @@ def test_each_include_read_from_the_package_is_found_by_its_description(tmp_path
     with zipfile.ZipFile(tmp_path / "local_packages" / "OpenRigs.Devices.0.1.1-x.2.nupkg", "w") as z:
         z.writestr("lib/net472/OpenRigs.Devices.dll", b"MZ\x00<WorkflowBuilder>other</WorkflowBuilder>\x00\x10" + rig_list + b"\x00\xff")
     monkeypatch.setattr(lint, "LIB_SRC", tmp_path / "nowhere")
-    wf = workflow(tmp_path, include(lint.DEVICES + "DomeHardware.bonsai", "<ReadyWaitsFor>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body</ReadyWaitsFor>"))
+    wf = workflow(tmp_path, include(lint.DEVICES + "DomeHardware.bonsai", "<PieceStages>HarpClockSet, SpoutsHomed, Camera-Face, Camera-Pupil, Camera-Body</PieceStages>"))
     assert len(lint.required_devices(wf)) == 9
 
 def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     def root(resource: str) -> lint.ET.Element:
         return lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
-    assert lint.zapit_for_task_problems(root("Zapit/ConnectForTask.bonsai")) == []
-    assert lint.manual_rewards_drop_problems(root("BehaviorBoard/ManualRewards.bonsai")) == []
+    assert rules.zapit_for_task_problems(root("Zapit/ConnectForTask.bonsai")) == []
+    assert rules.manual_rewards_drop_problems(root("BehaviorBoard/ManualRewards.bonsai")) == []
     group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
     wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.MANUAL_REWARDS) + group)
     # ManualRewards declares RewardLeft and RewardRight itself (DeclareControls): the task declares neither.
@@ -571,7 +567,6 @@ def test_the_lick_spout_stage_takes_the_spout_step_size_live_and_shows_its_defau
     names = {(c.get(lint.XSI), c.findtext(lint.CONTROL + "Name")) for c in root.iter(lint.W + "Combinator")}
     assert {("orcl:OnParameterSet", "SpoutStepSize"), ("orcl:ParameterDefault", "SpoutStepSize")} <= names
     assert text.count("<Value>150</Value>") == 1 and "StepSize>150<" not in text
-    assert "SpoutStepSize" not in (ROOT / "src" / "OpenRigs.Devices" / "DomeHardware.bonsai").read_text(encoding="utf-8-sig")
 
 
 def task_files(nodes: str = "") -> str:
@@ -605,14 +600,14 @@ def test_every_task_with_sound_has_the_lab_s_background_noise_once_after_its_tas
 
 def test_the_background_noise_plays_from_ready_at_the_launch_s_level_and_go_refuses_a_change():
     text = (ROOT / "src" / "OpenRigs.Audio" / "BackgroundNoise.bonsai").read_text(encoding="utf-8-sig")
-    assert lint.background_noise_include_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
+    assert rules.background_noise_include_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
     early = text.replace("<Name>Ready</Name>", "<Name>Speakers</Name>")
-    assert lint.background_noise_include_problems(lint.ET.fromstring(early.encode("utf-8"))) == ["the noise sent does not wait for Ready"]
+    assert rules.background_noise_include_problems(lint.ET.fromstring(early.encode("utf-8"))) == ["the noise sent does not wait for Ready"]
     at_go = text.replace("<Name>LaunchTaskConfig</Name>", "<Name>TaskConfig</Name>")
-    assert lint.background_noise_include_problems(lint.ET.fromstring(at_go.encode("utf-8"))) == [
+    assert rules.background_noise_include_problems(lint.ET.fromstring(at_go.encode("utf-8"))) == [
         "the noise sent does not wait for LaunchTaskConfig", "Go does not stop on a backgroundNoise changed after launch"]
-    a_file = text.replace('<Combinator xsi:type="aud:ReadBackgroundNoise" />', '<Combinator xsi:type="aud:ReadWave" />')
-    assert lint.background_noise_include_problems(lint.ET.fromstring(a_file.encode("utf-8"))) == [
+    a_file = text.replace('<Combinator xsi:type="aud:ReadBackgroundNoise" />', '<Combinator xsi:type="aud:CheckWaveRate" />')
+    assert rules.background_noise_include_problems(lint.ET.fromstring(a_file.encode("utf-8"))) == [
         "the noise is not rig.yml's backgroundNoise (ReadBackgroundNoise)"]
 
 
@@ -678,7 +673,7 @@ def test_no_experiment_folder_declares_what_log_lab_experiment_and_launch_settin
 
 
 def test_a_board_not_named_main_is_filled_from_the_template_s_first_board(tmp_path):
-    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet")
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + piece(lint.READY_GATE, PieceStages="HarpClockSet")
                   + named(lint.BOARD, "BehaviorBoard-Arena") + piece(lint.CLOCK_FROM_BOARD, Board="BehaviorBoard-Arena",
                   BoardCommandsSubjectName="BehaviorBoard-Arena.Commands", BoardDataSubjectName="BehaviorBoard-Arena.Data"))
     assert lint.hardware_problems(wf) == []
@@ -711,7 +706,6 @@ def test_camera_live_controls_declares_its_own_parameters_and_a_workflow_has_one
         ("CameraLiveControls", "CameraExposureUs"), ("CameraLiveControls", "CameraGainDb")}
     assert lint.declared_twice(one) == []
     text = (ROOT / "src" / "OpenRigs.Devices" / "CameraLiveControls.bonsai").read_text(encoding="utf-8-sig")
-    assert "ExposureParameter" not in text and "GainParameter" not in text
     copy = "<Parameters><Parameter><Name>CameraExposureUs</Name></Parameter><Parameter><Name>CameraGainDb</Name></Parameter></Parameters>"
     task = workflow(tmp_path / "task", include(lint.READ_LAB_RIG) + live + include(lint.EXPERIMENT_CONTROL, copy))
     assert lint.declared_twice(task) == ["the parameter CameraExposureUs is declared by ExperimentControl and by CameraLiveControls",

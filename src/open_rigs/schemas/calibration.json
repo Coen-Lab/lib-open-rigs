@@ -146,9 +146,9 @@
             "writeBufferSize": 2048,
             "tareCommand": "T",
             "printCommand": "IP",
-            "printPeriodS": 0.5,
+            "printPeriodSeconds": 0.5,
             "bootDelaySeconds": 0.5,
-            "tareDelayS": 1.5,
+            "tareDelaySeconds": 1.5,
             "unitSuffix": "g",
             "unstableMarker": "?",
             "ignore": "ES"
@@ -217,11 +217,11 @@
           "title": "SettleWindow",
           "type": "integer"
         },
-        "weighTimeoutS": {
+        "weighTimeoutSeconds": {
           "default": 60.0,
           "description": "Fail if the balance has not settled within this time, in seconds.",
           "exclusiveMinimum": 0,
-          "title": "WeighTimeoutS",
+          "title": "WeighTimeoutSeconds",
           "type": "number"
         }
       },
@@ -409,11 +409,11 @@
           "title": "PrintCommand",
           "type": "string"
         },
-        "printPeriodS": {
+        "printPeriodSeconds": {
           "default": 0.5,
           "description": "How often a reading is requested, in seconds.",
           "exclusiveMinimum": 0,
-          "title": "PrintPeriodS",
+          "title": "PrintPeriodSeconds",
           "type": "number"
         },
         "bootDelaySeconds": {
@@ -423,11 +423,11 @@
           "title": "BootDelaySeconds",
           "type": "number"
         },
-        "tareDelayS": {
+        "tareDelaySeconds": {
           "default": 1.5,
           "description": "Wait after taring before the first reading is requested, in seconds.",
           "minimum": 0,
-          "title": "TareDelayS",
+          "title": "TareDelaySeconds",
           "type": "number"
         },
         "unitSuffix": {

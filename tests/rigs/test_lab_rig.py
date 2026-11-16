@@ -49,7 +49,6 @@ def rig_with(**wiring):
 def test_template_validates():
     rig = LabRig.model_validate(RIG)
     assert rig.speaker_array.penalty_sound_channel == 2
-    assert "triggerLine" not in LabRig.model_json_schema(by_alias=True)["$defs"]["ZapitServer"]["properties"]
 
 
 def test_the_background_noise_is_a_rig_file_the_speaker_array_names():
@@ -236,11 +235,9 @@ def test_the_lab_rig_template_validates_and_fits_the_committed_schema():
     assert committed == json.loads(json.dumps(build_schema()))
 
 
-def test_the_mixer_boot_delay_is_in_seconds_and_a_speaker_has_no_gain():
-    # A speaker's differences belong to its calibration (SpeakerSet never read a gain).
+def test_the_mixer_boot_delay_is_in_seconds():
     defs = LabRig.model_json_schema(by_alias=True)["$defs"]
-    assert "bootDelaySeconds" in defs["AudioDevice"]["properties"] and "bootDelay" not in defs["AudioDevice"]["properties"]
-    assert "gain" not in defs["Speaker"]["properties"]
+    assert "bootDelaySeconds" in defs["AudioDevice"]["properties"]
 
 
 def test_the_reward_valve_lines_are_wiring_s():

@@ -32,7 +32,7 @@ namespace OpenRigs.Core
         /// <summary>
         /// Gets or sets how long to wait for the balance to settle, in seconds.
         /// </summary>
-        [Description("Give up with an error if the balance has not settled within this many seconds, mapped from the procedure's weighTimeoutS.")]
+        [Description("Give up with an error if the balance has not settled within this many seconds, mapped from the procedure's weighTimeoutSeconds.")]
         public double TimeoutSeconds { get; set; } = 60;
 
         /// <summary>

@@ -17,7 +17,7 @@
         <rx:Name>PathPrefix</rx:Name>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
-        <ReadyWaitsFor>SpoutsHomed</ReadyWaitsFor>
+        <PieceStages>SpoutsHomed</PieceStages>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LickSpoutStage.bonsai" />
       <Expression xsi:type="rx:PublishSubject" TypeArguments="ctl:ControlEvent">

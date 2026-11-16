@@ -16,7 +16,7 @@
         <rx:Name>PathPrefix</rx:Name>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
-        <ReadyWaitsFor>HarpClockSet</ReadyWaitsFor>
+        <PieceStages>HarpClockSet</PieceStages>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ClockFromTimestampGenerator.bonsai">
         <Name>TimestampGeneratorGen3-Main</Name>

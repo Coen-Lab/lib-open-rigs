@@ -74,7 +74,7 @@ namespace OpenRigs.Core.Tests
             var procedure = new DispenseProcedure
             {
                 Samples = new List<DispenseSample> { Sample(20), Sample(40), Sample(60) },
-                PrimingPulses = 2, SettleWindow = 2, WeighTimeoutS = 10,
+                PrimingPulses = 2, SettleWindow = 2, WeighTimeoutSeconds = 10,
             };
             var requests = new Subject<Tuple<int, int>>();
             var grams = new double[1];

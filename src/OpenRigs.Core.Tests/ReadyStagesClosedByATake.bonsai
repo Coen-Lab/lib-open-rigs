@@ -55,7 +55,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="core:StartupWatchdog">
-          <core:Expected>A, B, C</core:Expected>
+          <core:PieceStages>A, B, C</core:PieceStages>
           <core:TimeoutSeconds>10</core:TimeoutSeconds>
           <core:What>Readying the test rig</core:What>
         </Combinator>

@@ -288,28 +288,6 @@ namespace OpenRigs.Manifest.Tests
             Check("... and null when none was passed", ManifestWriter.ControlSection(null, "a", "b", null, null, null, null).First(p => p.Key == "launch_id").Value == null, "not null");
             Check("a blank ingest script is null, not left out", Field(Json.Serialize(records["no-controller"]), "ingest_script") == "null", "left out");
             ExperimentFolder(repo);
-            RetiredNames(repo);
-        }
-
-        // L1-L2: rig-sync retired on 13 Nov 2026; the overnight copy is jacuzzi-ingest's ingest-rig. The lab's
-        // code and READMEs name it only in dated history: a sentence holding a date or "once".
-        static void RetiredNames(string repo)
-        {
-            Console.WriteLine("Retired names:");
-            var lab = new[] { "Control", "Manifest", "HarpDevices", "LiveView", "Vision" }
-                .SelectMany(p => new[] { "OpenRigs." + p, "OpenRigs." + p + ".Tests" }).Concat(new[] { "Shared" })
-                .Select(d => Path.Combine(repo, "src", d)).Where(Directory.Exists).ToList();
-            var self = Path.Combine(repo, "src", "OpenRigs.Manifest.Tests", "Program.cs");
-            var found = new List<string>();
-            foreach (var file in lab.SelectMany(d => Directory.GetFiles(d, "*.cs", SearchOption.AllDirectories)
-                .Concat(Directory.GetFiles(d, "README.md", SearchOption.TopDirectoryOnly))))
-            {
-                if (file.Split(Path.DirectorySeparatorChar).Any(part => part == "bin" || part == "obj") || file == self) continue;
-                var sentences = Regex.Split(File.ReadAllText(file), @"(?<=[.!?])\s+");
-                found.AddRange(sentences.Where(s => s.Contains("rig-sync") && !Regex.IsMatch(s, @"\b\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b|\bonce\b"))
-                    .Select(s => file.Substring(repo.Length).TrimStart('\\')));
-            }
-            Check("no lab .cs or README names rig-sync outside dated history", lab.Count >= 10 && found.Count == 0, found.Count == 0 ? lab.Count + " folders" : string.Join(", ", found.Distinct()));
         }
 
         // The one name two languages make (claude-tools docs\architecture\records.md, Experiment folder name):

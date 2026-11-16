@@ -13,11 +13,11 @@ namespace OpenRigs.Devices.Zapit
     /// </summary>
     public static class ZapitConditions
     {
-        /// <summary>The shortest ramp-down allowed, in ms: a shorter one lets inhibition end abruptly (rebound excitation).</summary>
-        public const double MinimumRampDownMs = 100;
+        /// <summary>The shortest ramp-down allowed, in seconds: a shorter one lets inhibition end abruptly (rebound excitation).</summary>
+        public const double MinimumRampDownSeconds = 0.1;
 
-        /// <summary>The longest ramp-down allowed, in ms: the masking light goes out 1 s after the outcome, after the ramp and Zapit's stop.</summary>
-        public const double MaximumRampDownMs = 500;
+        /// <summary>The longest ramp-down allowed, in seconds: the masking light goes out 1 s after the outcome, after the ramp and Zapit's stop.</summary>
+        public const double MaximumRampDownSeconds = 0.5;
 
         static readonly Regex ConditionKey = new Regex(@"^stimLocations(\d+)\s*:", RegexOptions.CultureInvariant);
         static readonly Regex TopLevelKey = new Regex(@"^([A-Za-z_]\w*)\s*:", RegexOptions.Multiline | RegexOptions.CultureInvariant);
@@ -26,7 +26,7 @@ namespace OpenRigs.Devices.Zapit
 
         /// <summary>
         /// The number of conditions in the file, after checking they are numbered 1 to N and each
-        /// ramps down over <see cref="MinimumRampDownMs"/> to <see cref="MaximumRampDownMs"/> and over
+        /// ramps down over <see cref="MinimumRampDownSeconds"/> to <see cref="MaximumRampDownSeconds"/> and over
         /// more than one stimulus cycle. Throws, naming the file and every problem, otherwise.
         /// </summary>
         public static int Check(string path)
@@ -88,10 +88,10 @@ namespace OpenRigs.Devices.Zapit
                     continue;
                 }
                 var rampMs = double.Parse(ramp.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture);
-                if (rampMs < MinimumRampDownMs)
-                    problems.Add(string.Format(CultureInfo.InvariantCulture, "{0} ramps down over {1} ms, less than {2} ms", pair.Key, rampMs, MinimumRampDownMs));
-                else if (rampMs > MaximumRampDownMs)
-                    problems.Add(string.Format(CultureInfo.InvariantCulture, "{0} ramps down over {1} ms, more than {2} ms", pair.Key, rampMs, MaximumRampDownMs));
+                if (rampMs < MinimumRampDownSeconds * 1000)
+                    problems.Add(string.Format(CultureInfo.InvariantCulture, "{0} ramps down over {1} ms, less than {2} ms", pair.Key, rampMs, MinimumRampDownSeconds * 1000));
+                else if (rampMs > MaximumRampDownSeconds * 1000)
+                    problems.Add(string.Format(CultureInfo.InvariantCulture, "{0} ramps down over {1} ms, more than {2} ms", pair.Key, rampMs, MaximumRampDownSeconds * 1000));
                 else if (rampMs <= cycleMs)
                     problems.Add(string.Format(CultureInfo.InvariantCulture, "{0} ramps down over {1} ms, not longer than one {2} Hz cycle ({3} ms)", pair.Key, rampMs, hz, cycleMs));
             }
@@ -99,7 +99,7 @@ namespace OpenRigs.Devices.Zapit
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
                     "The Zapit conditions file '{0}': {1}. Each condition needs offRampDownDuration_ms of {2} to {3} ms and longer than one stimulus cycle.",
-                    path, string.Join("; ", problems), MinimumRampDownMs, MaximumRampDownMs));
+                    path, string.Join("; ", problems), MinimumRampDownSeconds * 1000, MaximumRampDownSeconds * 1000));
             }
         }
 

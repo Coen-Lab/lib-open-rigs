@@ -37,11 +37,11 @@
         <Combinator xsi:type="vid:CamerasOpen" />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Expected" DisplayName="CamerasExpected" Description="Every camera's Name, comma separated, such as Camera-Face, Camera-Pupil, Camera-Body: the triggers start once all have opened." />
+        <Property Name="PieceStages" DisplayName="CamerasExpected" Description="Every camera's Name, comma separated, such as Camera-Face, Camera-Pupil, Camera-Body: the triggers start once all have opened." />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="core:StartupWatchdog">
-          <core:Expected />
+          <core:PieceStages />
           <core:TimeoutSeconds>60</core:TimeoutSeconds>
           <core:What>Opening the cameras (CameraTriggers' CamerasExpected)</core:What>
         </Combinator>

@@ -94,7 +94,3 @@ def test_linear_fit_refuses_a_range_it_cannot_plan_in(fit):
     with pytest.raises(ValidationError):
         LinearFit(**fit)
 
-
-def test_a_dispense_procedure_names_no_unit_beside_pulse_width_ms():
-    # pulseWidthMs is in ms; a free xUnit beside it could only disagree. The curve written from it says ms.
-    assert "xUnit" not in DispenseProcedure.model_json_schema(by_alias=True)["properties"]

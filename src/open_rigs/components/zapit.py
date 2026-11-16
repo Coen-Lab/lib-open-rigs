@@ -5,7 +5,7 @@ from swc.aeon.schema import BaseSchema
 # How long before its trigger Zapit's armed reply must be in, in seconds (OpenRigs.Devices ZapitTrial.ReplyMarginSeconds):
 # every task using Zapit leaves this much between arming Zapit and the trigger.
 ZAPIT_REPLY_MARGIN_SECONDS = 0.2
-# The longest Zapit ramp-down a task may ask for, in seconds (OpenRigs.Devices ZapitConditions.MaximumRampDownMs).
+# The longest Zapit ramp-down a task may ask for, in seconds (OpenRigs.Devices ZapitConditions.MaximumRampDownSeconds).
 ZAPIT_MAX_RAMP_DOWN_SECONDS = 0.5
 
 

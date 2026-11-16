@@ -26,7 +26,7 @@ namespace OpenRigs.Devices.Tests
   <Workflow>
     <Nodes>
       <Expression xsi:type=""IncludeWorkflow"" Path=""OpenRigs.Devices:ReadyGate.bonsai"">
-        <ReadyWaitsFor>A</ReadyWaitsFor>
+        <PieceStages>A</PieceStages>
         <WorkflowStages>B</WorkflowStages>
       </Expression>
       <Expression xsi:type=""Combinator""><Combinator xsi:type=""rx:Timer""><rx:DueTime>PT0S</rx:DueTime><rx:Period>PT0S</rx:Period></Combinator></Expression>

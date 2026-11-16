@@ -289,7 +289,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void MaximumRampDownIsThePythonModels()
         {
-            StringAssert.Contains(PythonModel("components", "zapit.py"), "ZAPIT_MAX_RAMP_DOWN_SECONDS = " + (ZapitConditions.MaximumRampDownMs / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            StringAssert.Contains(PythonModel("components", "zapit.py"), "ZAPIT_MAX_RAMP_DOWN_SECONDS = " + ZapitConditions.MaximumRampDownSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         /// <summary>The text of one of the Python models, src\open_rigs\&lt;folder&gt;\&lt;file&gt;, found above the test output.</summary>

@@ -61,7 +61,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void PollsTareThenPrintOnTheSettingsSchedule()
         {
-            var settings = new SerialBalance { BootDelaySeconds = 0.02, TareDelayS = 0.03, PrintPeriodS = 0.02, TareCommand = "T", PrintCommand = "IP" };
+            var settings = new SerialBalance { BootDelaySeconds = 0.02, TareDelaySeconds = 0.03, PrintPeriodSeconds = 0.02, TareCommand = "T", PrintCommand = "IP" };
             var commands = PollBalance.Commands(settings).Take(4).ToList().Timeout(TimeSpan.FromSeconds(5)).Wait();
             CollectionAssert.AreEqual(new[] { "T", "IP", "IP", "IP" }, commands.ToArray());
         }
@@ -74,7 +74,7 @@ namespace OpenRigs.Core.Tests
             System.Threading.ThreadPool.GetMinThreads(out workers, out io);
             for (var i = 0; i < 10; i++)
             {
-                var settings = new SerialBalance { BootDelaySeconds = 0.02, TareDelayS = 0.03, PrintPeriodS = 0.02, TareCommand = "T", PrintCommand = "IP" };
+                var settings = new SerialBalance { BootDelaySeconds = 0.02, TareDelaySeconds = 0.03, PrintPeriodSeconds = 0.02, TareCommand = "T", PrintCommand = "IP" };
                 var commands = PollBalance.Commands(settings).Take(2).ToList().Timeout(TimeSpan.FromSeconds(5)).ToTask();
                 for (var j = 0; j < workers * 2; j++) System.Threading.ThreadPool.QueueUserWorkItem(_ => System.Threading.Thread.Sleep(80));
                 CollectionAssert.AreEqual(new[] { "T", "IP" }, commands.Result.ToArray());
@@ -84,7 +84,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void AnEmptyCommandIsNotSent()
         {
-            var settings = new SerialBalance { BootDelaySeconds = 0.01, TareDelayS = 0.01, PrintPeriodS = 0.01, TareCommand = "", PrintCommand = "IP" };
+            var settings = new SerialBalance { BootDelaySeconds = 0.01, TareDelaySeconds = 0.01, PrintPeriodSeconds = 0.01, TareCommand = "", PrintCommand = "IP" };
             var commands = PollBalance.Commands(settings).Take(2).ToList().Timeout(TimeSpan.FromSeconds(5)).Wait();
             CollectionAssert.AreEqual(new[] { "IP", "IP" }, commands.ToArray());
         }

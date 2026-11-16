@@ -25,7 +25,7 @@ namespace OpenRigs.Core.Tests
                     },
                     PrimingPulses = priming,
                     SettleWindow = 10,
-                    WeighTimeoutS = 60
+                    WeighTimeoutSeconds = 60
                 },
                 Balance = new SerialBalance()
             };
@@ -42,7 +42,7 @@ namespace OpenRigs.Core.Tests
             var settings = Apply(" COM7 ");
             Assert.AreEqual("COM7", settings.Balance.PortName);
             Assert.AreEqual(10, settings.Procedure.SettleWindow);
-            Assert.AreEqual(60, settings.Procedure.WeighTimeoutS);
+            Assert.AreEqual(60, settings.Procedure.WeighTimeoutSeconds);
         }
 
         [TestMethod]
@@ -51,7 +51,7 @@ namespace OpenRigs.Core.Tests
             var settings = Apply("Manual");
             Assert.AreEqual(BalancePort.Manual, settings.Balance.PortName);
             Assert.AreEqual(1, settings.Procedure.SettleWindow);
-            Assert.AreEqual(3600, settings.Procedure.WeighTimeoutS);
+            Assert.AreEqual(3600, settings.Procedure.WeighTimeoutSeconds);
         }
 
         [TestMethod]

@@ -16,7 +16,7 @@
         <rx:Name>PathPrefix</rx:Name>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
-        <ReadyWaitsFor>Camera-Face</ReadyWaitsFor>
+        <PieceStages>Camera-Face</PieceStages>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>RigConfigs</Name>

@@ -16,7 +16,7 @@
         <rx:Name>PathPrefix</rx:Name>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
-        <ReadyWaitsFor>LickDetector</ReadyWaitsFor>
+        <PieceStages>LickDetector</PieceStages>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:LicketySplit.bonsai">
         <Name>LicketySplit-Left</Name>

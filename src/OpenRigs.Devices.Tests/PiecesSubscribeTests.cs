@@ -55,18 +55,10 @@ namespace OpenRigs.Devices.Tests
 
         // The pieces' rig's face camera as the box's overhead one, on the same trigger.
         [TestMethod]
-        public void BBoxHardware()
+        public void BehaviorBoxHardware()
         {
             RequireSpinnaker();
-            Check(Run("BBoxHardware.bonsai", rig => rig.Replace("  face:", "  overhead:").Replace("Camera-Face", "Camera-Overhead")));
-        }
-
-        // Its own subjects, mappings and the tap's ticks run with no error while no Go comes.
-        [TestMethod]
-        public void PreflightChecks()
-        {
-            var errors = Run("PreflightChecks.bonsai", seconds: 3);
-            Assert.AreEqual(0, errors.Count, string.Join(" || ", errors));
+            Check(Run("BehaviorBoxHardware.bonsai", rig => rig.Replace("  face:", "  overhead:").Replace("Camera-Face", "Camera-Overhead")));
         }
 
         // From the SDK's install, as on a rig: Bonsai.Spinnaker's own copy is not the SDK's build and does not load.

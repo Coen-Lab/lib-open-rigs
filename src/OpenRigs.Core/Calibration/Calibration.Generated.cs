@@ -572,7 +572,7 @@ namespace OpenRigs.Core.Calibration
     
         private int _settleWindow;
     
-        private double _weighTimeoutS;
+        private double _weighTimeoutSeconds;
     
         public DispenseProcedure()
         {
@@ -581,7 +581,7 @@ namespace OpenRigs.Core.Calibration
             _primingPulses = 5;
             _densityGPerMl = 1D;
             _settleWindow = 10;
-            _weighTimeoutS = 60D;
+            _weighTimeoutSeconds = 60D;
         }
     
         protected DispenseProcedure(DispenseProcedure other)
@@ -592,7 +592,7 @@ namespace OpenRigs.Core.Calibration
             _primingPulseWidthMs = other._primingPulseWidthMs;
             _densityGPerMl = other._densityGPerMl;
             _settleWindow = other._settleWindow;
-            _weighTimeoutS = other._weighTimeoutS;
+            _weighTimeoutSeconds = other._weighTimeoutSeconds;
         }
     
         /// <summary>
@@ -707,18 +707,18 @@ namespace OpenRigs.Core.Calibration
         /// <summary>
         /// Fail if the balance has not settled within this time, in seconds.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("weighTimeoutS")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="weighTimeoutS")]
+        [Newtonsoft.Json.JsonPropertyAttribute("weighTimeoutSeconds")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="weighTimeoutSeconds")]
         [System.ComponentModel.DescriptionAttribute("Fail if the balance has not settled within this time, in seconds.")]
-        public double WeighTimeoutS
+        public double WeighTimeoutSeconds
         {
             get
             {
-                return _weighTimeoutS;
+                return _weighTimeoutSeconds;
             }
             set
             {
-                _weighTimeoutS = value;
+                _weighTimeoutSeconds = value;
             }
         }
     
@@ -740,7 +740,7 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("PrimingPulseWidthMs = " + _primingPulseWidthMs + ", ");
             stringBuilder.Append("DensityGPerMl = " + _densityGPerMl + ", ");
             stringBuilder.Append("SettleWindow = " + _settleWindow + ", ");
-            stringBuilder.Append("WeighTimeoutS = " + _weighTimeoutS);
+            stringBuilder.Append("WeighTimeoutSeconds = " + _weighTimeoutSeconds);
             return true;
         }
     
@@ -1269,11 +1269,11 @@ namespace OpenRigs.Core.Calibration
     
         private string _printCommand;
     
-        private double _printPeriodS;
+        private double _printPeriodSeconds;
     
         private double _bootDelaySeconds;
     
-        private double _tareDelayS;
+        private double _tareDelaySeconds;
     
         private string _unitSuffix;
     
@@ -1290,9 +1290,9 @@ namespace OpenRigs.Core.Calibration
             _writeBufferSize = 2048;
             _tareCommand = "T";
             _printCommand = "IP";
-            _printPeriodS = 0.5D;
+            _printPeriodSeconds = 0.5D;
             _bootDelaySeconds = 0.5D;
-            _tareDelayS = 1.5D;
+            _tareDelaySeconds = 1.5D;
             _unitSuffix = "g";
             _unstableMarker = "?";
             _ignore = "ES";
@@ -1307,9 +1307,9 @@ namespace OpenRigs.Core.Calibration
             _writeBufferSize = other._writeBufferSize;
             _tareCommand = other._tareCommand;
             _printCommand = other._printCommand;
-            _printPeriodS = other._printPeriodS;
+            _printPeriodSeconds = other._printPeriodSeconds;
             _bootDelaySeconds = other._bootDelaySeconds;
-            _tareDelayS = other._tareDelayS;
+            _tareDelaySeconds = other._tareDelaySeconds;
             _unitSuffix = other._unitSuffix;
             _unstableMarker = other._unstableMarker;
             _ignore = other._ignore;
@@ -1444,18 +1444,18 @@ namespace OpenRigs.Core.Calibration
         /// <summary>
         /// How often a reading is requested, in seconds.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("printPeriodS")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="printPeriodS")]
+        [Newtonsoft.Json.JsonPropertyAttribute("printPeriodSeconds")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="printPeriodSeconds")]
         [System.ComponentModel.DescriptionAttribute("How often a reading is requested, in seconds.")]
-        public double PrintPeriodS
+        public double PrintPeriodSeconds
         {
             get
             {
-                return _printPeriodS;
+                return _printPeriodSeconds;
             }
             set
             {
-                _printPeriodS = value;
+                _printPeriodSeconds = value;
             }
         }
     
@@ -1480,18 +1480,18 @@ namespace OpenRigs.Core.Calibration
         /// <summary>
         /// Wait after taring before the first reading is requested, in seconds.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("tareDelayS")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="tareDelayS")]
+        [Newtonsoft.Json.JsonPropertyAttribute("tareDelaySeconds")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="tareDelaySeconds")]
         [System.ComponentModel.DescriptionAttribute("Wait after taring before the first reading is requested, in seconds.")]
-        public double TareDelayS
+        public double TareDelaySeconds
         {
             get
             {
-                return _tareDelayS;
+                return _tareDelaySeconds;
             }
             set
             {
-                _tareDelayS = value;
+                _tareDelaySeconds = value;
             }
         }
     
@@ -1569,9 +1569,9 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("WriteBufferSize = " + _writeBufferSize + ", ");
             stringBuilder.Append("TareCommand = " + _tareCommand + ", ");
             stringBuilder.Append("PrintCommand = " + _printCommand + ", ");
-            stringBuilder.Append("PrintPeriodS = " + _printPeriodS + ", ");
+            stringBuilder.Append("PrintPeriodSeconds = " + _printPeriodSeconds + ", ");
             stringBuilder.Append("BootDelaySeconds = " + _bootDelaySeconds + ", ");
-            stringBuilder.Append("TareDelayS = " + _tareDelayS + ", ");
+            stringBuilder.Append("TareDelaySeconds = " + _tareDelaySeconds + ", ");
             stringBuilder.Append("UnitSuffix = " + _unitSuffix + ", ");
             stringBuilder.Append("UnstableMarker = " + _unstableMarker + ", ");
             stringBuilder.Append("Ignore = " + _ignore);

@@ -9,22 +9,22 @@ namespace OpenRigs.Core
 {
     /// <summary>
     /// Watches the names of start-up stages as they arrive. Emits the last of them and completes once
-    /// every name in <see cref="Expected"/> has arrived, so what follows it, such as a Ready report,
+    /// every name in <see cref="PieceStages"/> and <see cref="WorkflowStages"/> has arrived, so what follows it, such as a Ready report,
     /// runs then; if <see cref="TimeoutSeconds"/> of wall-clock time pass first, stops the workflow with
     /// an error naming the stages that arrived and those that never did.
     /// </summary>
     [Combinator]
-    [DefaultProperty("Expected")]
-    [Description("Watches the names of start-up stages as they arrive. Emits the last of them and completes once every name in Expected has arrived; if TimeoutSeconds pass first (wall clock, from subscription), stops the workflow with an error naming the stages that arrived and those that never did.")]
+    [DefaultProperty("PieceStages")]
+    [Description("Watches the names of start-up stages as they arrive. Emits the last of them and completes once every name in PieceStages and WorkflowStages has arrived; if TimeoutSeconds pass first (wall clock, from subscription), stops the workflow with an error naming the stages that arrived and those that never did.")]
     public class StartupWatchdog
     {
-        /// <summary>Gets or sets the stages that must all arrive, comma separated.</summary>
-        [Description("The stages that must all arrive, comma separated, in the order they normally do.")]
-        public string Expected { get; set; } = string.Empty;
+        /// <summary>Gets or sets the stages the pieces announce, all of which must arrive, comma separated.</summary>
+        [Description("The stages the pieces announce, all of which must arrive, comma separated, in the order they normally do.")]
+        public string PieceStages { get; set; } = string.Empty;
 
-        /// <summary>Gets or sets more stages that must all arrive, comma separated, beside <see cref="Expected"/>.</summary>
-        [Description("More stages that must all arrive, comma separated, beside Expected: ReadyGate's WorkflowStages, the workflow's own stages beside its pieces'. Empty for none.")]
-        public string AlsoExpected { get; set; } = string.Empty;
+        /// <summary>Gets or sets the workflow's own stages, all of which must also arrive, comma separated.</summary>
+        [Description("The workflow's own stages, all of which must also arrive, comma separated. Empty for none.")]
+        public string WorkflowStages { get; set; } = string.Empty;
 
         /// <summary>Gets or sets how long the stages may take, in seconds.</summary>
         [Description("How long the stages may take, from subscription, in seconds.")]
@@ -39,11 +39,11 @@ namespace OpenRigs.Core
         {
             return Observable.Defer(() =>
             {
-                var expected = ((Expected ?? string.Empty) + "," + (AlsoExpected ?? string.Empty)).Split(',')
+                var expected = ((PieceStages ?? string.Empty) + "," + (WorkflowStages ?? string.Empty)).Split(',')
                     .Select(s => s.Trim()).Where(s => s.Length > 0).Distinct().ToList();
                 var timeoutSeconds = TimeoutSeconds;
                 var what = What;
-                if (expected.Count == 0) throw new InvalidOperationException("StartupWatchdog for " + what + " names no Expected stages to watch.");
+                if (expected.Count == 0) throw new InvalidOperationException("StartupWatchdog for " + what + " names no stages to watch.");
                 if (!(timeoutSeconds > 0)) throw new InvalidOperationException("StartupWatchdog for " + what + " has a TimeoutSeconds of " + timeoutSeconds + "; it must be more than 0.");
 
                 var arrived = new HashSet<string>();

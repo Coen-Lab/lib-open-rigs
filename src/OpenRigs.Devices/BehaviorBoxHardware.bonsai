@@ -9,7 +9,7 @@
         <Property Name="Binning" Description="Camera binning, 1 for full resolution, in place of rig.yml's while set. Blank: rig.yml's." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
-        <ReadyWaitsFor>HarpClockSet, Camera-Overhead</ReadyWaitsFor>
+        <PieceStages>HarpClockSet, Camera-Overhead</PieceStages>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai">
         <Name>BehaviorBoard-Main</Name>
