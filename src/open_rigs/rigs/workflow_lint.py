@@ -663,12 +663,17 @@ def spout_step_size_problems(wf: Workflow) -> list[str]:
 def background_noise_problems(wf: Workflow) -> list[str]:
     """Every task with sound has background noise: OpenRigs.Audio's BackgroundNoise, included once, after the task
     declares LaunchTaskConfig and TaskConfig, which it reads; the workflow sends nothing into BackgroundNoise and reads
-    no backgroundNoise itself."""
+    no backgroundNoise itself. The noise is the lab's one file, rig.yml's speakerArray.backgroundNoise (16 Nov 2026), so
+    the include takes no file and the task keeps no noise WAV."""
     count = wf.text.count(f'Path="{BACKGROUND_NOISE}"')
     mixer = any(p == SPEAKER_MIXER for p, _ in hardware(wf))
     if count != (1 if mixer else 0):
         return [f"the workflow includes BackgroundNoise {count} times, " + ("not once" if mixer else "and has no SpeakerMixer")]
     problems = []
+    if any(n.get("Path") == BACKGROUND_NOISE and n.find(W + "FileName") is not None for n in wf.root.iter(W + "Expression")):
+        problems.append("the workflow gives BackgroundNoise a FileName (the noise is rig.yml's speakerArray.backgroundNoise)")
+    for wav in sorted(p for p in (wf.repo / "src").rglob("*.wav") if "noise" in p.name.lower()):
+        problems.append(f"{wav.relative_to(wf.repo).as_posix()} is a noise of the task's own (BackgroundNoise plays rig.yml's speakerArray.backgroundNoise)")
     if any(n.get(XSI) == "MulticastSubject" and _name(n) == "BackgroundNoise" for n in wf.root.iter(W + "Expression")):
         problems.append("the workflow sends BackgroundNoise itself (the BackgroundNoise include does)")
     if "TaskParameters.BackgroundNoise" in wf.text:
@@ -683,7 +688,7 @@ def background_noise_problems(wf: Workflow) -> list[str]:
 
 
 def background_noise_include_problems(root: ET.Element) -> list[str]:
-    """BackgroundNoise sends into BackgroundNoise only at Ready, the WAV read at the mixer's rate (ReadWave), laid out
+    """BackgroundNoise sends into BackgroundNoise only at Ready, rig.yml's noise read with the speakers (ReadBackgroundNoise), laid out
     unequalised at LaunchTaskConfig's backgroundNoise.levelDbfs; and stops at Go on a TaskConfig whose backgroundNoise
     differs from LaunchTaskConfig's. `root` is OpenRigs.Audio's BackgroundNoise.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
@@ -698,8 +703,8 @@ def background_noise_include_problems(root: ET.Element) -> list[str]:
         problems.append("the noise is not one SpeakerBuffer, unequalised")
     if "TaskParameters.BackgroundNoise.LevelDbfs" not in {n.findtext(W + "Selector") for n in up}:
         problems.append("the noise's level is not the launched task file's backgroundNoise.levelDbfs")
-    if not any(kind(n) == "aud:ReadWave" for n in up):
-        problems.append("the noise is not read by ReadWave, at the mixer's rate")
+    if not any(kind(n) == "aud:ReadBackgroundNoise" for n in up):
+        problems.append("the noise is not rig.yml's backgroundNoise (ReadBackgroundNoise)")
     stops = [i for i, n in enumerate(nodes) if kind(n) == "core:ThrowError"]
     if not any({"TaskConfig", "LaunchTaskConfig"} <= {_name(nodes[a]) for a in upstream(edges, s)} for s in stops):
         problems.append("Go does not stop on a backgroundNoise changed after launch")

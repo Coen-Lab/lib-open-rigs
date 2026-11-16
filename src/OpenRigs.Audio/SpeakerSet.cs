@@ -52,6 +52,9 @@ namespace OpenRigs.Audio
         /// <summary>The channel the penalty sound plays on (speakerArray.penaltySoundChannel), or null.</summary>
         public int? PenaltySoundChannel { get; private set; }
 
+        /// <summary>The lab's background noise (speakerArray.backgroundNoise), its full path from rig.yml's folder, or null.</summary>
+        public string BackgroundNoiseFile { get; private set; }
+
         /// <summary>Every speaker, in rig.yml's order.</summary>
         public IList<Speaker> Speakers { get; private set; }
 
@@ -208,6 +211,8 @@ namespace OpenRigs.Audio
             var loaded = new List<Speaker>();
             var read = new List<Speaker>();  // every speaker, its filter good or not, for the channel checks
             var folder = Path.GetDirectoryName(path);
+            var noise = Text(Child(array, "backgroundNoise"));
+            if (noise != null) set.BackgroundNoiseFile = Path.GetFullPath(Path.IsPathRooted(noise) ? noise : Path.Combine(folder, noise));
             foreach (var entry in entries)
             {
                 var position = Child(entry.Settings, "position") as YamlMappingNode;

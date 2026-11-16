@@ -82,6 +82,27 @@ namespace OpenRigs.Audio
         }
     }
 
+    /// <summary>The lab's background noise, the same file in every task, named by rig.yml's speakerArray.backgroundNoise.</summary>
+    public static class BackgroundNoiseSound
+    {
+        /// <summary>The noise, one row as stored; throws, naming the file, when rig.yml names none, it is missing or at another rate.</summary>
+        public static Mat Read(SpeakerSet speakers)
+        {
+            var path = speakers.BackgroundNoiseFile;
+            if (path == null)
+            {
+                throw new InvalidOperationException("rig.yml's speakerArray has no backgroundNoise, the lab's background noise every task plays. " +
+                    "Add it: backgroundNoise: ../shared/sounds/background_noise.wav (the rig's upkeep copies it from the server's config\\shared).");
+            }
+            if (!File.Exists(path))
+            {
+                throw new InvalidOperationException("The background noise rig.yml's speakerArray.backgroundNoise names is missing: " + path +
+                    ". The rig's upkeep copies it from the server's config\\shared; run it, or copy the file there.");
+            }
+            return Wave.Read(path, speakers.SampleRate);
+        }
+    }
+
     /// <summary>The lab's penalty sound, the same in every task: one second of white noise filtered to about 4 to 21 kHz, at 48 kHz.</summary>
     public static class PenaltySound
     {

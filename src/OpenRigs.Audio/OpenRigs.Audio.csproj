@@ -4,7 +4,7 @@
     <Description>A rig's speakers: rig.yml's speakerArray and their filters, the shared speaker mixer, sounds at their levels in dBFS RMS equalised for each speaker, and the lab's penalty sound.</Description>
     <PackageTags>$(PackageTags) Audio</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.11</Version>
+    <Version>0.1.1-coen-lab.12</Version>
   </PropertyGroup>
 
   <!-- SpeakerMixer.bonsai uses Bonsai.Mixer, which every workflow that plays sound has in its own Bonsai.config. -->

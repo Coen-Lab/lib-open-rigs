@@ -6,23 +6,14 @@
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A task's background noise, the same in every task: the mono WAV file FileName (16-bit PCM or 32-bit float, relative to the workflow's folder, src), read whole at Start at the mixer's rate (ReadWave, which stops on another rate, as nothing converts it: rig.yml's speakerArray.device.sampleRate), laid out as it is on every rig.yml speaker (SpeakerBuffer, not equalised) at the task file's backgroundNoise.levelDbfs as launched (LaunchTaskConfig, read at Start), and sent into SpeakerMixer's BackgroundNoise at Ready, which loops it, faded in over 2 s; nothing when the launched backgroundNoise.enabled is false. Go stops the workflow if the task file read at Go (TaskConfig) changed backgroundNoise's enabled or levelDbfs: the noise already plays at the launch's level. Subjects: LaunchTaskConfig and TaskConfig (the task's, each with TaskParameters.BackgroundNoise), Speakers, RigConfigs, Ready.</Description>
+  <Description>A task's background noise, the same file in every task: rig.yml's speakerArray.backgroundNoise (relative to rig.yml's folder, ../shared/sounds/background_noise.wav, the server's config\shared copy, kept on the rig by its upkeep), read whole at Start with the speakers (ReadBackgroundNoise, which stops, naming the file, when rig.yml names none, it is missing, or it is not at speakerArray.device.sampleRate, as nothing converts a rate), laid out as it is on every rig.yml speaker (SpeakerBuffer, not equalised) at the task file's backgroundNoise.levelDbfs as launched (LaunchTaskConfig, read at Start), and sent into SpeakerMixer's BackgroundNoise at Ready, which loops it, faded in over 2 s; nothing when the launched backgroundNoise.enabled is false. Go stops the workflow if the task file read at Go (TaskConfig) changed backgroundNoise's enabled or levelDbfs: the noise already plays at the launch's level. Subjects: LaunchTaskConfig and TaskConfig (the task's, each with TaskParameters.BackgroundNoise), Speakers, Ready.</Description>
   <Workflow>
     <Nodes>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="FileName" Description="The background noise, a mono WAV file (16-bit PCM or 32-bit float) at the mixer's rate, relative to the workflow's folder (src)." />
-      </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>RigConfigs</Name>
-      </Expression>
-      <Expression xsi:type="MemberSelector">
-        <Selector>SpeakerArray.Device.SampleRate</Selector>
+        <Name>Speakers</Name>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Name>BackgroundNoiseWave</Name>
-        <Combinator xsi:type="aud:ReadWave">
-          <aud:FileName />
-        </Combinator>
+        <Combinator xsi:type="aud:ReadBackgroundNoise" />
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>Speakers</Name>
@@ -120,26 +111,24 @@
       </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="3" Label="Source2" />
-      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="0" To="1" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
+      <Edge From="1" To="3" Label="Source2" />
       <Edge From="4" To="5" Label="Source1" />
-      <Edge From="3" To="5" Label="Source2" />
+      <Edge From="5" To="6" Label="Source1" />
       <Edge From="6" To="7" Label="Source1" />
+      <Edge From="3" To="7" Label="Source2" />
       <Edge From="7" To="8" Label="Source1" />
       <Edge From="8" To="9" Label="Source1" />
-      <Edge From="5" To="9" Label="Source2" />
-      <Edge From="9" To="10" Label="Source1" />
-      <Edge From="10" To="11" Label="Source1" />
-      <Edge From="11" To="13" Label="Source1" />
-      <Edge From="12" To="13" Label="Source2" />
-      <Edge From="13" To="14" Label="Source1" />
-      <Edge From="14" To="15" Label="Source1" />
-      <Edge From="16" To="18" Label="Source1" />
-      <Edge From="17" To="18" Label="Source2" />
+      <Edge From="9" To="11" Label="Source1" />
+      <Edge From="10" To="11" Label="Source2" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="14" To="16" Label="Source1" />
+      <Edge From="15" To="16" Label="Source2" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
       <Edge From="18" To="19" Label="Source1" />
-      <Edge From="19" To="20" Label="Source1" />
-      <Edge From="20" To="21" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

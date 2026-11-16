@@ -449,8 +449,16 @@ def task_files(nodes: str = "") -> str:
 
 def test_every_task_with_sound_has_the_lab_s_background_noise_once_after_its_task_files(tmp_path):
     rig = include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai")
-    noise = include(lint.BACKGROUND_NOISE, "<FileName>waveforms\\background_noise.wav</FileName>")
+    noise = include(lint.BACKGROUND_NOISE)
     assert lint.background_noise_problems(workflow(tmp_path, rig + task_files() + noise)) == []
+    # The noise is rig.yml's speakerArray.backgroundNoise (16 Nov 2026): a file named on the include, or a noise WAV kept in the task, is refused.
+    own_file = workflow(tmp_path / "f", rig + task_files() + include(lint.BACKGROUND_NOISE, "<FileName>waveforms\\background_noise.wav</FileName>"))
+    (tmp_path / "f" / "src" / "waveforms").mkdir()
+    (tmp_path / "f" / "src" / "waveforms" / "Background_Noise.wav").write_bytes(b"RIFF")
+    (tmp_path / "f" / "src" / "waveforms" / "tone.wav").write_bytes(b"RIFF")
+    assert lint.background_noise_problems(own_file) == [
+        "the workflow gives BackgroundNoise a FileName (the noise is rig.yml's speakerArray.backgroundNoise)",
+        "src/waveforms/Background_Noise.wav is a noise of the task's own (BackgroundNoise plays rig.yml's speakerArray.backgroundNoise)"]
     assert lint.background_noise_problems(workflow(tmp_path / "b", rig + task_files())) == ["the workflow includes BackgroundNoise 0 times, not once"]
     assert lint.background_noise_problems(workflow(tmp_path / "c", rig + noise + task_files())) == [
         "BackgroundNoise comes before LaunchTaskConfig is declared", "BackgroundNoise comes before TaskConfig is declared"]
@@ -471,6 +479,9 @@ def test_the_background_noise_plays_from_ready_at_the_launch_s_level_and_go_refu
     at_go = text.replace("<Name>LaunchTaskConfig</Name>", "<Name>TaskConfig</Name>")
     assert lint.background_noise_include_problems(lint.ET.fromstring(at_go.encode("utf-8"))) == [
         "the noise sent does not wait for LaunchTaskConfig", "Go does not stop on a backgroundNoise changed after launch"]
+    a_file = text.replace('<Combinator xsi:type="aud:ReadBackgroundNoise" />', '<Combinator xsi:type="aud:ReadWave" />')
+    assert lint.background_noise_include_problems(lint.ET.fromstring(a_file.encode("utf-8"))) == [
+        "the noise is not rig.yml's backgroundNoise (ReadBackgroundNoise)"]
 
 
 RECORDS = include(lint.EXPERIMENT_RECORDS, "<ConfigRoot>C:\\Root</ConfigRoot><IngestScript>task</IngestScript><ExpectedFiles>auto;harp;Settings/Settings_Rig_;Settings/Settings_Experiment_;BonsaiData/BonsaiData_Async_</ExpectedFiles>")

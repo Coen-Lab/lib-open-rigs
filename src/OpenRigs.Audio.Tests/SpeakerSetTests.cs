@@ -60,6 +60,57 @@ namespace OpenRigs.Audio.Tests
             Assert.AreEqual(-90.0, set.Speakers[0].AzimuthDeg);
         }
 
+        // A mono 32-bit float WAV of the given samples at the given rate.
+        static void WriteFloatWave(string path, int rate, params float[] samples)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            using (var writer = new BinaryWriter(File.Create(path)))
+            {
+                writer.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                writer.Write(36 + 4 * samples.Length);
+                writer.Write(System.Text.Encoding.ASCII.GetBytes("WAVEfmt "));
+                writer.Write(16);
+                writer.Write((short)3);
+                writer.Write((short)1);
+                writer.Write(rate);
+                writer.Write(rate * 4);
+                writer.Write((short)4);
+                writer.Write((short)32);
+                writer.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                writer.Write(4 * samples.Length);
+                foreach (var sample in samples) writer.Write(sample);
+            }
+        }
+
+        // The lab's one background noise is rig.yml's speakerArray.backgroundNoise (16 Nov 2026), relative to rig.yml's
+        // folder (../shared/sounds/background_noise.wav on a rig), read as stored; refused, naming the file, when rig.yml
+        // names none, it is missing or it is at another rate.
+        [TestMethod]
+        public void TheBackgroundNoiseIsTheFileRigYmlNamesAndIsRefusedNamingIt()
+        {
+            var shared = "shared-" + Guid.NewGuid().ToString("N");
+            var rig = Rig(extra: "  syncChannel: 31\n  penaltySoundChannel: 2\n  backgroundNoise: ../" + shared + "/sounds/background_noise.wav\n");
+            var noise = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(rig), "..", shared, "sounds", "background_noise.wav"));
+            var read = new ReadBackgroundNoise();
+
+            var set = SpeakerSet.Load(rig, "TEST-RIG");
+            Assert.AreEqual(noise, set.BackgroundNoiseFile);
+            var missing = Assert.ThrowsException<InvalidOperationException>(() => BackgroundNoiseSound.Read(set));
+            StringAssert.Contains(missing.Message, "is missing: " + noise);
+
+            WriteFloatWave(noise, 48000, 0.25f, -0.5f, 0.125f);
+            CollectionAssert.AreEqual(new[] { 0.25f, -0.5f, 0.125f }, Values(System.Reactive.Linq.Observable.Wait(read.Process(System.Reactive.Linq.Observable.Return(set))), 0));
+
+            WriteFloatWave(noise, 44100, 0.25f);
+            var rate = Assert.ThrowsException<InvalidDataException>(() => BackgroundNoiseSound.Read(set));
+            StringAssert.Contains(rate.Message, "is 44100 Hz, but the audio device runs at 48000 Hz");
+            StringAssert.Contains(rate.Message, noise);
+
+            var none = Assert.ThrowsException<InvalidOperationException>(() => BackgroundNoiseSound.Read(SpeakerSet.Load(Rig(), "TEST-RIG")));
+            StringAssert.Contains(none.Message, "rig.yml's speakerArray has no backgroundNoise");
+            Directory.Delete(Path.GetDirectoryName(Path.GetDirectoryName(noise)), true);
+        }
+
         [TestMethod]
         public void ASpeakerOnTheSyncChannelIsRefusedAtLoad()
         {

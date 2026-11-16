@@ -79,6 +79,19 @@ namespace OpenRigs.Audio
         }
     }
 
+    /// <summary>Reads the lab's background noise, rig.yml's speakerArray.backgroundNoise (<see cref="BackgroundNoiseSound.Read"/>).</summary>
+    [Combinator]
+    [Description("Reads the lab's background noise, the same file in every task: rig.yml's speakerArray.backgroundNoise (relative to rig.yml's folder: ../shared/sounds/background_noise.wav, the server's copy, kept on the rig by its upkeep), a mono WAV read whole as one row of floats. Stops the workflow, naming the file, when rig.yml names none, the file is missing, or it is not at the audio device's rate. Input: the speakers.")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class ReadBackgroundNoise
+    {
+        /// <summary>The noise for each input.</summary>
+        public IObservable<Mat> Process(IObservable<SpeakerSet> source)
+        {
+            return source.Select(BackgroundNoiseSound.Read);
+        }
+    }
+
     /// <summary>Stops the workflow on a sound sent before the mixer has started, which the mixer would not play.</summary>
     [Combinator]
     [Description("Passes on each sound once the mixer has started, and stops the workflow, naming Sound and the mixer's boot delay, on a sound sent before: the mixer would not play it while the trial log records it as sent. Input: (the sounds, the mixer). SpeakerMixer runs StimulusSounds and PenaltySounds through it.")]
