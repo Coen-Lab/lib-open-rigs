@@ -13,27 +13,27 @@ namespace OpenRigs.Devices
     public class SpoutPositions
     {
         /// <summary>The axes in file and rig.yml order.</summary>
-        public static readonly string[] AxisNames = { "baseTransverse", "leftRadial", "rightRadial", "leftElevation", "rightElevation" };
+        public static readonly string[] AxisNames = { "baseTransverse", "radialLeft", "radialRight", "elevationLeft", "elevationRight" };
 
         /// <summary>Gets or sets the base's transverse axis (StepperDriver-A motor 0).</summary>
         public int BaseTransverse { get; set; }
 
         /// <summary>Gets or sets the left spout's radial axis (StepperDriver-A motor 1).</summary>
-        public int LeftRadial { get; set; }
+        public int RadialLeft { get; set; }
 
         /// <summary>Gets or sets the right spout's radial axis (StepperDriver-A motor 2).</summary>
-        public int RightRadial { get; set; }
+        public int RadialRight { get; set; }
 
         /// <summary>Gets or sets the left spout's elevation axis (StepperDriver-B motor 0).</summary>
-        public int LeftElevation { get; set; }
+        public int ElevationLeft { get; set; }
 
         /// <summary>Gets or sets the right spout's elevation axis (StepperDriver-B motor 1).</summary>
-        public int RightElevation { get; set; }
+        public int ElevationRight { get; set; }
 
         /// <summary>The axes in <see cref="AxisNames"/> order.</summary>
         public int[] ToArray()
         {
-            return new[] { BaseTransverse, LeftRadial, RightRadial, LeftElevation, RightElevation };
+            return new[] { BaseTransverse, RadialLeft, RadialRight, ElevationLeft, ElevationRight };
         }
 
         /// <summary>Positions from values in <see cref="AxisNames"/> order.</summary>
@@ -42,10 +42,10 @@ namespace OpenRigs.Devices
             return new SpoutPositions
             {
                 BaseTransverse = values[0],
-                LeftRadial = values[1],
-                RightRadial = values[2],
-                LeftElevation = values[3],
-                RightElevation = values[4]
+                RadialLeft = values[1],
+                RadialRight = values[2],
+                ElevationLeft = values[3],
+                ElevationRight = values[4]
             };
         }
 
@@ -55,10 +55,10 @@ namespace OpenRigs.Devices
             return new SpoutPositions
             {
                 BaseTransverse = BaseTransverse,
-                LeftRadial = left ? LeftRadial - steps : LeftRadial,
-                RightRadial = right ? RightRadial - steps : RightRadial,
-                LeftElevation = left ? LeftElevation - steps : LeftElevation,
-                RightElevation = right ? RightElevation - steps : RightElevation
+                RadialLeft = left ? RadialLeft - steps : RadialLeft,
+                RadialRight = right ? RadialRight - steps : RadialRight,
+                ElevationLeft = left ? ElevationLeft - steps : ElevationLeft,
+                ElevationRight = right ? ElevationRight - steps : ElevationRight
             };
         }
 

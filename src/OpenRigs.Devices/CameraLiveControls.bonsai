@@ -7,7 +7,7 @@
                  xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Optional live controls for one SpinnakerCamera piece, Camera, included once per camera: two experiment parameters the piece declares itself for its camera (DeclareDeviceControls, the piece its camera), Camera.ExposureUs (us) and Camera.GainDb (dB), such as Camera-Overhead.ExposureUs, so the workflow declares neither, each taken straight to the open camera when the controller sets it (OnDeviceParameterSet, CameraLiveSetting), so the preview shows the change while ready; Go fixes them. One second after Start, once the controller's server is up, shows rig.yml's exposureTime and gain as the parameters' values (DeviceParameterDefault) and limits a set exposure to the camera's trigger period less 1000 us (DeviceParameterMaximum), so a longer one is refused at the controller instead of stopping the workflow. Board is the camera's board, for its trigger.</Description>
+  <Description>Optional live controls for one SpinnakerCamera piece, Camera, included once per camera: two experiment parameters the piece declares itself for its camera (DeclareDeviceControls, the piece its camera), Camera.ExposureUs (us) and Camera.GainDb (dB), such as Camera-Overhead.ExposureUs, so the workflow declares neither, each taken straight to the open camera when the controller sets it (OnDeviceParameterSet, CameraLiveSetting), so the preview shows the change while ready; Go fixes them. One second after Start, once the controller's server is up, shows rig.yml's exposureUs and gainDb as the parameters' values (DeviceParameterDefault) and limits a set exposure to the camera's trigger period less 1000 us (DeviceParameterMaximum), so a longer one is refused at the controller instead of stopping the workflow. Board is the camera's board, for its trigger.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -72,7 +72,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="MemberSelector">
-        <Selector>Camera.Settings.ExposureTime</Selector>
+        <Selector>Camera.Settings.ExposureUs</Selector>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orcl:DeviceParameterDefault">
@@ -81,7 +81,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="MemberSelector">
-        <Selector>Camera.Settings.Gain</Selector>
+        <Selector>Camera.Settings.GainDb</Selector>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orcl:DeviceParameterDefault">

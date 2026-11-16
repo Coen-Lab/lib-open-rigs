@@ -16,7 +16,7 @@ namespace OpenRigs.Devices.Tests
         static CameraOnTrigger Find(string board, double exposure = 19000)
         {
             var rig = LabRigTests.Deserialize("behaviorBoard:\n  main:\n    portName: COM1\n" + board +
-                "camera:\n  face: { serialNumber: '1', exposureTime: " + exposure + ", gain: 0, binning: 1 }\n");
+                "camera:\n  face: { serialNumber: '1', exposureUs: " + exposure + ", gainDb: 0, binning: 1 }\n");
             var camera = RigDevice.Find(rig.Camera, "Camera-Face");
             var entry = RigDevice.Find(rig.BehaviorBoard, "BehaviorBoard-Main");
             return CameraTrigger.Find(new NamedDevice<Rigs.SpinnakerCamera>("Camera-Face", camera), new NamedDevice<Rigs.BehaviorBoard>("BehaviorBoard-Main", entry), 1000);
@@ -47,7 +47,7 @@ namespace OpenRigs.Devices.Tests
         public void RefusesAnExposureTooLongForItsTrigger()
         {
             var ex = Assert.ThrowsException<InvalidOperationException>(() => Find("    wiring:\n      DO0: { device: CameraTrigger, targets: [Camera-Face] }\n" + Trigger, 19500));
-            StringAssert.Contains(ex.Message, "Camera-Face's ExposureTime is 19500 us, longer than 19000");
+            StringAssert.Contains(ex.Message, "Camera-Face's exposureUs is 19500 us, longer than 19000");
         }
 
         [TestMethod]

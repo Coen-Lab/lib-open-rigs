@@ -28,8 +28,11 @@ from open_rigs.devices.behavior_board import PulseOutputs
 REWARD_VALVE_DEVICE = "RewardValve"
 ZAPIT_TRIGGER = "ZapitTrigger"
 CAMERA_TRIGGER = "CameraTrigger"
+PHOTODIODE = "Photodiode"
 # The Behavior board lines that can pulse, so can carry a reward valve (OpenRigs.Devices PulseLines).
 PULSE_LINES = ("DO0", "DO1", "DO2", "DO3", "DOPort0", "DOPort1", "DOPort2")
+# The Behavior board lines that read a digital input, so can carry a photodiode.
+INPUT_LINES = ("DIPort0", "DIPort1", "DIPort2", "DI3", "DIO0", "DIO1", "DIO2")
 WHERE = "(lab rig model, open_rigs.rigs.lab_rig)"
 PLACEHOLDER = "CHANGE-ME"  # rig-template.yml's mark on each value a rig fills in
 # The rig.yml kinds a preflight lists, in its order (OpenRigs.Devices PreflightDevices.AllKinds, held equal by a test): each
@@ -47,7 +50,7 @@ class LabRig(Rig):
 
     behavior_board: Dict[str, BehaviorBoard] = Field(
         default_factory=dict,
-        description="Harp Behavior boards by name, such as main (BehaviorBoard-Main): valves, camera trigger, Zapit trigger and running wheel.",
+        description="Harp Behavior boards by name, such as main (BehaviorBoard-Main): valves, camera trigger, Zapit trigger, photodiode and running wheel.",
     )
     timestamp_generator_gen3: Dict[str, HarpTimestampGeneratorGen3] = Field(
         default_factory=dict,
@@ -109,6 +112,13 @@ class LabRig(Rig):
         workflow_lint.fixed_width_pulses_on_reward_valves)."""
         return {line for _, line in self.reward_valves().values()}
 
+    def photodiode_lines(self) -> dict[str, str]:
+        """Each board's (BehaviorBoard-Main) line wiring names as its Photodiode (DIPort0)."""
+        return {"BehaviorBoard-" + _title(name): alias
+                for name, board in self.behavior_board.items() if board.wiring
+                for field, alias in _ALIASES.items()
+                if (line := getattr(board.wiring, field)) is not None and line.device == PHOTODIODE}
+
     @model_validator(mode="after")
     def _wired_lines(self):
         zapit_boards, valve_names = [], Counter()
@@ -129,6 +139,13 @@ class LabRig(Rig):
                     f"Plug it into one of {', '.join(PULSE_LINES)} and wire it there."
                 )
             valve_names.update(line.name for line in valves.values())
+            photodiodes = sorted(alias for alias, line in lines.items() if line.device == PHOTODIODE)
+            unread = [alias for alias in photodiodes if alias not in INPUT_LINES]
+            if unread or len(photodiodes) > 1:
+                raise ValueError(
+                    f"behaviorBoard {name}: wiring has a Photodiode on {', '.join(photodiodes)}, and a board reads one, on a digital input {WHERE}. "
+                    f"Keep the input it is plugged into, one of {', '.join(INPUT_LINES)}, as in `DIPort0: {{ device: Photodiode }}`."
+                )
             zapit = [alias for alias, line in lines.items() if line.device == ZAPIT_TRIGGER]
             if len(zapit) > 1:
                 raise ValueError(

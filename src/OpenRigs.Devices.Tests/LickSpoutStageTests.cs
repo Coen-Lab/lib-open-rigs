@@ -25,7 +25,7 @@ namespace OpenRigs.Devices.Tests
         {
             var path = Path.Combine(folder, "rig.yml");
             File.WriteAllText(path,
-                "rootPath: x\nlickSpoutDefaultPosition:\n  baseTransverse: 10\n  leftRadial: 2000\n  rightRadial: 2100\n  leftElevation: 3000\n  rightElevation: 3100\n");
+                "rootPath: x\nlickSpoutDefaultPosition:\n  baseTransverse: 10\n  radialLeft: 2000\n  radialRight: 2100\n  elevationLeft: 3000\n  elevationRight: 3100\n");
             return path;
         }
 
@@ -115,7 +115,7 @@ namespace OpenRigs.Devices.Tests
             var rig = Path.Combine(folder, "rig.yml");
             File.WriteAllText(rig, "lickSpoutDefaultPosition:\n  baseTransverse: 1\n");
             var ex = Assert.ThrowsException<InvalidDataException>(() => LickSpoutStage.Start(rig, Path.Combine(folder, "none.csv")));
-            StringAssert.Contains(ex.Message, "lickSpoutDefaultPosition.leftRadial must be a whole number");
+            StringAssert.Contains(ex.Message, "lickSpoutDefaultPosition.radialLeft must be a whole number");
         }
 
         [TestMethod]

@@ -31,13 +31,13 @@ namespace OpenRigs.Devices
         RightUp,
         /// <summary>Right elevation down one step size.</summary>
         RightDown,
-        /// <summary>Left radial forward one step size.</summary>
+        /// <summary>Left radial in (towards the mouse) one step size.</summary>
         LeftFront,
-        /// <summary>Left radial back one step size.</summary>
+        /// <summary>Left radial out one step size.</summary>
         LeftBack,
-        /// <summary>Right radial forward one step size.</summary>
+        /// <summary>Right radial in (towards the mouse) one step size.</summary>
         RightFront,
-        /// <summary>Right radial back one step size.</summary>
+        /// <summary>Right radial out one step size.</summary>
         RightBack,
         /// <summary>Base transverse one step size one way.</summary>
         BaseLeft,
@@ -62,7 +62,7 @@ namespace OpenRigs.Devices
         public string RigFile { get; set; }
 
         /// <summary>Gets or sets this mouse's positions file.</summary>
-        [Description("This mouse's positions file: one line, baseTransverse,leftRadial,rightRadial,leftElevation,rightElevation.")]
+        [Description("This mouse's positions file: one line, baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight.")]
         public string PositionsFile { get; set; }
 
         /// <summary>Gets or sets the steps each nudge moves, read at each nudge.</summary>

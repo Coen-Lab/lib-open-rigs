@@ -84,7 +84,7 @@ def test_stepper_wiring_by_the_driver_s_names():
     entry = {"portName": "COM3", "usbSerial": "AQ03WRBF", "wiring": {
         "Motor0": {"device": "BaseTransverse"},
         "Motor1": {"device": "Radial", "side": "left"},
-        "Input0": {"device": "HomeSwitch", "note": "base transverse"}}}
+        "Input0": {"device": "BaseTransverseHome"}}}
     driver = HarpStepperDriver.model_validate(entry)
     assert driver.wiring.motor1.side.value == "left" and driver.wiring.motor2 is None
     assert driver.model_dump(by_alias=True, exclude_none=True, mode="json")["wiring"] == entry["wiring"]

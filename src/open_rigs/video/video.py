@@ -14,11 +14,9 @@ class ArducamOV9180(DiscriminatorTypeMixin, BaseSchema):
 
 class SpinnakerCamera(DiscriminatorTypeMixin, BaseSchema):
     # No trigger frequency: a camera runs at the rate of the board trigger its wiring line names it on.
-    exposure_time: float = Field(
-        default=15000, ge=0, description="The exposure time for the camera (in microseconds)."
-    )
+    exposure_us: float = Field(default=15000, ge=0, description="The exposure time, in microseconds.")
     serial_number: str | None = Field(default="00000", description="The serial number of the camera.")
-    gain: float = Field(default=1, ge=0, description="The camera gain.")
+    gain_db: float = Field(default=1, ge=0, description="The sensor gain, in dB.")
     binning: int = Field(default=1, ge=1, description="The binning setting for the camera.")
 
 

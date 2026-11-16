@@ -34,8 +34,10 @@ behaviorBoard:
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
         DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
     # What each line drives (lab rig model, open_rigs.rigs.lab_rig): each RewardValve by its name
-    # (name: left is the piece RewardValve-Left) and one ZapitTrigger. The workflow reads the reward and Zapit lines from here.
+    # (name: left is the piece RewardValve-Left), one ZapitTrigger and the Photodiode on the screen's sync square.
+    # The workflow reads the reward and Zapit lines from here.
     wiring:
+      DIPort0: { device: Photodiode }
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
       DO1: { device: RewardValve, name: left }
       DO2: { device: RewardValve, name: right }
@@ -81,20 +83,20 @@ licketySplit:
 camera:
   face:
     serialNumber: "00000000"
-    exposureTime: 19000    # microseconds
-    gain: 0
+    exposureUs: 19000
+    gainDb: 0
     binning: 1
     pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   pupil:
     serialNumber: "00000000"
-    exposureTime: 19000    # microseconds
-    gain: 0
+    exposureUs: 19000
+    gainDb: 0
     binning: 1
     pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   body:
     serialNumber: "00000000"
-    exposureTime: 19000    # microseconds
-    gain: 0
+    exposureUs: 19000
+    gainDb: 0
     binning: 1
     pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
 
@@ -152,7 +154,7 @@ zapit:
 # The stage's in position, in steps, for a mouse with no positions file of its own
 lickSpoutDefaultPosition:
   baseTransverse: 0
-  leftRadial: 0
-  rightRadial: 0
-  leftElevation: 0
-  rightElevation: 0
+  radialLeft: 0
+  radialRight: 0
+  elevationLeft: 0
+  elevationRight: 0

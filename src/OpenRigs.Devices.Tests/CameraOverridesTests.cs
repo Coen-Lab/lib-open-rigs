@@ -10,7 +10,7 @@ namespace OpenRigs.Devices.Tests
     {
         static NamedDevice<SpinnakerCamera> Camera()
         {
-            return new NamedDevice<SpinnakerCamera>("Camera-Overhead", new SpinnakerCamera { SerialNumber = "1", Binning = 2, ExposureTime = 19000, PixelFormat = "Mono8" });
+            return new NamedDevice<SpinnakerCamera>("Camera-Overhead", new SpinnakerCamera { SerialNumber = "1", Binning = 2, ExposureUs = 19000, PixelFormat = "Mono8" });
         }
 
         [TestMethod]

@@ -105,13 +105,13 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Harp Behavior boards by name, such as main (BehaviorBoard-Main): valves, camera trigger, Zapit trigger and running wheel.
+        /// Harp Behavior boards by name, such as main (BehaviorBoard-Main): valves, camera trigger, Zapit trigger, photodiode and running wheel.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("behaviorBoard")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="behaviorBoard")]
         [System.ComponentModel.DescriptionAttribute("Harp Behavior boards by name, such as main (BehaviorBoard-Main): valves, camera t" +
-            "rigger, Zapit trigger and running wheel.")]
+            "rigger, Zapit trigger, photodiode and running wheel.")]
         public System.Collections.Generic.Dictionary<string, BehaviorBoard> BehaviorBoard
         {
             get
@@ -3192,11 +3192,11 @@ namespace OpenRigs.Devices.Rigs
     public partial class SpinnakerCamera
     {
     
-        private double _exposureTime;
+        private double _exposureUs;
     
         private string _serialNumber;
     
-        private double _gain;
+        private double _gainDb;
     
         private int _binning;
     
@@ -3208,18 +3208,18 @@ namespace OpenRigs.Devices.Rigs
     
         public SpinnakerCamera()
         {
-            _exposureTime = 15000D;
+            _exposureUs = 15000D;
             _serialNumber = "00000";
-            _gain = 1D;
+            _gainDb = 1D;
             _binning = 1;
             _discriminatorType = "SpinnakerCamera";
         }
     
         protected SpinnakerCamera(SpinnakerCamera other)
         {
-            _exposureTime = other._exposureTime;
+            _exposureUs = other._exposureUs;
             _serialNumber = other._serialNumber;
-            _gain = other._gain;
+            _gainDb = other._gainDb;
             _binning = other._binning;
             _discriminatorType = other._discriminatorType;
             _liveView = other._liveView;
@@ -3227,20 +3227,20 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The exposure time for the camera (in microseconds).
+        /// The exposure time, in microseconds.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("exposureTime")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="exposureTime")]
-        [System.ComponentModel.DescriptionAttribute("The exposure time for the camera (in microseconds).")]
-        public double ExposureTime
+        [Newtonsoft.Json.JsonPropertyAttribute("exposureUs")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="exposureUs")]
+        [System.ComponentModel.DescriptionAttribute("The exposure time, in microseconds.")]
+        public double ExposureUs
         {
             get
             {
-                return _exposureTime;
+                return _exposureUs;
             }
             set
             {
-                _exposureTime = value;
+                _exposureUs = value;
             }
         }
     
@@ -3263,20 +3263,20 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The camera gain.
+        /// The sensor gain, in dB.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("gain")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="gain")]
-        [System.ComponentModel.DescriptionAttribute("The camera gain.")]
-        public double Gain
+        [Newtonsoft.Json.JsonPropertyAttribute("gainDb")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="gainDb")]
+        [System.ComponentModel.DescriptionAttribute("The sensor gain, in dB.")]
+        public double GainDb
         {
             get
             {
-                return _gain;
+                return _gainDb;
             }
             set
             {
-                _gain = value;
+                _gainDb = value;
             }
         }
     
@@ -3364,9 +3364,9 @@ namespace OpenRigs.Devices.Rigs
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
-            stringBuilder.Append("ExposureTime = " + _exposureTime + ", ");
+            stringBuilder.Append("ExposureUs = " + _exposureUs + ", ");
             stringBuilder.Append("SerialNumber = " + _serialNumber + ", ");
-            stringBuilder.Append("Gain = " + _gain + ", ");
+            stringBuilder.Append("GainDb = " + _gainDb + ", ");
             stringBuilder.Append("Binning = " + _binning + ", ");
             stringBuilder.Append("DiscriminatorType = " + _discriminatorType + ", ");
             stringBuilder.Append("LiveView = " + _liveView + ", ");
@@ -3400,15 +3400,15 @@ namespace OpenRigs.Devices.Rigs
     public partial class StepperPositions
     {
     
-        private int _leftElevation;
-    
-        private int _rightElevation;
-    
-        private int _rightRadial;
-    
-        private int _leftRadial;
-    
         private int _baseTransverse;
+    
+        private int _radialLeft;
+    
+        private int _radialRight;
+    
+        private int _elevationLeft;
+    
+        private int _elevationRight;
     
         public StepperPositions()
         {
@@ -3416,87 +3416,11 @@ namespace OpenRigs.Devices.Rigs
     
         protected StepperPositions(StepperPositions other)
         {
-            _leftElevation = other._leftElevation;
-            _rightElevation = other._rightElevation;
-            _rightRadial = other._rightRadial;
-            _leftRadial = other._leftRadial;
             _baseTransverse = other._baseTransverse;
-        }
-    
-        /// <summary>
-        /// Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriver b, motor 0)
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("leftElevation", Required=Newtonsoft.Json.Required.Always)]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="leftElevation")]
-        [System.ComponentModel.DescriptionAttribute("Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriv" +
-            "er b, motor 0)")]
-        public int LeftElevation
-        {
-            get
-            {
-                return _leftElevation;
-            }
-            set
-            {
-                _leftElevation = value;
-            }
-        }
-    
-        /// <summary>
-        /// Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDriver b, motor 1)
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("rightElevation", Required=Newtonsoft.Json.Required.Always)]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="rightElevation")]
-        [System.ComponentModel.DescriptionAttribute("Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDri" +
-            "ver b, motor 1)")]
-        public int RightElevation
-        {
-            get
-            {
-                return _rightElevation;
-            }
-            set
-            {
-                _rightElevation = value;
-            }
-        }
-    
-        /// <summary>
-        /// Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (StepperDriver a, motor 2)
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("rightRadial", Required=Newtonsoft.Json.Required.Always)]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="rightRadial")]
-        [System.ComponentModel.DescriptionAttribute("Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (Step" +
-            "perDriver a, motor 2)")]
-        public int RightRadial
-        {
-            get
-            {
-                return _rightRadial;
-            }
-            set
-            {
-                _rightRadial = value;
-            }
-        }
-    
-        /// <summary>
-        /// Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (StepperDriver a, motor 1)
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("leftRadial", Required=Newtonsoft.Json.Required.Always)]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="leftRadial")]
-        [System.ComponentModel.DescriptionAttribute("Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (Stepp" +
-            "erDriver a, motor 1)")]
-        public int LeftRadial
-        {
-            get
-            {
-                return _leftRadial;
-            }
-            set
-            {
-                _leftRadial = value;
-            }
+            _radialLeft = other._radialLeft;
+            _radialRight = other._radialRight;
+            _elevationLeft = other._elevationLeft;
+            _elevationRight = other._elevationRight;
         }
     
         /// <summary>
@@ -3518,6 +3442,82 @@ namespace OpenRigs.Devices.Rigs
             }
         }
     
+        /// <summary>
+        /// Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (StepperDriver a, motor 1)
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("radialLeft", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="radialLeft")]
+        [System.ComponentModel.DescriptionAttribute("Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (Stepp" +
+            "erDriver a, motor 1)")]
+        public int RadialLeft
+        {
+            get
+            {
+                return _radialLeft;
+            }
+            set
+            {
+                _radialLeft = value;
+            }
+        }
+    
+        /// <summary>
+        /// Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (StepperDriver a, motor 2)
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("radialRight", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="radialRight")]
+        [System.ComponentModel.DescriptionAttribute("Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (Step" +
+            "perDriver a, motor 2)")]
+        public int RadialRight
+        {
+            get
+            {
+                return _radialRight;
+            }
+            set
+            {
+                _radialRight = value;
+            }
+        }
+    
+        /// <summary>
+        /// Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriver b, motor 0)
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("elevationLeft", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="elevationLeft")]
+        [System.ComponentModel.DescriptionAttribute("Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriv" +
+            "er b, motor 0)")]
+        public int ElevationLeft
+        {
+            get
+            {
+                return _elevationLeft;
+            }
+            set
+            {
+                _elevationLeft = value;
+            }
+        }
+    
+        /// <summary>
+        /// Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDriver b, motor 1)
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("elevationRight", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="elevationRight")]
+        [System.ComponentModel.DescriptionAttribute("Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDri" +
+            "ver b, motor 1)")]
+        public int ElevationRight
+        {
+            get
+            {
+                return _elevationRight;
+            }
+            set
+            {
+                _elevationRight = value;
+            }
+        }
+    
         public System.IObservable<StepperPositions> Generate()
         {
             return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new StepperPositions(this)));
@@ -3530,11 +3530,11 @@ namespace OpenRigs.Devices.Rigs
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
-            stringBuilder.Append("LeftElevation = " + _leftElevation + ", ");
-            stringBuilder.Append("RightElevation = " + _rightElevation + ", ");
-            stringBuilder.Append("RightRadial = " + _rightRadial + ", ");
-            stringBuilder.Append("LeftRadial = " + _leftRadial + ", ");
-            stringBuilder.Append("BaseTransverse = " + _baseTransverse);
+            stringBuilder.Append("BaseTransverse = " + _baseTransverse + ", ");
+            stringBuilder.Append("RadialLeft = " + _radialLeft + ", ");
+            stringBuilder.Append("RadialRight = " + _radialRight + ", ");
+            stringBuilder.Append("ElevationLeft = " + _elevationLeft + ", ");
+            stringBuilder.Append("ElevationRight = " + _elevationRight);
             return true;
         }
     

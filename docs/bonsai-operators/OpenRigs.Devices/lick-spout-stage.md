@@ -10,10 +10,10 @@ The lick spout stage positions a pair of lick spouts in front of the animal on f
 stepperDriver:
   a: { portName: COM3, usbSerial: CHANGE-ME }
   b: { portName: COM4, usbSerial: CHANGE-ME }
-lickSpoutDefaultPosition: { baseTransverse: 0, leftRadial: 0, rightRadial: 0, leftElevation: 0, rightElevation: 0 }
+lickSpoutDefaultPosition: { baseTransverse: 0, radialLeft: 0, radialRight: 0, elevationLeft: 0, elevationRight: 0 }
 ```
 
-A mouse's own positions are `calibration\LickSpoutPositions\<SubjectId>.csv` beside `rig.yml`, one line: `baseTransverse,leftRadial,rightRadial,leftElevation,rightElevation`. The operator saves them with `SaveSpoutPositions`; a mouse without a file gets `lickSpoutDefaultPosition`.
+A mouse's own positions are `calibration\LickSpoutPositions\<SubjectId>.csv` beside `rig.yml`, one line: `baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight`. The operator saves them with `SaveSpoutPositions`; a mouse without a file gets `lickSpoutDefaultPosition`.
 
 ---
 

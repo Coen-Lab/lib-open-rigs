@@ -43,7 +43,7 @@ namespace OpenRigs.Devices
     /// trigger rate with no gap in its FrameID, and every frame is paired with the wrong trigger time.
     /// </summary>
     [Combinator]
-    [Description("The Behavior board trigger that drives the camera, from the board's wiring in rig.yml (the CameraTrigger line whose targets name the camera). Input: the camera and the board, as RigDevice gives them. Stops the workflow unless exactly one enabled trigger line names the camera and its ExposureTime plus MarginMicroseconds fits the trigger period.")]
+    [Description("The Behavior board trigger that drives the camera, from the board's wiring in rig.yml (the CameraTrigger line whose targets name the camera). Input: the camera and the board, as RigDevice gives them. Stops the workflow unless exactly one enabled trigger line names the camera and its exposureUs plus MarginMicroseconds fits the trigger period.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class CameraTrigger
     {
@@ -89,12 +89,12 @@ namespace OpenRigs.Devices
                     "{0}'s camera trigger {1} drives {2} (wiring {3}), but its cameraTriggerController.trigger{1}Enabled is false in rig.yml.", board.Name, output, camera.Name, lines[0]));
             }
             var frequency = output == 0 ? trigger.Trigger0Frequency : trigger.Trigger1Frequency;
-            CheckExposure(camera.Name, camera.Settings.ExposureTime, frequency, margin);
+            CheckExposure(camera.Name, camera.Settings.ExposureUs, frequency, margin);
             return new CameraOnTrigger(camera, output, frequency);
         }
 
         /// <summary>Throws, saying the longest exposure allowed, unless exposure + margin fits in one trigger period.</summary>
-        public static void CheckExposure(string camera, double exposureTime, double frequency, double margin)
+        public static void CheckExposure(string camera, double exposureUs, double frequency, double margin)
         {
             if (frequency <= 0)
             {
@@ -102,12 +102,12 @@ namespace OpenRigs.Devices
                     "{0}'s trigger frequency in rig.yml is {1} Hz; it must be above 0.", camera, frequency));
             }
             var limit = 1e6 / frequency - margin;
-            if (exposureTime > limit)
+            if (exposureUs > limit)
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
-                    "{0}'s ExposureTime is {1} us, longer than {2} us, the most that fits its {3} Hz trigger (a period of {4} us, less {5} us " +
-                    "for the camera). The camera would skip triggers and every frame would get the wrong time. Set rig.yml's exposureTime to {2} or less.",
-                    camera, exposureTime, limit, frequency, 1e6 / frequency, margin));
+                    "{0}'s exposureUs is {1} us, longer than {2} us, the most that fits its {3} Hz trigger (a period of {4} us, less {5} us " +
+                    "for the camera). The camera would skip triggers and every frame would get the wrong time. Set rig.yml's exposureUs to {2} or less.",
+                    camera, exposureUs, limit, frequency, 1e6 / frequency, margin));
             }
         }
     }

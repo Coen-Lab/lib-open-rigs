@@ -774,7 +774,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/BehaviorBoard"
           },
-          "description": "Harp Behavior boards by name, such as main (BehaviorBoard-Main): valves, camera trigger, Zapit trigger and running wheel.",
+          "description": "Harp Behavior boards by name, such as main (BehaviorBoard-Main): valves, camera trigger, Zapit trigger, photodiode and running wheel.",
           "title": "BehaviorBoard",
           "type": "object"
         },
@@ -1235,11 +1235,11 @@
     },
     "SpinnakerCamera": {
       "properties": {
-        "exposureTime": {
+        "exposureUs": {
           "default": 15000,
-          "description": "The exposure time for the camera (in microseconds).",
+          "description": "The exposure time, in microseconds.",
           "minimum": 0,
-          "title": "ExposureTime",
+          "title": "ExposureUs",
           "type": "number"
         },
         "serialNumber": {
@@ -1251,11 +1251,11 @@
             "null"
           ]
         },
-        "gain": {
+        "gainDb": {
           "default": 1,
-          "description": "The camera gain.",
+          "description": "The sensor gain, in dB.",
           "minimum": 0,
-          "title": "Gain",
+          "title": "GainDb",
           "type": "number"
         },
         "binning": {
@@ -1305,38 +1305,38 @@
     "StepperPositions": {
       "description": "Absolute target position for the 5-axis spout rig, expressed in task-relative axes.",
       "properties": {
-        "leftElevation": {
-          "description": "Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriver b, motor 0)",
-          "title": "LeftElevation",
-          "type": "integer"
-        },
-        "rightElevation": {
-          "description": "Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDriver b, motor 1)",
-          "title": "RightElevation",
-          "type": "integer"
-        },
-        "rightRadial": {
-          "description": "Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (StepperDriver a, motor 2)",
-          "title": "RightRadial",
-          "type": "integer"
-        },
-        "leftRadial": {
-          "description": "Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (StepperDriver a, motor 1)",
-          "title": "LeftRadial",
-          "type": "integer"
-        },
         "baseTransverse": {
           "description": "Base transverse axis absolute position (steps). Maps to motor 1 (StepperDriver a, motor 0)",
           "title": "BaseTransverse",
           "type": "integer"
+        },
+        "radialLeft": {
+          "description": "Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (StepperDriver a, motor 1)",
+          "title": "RadialLeft",
+          "type": "integer"
+        },
+        "radialRight": {
+          "description": "Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (StepperDriver a, motor 2)",
+          "title": "RadialRight",
+          "type": "integer"
+        },
+        "elevationLeft": {
+          "description": "Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriver b, motor 0)",
+          "title": "ElevationLeft",
+          "type": "integer"
+        },
+        "elevationRight": {
+          "description": "Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDriver b, motor 1)",
+          "title": "ElevationRight",
+          "type": "integer"
         }
       },
       "required": [
-        "leftElevation",
-        "rightElevation",
-        "rightRadial",
-        "leftRadial",
-        "baseTransverse"
+        "baseTransverse",
+        "radialLeft",
+        "radialRight",
+        "elevationLeft",
+        "elevationRight"
       ],
       "title": "StepperPositions",
       "type": "object"

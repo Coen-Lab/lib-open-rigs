@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from open_rigs.rigs.lab_rig import LabRig
 
 HARP = {"portName": "COM1", "usbSerial": "X"}
-STAGE = {"baseTransverse": 0, "leftRadial": 0, "rightRadial": 0, "leftElevation": 0, "rightElevation": 0}
+STAGE = {"baseTransverse": 0, "radialLeft": 0, "radialRight": 0, "elevationLeft": 0, "elevationRight": 0}
 CAMERA_LINE = {"DO0": {"device": "CameraTrigger", "targets": ["Camera-Face", "Camera-Pupil", "Camera-Body"]}}
 
 RIG = {
@@ -115,6 +115,7 @@ def test_old_keys_gone():
         (lambda rig: rig["behaviorBoard"]["main"]["wiring"]["DO1"].update(valve="left"),
          "behaviorBoard.main.wiring.DO1.valve"),
         (lambda rig: rig["camera"]["face"].update(exposure=1), "camera.face.exposure"),
+        (lambda rig: rig["camera"]["face"].update(exposureTime=1, gain=0), "camera.face.exposureTime, camera.face.gain"),
     ],
 )
 def test_unknown_keys_refused(edit, keys):
@@ -184,6 +185,26 @@ def test_reward_valves_on_two_boards():
     second["wiring"]["DO2"]["name"] = "left"
     with pytest.raises(ValidationError, match="rig.yml's wiring has more than one RewardValve named left, and each valve's name is its own"):
         LabRig.model_validate(rig)
+
+
+def test_camera_exposure_and_gain_carry_their_units():
+    rig = copy.deepcopy(RIG)
+    rig["camera"]["face"].update(exposureUs=19000, gainDb=0)
+    face = LabRig.model_validate(rig).camera["face"]
+    assert (face.exposure_us, face.gain_db) == (19000, 0)
+
+
+def test_the_photodiode_is_a_board_s_digital_input():
+    rig = rig_with(DIPort0={"device": "Photodiode"}, DO1={"device": "RewardValve", "name": "left"},
+                   DO2={"device": "RewardValve", "name": "right"}, DO3={"device": "ZapitTrigger"})
+    assert LabRig.model_validate(rig).photodiode_lines() == {"BehaviorBoard-Main": "DIPort0"}
+    assert LabRig.model_validate(RIG).photodiode_lines() == {}
+    for line in ("DO2", "DIPort1"):
+        wrong = copy.deepcopy(rig)
+        wrong["behaviorBoard"]["main"]["wiring"][line] = {"device": "Photodiode"}
+        with pytest.raises(ValidationError, match="wiring has a Photodiode on") as refused:
+            LabRig.model_validate(wrong)
+        assert "`DIPort0: { device: Photodiode }`" in str(refused.value)
 
 
 def test_zapit_needs_its_trigger_line():
