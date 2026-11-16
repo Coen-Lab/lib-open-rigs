@@ -1,0 +1,46 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns:ctl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A preflight's check with one tap, BehaviorBoard-Main's stand-in (a timer); the controller's Go never comes. PiecesSubscribeTests sets ConfigRoot.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>CONFIG_ROOT</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Control:ExperimentControl.bonsai">
+        <SubjectId>test</SubjectId>
+        <SessionId>001</SessionId>
+        <ControlEndpoint>@tcp://127.0.0.1:55761</ControlEndpoint>
+        <Parameters />
+        <Commands />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:PreflightChecks.bonsai">
+        <RawFile>preflight-raw.csv</RawFile>
+        <TaskPath>task.yml</TaskPath>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Timer">
+          <rx:DueTime>PT0S</rx:DueTime>
+          <rx:Period>PT0.1S</rx:Period>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightTap">
+          <dev:Device>BehaviorBoard-Main</dev:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

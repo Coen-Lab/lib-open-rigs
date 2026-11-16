@@ -90,9 +90,12 @@ WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDrive
 LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage's C# drives drivers a and b
 # Lab includes read from the package (never from the workflow), found in OpenRigs.Devices.dll by the start of their
 # Description: a rig list holds only pieces, and is expanded in place.
-RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The domes' hardware"}
+RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The domes' hardware", DEVICES + "BBoxHardware.bonsai": "The behaviour boxes' hardware"}
+# A preflight's check, the same for every rig kind: it declares the Confirm command (DeclareControls).
+PREFLIGHT_CHECKS = DEVICES + "PreflightChecks.bonsai"
 SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", MANUAL_REWARDS: "The manual rewards, the same in every task",
-                          CAMERA_LIVE_CONTROLS: "Optional live controls for one SpinnakerCamera piece"}
+                          CAMERA_LIVE_CONTROLS: "Optional live controls for one SpinnakerCamera piece",
+                          PREFLIGHT_CHECKS: "A preflight's check, the same for every rig kind"}
 # lib-open-rigs' own source, when this module runs from it (its tests); a workflow's lint reads its package instead.
 LIB_SRC = Path(__file__).parents[2]
 BLOCK_SUBJECTS = {

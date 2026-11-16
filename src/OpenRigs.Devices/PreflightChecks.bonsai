@@ -1,0 +1,234 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A preflight's check, the same for every rig kind, after the rig list: its rows are rig.yml's devices (RigConfigs: PreflightDevices), so a device rig.yml has and the run does not open still has a row, its error. Each device the run opens is counted from its piece's own data through a PreflightTap the workflow multicasts into DeviceTicks (declared here), and the devices metric gives each one's rate once a second once all are open. At Go: Recording, the task file TaskPath read (countSeconds, questions by rig.yml kind: ReadPreflightTask), each device counted in turn for countSeconds (step metric), then each device of a kind the task asks about asked in turn (prompt metric) until the controller's Confirm (declared here: DeclareControls), a speaker array's test sounds (SpeakerSounds, which the workflow multicasts) given before the person's answer. The rows (device,measure,value,detail) go to RawFile, closed before Finished. Needs RigConfigs, ExperimentGo and ControlEvents from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="FileName" DisplayName="RawFile" Description="Where the raw rows go: device,measure,value,detail." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Path" DisplayName="TaskPath" Description="The rig kind's task file, read at Go: countSeconds and questions by rig.yml kind." />
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="dev:DeviceTick">
+        <rx:Name>DeviceTicks</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:ReplaySubject" TypeArguments="dev:SpeakerSounds">
+        <rx:Name>SpeakerSounds</rx:Name>
+        <rx:BufferSize>1</rx:BufferSize>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:PreflightDevices">
+          <dev:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,speakerArray,projectionCalibration</dev:Kinds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>PreflightDevices</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PreflightDevices</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>DeviceTicks</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:DeviceReports">
+          <dev:NotCounted>speakerArray</dev:NotCounted>
+          <dev:OpenSeconds>5</dev:OpenSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>DeviceReports</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PreflightDevices</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>DeviceReports</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>SpeakerSounds</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:DeviceRates">
+          <dev:NotCounted>speakerArray</dev:NotCounted>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>devices</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportPhase">
+          <orcl:Phase>Recording</orcl:Phase>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:ReadPreflightTask">
+          <dev:Path>UNMAPPED</dev:Path>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnCommand">
+          <orcl:Name>Confirm</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PreflightDevices</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>DeviceReports</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>SpeakerSounds</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:RunCheck">
+          <dev:NotCounted>speakerArray</dev:NotCounted>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>CheckEvents</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>CheckEvents</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Step</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:DistinctUntilChanged" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>step</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>CheckEvents</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Prompt</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:DistinctUntilChanged" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>prompt</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>CheckEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:RowsOf" />
+      </Expression>
+      <Expression xsi:type="orl:CsvWriter">
+        <io:FileName>UNMAPPED</io:FileName>
+        <io:Append>false</io:Append>
+        <io:Overwrite>true</io:Overwrite>
+        <io:Suffix>None</io:Suffix>
+        <io:IncludeHeader>true</io:IncludeHeader>
+        <io:Selector />
+        <orl:AutoFlush>false</orl:AutoFlush>
+        <orl:PublishRows>false</orl:PublishRows>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>CheckEvents</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>Done</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Done</Selector>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Delay">
+          <rx:DueTime>PT1.5S</rx:DueTime>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportPhase">
+          <orcl:Phase>Finished</orcl:Phase>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:DeclareControls">
+          <orcl:Piece>PreflightChecks</orcl:Piece>
+          <orcl:Parameters />
+          <orcl:Commands>
+            <orcl:Command>
+              <orcl:Name>Confirm</orcl:Name>
+              <orcl:Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as SpeakerArray yes.</orcl:Description>
+            </orcl:Command>
+          </orcl:Commands>
+        </Combinator>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="7" To="9" Label="Source1" />
+      <Edge From="8" To="9" Label="Source2" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="11" To="14" Label="Source1" />
+      <Edge From="12" To="14" Label="Source2" />
+      <Edge From="13" To="14" Label="Source3" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="18" To="19" Label="Source1" />
+      <Edge From="1" To="19" Label="Source2" />
+      <Edge From="20" To="21" Label="Source1" />
+      <Edge From="22" To="25" Label="Source1" />
+      <Edge From="23" To="25" Label="Source2" />
+      <Edge From="19" To="25" Label="Source3" />
+      <Edge From="21" To="25" Label="Source4" />
+      <Edge From="24" To="25" Label="Source5" />
+      <Edge From="25" To="26" Label="Source1" />
+      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="28" To="29" Label="Source1" />
+      <Edge From="29" To="30" Label="Source1" />
+      <Edge From="31" To="32" Label="Source1" />
+      <Edge From="32" To="33" Label="Source1" />
+      <Edge From="33" To="34" Label="Source1" />
+      <Edge From="35" To="36" Label="Source1" />
+      <Edge From="36" To="37" Label="Source1" />
+      <Edge From="0" To="37" Label="Source2" />
+      <Edge From="38" To="39" Label="Source1" />
+      <Edge From="39" To="40" Label="Source1" />
+      <Edge From="40" To="41" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

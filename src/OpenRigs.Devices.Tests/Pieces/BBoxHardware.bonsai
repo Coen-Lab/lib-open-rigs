@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns:ctl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The behaviour boxes' rig list, whole. PiecesSubscribeTests sets ConfigRoot; PathPrefix never comes, so nothing is logged.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>CONFIG_ROOT</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:String">
+        <rx:Name>PathPrefix</rx:Name>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BBoxHardware.bonsai" />
+    </Nodes>
+    <Edges>
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

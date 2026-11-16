@@ -462,6 +462,13 @@ def test_the_zapit_trigger_line_is_set_and_cleared_by_the_lab_s_include(tmp_path
     assert 'DisplayName="BoardCommandsSubjectName"' in text and "<Name>ZapitTriggerLine</Name>" in text
 
 
+def test_the_behaviour_box_rig_list_is_expanded_with_the_workflow_s_binning(tmp_path):
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BBoxHardware.bonsai", "<Binning>2</Binning>"))
+    assert lint.hardware_problems(wf) == []
+    assert lint.required_devices(wf) == [("BehaviorBoard-Main", "behaviorBoard"), ("Camera-Overhead", "camera")]
+    assert dict(lint.hardware(wf))[lint.CAMERA]["Binning"] == "2"
+
+
 def test_each_include_read_from_the_package_is_found_by_its_description(tmp_path, monkeypatch):
     for path, signature in lint.SIGNATURES.items():
         package, resource = path.split(":")
