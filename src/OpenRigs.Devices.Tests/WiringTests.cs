@@ -76,6 +76,62 @@ namespace OpenRigs.Devices.Tests
             Assert.ThrowsException<System.Collections.Generic.KeyNotFoundException>(() => WiredOutputs.Find(LabRigTests.Deserialize("rootPath: x\n"), "BehaviorBoard-Main", "RewardValve"));
         }
 
+        static Rigs.LabRig TwoBoards()
+        {
+            return LabRigTests.Deserialize(
+                "behaviorBoard:\n  main:\n    portName: COM1\n    wiring:\n      DO1: { device: RewardValve, name: left }\n      DO3: { device: ZapitTrigger }\n" +
+                "  arena:\n    portName: COM2\n    wiring:\n      DOPort1: { device: RewardValve, name: corner }\n");
+        }
+
+        [DataTestMethod]
+        [DataRow("RewardValve-Left", "BehaviorBoard-Main", DigitalOutputs.DO1)]
+        [DataRow("RewardValve-Corner", "BehaviorBoard-Arena", DigitalOutputs.DOPort1)]
+        [DataRow("RewardValve-corner", "BehaviorBoard-Arena", DigitalOutputs.DOPort1)]
+        public void FindsAValveByNameOnWhicheverBoardWiresIt(string valve, string board, DigitalOutputs line)
+        {
+            var wired = WiredRewardValve.Find(TwoBoards(), valve);
+            Assert.AreEqual(board, wired.Board);
+            Assert.AreEqual(line, wired.Line);
+            Assert.AreEqual(valve.ToLowerInvariant(), wired.Valve.ToLowerInvariant());
+        }
+
+        [TestMethod]
+        public void TheCombinatorReadsEachRig()
+        {
+            var wired = System.Reactive.Linq.Observable.Wait(
+                new WiredRewardValve { Valve = "RewardValve-Corner" }.Process(System.Reactive.Linq.Observable.Return(TwoBoards())));
+            Assert.AreEqual("BehaviorBoard-Arena", wired.Board);
+        }
+
+        [DataTestMethod]
+        [DataRow("RewardValve-Right", null, "has no RewardValve named right (RewardValve-Right); it needs exactly one. Its valves: RewardValve-Left (DO1 on BehaviorBoard-Main), RewardValve-Corner (DOPort1 on BehaviorBoard-Arena)")]
+        [DataRow("RewardValve-Corner", "BehaviorBoard-Main", "RewardValve-Corner (DOPort1 on BehaviorBoard-Arena) is not on BehaviorBoard-Main")]
+        public void RefusesAValveItCannotFire(string valve, string board, string message)
+        {
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => WiredRewardValve.Find(TwoBoards(), valve, board));
+            StringAssert.Contains(ex.Message, message);
+        }
+
+        [TestMethod]
+        public void RefusesAValveOnTwoBoardsOrOffThePulseLines()
+        {
+            var twice = LabRigTests.Deserialize(
+                "behaviorBoard:\n  main:\n    portName: COM1\n    wiring:\n      DO1: { device: RewardValve, name: left }\n" +
+                "  arena:\n    portName: COM2\n    wiring:\n      DO2: { device: RewardValve, name: left }\n");
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => WiredRewardValve.Find(twice, "RewardValve-Left")).Message, "has 2 RewardValve named left");
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => WiredRewardValve.Find(LabRig("      DI3: { device: RewardValve, name: left }\n"), "RewardValve-Left")).Message,
+                "RewardValve-Left (DI3 on BehaviorBoard-Main) is not on a line the board can pulse");
+        }
+
+        [DataTestMethod]
+        [DataRow(null)]
+        [DataRow("DO1")]
+        [DataRow("RewardValve-")]
+        public void RefusesAValveThatIsNotAPieceName(string valve)
+        {
+            StringAssert.Contains(Assert.ThrowsException<ArgumentException>(() => WiredRewardValve.Find(TwoBoards(), valve)).Message, "such as RewardValve-Left");
+        }
+
         static Rigs.LabRig PulsedRig(string enabled, string wiring)
         {
             return LabRigTests.Deserialize("behaviorBoard:\n  main:\n    portName: COM1\n    pulseController:\n      outputPulseEnable: " + enabled + "\n    wiring:\n" + wiring);

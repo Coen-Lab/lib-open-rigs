@@ -3,6 +3,7 @@ using Harp.Behavior;
 using OpenRigs.Devices.Rigs;
 using OpenRigs.Shared;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Reactive.Linq;
@@ -119,6 +120,94 @@ namespace OpenRigs.Devices
                 outputs |= (DigitalOutputs)Enum.Parse(typeof(DigitalOutputs), line);
             }
             return outputs;
+        }
+    }
+
+    /// <summary>One reward valve as rig.yml wires it: its piece, its board and its line.</summary>
+    public class RewardValveWiring
+    {
+        /// <summary>Gets or sets the valve's piece, such as RewardValve-Left.</summary>
+        public string Valve { get; set; }
+
+        /// <summary>Gets or sets the board it is wired on, such as BehaviorBoard-Main.</summary>
+        public string Board { get; set; }
+
+        /// <summary>Gets or sets its line, such as DO1.</summary>
+        public DigitalOutputs Line { get; set; }
+    }
+
+    /// <summary>
+    /// A reward valve found by its piece name (RewardValve-Left) on whichever Behavior board rig.yml's
+    /// wiring puts it, as LabRig.reward_valves() finds it in Python. Stops the workflow, naming the valves
+    /// there are, unless exactly one board wires it, on a line the board can pulse, and that board is
+    /// Board when Board is set.
+    /// </summary>
+    [Combinator]
+    [Description("The board and line rig.yml's wiring gives the RewardValve Valve (such as RewardValve-Left), on any board, from the lab rig model (RigConfigs). Stops the workflow unless exactly one board wires it, on a line the board can pulse, and, when Board is set, that board is Board.")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class WiredRewardValve
+    {
+        /// <summary>Gets or sets the valve's piece.</summary>
+        [Description("The valve's piece, RewardValve- and its name in rig.yml's wiring: name: left is RewardValve-Left.")]
+        public string Valve { get; set; }
+
+        /// <summary>Gets or sets the board the workflow fires the valve through, or empty for any.</summary>
+        [Description("The board the workflow fires the valve through, such as BehaviorBoard-Main; a valve on another board stops the workflow. Empty: any board.")]
+        public string Board { get; set; }
+
+        /// <summary>The valve's wiring in each rig.</summary>
+        public IObservable<RewardValveWiring> Process(IObservable<LabRig> source)
+        {
+            return source.Select(rig => Find(rig, Valve, Board));
+        }
+
+        const string ValvePrefix = "RewardValve-";
+
+        /// <summary>The wiring of <paramref name="valve"/>, or an exception saying why not.</summary>
+        public static RewardValveWiring Find(LabRig rig, string valve, string board = null)
+        {
+            if (string.IsNullOrWhiteSpace(valve) || !valve.StartsWith(ValvePrefix, StringComparison.Ordinal) || valve.Length == ValvePrefix.Length)
+            {
+                throw new ArgumentException("WiredRewardValve's Valve is '" + valve + "': it needs the valve's piece, RewardValve- and its name in rig.yml's wiring, such as RewardValve-Left.");
+            }
+            var name = valve.Substring(ValvePrefix.Length);
+            var valves = (
+                from entry in rig.BehaviorBoard ?? new Dictionary<string, BehaviorBoard>()
+                where entry.Value != null && entry.Value.Wiring != null
+                from property in typeof(BoardWiring).GetProperties()
+                where property.PropertyType == typeof(WiredLine)
+                let line = (WiredLine)property.GetValue(entry.Value.Wiring)
+                where line != null && line.Device == "RewardValve" && line.Name != null
+                select new
+                {
+                    Valve = ValvePrefix + UpperFirst(line.Name),
+                    Board = "BehaviorBoard-" + UpperFirst(entry.Key),
+                    Line = property.Name,
+                }).ToList();
+            var found = valves.Where(v => string.Equals(v.Valve, valve, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (found.Count != 1)
+            {
+                throw new InvalidOperationException(string.Format(
+                    "rig.yml's wiring has {0} RewardValve named {1} ({2}); it needs exactly one. Its valves: {3}.",
+                    found.Count == 0 ? "no" : found.Count.ToString(), name.ToLowerInvariant(), valve,
+                    valves.Count == 0 ? "none" : string.Join(", ", valves.Select(v => v.Valve + " (" + v.Line + " on " + v.Board + ")"))));
+            }
+            var wired = found[0];
+            var where = wired.Valve + " (" + wired.Line + " on " + wired.Board + ")";
+            if (!string.IsNullOrEmpty(board) && wired.Board != board)
+            {
+                throw new InvalidOperationException(where + " is not on " + board + ", the board this workflow fires valves through.");
+            }
+            if (PulseLines.Mask(wired.Line) == 0)
+            {
+                throw new InvalidOperationException(where + " is not on a line the board can pulse, DO0 to DO3 or DOPort0 to DOPort2.");
+            }
+            return new RewardValveWiring { Valve = wired.Valve, Board = wired.Board, Line = (DigitalOutputs)Enum.Parse(typeof(DigitalOutputs), wired.Line) };
+        }
+
+        static string UpperFirst(string text)
+        {
+            return text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text.Substring(1);
         }
     }
 
