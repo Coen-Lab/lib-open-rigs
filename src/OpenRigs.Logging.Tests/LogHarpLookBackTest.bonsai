@@ -96,7 +96,7 @@
       <Expression xsi:type="WorkflowOutput" />
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:DelaySubscription">
-          <rx:DueTime>PT0.5S</rx:DueTime>
+          <rx:DueTime>PT2S</rx:DueTime>
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:PublishSubject">

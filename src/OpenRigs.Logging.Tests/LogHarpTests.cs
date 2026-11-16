@@ -121,24 +121,24 @@ namespace OpenRigs.Logging.Tests
     {
         protected override string WorkflowFileName => "LogHarpLookBackTest.bonsai";
 
-        // PathPrefix 0.5 s after the device starts (LogController subscribed late): the log still holds the
-        // messages of the second before it, as a camera frame reaches its log about 75 ms after the trigger it
+        // PathPrefix 2 s after the device starts (LogController subscribed late): the log still holds the
+        // messages of the half second before it, and no more, as a camera frame reaches its log about 75 ms after the trigger it
         // is stamped with and every trigger must be in the board's log (rig test, 16 Nov 2026: the first 4
         // triggers of every camera CSV were missing from the board's log).
         [TestMethod]
-        public void LogHarpDevice_PathPrefixLate_LogsTheSecondBeforeIt()
+        public void LogHarpDevice_PathPrefixLate_LogsTheHalfSecondBeforeIt()
         {
             var result = RunWorkflow(new Dictionary<string, string>
             {
                 { "HarpLogName", "LookBack" },
-                { "Count", "150" },
+                { "Count", "300" },
                 { "Period", "0.01" }
             });
             var first = FindLogFiles("*.bin", result)
                 .SelectMany(HarpBinaryLog.ReadMessages)
                 .Where(message => message.Timestamp.HasValue)
                 .Min(message => message.Timestamp.Value);
-            Assert.IsTrue(first < 0.15, $"The first logged message is at {first} s, near PathPrefix (0.5 s after the device started): nothing from before it was kept.{result.Describe()}");
+            Assert.IsTrue(first > 0.6 && first < 1.4, $"The first logged message is at {first} s; PathPrefix came about 1.5 s in (2 s after the device started) and the log should start half a second (HarpLookBack) before it.{result.Describe()}");
         }
     }
 }
