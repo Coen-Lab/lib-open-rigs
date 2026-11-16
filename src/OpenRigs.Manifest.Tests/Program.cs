@@ -27,6 +27,13 @@ namespace OpenRigs.Manifest.Tests
             if (!ok) failed++;
         }
 
+        // The recorder's disposal, and the final write it starts on a thread of its own.
+        static void Finished(IDisposable subscription)
+        {
+            subscription.Dispose();
+            if (!ManifestRecorder.WaitForFinalWrites(TimeSpan.FromSeconds(60))) Check("the final write is done within 60 s of the disposal", false, "not done");
+        }
+
         static string Field(string json, string path)
         {
             // "a.b.c" into a pretty-printed manifest: enough for these checks, not a parser.
@@ -84,7 +91,7 @@ namespace OpenRigs.Manifest.Tests
             if (control != null) control.SetPhase(ExperimentPhase.Recording);
             path.OnNext(folder);
             if (during != null) during(control);
-            subscription.Dispose();
+            Finished(subscription);
             Set(null, "Current", null);
             return File.ReadAllText(Path.Combine(folder, ManifestWriter.FileName));
         }
@@ -508,7 +515,7 @@ namespace OpenRigs.Manifest.Tests
                     Check("a run that fails before the folder exists ends the node with its error at once", failedWith != null && failedWith.Message == "camera lost before Go", failedWith?.ToString() ?? "no OnError");
                     Check("... and writes nothing", !Directory.Exists(failedFolder), failedFolder);
                     failedSubscription.Dispose();
-                    subscription.Dispose();
+                    Finished(subscription);
                 }
                 {
                     // L1-L1 (8 Nov 2026): the run's error after Finished or the controller's stop is how the workflow stopped.
@@ -524,7 +531,7 @@ namespace OpenRigs.Manifest.Tests
                         path.OnNext(folder);
                         if (finishedFirst) control.SetPhase(ExperimentPhase.Finished); else Stop(control, "mouse unwell");
                         run.OnError(new InvalidOperationException("the session was stopped"));
-                        subscription.Dispose();
+                        Finished(subscription);
                         Set(null, "Current", null);
                         var text = File.ReadAllText(Path.Combine(folder, ManifestWriter.FileName));
                         var want = finishedFirst ? "completed" : "stopped";
@@ -553,10 +560,58 @@ namespace OpenRigs.Manifest.Tests
                         if (Field(provisional, "run.outcome") != "running") break;
                     }
                     Check("a workflow's Finished is written as it comes, completed and not final", Field(provisional, "run.outcome") == "completed" && Field(provisional, "run.final") == "false", Field(provisional, "run.outcome") + " " + Field(provisional, "run.final"));
-                    subscription.Dispose();
+                    Finished(subscription);
                     Set(null, "Current", null);
                     var last = File.ReadAllText(manifest);
                     Check("... and the end-of-run write is completed and final", Field(last, "run.outcome") == "completed" && Field(last, "run.final") == "true", Field(last, "run.outcome") + " " + Field(last, "run.final"));
+                }
+                {
+                    // 16 Nov 2026: every camera's CSV read closed: false, the final write made at disposal
+                    // while ffmpeg's recording still held it. The write waits, at most CloseWait, for every
+                    // file to read closed, on a thread of its own, so disposal does not block.
+                    foreach (var closes in new[] { true, false })
+                    {
+                        var saved = ManifestRecorder.CloseWait;
+                        if (!closes) ManifestRecorder.CloseWait = TimeSpan.FromSeconds(1);
+                        try
+                        {
+                            var folder = Path.Combine(root, "sub-TC002", "ses-held" + closes + "_2026-10-30T19-57-12");
+                            var path = new Subject<string>();
+                            var recorder = new ManifestRecorder(null, "", ExpectedPlan.Create("", null, n => null));
+                            var subscription = recorder.Process(path).Subscribe(_ => { }, _ => { });
+                            path.OnNext(folder);
+                            var csv = Path.Combine(folder, "Camera", "Camera.csv");
+                            Directory.CreateDirectory(Path.GetDirectoryName(csv));
+                            var held = new FileStream(csv, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+                            held.WriteByte(65);
+                            held.Flush();
+                            var clock = System.Diagnostics.Stopwatch.StartNew();
+                            subscription.Dispose();
+                            var disposal = clock.Elapsed;
+                            if (closes)
+                            {
+                                System.Threading.Thread.Sleep(500);
+                                held.Dispose();
+                            }
+                            var written = ManifestRecorder.WaitForFinalWrites(TimeSpan.FromSeconds(30));
+                            var writtenAfter = clock.Elapsed;
+                            held.Dispose();
+                            var text = File.ReadAllText(Path.Combine(folder, ManifestWriter.FileName));
+                            var entry = Regex.Match(text, "\"path\": \"Camera/Camera.csv\",\\s*\"size\": 1,\\s*\"mtime\": \"[^\"]*\",\\s*\"closed\": (true|false)");
+                            var closed = entry.Success ? entry.Groups[1].Value : "not listed";
+                            if (closes)
+                            {
+                                Check("a file closed 500 ms after the recorder's disposal reads closed: true in the final manifest", written && closed == "true" && Field(text, "run.final") == "true", written + " " + closed + " " + Field(text, "run.final"));
+                                Check("... and the disposal does not wait for it", disposal < TimeSpan.FromMilliseconds(250), disposal.TotalMilliseconds + " ms");
+                            }
+                            else
+                            {
+                                Check("a file never closed reads closed: false in the final manifest, written once CloseWait has passed", written && closed == "false" && Field(text, "run.final") == "true" && writtenAfter >= TimeSpan.FromSeconds(0.9),
+                                    written + " " + closed + " " + Field(text, "run.final") + " after " + writtenAfter.TotalMilliseconds + " ms");
+                            }
+                        }
+                        finally { ManifestRecorder.CloseWait = saved; }
+                    }
                 }
                 {
                     // Version 4: a condition's subject decides, at each write, whether its entry is required.
@@ -570,7 +625,7 @@ namespace OpenRigs.Manifest.Tests
                     var off = File.ReadAllText(manifest);
                     Check("a condition's subject false at the first write: the entry is not required", off.Contains("\"condition\": \"Optogenetics\",") && off.Contains("\"required\": false,") && Field(off, "version") == "4", off.Length.ToString());
                     optogenetics.OnNext(true);
-                    subscription.Dispose();
+                    Finished(subscription);
                     var on = File.ReadAllText(manifest);
                     Check("... and true by the end-of-run write: it is", on.Contains("\"required\": true,") && !on.Contains("has sent no value"), on.Length.ToString());
                 }
@@ -601,7 +656,7 @@ namespace OpenRigs.Manifest.Tests
                     // Thrown, it went back up the thread that delivered the path, ControlServer's from Go,
                     // and killed Bonsai (round 2 audit, 1 Nov 2026).
                     Check("ends the node with its error rather than throwing to whoever named the folder", thrown == null && error is IOException, thrown != null ? "threw " + thrown.GetType().Name : "error " + error);
-                    subscription.Dispose();
+                    Finished(subscription);
                 }
                 {
                     // L1-M1 (audit, 11 Nov 2026): an end-of-run write that failed, the file held by a
@@ -633,7 +688,7 @@ namespace OpenRigs.Manifest.Tests
                     run.OnCompleted();
                     reader.Join();
                     Check("an end-of-run write the reader blocks ends the node with its error", error != null, "no error");
-                    subscription.Dispose();
+                    Finished(subscription);
                     var text = File.ReadAllText(manifest);
                     Check("... and is written at disposal, completed, final, with its items", Field(text, "run.outcome") == "completed" && Field(text, "run.final") == "true" && Field(text, "run.items") == "1",
                         Field(text, "run.outcome") + " " + Field(text, "run.final") + " " + Field(text, "run.items"));

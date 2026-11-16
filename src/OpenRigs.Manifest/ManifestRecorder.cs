@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Threading;
 
 namespace OpenRigs.Manifest
 {
@@ -20,6 +21,34 @@ namespace OpenRigs.Manifest
 
         // How often the controller's stop is looked for while the run goes on: ControlExperiment is read by name, with nothing to subscribe to.
         internal static TimeSpan StopPoll = TimeSpan.FromMilliseconds(250);
+
+        // How long the final write at disposal waits for every file of the experiment to read closed:
+        // beyond ffmpeg's 20 s StopTimeout, so a camera's video that closes in time reads closed.
+        internal static TimeSpan CloseWait = TimeSpan.FromSeconds(25);
+
+        // How often the files are looked at while the final write waits.
+        static readonly TimeSpan ClosePoll = TimeSpan.FromMilliseconds(100);
+
+        // The final writes' threads, for WaitForFinalWrites.
+        static readonly List<Thread> Closers = new List<Thread>();
+
+        /// <summary>For tests: waits, at most the timeout, for every final write started at disposal to be done; true when they are.</summary>
+        internal static bool WaitForFinalWrites(TimeSpan timeout)
+        {
+            Thread[] waiting;
+            lock (Closers)
+            {
+                Closers.RemoveAll(t => !t.IsAlive && t.ThreadState != System.Threading.ThreadState.Unstarted);
+                waiting = Closers.ToArray();
+            }
+            var clock = Stopwatch.StartNew();
+            foreach (var thread in waiting)
+            {
+                var left = timeout - clock.Elapsed;
+                if (left < TimeSpan.Zero || !thread.Join(left)) return false;
+            }
+            return true;
+        }
 
         internal ManifestRecorder(string ingestScript, string configFiles, ExpectedPlan expected, string trialColumns = null)
         {
@@ -203,10 +232,44 @@ namespace OpenRigs.Manifest
 
                 // Disposed before the run ended: the workflow is stopping. Why is read from the
                 // controller's phase, the only witness this node has.
+                // The other loggers close their files as the same disposal goes on (a camera's CSV and
+                // video once its queue drains and ffmpeg exits), so the final write waits for every file
+                // to read closed, at most CloseWait, on a thread of its own: disposal does not block,
+                // and a foreground thread keeps a headless Bonsai open until the file is written. Written
+                // at once, every camera's CSV read closed: false (16 Nov 2026).
                 subscriptions.Add(Disposable.Create(() =>
                 {
-                    try { finish(RunEnd.AtDisposal(control ?? ControlExperiment.Current())); }
-                    catch (Exception ex) { NotWritten("the final manifest", ex); }
+                    RunEnd end;
+                    try
+                    {
+                        end = RunEnd.AtDisposal(control ?? ControlExperiment.Current());
+                        lock (gate)
+                        {
+                            if (finished) return;
+                            if (!begun)
+                            {
+                                finish(end);  // writes nothing: the end is kept for a folder that never comes
+                                return;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        NotWritten("the final manifest", ex);
+                        return;
+                    }
+                    var closer = new Thread(() =>
+                    {
+                        try
+                        {
+                            var waited = Stopwatch.StartNew();
+                            while (waited.Elapsed < CloseWait && !writer.FilesClosed()) Thread.Sleep(ClosePoll);
+                            finish(end);
+                        }
+                        catch (Exception ex) { NotWritten("the final manifest", ex); }
+                    }) { IsBackground = false, Name = "ExperimentManifest final write" };
+                    lock (Closers) Closers.Add(closer);
+                    closer.Start();
                 }));
                 return subscriptions;
             });

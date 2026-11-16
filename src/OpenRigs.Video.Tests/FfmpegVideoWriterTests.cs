@@ -240,6 +240,41 @@ namespace OpenRigs.Video.Tests
             Assert.AreEqual(121, File.ReadAllLines(recording.CsvFileName).Length);
         }
 
+        // ExperimentManifest's final write read every camera's CSV as open (16 Nov 2026): it was closed
+        // after ffmpeg exited. A stand-in that reads its stdin to the end and then takes 3 s to exit
+        // shows the CSV closed while it still runs: closed as the queue drained, not after ffmpeg.
+        [TestMethod]
+        public void TheCsvIsClosedOnceTheQueueDrains_BeforeFfmpegExits()
+        {
+            var powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
+            var encoder = new VideoEncoder(VideoEncoder.DefaultCodec, powershell,
+                "-NoProfile -NonInteractive -Command \"$s = [Console]::OpenStandardInput(); $b = New-Object byte[] 65536; while ($s.Read($b, 0, $b.Length) -gt 0) { }; Start-Sleep -Seconds 3\"");
+            var recording = new FfmpegRecording(Video, FrameRate, encoder, 50, TimeSpan.FromSeconds(20), TextWriter.Null);
+            foreach (var frame in Frames(10)) recording.Add(frame);
+            recording.End();
+            Process stand = null;
+            for (var waited = Stopwatch.StartNew(); stand == null && waited.Elapsed < TimeSpan.FromSeconds(10); Thread.Sleep(20))
+            {
+                var id = recording.FfmpegProcessId;
+                if (id.HasValue) stand = Process.GetProcessById(id.Value);
+            }
+            Assert.IsNotNull(stand, "the stand-in started");
+            var closedWhileRunning = false;
+            while (!stand.HasExited && !closedWhileRunning)
+            {
+                try
+                {
+                    using (File.Open(recording.CsvFileName, FileMode.Open, FileAccess.Read, FileShare.None)) { }
+                    closedWhileRunning = !stand.HasExited;
+                }
+                catch (IOException) { Thread.Sleep(20); }
+            }
+            Assert.IsTrue(closedWhileRunning, "the CSV read closed while the stand-in for ffmpeg was still running");
+            Assert.IsTrue(recording.Wait(TimeSpan.FromSeconds(20)));
+            Assert.AreEqual(0, recording.ExitCode);
+            Assert.AreEqual(11, File.ReadAllLines(recording.CsvFileName).Length, "the header and a row for each frame");
+        }
+
         // An ffmpeg that never reads its stdin and never exits (PING.EXE, which ignores stdin): the
         // writer blocks on its first frame, the queue fills, and the end comes at the stop timeout.
         FfmpegRecording Stuck(int capacity, TimeSpan stopTimeout)

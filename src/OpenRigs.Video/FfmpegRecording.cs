@@ -217,6 +217,10 @@ namespace OpenRigs.Video
                         Kill();
                     }
                 }
+                // Every row is written and flushed once the queue has drained: the CSV is closed now,
+                // not after ffmpeg exits, since ExperimentManifest's final write, which does not wait
+                // for ffmpeg, reads a file still open as closed: false (16 Nov 2026).
+                CloseCsv();
                 Close();
             }
             catch (Exception ex)
@@ -226,8 +230,7 @@ namespace OpenRigs.Video
             }
             finally
             {
-                try { csv?.Dispose(); }
-                catch (IOException ex) { Fail("the frame log " + CsvFileName + " could not be closed: " + ex.Message); }
+                CloseCsv();
                 Report();
                 Process? ended;
                 lock (gate)
@@ -238,6 +241,15 @@ namespace OpenRigs.Video
                 ended?.Dispose();
                 done.Set();
             }
+        }
+
+        // Closes the frame log, once: no row is written after it.
+        void CloseCsv()
+        {
+            var closing = csv;
+            csv = null;
+            try { closing?.Dispose(); }
+            catch (IOException ex) { Fail("the frame log " + CsvFileName + " could not be closed: " + ex.Message); }
         }
 
         bool Failed()

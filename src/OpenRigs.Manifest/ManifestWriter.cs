@@ -250,6 +250,14 @@ namespace OpenRigs.Manifest
             Write(end, items, control, DateTime.UtcNow, true);
         }
 
+        /// <summary>Whether every file the files section would list reads closed now; true when there is no folder (no Begin), as nothing then waits.</summary>
+        public bool FilesClosed()
+        {
+            if (folder == null) return true;
+            try { return FilesSection(folder).Cast<JsonObject>().All(f => (bool)f.First(p => p.Key == "closed").Value); }
+            catch (DirectoryNotFoundException) { return true; }
+        }
+
         void Write(RunEnd end, long? items, ControlExperiment control, DateTime? ended, bool final)
         {
             // A running write carries the stop too (a workflow killed before the stop's own write, which then is the last).
