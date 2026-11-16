@@ -58,7 +58,7 @@ class LabRig(Rig):
         description="Triggered Spinnaker cameras by name, such as face (Camera-Face), each on the board trigger whose wiring line (device CameraTrigger, DO0 or DO1) names it in targets, at that trigger's frequency.",
     )
     projection_calibration: Optional[ProjectionCalibration] = Field(
-        default=None, description="Mesh-map and gamma-LUT file paths for the projector's display."
+        default=None, description="Mesh-map and gamma-LUT files for the projector's display, each relative to rig.yml's folder."
     )
     speaker_array: Optional[EqualisedSpeakerArray] = Field(default=None, description="Speaker array and audio output device.")
     lick_spout_default_position: Optional[StepperPositions] = Field(

@@ -206,12 +206,13 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Mesh-map and gamma-LUT file paths for the projector's display.
+        /// Mesh-map and gamma-LUT files for the projector's display, each relative to rig.yml's folder.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("projectionCalibration")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="projectionCalibration")]
-        [System.ComponentModel.DescriptionAttribute("Mesh-map and gamma-LUT file paths for the projector\'s display.")]
+        [System.ComponentModel.DescriptionAttribute("Mesh-map and gamma-LUT files for the projector\'s display, each relative to rig.ym" +
+            "l\'s folder.")]
         public ProjectionCalibration ProjectionCalibration
         {
             get
@@ -2411,11 +2412,12 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Path to the mesh-mapping interpolation file (CSV)
+        /// The mesh-mapping interpolation file (CSV), relative to rig.yml's folder. A full path stops the workflow at Start (OpenRigs.Core ResolveRigFile).
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("meshMapPath", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="meshMapPath")]
-        [System.ComponentModel.DescriptionAttribute("Path to the mesh-mapping interpolation file (CSV)")]
+        [System.ComponentModel.DescriptionAttribute("The mesh-mapping interpolation file (CSV), relative to rig.yml\'s folder. A full p" +
+            "ath stops the workflow at Start (OpenRigs.Core ResolveRigFile).")]
         public string MeshMapPath
         {
             get
@@ -2429,11 +2431,12 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Path to the gamma lookup-table image (BMP)
+        /// The gamma lookup-table image (BMP), relative to rig.yml's folder. A full path stops the workflow at Start (OpenRigs.Core ResolveRigFile).
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("gammaLutPath", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="gammaLutPath")]
-        [System.ComponentModel.DescriptionAttribute("Path to the gamma lookup-table image (BMP)")]
+        [System.ComponentModel.DescriptionAttribute("The gamma lookup-table image (BMP), relative to rig.yml\'s folder. A full path sto" +
+            "ps the workflow at Start (OpenRigs.Core ResolveRigFile).")]
         public string GammaLutPath
         {
             get

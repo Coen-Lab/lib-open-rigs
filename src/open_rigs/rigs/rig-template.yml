@@ -103,10 +103,10 @@ camera:
 videoEncoder:
   codec: h264_nvenc
 
-# Full paths into this rig's calibration folder (<ConfigRoot>\<MACHINE-NAME>\calibration).
+# Relative to this directory, as every file here is; a full path stops the workflow at Start (ProjectorDisplay).
 projectionCalibration:
-  meshMapPath: C:\RigConfigs\CHANGE-ME\calibration\MeshMap.csv
-  gammaLutPath: C:\RigConfigs\CHANGE-ME\calibration\gammalut.bmp
+  meshMapPath: calibration/MeshMap.csv
+  gammaLutPath: calibration/gammalut.bmp
 
 speakerArray:
   device:                   # the mixer and the stimulus loader read these

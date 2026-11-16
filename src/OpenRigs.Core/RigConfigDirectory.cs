@@ -34,36 +34,38 @@ namespace OpenRigs.Core
         }
 
         /// <summary>
-        /// Returns the full path of a file relative to the given rig configuration directory,
-        /// or throws if it does not exist. A rooted path is checked as given.
+        /// Returns the full path of a file relative to the given rig configuration directory, or throws if it does
+        /// not exist or is given as a full path. <paramref name="setting"/>, the rig.yml key the path is from
+        /// (such as projectionCalibration.meshMapPath), is named in each refusal when given.
         /// </summary>
-        public static string ResolveFile(string directory, string relativePath)
+        public static string ResolveFile(string directory, string relativePath, string setting = null)
         {
+            var named = string.IsNullOrEmpty(setting) ? "The rig file path" : "rig.yml's " + setting;
             if (string.IsNullOrEmpty(relativePath))
             {
-                throw new ArgumentException("The rig file path must be specified.", "relativePath");
+                throw new InvalidOperationException(named + " is empty: give it relative to rig.yml's folder.");
             }
 
-            string path;
             if (Path.IsPathRooted(relativePath))
             {
-                path = Path.GetFullPath(relativePath);
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(directory))
-                {
-                    throw new InvalidOperationException(
-                        "No rig configuration directory was given to resolve '" + relativePath + "'.");
-                }
-
-                path = Path.GetFullPath(Path.Combine(directory, relativePath));
+                throw new InvalidOperationException(string.Format(
+                    "{0} is a full path, {1}: give it relative to rig.yml's folder ({2}), as calibration/{3}.",
+                    named, relativePath, string.IsNullOrEmpty(directory) ? "<ConfigRoot>\\<MACHINE-NAME>" : directory,
+                    Path.GetFileName(relativePath)));
             }
 
-            if (!File.Exists(path))
+            if (string.IsNullOrEmpty(directory))
             {
                 throw new InvalidOperationException(
-                    "No rig file '" + relativePath + "'. Expected: " + path);
+                    "No rig configuration directory was given to resolve '" + relativePath + "'.");
+            }
+
+            var path = Path.GetFullPath(Path.Combine(directory, relativePath));
+            if (!File.Exists(path))
+            {
+                throw new InvalidOperationException(string.IsNullOrEmpty(setting)
+                    ? "No rig file '" + relativePath + "'. Expected: " + path
+                    : named + " names " + relativePath + ", and there is no such file: " + path);
             }
 
             return path;

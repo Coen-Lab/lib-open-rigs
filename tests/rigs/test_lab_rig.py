@@ -29,7 +29,7 @@ RIG = {
     "stepperDriver": {"a": HARP, "b": HARP},
     "licketySplit": {"left": HARP, "right": HARP},
     "camera": {"face": {"serialNumber": "1"}, "pupil": {"serialNumber": "2"}, "body": {"serialNumber": "3"}},
-    "projectionCalibration": {"meshMapPath": "m.csv", "gammaLutPath": "g.bmp"},
+    "projectionCalibration": {"meshMapPath": "calibration/MeshMap.csv", "gammaLutPath": "calibration/gammalut.bmp"},
     "speakerArray": {
         "device": {"deviceName": "Speakers"},
         "speakers": {"centre": {"position": {"azimuth": 0, "elevation": 15}, "channel": 2, "filter": "calibration/speaker-centre.json"}},
@@ -60,6 +60,23 @@ def test_the_background_noise_is_a_rig_file_the_speaker_array_names():
     found = rig_artefacts(LabRig.model_validate(rig))
     assert found["speakerArray.backgroundNoise"] == "../shared/sounds/background_noise.wav"
     assert LabRig.model_validate(RIG).speaker_array.background_noise is None
+
+
+@pytest.mark.parametrize("key, path", [("meshMapPath", "C:\\RigConfigs\\RIG\\calibration\\MeshMap.csv"),
+                                       ("gammaLutPath", "/calibration/gammalut.bmp")])
+def test_projector_files_are_relative_to_rig_yml(key, path):
+    # ProjectorDisplay resolves them against rig.yml's folder and refuses a full path at Start.
+    from open_rigs.core.artefacts import rig_artefacts
+
+    found = rig_artefacts(LabRig.model_validate(RIG))
+    assert found["projectionCalibration.meshMapPath"] == "calibration/MeshMap.csv"
+    assert found["projectionCalibration.gammaLutPath"] == "calibration/gammalut.bmp"
+    rig = copy.deepcopy(RIG)
+    rig["projectionCalibration"][key] = path
+    name = path.replace("\\", "/").rsplit("/", 1)[1]
+    with pytest.raises(ValidationError, match=f"projectionCalibration.{key} is a full path") as refused:
+        LabRig.model_validate(rig)
+    assert f"`{key}: calibration/{name}`" in str(refused.value)
 
 
 def test_old_keys_gone():

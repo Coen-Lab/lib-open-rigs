@@ -21,11 +21,12 @@ Artefacts belong to the machine they were measured on. They sit under the machin
   calibration\
     valve-DO1.json
     valve-DO2.json
+    MeshMap.csv, gammalut.bmp   projectionCalibration's meshMapPath and gammaLutPath
     history\
       valve-DO1_2026-10-05T143012Z.json
 ```
 
-The calibration workflow replaces the file the rig reads on every run and keeps a dated copy in `history\`. See the rig configuration page for `ResolveRigConfigDirectory` and `ResolveRigFile`.
+The calibration workflow replaces the file the rig reads on every run and keeps a dated copy in `history\`. `rig.yml` names each file relative to its own folder, as `calibration/valve-DO1.json`; `ResolveRigFile` refuses a full path. See the rig configuration page for `ResolveRigConfigDirectory` and `ResolveRigFile`.
 
 ## Running a dispense calibration
 

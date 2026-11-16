@@ -820,7 +820,7 @@
             }
           ],
           "default": null,
-          "description": "Mesh-map and gamma-LUT file paths for the projector's display.",
+          "description": "Mesh-map and gamma-LUT files for the projector's display, each relative to rig.yml's folder.",
           "title": "ProjectionCalibration"
         },
         "speakerArray": {
@@ -987,20 +987,22 @@
       "description": "File-based calibration assets for mesh-mapped projection displays.",
       "properties": {
         "meshMapPath": {
-          "description": "Path to the mesh-mapping interpolation file (CSV)",
+          "description": "The mesh-mapping interpolation file (CSV), relative to rig.yml's folder. A full path stops the workflow at Start (OpenRigs.Core ResolveRigFile).",
           "examples": [
-            "C:\\RigConfigs\\MeshMap.csv"
+            "calibration/MeshMap.csv"
           ],
           "title": "MeshMapPath",
-          "type": "string"
+          "type": "string",
+          "x-rig-artefact": true
         },
         "gammaLutPath": {
-          "description": "Path to the gamma lookup-table image (BMP)",
+          "description": "The gamma lookup-table image (BMP), relative to rig.yml's folder. A full path stops the workflow at Start (OpenRigs.Core ResolveRigFile).",
           "examples": [
-            "C:\\RigConfigs\\gammalut.bmp"
+            "calibration/gammalut.bmp"
           ],
           "title": "GammaLutPath",
-          "type": "string"
+          "type": "string",
+          "x-rig-artefact": true
         }
       },
       "required": [

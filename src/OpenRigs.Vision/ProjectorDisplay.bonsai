@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:vis="clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A projector's display: the projector's window (ProjectorWindow: DisplayDevice, an orthographic view of azimuth -135 to 135 and elevation -22.5 to 82.5 degrees, created once the whole workflow has subscribed), then mesh mapping and gamma correction from the input (rig.yml's projectionCalibration: meshMapPath, gammaLutPath). Stimuli draw on the DrawStimuli subject. Stops the workflow at start, saying so, if the input is null (rig.yml has no projectionCalibration) or DisplayDevice is not a display on this machine (RequireDisplay). Disposed on the render thread (DisposeOnRenderThread), so stopping from another thread cannot crash Bonsai. RawProjectorDisplay is the same window without the two corrections.</Description>
+  <Description>A projector's display: the projector's window (ProjectorWindow: DisplayDevice, an orthographic view of azimuth -135 to 135 and elevation -22.5 to 82.5 degrees, created once the whole workflow has subscribed), then mesh mapping and gamma correction from the input (rig.yml's projectionCalibration: meshMapPath, gammaLutPath, each relative to rig.yml's folder, the RigConfigDirectory subject, as calibration/MeshMap.csv). Stimuli draw on the DrawStimuli subject. Stops the workflow at start, saying so, if the input is null (rig.yml has no projectionCalibration), either path is a full path or names no file (ResolveRigFile), or DisplayDevice is not a display on this machine (RequireDisplay). Disposed on the render thread (DisposeOnRenderThread), so stopping from another thread cannot crash Bonsai. RawProjectorDisplay is the same window without the two corrections.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -12,8 +13,8 @@
       </Expression>
       <Expression xsi:type="PropertyMapping">
         <PropertyMappings>
-          <Property Name="FileName" Selector="MeshMapPath" />
-          <Property Name="GammaLut" Selector="GammaLutPath" />
+          <Property Name="FileName" Selector="Item1" />
+          <Property Name="GammaLut" Selector="Item2" />
         </PropertyMappings>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
@@ -82,10 +83,53 @@
           <vis:Name>ProjectorDisplay</vis:Name>
         </Combinator>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigDirectory</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>MeshMapPath</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:ResolveRigFile">
+          <core:Directory />
+          <core:Setting>projectionCalibration.meshMapPath</core:Setting>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigDirectory</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>GammaLutPath</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:ResolveRigFile">
+          <core:Directory />
+          <core:Setting>projectionCalibration.gammaLutPath</core:Setting>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="6" Label="Source1" />
-      <Edge From="6" To="1" Label="Source1" />
+      <Edge From="6" To="10" Label="Source1" />
+      <Edge From="6" To="14" Label="Source1" />
+      <Edge From="9" To="11" Label="Source1" />
+      <Edge From="10" To="11" Label="Source2" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="13" To="15" Label="Source1" />
+      <Edge From="14" To="15" Label="Source2" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="12" To="17" Label="Source1" />
+      <Edge From="16" To="17" Label="Source2" />
+      <Edge From="17" To="1" Label="Source1" />
       <Edge From="1" To="3" Label="Source1" />
       <Edge From="2" To="3" Label="Source2" />
       <Edge From="7" To="3" Label="Source3" />

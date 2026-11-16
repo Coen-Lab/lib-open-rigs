@@ -1184,7 +1184,6 @@ def filled_rig(wf: Workflow, root: PurePath, machine: str) -> tuple[str, list[st
     rig = yaml.load(TEMPLATE.read_text(encoding="utf-8"))
     devices = required_devices(wf)
     rig["rootPath"], rig["rigId"] = str(root), "D1"
-    rig["projectionCalibration"] = {k: v.replace("CHANGE-ME", machine) for k, v in rig["projectionCalibration"].items()}
     camera = dict(next(iter(rig["camera"].values())), serialNumber="1")
     entry = {name: name.split("-", 1)[1][:1].lower() + name.split("-", 1)[1][1:] for name, _ in devices}
     for group in ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera"):
