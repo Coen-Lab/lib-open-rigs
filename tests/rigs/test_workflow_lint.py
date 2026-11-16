@@ -219,6 +219,19 @@ def test_a_broken_combination_is_named(tmp_path):
         "CameraTriggers' CamerasExpected is Camera-Face, not Camera-Overhead"]
 
 
+def test_a_stage_the_workflow_announces_itself_is_one_of_ready_gate_s_workflow_stages(tmp_path):
+    own = ('<Expression xsi:type="Combinator"><Combinator xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core" '
+           'xsi:type="orc:AnnounceStage"><orc:Stage>CalibrationReady</orc:Stage></Combinator></Expression>')
+    gate = piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet, SpoutsHomed, Camera-Overhead")
+    listed = MIXED.replace(gate, piece(lint.READY_GATE, ReadyWaitsFor="HarpClockSet, SpoutsHomed, Camera-Overhead",
+                                       WorkflowStages="CalibrationReady"))
+    assert lint.hardware_problems(workflow(tmp_path, listed + own)) == []
+    assert lint.hardware_problems(workflow(tmp_path / "b", MIXED + own)) == [
+        "ReadyGate's WorkflowStages is not set, not the stages the workflow announces itself (CalibrationReady)"]
+    assert lint.hardware_problems(workflow(tmp_path / "c", listed)) == [
+        "ReadyGate's WorkflowStages is CalibrationReady, not the stages the workflow announces itself (none)"]
+
+
 def test_a_workflow_s_own_ready_report_is_found_under_any_prefix(tmp_path):
     own = '<Expression xsi:type="Combinator"><Combinator xmlns:p3="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control" xsi:type="p3:ReportPhase"><p3:Phase>Ready</p3:Phase></Combinator></Expression>'
     assert lint.hardware_problems(workflow(tmp_path, MIXED + own)) == ["the workflow has its own Ready report"]

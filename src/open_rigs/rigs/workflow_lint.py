@@ -25,6 +25,7 @@ RX = "{clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core}"
 SCRIPT = "{clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions}"
 AUDIO = "{clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio}"
 CONTROL = "{clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control}"
+CORE = "{clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core}"
 FINITE = ("rx:Take", "rx:TakeLast", "rx:First", "rx:Last")
 WALL_CLOCK = ("rx:Timer", "rx:Delay", "rx:DelaySubscription", "rx:Throttle", "rx:Timeout", "rx:Interval", "rx:TimeInterval",
               "rx:Timestamp", "gl:Timer", "gl:Delay")
@@ -430,8 +431,9 @@ def hardware_problems(wf: Workflow) -> list[str]:
     declares); exactly one clock; each piece's Name unique and its subject properties that Name's .Commands and .Data;
     every Board a Behavior board piece and every Camera a camera piece; one CameraTriggers exactly when there is a
     camera, expecting every camera; ReadyGate's ReadyWaitsFor exactly the stages the pieces announce (HarpClockSet,
-    SpoutsHomed for the lick spout stage, each camera's Name, MixerStarted for SpeakerMixer); and the workflow makes no
-    Ready report, StartCameras or announcement of its own."""
+    SpoutsHomed for the lick spout stage, each camera's Name, MixerStarted for SpeakerMixer) and its WorkflowStages
+    exactly those the workflow announces itself (its own AnnounceStage nodes, such as a calibration's CalibrationReady);
+    and the workflow makes no Ready report or StartCameras of its own."""
     pieces = hardware(wf)
     paths = [p for p, _ in pieces]
     problems = [f"the workflow includes {p.split(':')[1].removesuffix('.bonsai')} {paths.count(p)} times, not once"
@@ -474,9 +476,16 @@ def hardware_problems(wf: Workflow) -> list[str]:
         problems.append(f"CameraTriggers' CamerasExpected is {triggers[0].get('CamerasExpected') or 'not set'}, not {', '.join(cameras)}")
     announced = list(dict.fromkeys(READY_STAGES[p] for p in (*CLOCKS, LICK_SPOUT_STAGE) if p in paths)) + cameras \
         + ([READY_STAGES[SPEAKER_MIXER]] if SPEAKER_MIXER in paths else [])
-    waits = next((props.get("ReadyWaitsFor") for p, props in pieces if p == READY_GATE), None)
+    gate_props = next((props for p, props in pieces if p == READY_GATE), {})
+    waits = gate_props.get("ReadyWaitsFor")
     if READY_GATE in paths and set(_stages(waits)) != set(announced):
         problems.append(f"ReadyGate's ReadyWaitsFor is {waits or 'not set'}, not {', '.join(announced)}")
+    own = [child(n, W + "Combinator").findtext(CORE + "Stage") or "" for n in wf.root.iter(W + "Expression")
+           if kind(n) == "core:AnnounceStage"]
+    workflow_stages = gate_props.get("WorkflowStages")
+    if READY_GATE in paths and set(_stages(workflow_stages)) != set(own):
+        problems.append(f"ReadyGate's WorkflowStages is {workflow_stages or 'not set'}, not the stages the workflow announces "
+                        f"itself ({', '.join(own) or 'none'})")
     problems += [f"the workflow has its own {what}" for what, found in (
         ("Ready report", re.search(r"<\w+:Phase>Ready</\w+:Phase>", wf.text)),
         ("StartCameras", "<Name>StartCameras</Name>" in wf.text)) if found]
@@ -525,7 +534,7 @@ def mixer_ready_problems(root: ET.Element) -> list[str]:
     Mixer subject's value), the stage Ready waits for on a workflow that plays sound. `root` is OpenRigs.Audio's
     SpeakerMixer.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
-    stage = "{clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core}Stage"
+    stage = CORE + "Stage"
     for a, b, _ in edges:
         for c in [c for b2, c, _ in edges if b2 == b]:
             first, middle, last = nodes[a], nodes[b], nodes[c]

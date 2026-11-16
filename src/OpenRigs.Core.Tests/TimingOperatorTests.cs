@@ -167,6 +167,14 @@ namespace OpenRigs.Core.Tests
         }
 
         [TestMethod]
+        public void WaitsAlsoForTheStagesOfAlsoExpected()
+        {
+            var watchdog = new StartupWatchdog { Expected = "Board", AlsoExpected = "Photodiode", TimeoutSeconds = 0.1 };
+            var ex = Assert.ThrowsException<TimeoutException>(() => watchdog.Process(Observable.Return("Board")).Wait());
+            StringAssert.EndsWith(ex.Message, "Never arrived: Photodiode.");
+        }
+
+        [TestMethod]
         public void RefusesToWatchNothing()
         {
             Assert.ThrowsException<InvalidOperationException>(() => new StartupWatchdog().Process(Observable.Never<string>()).Wait());

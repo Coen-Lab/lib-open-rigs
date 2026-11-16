@@ -22,6 +22,10 @@ namespace OpenRigs.Core
         [Description("The stages that must all arrive, comma separated, in the order they normally do.")]
         public string Expected { get; set; } = string.Empty;
 
+        /// <summary>Gets or sets more stages that must all arrive, comma separated, beside <see cref="Expected"/>.</summary>
+        [Description("More stages that must all arrive, comma separated, beside Expected: ReadyGate's WorkflowStages, the workflow's own stages beside its pieces'. Empty for none.")]
+        public string AlsoExpected { get; set; } = string.Empty;
+
         /// <summary>Gets or sets how long the stages may take, in seconds.</summary>
         [Description("How long the stages may take, from subscription, in seconds.")]
         public double TimeoutSeconds { get; set; } = 60;
@@ -35,7 +39,8 @@ namespace OpenRigs.Core
         {
             return Observable.Defer(() =>
             {
-                var expected = (Expected ?? string.Empty).Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+                var expected = ((Expected ?? string.Empty) + "," + (AlsoExpected ?? string.Empty)).Split(',')
+                    .Select(s => s.Trim()).Where(s => s.Length > 0).Distinct().ToList();
                 var timeoutSeconds = TimeoutSeconds;
                 var what = What;
                 if (expected.Count == 0) throw new InvalidOperationException("StartupWatchdog for " + what + " names no Expected stages to watch.");
