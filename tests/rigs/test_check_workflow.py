@@ -104,3 +104,34 @@ def test_a_workflow_other_than_main_is_checked_when_named(tmp_path):
     assert missing.stdout.splitlines() == [f"check-workflow: {repo} has no src\\box.bonsai."]
     (repo / "src" / "box.bonsai").write_text("<WorkflowBuilder />", encoding="utf-8")
     assert "1. Compiling src\\Extensions as C# 5..." in check(repo, "-Workflow", "box.bonsai").stdout
+
+@windows_only
+def test_a_workflow_with_no_extensions_project_has_no_extensions_to_build(tmp_path):
+    # The projector calibration has no src\Extensions.csproj: step 1 says so and passes, and the check goes on.
+    repo = environment(tmp_path, {"OpenRigs.Core": "0.1.1-fork-lab.14"}, ["OpenRigs.Core.0.1.1-fork-lab.14"])
+    run = check(repo)
+    lines = run.stdout.splitlines()
+    assert lines[:2] == ["1. Compiling src\Extensions as C# 5...", "  ok    no extensions to build (no src\Extensions.csproj)"]
+    assert lines[2] == "2. tests\Extensions.Tests..."
+
+
+@windows_only
+@pytest.mark.parametrize("text, records", [
+    ('<Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:NoExperimentFolder.bonsai" />', False),
+    ('<Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogLabExperiment.bonsai" />', True),
+])
+def test_only_a_workflow_with_no_experiment_folder_skips_the_records_and_task_checks(tmp_path, text, records):
+    # The Build and Checks steps read $noRecords: the records, manifest, trial-column and task-file checks run for a
+    # workflow that makes an experiment folder and are skipped, and said, for one that records nothing.
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.bonsai").write_text(f"<WorkflowBuilder>{text}</WorkflowBuilder>", encoding="utf-8")
+    command = (
+        f"$workflowFile = '{tmp_path / 'src' / 'main.bonsai'}'; "
+        f"$ast = [Management.Automation.Language.Parser]::ParseFile('{SCRIPT}', [ref]$null, [ref]$null); "
+        "$line = $ast.FindAll({ param($n) $n -is [Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$noRecords' }, $false); "
+        ". ([scriptblock]::Create($line[0].Extent.Text)); $noRecords")
+    run = subprocess.run(POWERSHELL + ["-Command", command], capture_output=True, text=True, timeout=120)
+    assert run.stderr == ""
+    assert run.stdout.strip() == ("False" if records else "True")
+    script = SCRIPT.read_text(encoding="utf-8")
+    assert "NoExperimentFolder: the workflow records nothing" in script and "NoExperimentFolder: no generated TaskLogic" in script

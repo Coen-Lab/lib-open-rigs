@@ -9,21 +9,25 @@ param(
 # The lab's check of a workflow made of the lab's device pieces, one copy for every such workflow: each one's scripts\check-workflow.ps1
 # runs this, from the open-rigs it pins (.venv\Lib\site-packages\open_rigs\scripts), on itself. Without the rig and
 # without opening Bonsai: no window, no device.
-#   1. Compiles src\Extensions under C# 5, the language Bonsai compiles it with.
+#   1. Compiles src\Extensions under C# 5, the language Bonsai compiles it with (a workflow with no src\Extensions.csproj has no extensions to build).
 #   2. Runs tests\Extensions.Tests.
 #   3. Builds src\<Workflow> (main.bonsai unless -Workflow names another) with Bonsai's own expression builders, as Bonsai does at Start before it subscribes
 #      anything, against the lab's rig template (open_rigs\rigs\rig-template.yml) filled in as a rig with exactly the devices the workflow's pieces drive (workflow_lint.filled_rig), and the lint's hardware rules: every type,
 #      selector, include, subject and mapping; what RecordHarpDevices made from rig.yml, what ExperimentManifest
 #      expects, the trial row's columns against schemas\trial-columns.yml, and each window in config\<its stem>.layout.
-#      Skipped, and said, on a machine without the Spinnaker SDK (a CI runner).
-#   4. Each config\task*.yml reads as the workflow reads it at Go, TaskPath is exposed, and every key in the
-#      template reaches the Settings_Rig JSON the experiment logs.
+#      Skipped, and said, on a machine without the Spinnaker SDK (a CI runner). A workflow that includes NoExperimentFolder (a QC
+#      calibration, a preflight) records nothing, so it is built against the filled template and linted all the same, but the Harp records,
+#      the manifest's expectations and the trial row's columns are skipped, and said.
+#   4. Each config\task*.yml reads as the workflow reads it at Go, TaskPath is exposed (neither for a NoExperimentFolder workflow, which
+#      reads no generated TaskLogic), and every key in the template reaches the Settings_Rig JSON the experiment logs.
 # Needs the environment set up (.bonsai\Setup.ps1: .bonsai\Packages). Exit 0 when all pass.
 $ErrorActionPreference = 'Stop'
 $self = $MyInvocation.MyCommand.Path
 $Repo = (Resolve-Path $Repo).Path
 $workflowFile = Join-Path $Repo "src\$Workflow"
 if (-not (Test-Path $workflowFile -PathType Leaf)) { "check-workflow: $Repo has no src\$Workflow."; exit 1 }
+# A workflow that includes NoExperimentFolder makes no experiment folder: no Harp records, manifest or trial log.
+$noRecords = (Get-Content $workflowFile -Raw).Contains('Path="OpenRigs.Logging:NoExperimentFolder.bonsai"')
 $layoutFile = Join-Path $Repo ("config\" + [IO.Path]::GetFileNameWithoutExtension($Workflow) + ".layout")
 $bin = Join-Path ([IO.Path]::GetTempPath()) ('check-workflow-' + (Split-Path $Repo -Leaf))
 $bonsaiDir = Join-Path $Repo '.bonsai'
@@ -62,8 +66,9 @@ function Initialize-Assemblies {
     foreach ($a in $cfg.PackageConfiguration.AssemblyLocations.AssemblyLocation) {
         if ($a.processorArchitecture -in 'MSIL', 'Amd64') { $map[$a.assemblyName] = Join-Path $bonsaiDir $a.location }
     }
+    # The Extensions build's own copies, when there is a build (none without src\Extensions.csproj: the packages' are used).
     $map['Extensions'] = Join-Path $bin 'Extensions.dll'
-    foreach ($n in 'YamlDotNet', 'Newtonsoft.Json') { $map[$n] = Join-Path $bin "$n.dll" }
+    foreach ($n in 'YamlDotNet', 'Newtonsoft.Json') { if (Test-Path (Join-Path $bin "$n.dll")) { $map[$n] = Join-Path $bin "$n.dll" } }
     # Native libraries (OpenCV, libgit2) from the folders Bonsai.config names for x64.
     foreach ($f in $cfg.PackageConfiguration.LibraryFolders.LibraryFolder) {
         if ($f.platform -eq 'x64') { $env:PATH = (Join-Path $bonsaiDir $f.path) + ';' + $env:PATH }
@@ -75,12 +80,12 @@ function Initialize-Assemblies {
         $loaded = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq $n } | Select-Object -First 1
         if ($loaded) { return $loaded }
         $p = $script:resolveMap[$n]
-        if (-not $p) { $p = Find-PackageAssembly $script:resolveFolders $n }
+        if (-not $p -or -not (Test-Path $p)) { $p = Find-PackageAssembly $script:resolveFolders $n }
         if ($p -and (Test-Path $p)) { return [Reflection.Assembly]::LoadFrom($p) }
         return $null
     }
     [AppDomain]::CurrentDomain.add_AssemblyResolve($script:resolver)
-    foreach ($n in 'Bonsai.Core', 'Bonsai', 'Extensions', 'OpenRigs.Devices') { $null = [Reflection.Assembly]::LoadFrom($map[$n]) }
+    foreach ($n in 'Bonsai.Core', 'Bonsai', 'Extensions', 'OpenRigs.Devices') { if (Test-Path $map[$n]) { $null = [Reflection.Assembly]::LoadFrom($map[$n]) } }
 }
 
 # The template filled in as a rig with exactly the workflow's devices (workflow_lint.filled_rig, from its pieces), at
@@ -165,6 +170,11 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
 '@
     $objects = New-Object BuiltObjects
     $null = $objects.Visit($built)
+    foreach ($p in $script:plan.problems) { "  FAIL  $p"; $failed++ }
+    if ($noRecords) {
+        "  ok    NoExperimentFolder: the workflow records nothing, so no RecordHarpDevices, ExperimentManifest or trial log to check"
+        exit $(if ($failed) { 1 } else { 0 })
+    }
     $records = @($objects.Found | Where-Object { $_.GetType().FullName -eq 'OpenRigs.HarpDevices.RecordHarpDevice' })
     $got = @($records | ForEach-Object { "$($_.Name) $($_.PortName) $($_.UsbSerial) $($_.ExpectedWhoAmI)" } | Sort-Object)
     $want = @($script:plan.records | Sort-Object)
@@ -172,7 +182,6 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
     else { "  FAIL  RecordHarpDevices made: $($got -join '; '); the workflow's pieces drive: $($want -join '; ')"; $failed++ }
     $dumps = @($objects.Found | Where-Object { $_.GetType().FullName -eq 'OpenRigs.HarpDevices.RequestRegisterDump' }).Count
     if ($dumps -eq $want.Count) { "  ok    ... and asks each for its dump on <Name>.Commands" } else { "  FAIL  $dumps dump request(s), not $($want.Count): is every board's command subject <Name>.Commands?"; $failed++ }
-    foreach ($p in $script:plan.problems) { "  FAIL  $p"; $failed++ }
     $recorder = @($objects.Found | Where-Object { $_.GetType().Name -eq 'ManifestRecorder' })
     $planField = if ($recorder.Count) { $recorder[0].GetType().GetFields([Reflection.BindingFlags]'Instance,NonPublic,Public') | Where-Object { $_.FieldType.Name -eq 'ExpectedPlan' } | Select-Object -First 1 }
     # The devices' folders and the Harp records, from rig.yml; each log's entry (ending _) is workflow_lint.expected_files_problems' to check.
@@ -237,14 +246,18 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
 if ($Step -eq 'Checks') {
     Initialize-Assemblies
     foreach ($p in $script:resolveMap.Values) { if (Test-Path $p) { try { $null = [Reflection.Assembly]::LoadFrom($p) } catch {} } }
-    [AppDomain]::CurrentDomain.remove_AssemblyResolve($script:resolver)
+    # The resolver goes (a script block resolving on an Rx thread deadlocks) unless there is no Extensions build to
+    # supply YamlDotNet at the version OpenRigs.Devices binds to: then the package's is resolved to it.
+    if (Test-Path (Join-Path $bin 'YamlDotNet.dll')) { [AppDomain]::CurrentDomain.remove_AssemblyResolve($script:resolver) }
     $failed = 0
     # Each task file as the workflow reads it at Go (the generated deserializer: no unknown key).
     $taskType = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq 'Extensions' } |
         ForEach-Object { $_.GetTypes() } | Where-Object { $_.IsPublic -and $_.Name -like '*TaskLogic' -and $_.Namespace -like '*Task' } | Select-Object -First 1
-    $taskFiles = @(Get-ChildItem (Join-Path $Repo 'config') -Filter 'task*.yml' -ErrorAction SilentlyContinue)
+    # A workflow with NoExperimentFolder has no generated TaskLogic: its task file, if any, is read by an include.
+    $taskFiles = if ($noRecords) { @() } else { @(Get-ChildItem (Join-Path $Repo 'config') -Filter 'task*.yml' -ErrorAction SilentlyContinue) }
     if (-not $taskType -and $taskFiles.Count) { "  FAIL  src\Extensions has no generated <Name>Task.<Name>TaskLogic"; exit 1 }
-    if (-not $taskFiles.Count) { "  ok    no task file (the workflow takes none)" }
+    if ($noRecords) { "  ok    NoExperimentFolder: no generated TaskLogic, so no task file read here" }
+    elseif (-not $taskFiles.Count) { "  ok    no task file (the workflow takes none)" }
     foreach ($file in $taskFiles) {
         try {
             $d = (New-Object YamlDotNet.Serialization.DeserializerBuilder).Build()
@@ -309,9 +322,13 @@ $sourceArgs = @($sources | Select-Object -Unique | ForEach-Object { '--source'; 
 $bad = 0
 "1. Compiling src\Extensions as C# 5..."
 Remove-Item $bin -Recurse -Force -ErrorAction SilentlyContinue
-$log = & { $ErrorActionPreference = 'Continue'; & dotnet build (Join-Path $Repo 'src\Extensions.csproj') -o $bin -nologo -v q -p:LangVersion=5 @sourceArgs 2>&1 | ForEach-Object { "$_" } }
-if ($LASTEXITCODE -ne 0) { $log | Where-Object { $_ -match 'error' } | Select-Object -Unique | ForEach-Object { "  $_" }; "  FAILED"; exit 1 }
-"  ok"
+$null = New-Item -ItemType Directory $bin -Force
+if (-not (Test-Path (Join-Path $Repo 'src\Extensions.csproj'))) { "  ok    no extensions to build (no src\Extensions.csproj)" }
+else {
+    $log = & { $ErrorActionPreference = 'Continue'; & dotnet build (Join-Path $Repo 'src\Extensions.csproj') -o $bin -nologo -v q -p:LangVersion=5 @sourceArgs 2>&1 | ForEach-Object { "$_" } }
+    if ($LASTEXITCODE -ne 0) { $log | Where-Object { $_ -match 'error' } | Select-Object -Unique | ForEach-Object { "  $_" }; "  FAILED"; exit 1 }
+    "  ok"
+}
 "2. tests\Extensions.Tests..."
 $tests = Join-Path $Repo 'tests\Extensions.Tests'
 if (-not (Test-Path $tests)) { "  ok    none (src\Extensions holds no task logic)" }
