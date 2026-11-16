@@ -29,6 +29,8 @@
     href: OpenRigs.Devices/lickety-split.md
   - name: Serial Device
     href: OpenRigs.Devices/serial-device.md
+  - name: Trial Loop
+    href: OpenRigs.Devices/trial-loop.md
   - name: Triggered Spinnaker
     href: OpenRigs.Devices/triggered-spinnaker.md
 - name: OpenRigs.Logging

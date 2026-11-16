@@ -1,0 +1,295 @@
+using OpenRigs.Devices.Zapit;
+using System;
+using System.Collections.Generic;
+
+namespace OpenRigs.Devices
+{
+    /// <summary>What a <see cref="TrialLoop{TTrial, TUpdate, TOutcome}"/> event is.</summary>
+    public enum TrialEventKind
+    {
+        /// <summary>The trial was drawn and its interval began; Seconds is the interval's start, exactly.</summary>
+        Interval,
+        /// <summary>On a hardware-triggered rig, a laser trial's StartStimulus goes now, during its interval.</summary>
+        Arm,
+        /// <summary>The trial starts; Seconds is the start, exactly: the interval's end less the lead, or later until the quiet waits hold.</summary>
+        Start,
+        /// <summary>A laser trial's trigger: the trigger line rises; on a rig without hardware triggering its StartStimulus goes now.</summary>
+        Trigger,
+        /// <summary>The stimulus goes on, at the first tick at or after the trial start plus the lead.</summary>
+        Stimulus,
+        /// <summary>The task's own change during the trial, in Update (a pip, a moved grating).</summary>
+        Update,
+        /// <summary>One of the task's timed cues, named in Cue.</summary>
+        Cue,
+        /// <summary>The trial ended, its outcome in Outcome.</summary>
+        Outcome,
+        /// <summary>The laser has run its longest (LaserTiming.LaserMaxSeconds from the trigger) with no outcome yet: stop it.</summary>
+        LaserCap,
+        /// <summary>The trigger line falls.</summary>
+        TriggerOff
+    }
+
+    /// <summary>When a trial's laser ends, and so when the next trial's StartStimulus may go.</summary>
+    public enum LaserEnd
+    {
+        /// <summary>The laser runs until the outcome (or LaserCap); the trigger line falls TriggerHoldSeconds after the outcome.</summary>
+        AtOutcome,
+        /// <summary>The laser runs LaserDurationSeconds from the trigger, outcome or not; the line falls then.</summary>
+        AfterDuration
+    }
+
+    /// <summary>
+    /// An experiment's laser timing: the triggering, when the laser and its trigger line end, and when the next trial
+    /// may be armed (the line fallen, plus any ramp-down Zapit plays before it takes another StartStimulus).
+    /// </summary>
+    public sealed class LaserTiming
+    {
+        LaserTiming()
+        {
+        }
+
+        /// <summary>Gets whether the Zapit DAQ waits for the trigger line: its StartStimulus goes during the interval (Arm), else at the trigger.</summary>
+        public bool HardwareTriggered { get; private set; }
+
+        /// <summary>Gets when the laser ends.</summary>
+        public LaserEnd End { get; private set; }
+
+        /// <summary>Gets how long the trigger line stays up past the outcome, in seconds (AtOutcome).</summary>
+        public double TriggerHoldSeconds { get; private set; }
+
+        /// <summary>Gets how long the line stays up from the trigger, in seconds (AfterDuration).</summary>
+        public double LaserDurationSeconds { get; private set; }
+
+        /// <summary>Gets how long after the line falls Zapit takes the next StartStimulus, in seconds (AfterDuration).</summary>
+        public double RampDownSeconds { get; private set; }
+
+        /// <summary>Gets how long after the trigger LaserCap comes with no outcome yet, in seconds (AtOutcome); infinity for none.</summary>
+        public double LaserMaxSeconds { get; private set; }
+
+        /// <summary>The laser on until the outcome, stopped by LaserCap laserMaxSeconds after the trigger; the line held triggerHoldSeconds past the outcome.</summary>
+        public static LaserTiming UntilOutcome(bool hardwareTriggered, double triggerHoldSeconds, double laserMaxSeconds)
+        {
+            Check("triggerHoldSeconds", triggerHoldSeconds, false);
+            if (!(laserMaxSeconds > 0)) throw new ArgumentException(string.Format("LaserTiming: laserMaxSeconds is {0}; it must be above 0 (infinity for no cap).", laserMaxSeconds));
+            return new LaserTiming
+            {
+                HardwareTriggered = hardwareTriggered,
+                End = LaserEnd.AtOutcome,
+                TriggerHoldSeconds = triggerHoldSeconds,
+                LaserMaxSeconds = laserMaxSeconds,
+            };
+        }
+
+        /// <summary>The laser on for laserDurationSeconds from the trigger; the next trial armed rampDownSeconds after the line falls.</summary>
+        public static LaserTiming ForDuration(bool hardwareTriggered, double laserDurationSeconds, double rampDownSeconds)
+        {
+            Check("laserDurationSeconds", laserDurationSeconds, true);
+            Check("rampDownSeconds", rampDownSeconds, false);
+            return new LaserTiming
+            {
+                HardwareTriggered = hardwareTriggered,
+                End = LaserEnd.AfterDuration,
+                LaserDurationSeconds = laserDurationSeconds,
+                RampDownSeconds = rampDownSeconds,
+                LaserMaxSeconds = double.PositiveInfinity,
+            };
+        }
+
+        static void Check(string name, double value, bool aboveZero)
+        {
+            if (!(aboveZero ? value > 0 : value >= 0) || double.IsInfinity(value))
+            {
+                throw new ArgumentException(string.Format("LaserTiming: {0} is {1}; it must be a finite number {2}.", name, value, aboveZero ? "above 0" : "from 0"));
+            }
+        }
+    }
+
+    /// <summary>What a task's cue is timed from.</summary>
+    public enum CueAnchor
+    {
+        /// <summary>The stimulus as it was due (the trial start plus the lead); a trial whose stimulus never came has none of these.</summary>
+        Stimulus,
+        /// <summary>The start of the interval after the trial's outcome (the outcome plus its timeout).</summary>
+        NextInterval
+    }
+
+    /// <summary>A moment of a trial the task names, such as the grating off or the spouts in: a Cue event at the first tick at or past it, outcome or not.</summary>
+    public sealed class TrialCue
+    {
+        /// <summary>A cue named <paramref name="name"/>, <paramref name="seconds"/> after its anchor.</summary>
+        public TrialCue(string name, CueAnchor anchor, double seconds)
+        {
+            if (string.IsNullOrEmpty(name)) throw new ArgumentException("TrialCue: a cue needs a name.");
+            if (!(seconds >= 0) || double.IsInfinity(seconds)) throw new ArgumentException(string.Format("TrialCue: cue {0} is {1} s after its anchor; it must be a finite number from 0.", name, seconds));
+            Name = name;
+            Anchor = anchor;
+            Seconds = seconds;
+        }
+
+        /// <summary>Gets the cue's name, as a Cue event carries it.</summary>
+        public string Name { get; private set; }
+
+        /// <summary>Gets what the cue is timed from.</summary>
+        public CueAnchor Anchor { get; private set; }
+
+        /// <summary>Gets the seconds from the anchor.</summary>
+        public double Seconds { get; private set; }
+    }
+
+    /// <summary>What one trial asks of the loop, given by the task's rules as the trial is drawn.</summary>
+    public sealed class TrialTiming
+    {
+        /// <summary>A trial with no interval, lead, quiet waits, laser or cues and no response limit.</summary>
+        public TrialTiming()
+        {
+            ResponseSeconds = double.PositiveInfinity;
+        }
+
+        /// <summary>Gets or sets the interval drawn for the trial (itiSeconds): its start to the stimulus with a quiet mouse.</summary>
+        public double IntervalSeconds { get; set; }
+
+        /// <summary>Gets or sets the signed lead (laserToStimulusSeconds): the trigger this long before the stimulus, after it if negative. The trial starts max(lead, 0) before the stimulus in every experiment.</summary>
+        public double LaserToStimulusSeconds { get; set; }
+
+        /// <summary>Gets or sets how long every spout must be released before the trial starts; 0 for none (QuietWait).</summary>
+        public double LickQuietSeconds { get; set; }
+
+        /// <summary>Gets or sets the window the wheel's travel is counted over before the trial starts; 0 for none (QuietWait).</summary>
+        public double WheelQuietSeconds { get; set; }
+
+        /// <summary>Gets or sets the most wheel travel, in cm, that window may hold (QuietWait).</summary>
+        public double WheelQuietCm { get; set; }
+
+        /// <summary>Gets or sets whether the trial is armed and triggered (every trial of an optogenetics experiment, laser on or off).</summary>
+        public bool Laser { get; set; }
+
+        /// <summary>Gets or sets the stimulus to the response window's opening, in seconds (an open loop).</summary>
+        public double ResponseDelaySeconds { get; set; }
+
+        /// <summary>Gets or sets how long the response window stays open, in seconds; at its end the rules' ResponseEnd gives the outcome. Infinity for no limit.</summary>
+        public double ResponseSeconds { get; set; }
+
+        /// <summary>Gets or sets the trial's cues; null or empty for none.</summary>
+        public IList<TrialCue> Cues { get; set; }
+    }
+
+    /// <summary>
+    /// The Harp times of the trial so far, as its row logs them (the lab's shared block of trial columns): each a time
+    /// on the Harp clock, NaN until it comes. Given to the rules with each input, so an outcome built from it is timed at Now.
+    /// </summary>
+    public sealed class TrialTimes
+    {
+        /// <summary>Gets or sets when the interval before the trial began (itiStartTime).</summary>
+        public double IntervalStartTime { get; set; }
+
+        /// <summary>Gets or sets the interval drawn for the trial (itiSeconds).</summary>
+        public double IntervalSeconds { get; set; }
+
+        /// <summary>Gets or sets how long the quiet waits held the start past the interval's end less the lead (quietWaitSeconds).</summary>
+        public double QuietWaitSeconds { get; set; }
+
+        /// <summary>Gets or sets the trial start, exactly (trialStartTime).</summary>
+        public double TrialStartTime { get; set; }
+
+        /// <summary>Gets or sets when the stimulus was due: the trial start plus the lead.</summary>
+        public double StimulusTime { get; set; }
+
+        /// <summary>Gets or sets the tick the stimulus was commanded on (stimulusOnsetTime); NaN before.</summary>
+        public double StimulusOnsetTime { get; set; }
+
+        /// <summary>Gets or sets when the response window opens: StimulusTime plus the response delay.</summary>
+        public double ResponseStartTime { get; set; }
+
+        /// <summary>Gets or sets when it closes; infinity for no limit.</summary>
+        public double ResponseEndTime { get; set; }
+
+        /// <summary>Gets or sets the tick the trigger line rose (laserTriggerTime); NaN if it has not.</summary>
+        public double LaserTriggerTime { get; set; }
+
+        /// <summary>Gets or sets the Harp clock's latest tick: an outcome given now is timed then (outcomeTime).</summary>
+        public double Now { get; set; }
+
+        /// <summary>Gets whether the laser was triggered: an outcome given now logs its power, else 0 mW.</summary>
+        public bool LaserFired { get { return !double.IsNaN(LaserTriggerTime); } }
+
+        /// <summary>Gets whether the response window is open at Now.</summary>
+        public bool Responding { get { return Now >= ResponseStartTime - TrialLoop.Tolerance; } }
+    }
+
+    /// <summary>A trial's outcome as a task's rules give it: the loop needs only its timeout.</summary>
+    public interface ITrialOutcome
+    {
+        /// <summary>Gets the timeout after the trial, in seconds (penaltyTimeoutSeconds): the next interval starts at the outcome plus this.</summary>
+        double TimeoutSeconds { get; }
+    }
+
+    /// <summary>
+    /// A task's own part of its trials, which <see cref="TrialLoop{TTrial, TUpdate, TOutcome}"/> runs: the draw, each
+    /// trial's timing, and the response rule, called with each input from the trial's start to its outcome. A method
+    /// returns the outcome when the trial ends, else null; changes the task shows (TUpdate) go into updates, in order.
+    /// Called under the loop's lock, one call at a time.
+    /// </summary>
+    public interface ITrialRules<TTrial, TUpdate, TOutcome>
+        where TTrial : class, IZapitTrial
+        where TOutcome : class, ITrialOutcome
+    {
+        /// <summary>Gets the experiment's laser timing; null in an experiment without a laser.</summary>
+        LaserTiming Laser { get; }
+
+        /// <summary>The next trial, at the start of its interval; previous is the last trial's outcome, null before the first.</summary>
+        TTrial Draw(TOutcome previous);
+
+        /// <summary>What the trial asks of the loop.</summary>
+        TrialTiming Timing(TTrial trial);
+
+        /// <summary>The trial starts; wheelCm is the wheel's latest distance, NaN if none has come.</summary>
+        void Start(TTrial trial, TrialTimes times, double wheelCm);
+
+        /// <summary>The stimulus goes on (the Stimulus event is just before these updates).</summary>
+        void Stimulus(TTrial trial, TrialTimes times, ICollection<TUpdate> updates);
+
+        /// <summary>Each Harp clock tick from the stimulus to the outcome, the stimulus's own tick included.</summary>
+        TOutcome Tick(TTrial trial, TrialTimes times, ICollection<TUpdate> updates);
+
+        /// <summary>A spout touched (spout 0 left, 1 right) from the trial's start to its outcome; times.Responding says whether the window is open.</summary>
+        TOutcome Lick(TTrial trial, int spout, TrialTimes times, ICollection<TUpdate> updates);
+
+        /// <summary>The wheel's distance in cm, from the trial's start to its outcome.</summary>
+        TOutcome Wheel(TTrial trial, double cm, TrialTimes times, ICollection<TUpdate> updates);
+
+        /// <summary>The response window closed with no outcome: the outcome then, never null.</summary>
+        TOutcome ResponseEnd(TTrial trial, TrialTimes times);
+    }
+
+    /// <summary>One thing a trial loop asks the workflow to do, at a Harp time.</summary>
+    public sealed class TrialEvent<TTrial, TUpdate, TOutcome>
+    {
+        internal TrialEvent(TrialEventKind kind, double seconds, TTrial trial, string cue, TUpdate update, TOutcome outcome)
+        {
+            Kind = kind;
+            Seconds = seconds;
+            Trial = trial;
+            Cue = cue;
+            Update = update;
+            Outcome = outcome;
+        }
+
+        /// <summary>Gets what the event is.</summary>
+        public TrialEventKind Kind { get; private set; }
+
+        /// <summary>Gets its Harp time: the tick it came on, or the exact moment for Interval and Start.</summary>
+        public double Seconds { get; private set; }
+
+        /// <summary>Gets the trial it belongs to.</summary>
+        public TTrial Trial { get; private set; }
+
+        /// <summary>Gets the cue's name (Cue).</summary>
+        public string Cue { get; private set; }
+
+        /// <summary>Gets the task's change (Update).</summary>
+        public TUpdate Update { get; private set; }
+
+        /// <summary>Gets the outcome (Outcome).</summary>
+        public TOutcome Outcome { get; private set; }
+    }
+}
