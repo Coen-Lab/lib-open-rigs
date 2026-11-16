@@ -8,13 +8,14 @@ namespace OpenRigs.Core
 {
     /// <summary>
     /// Passes a stream's values through and stops the workflow with <see cref="Message"/> once none
-    /// has arrived for <see cref="GapSeconds"/>, from subscription or from the last value: a stream
-    /// that stops arriving mid-run, such as a camera's frames, ends the run saying what stopped.
+    /// has arrived for <see cref="GapSeconds"/>, from subscription (or from a second input's first value)
+    /// or from the last value: a stream that stops arriving mid-run, such as a camera's frames, ends the
+    /// run saying what stopped.
     /// Rx's Timeout says only "The operation has timed out.", which cannot tell two of them apart.
     /// </summary>
     [Combinator]
     [DefaultProperty("Message")]
-    [Description("Passes the values through and stops the workflow with Message once none has arrived for GapSeconds, from subscription or from the last value.")]
+    [Description("Passes the values through and stops the workflow with Message once none has arrived for GapSeconds, from subscription (with a second input, from its first value) or from the last value.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class GapWatchdog
     {
@@ -30,8 +31,23 @@ namespace OpenRigs.Core
         [Description("What is watched, such as a camera's name (Camera-Face), put before Message so one message serves every instance of a device. Blank for none.")]
         public string Name { get; set; }
 
-        /// <summary>Passes the values through until a gap longer than GapSeconds.</summary>
+        /// <summary>Passes the values through until a gap longer than GapSeconds, the first counted from subscription.</summary>
         public IObservable<TSource> Process<TSource>(IObservable<TSource> source)
+        {
+            return Watch(source, scheduler => Observable.Timer(TimeSpan.FromSeconds(GapSeconds), scheduler));
+        }
+
+        /// <summary>
+        /// Passes the values through until a gap longer than GapSeconds, the first counted from the first value of
+        /// <paramref name="start"/> (or the first value, if sooner): a stream that cannot begin before something
+        /// else, such as frames before the camera trigger starts, is not timed while it waits.
+        /// </summary>
+        public IObservable<TSource> Process<TSource, TStart>(IObservable<TSource> source, IObservable<TStart> start)
+        {
+            return Watch(source, scheduler => start.Take(1).SelectMany(_ => Observable.Timer(TimeSpan.FromSeconds(GapSeconds), scheduler)));
+        }
+
+        IObservable<TSource> Watch<TSource>(IObservable<TSource> source, Func<IScheduler, IObservable<long>> firstTimeout)
         {
             return Observable.Defer(() =>
             {
@@ -45,9 +61,9 @@ namespace OpenRigs.Core
                 return Observable.Using(
                     () => new EventLoopScheduler(),
                     scheduler => source.Timeout(
-                        TimeSpan.FromSeconds(gapSeconds),
-                        Observable.Defer(() => Observable.Throw<TSource>(new TimeoutException(message))),
-                        scheduler));
+                        firstTimeout(scheduler),
+                        _ => Observable.Timer(TimeSpan.FromSeconds(gapSeconds), scheduler),
+                        Observable.Defer(() => Observable.Throw<TSource>(new TimeoutException(message)))));
             });
         }
     }

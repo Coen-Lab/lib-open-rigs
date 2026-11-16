@@ -66,6 +66,39 @@ namespace OpenRigs.Core.Tests
             Assert.Inconclusive("the runner held the test's thread past 0.45 s between values in every attempt");
         }
 
+        // A camera's frames cannot come before its trigger starts, which waits for every camera to open: the
+        // first gap is timed from the start signal, so a slow open is not read as a trigger fault.
+        [TestMethod]
+        public void WithAStartTheFirstGapWaitsForIt()
+        {
+            var dog = new GapWatchdog { GapSeconds = 0.3, Message = Message };
+            var source = new Subject<int>();
+            var start = new Subject<bool>();
+            var stopped = new System.Threading.ManualResetEventSlim();
+            Exception error = null;
+            using (dog.Process(source, start).Subscribe(_ => { }, e => { error = e; stopped.Set(); }))
+            {
+                Assert.IsFalse(stopped.Wait(TimeSpan.FromSeconds(1)), "it stopped before the start came");
+                start.OnNext(true);
+                Assert.IsTrue(stopped.Wait(TimeSpan.FromSeconds(30)), "no frame after the start never stopped it");
+            }
+            Assert.IsInstanceOfType(error, typeof(TimeoutException));
+            Assert.AreEqual(Message, error.Message);
+        }
+
+        [TestMethod]
+        public void WithAStartAGapMidRunStillStopsIt()
+        {
+            var dog = new GapWatchdog { GapSeconds = 0.3, Message = Message };
+            var source = new Subject<int>();
+            var stopped = new System.Threading.ManualResetEventSlim();
+            using (dog.Process(source, Observable.Never<bool>()).Subscribe(_ => { }, e => stopped.Set()))
+            {
+                source.OnNext(1);
+                Assert.IsTrue(stopped.Wait(TimeSpan.FromSeconds(30)), "a gap after a frame never stopped it");
+            }
+        }
+
         [TestMethod]
         public void StopsWithItsMessageAfterAGapMidRun()
         {
