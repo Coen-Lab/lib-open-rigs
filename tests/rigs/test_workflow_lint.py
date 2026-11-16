@@ -513,3 +513,17 @@ def test_a_board_not_named_main_is_filled_from_the_template_s_first_board(tmp_pa
     LabRig.model_validate(rig)
     assert list(rig["behaviorBoard"]) == ["arena"] and records == ["BehaviorBoard-Arena COM1 SERIAL0 1216"]
     assert files == ["BehaviorBoard-Arena/", "BehaviorBoard-Arena/BehaviorBoard-Arena_device.json", "BehaviorBoard-Arena/BehaviorBoard-Arena.yml"]
+
+
+def test_each_clock_publishes_timestamp_from_its_fast_register():
+    # Every pulse width, wait and event time reads Timestamp: a 1 Hz heartbeat clock rounds them to whole seconds (16 Nov 2026).
+    def register_into_timestamp(resource: str) -> str:
+        root = lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
+        nodes = list(root.find(f"{lint.W}Workflow/{lint.W}Nodes") or [])
+        edges = {int(e.get("To", -1)): int(e.get("From", -1)) for e in root.iter(f"{lint.W}Edge")}
+        at = next(i for i, n in enumerate(nodes) if n.get(lint.XSI) == "rx:BehaviorSubject" and n.findtext(f"{lint.W}Name") == "Timestamp")
+        while not (nodes[at].get(lint.XSI) or "").endswith(":Parse"):
+            at = edges[at]
+        return next(iter(nodes[at])).get(lint.XSI) or ""
+    assert register_into_timestamp("BehaviorBoard/ClockFromBoard.bonsai") == "beh:TimestampedAnalogData"
+    assert register_into_timestamp("ClockFromTimestampGenerator.bonsai") == "tsg:TimestampedTimer"

@@ -5,8 +5,9 @@
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The rig's clock from a Behavior board's own Harp clock, for a rig with no timestamp generator; a workflow has exactly one clock. The board is a BehaviorBoard piece, Board. Sets the board's clock to the PC's UTC time, again at each heartbeat until one agrees (SetHarpClock: a write is lost about one start in four), and publishes Timestamp (each heartbeat's time, in Harp seconds) and HarpClockSet (the first Timestamp within 2 s of UTC), announcing HarpClockSet into ReadyStages. HarpClockSet is declared by ReadyGate, which comes before every device: the board's own log waits for it, so a definition here, built from the board's messages, would depend on itself. Without it the board counts from power-on, and every Harp time and file name follows that count (1904). Stops the workflow, naming the board, if its clock is not set within 10 s or its heartbeats stop for 3 s.</Description>
+  <Description>The rig's clock from a Behavior board's own Harp clock, for a rig with no timestamp generator; a workflow has exactly one clock. The board is a BehaviorBoard piece, Board. Sets the board's clock to the PC's UTC time, again at each heartbeat until one agrees (SetHarpClock: a write is lost about one start in four), and publishes Timestamp (the time of each of the board's AnalogData events, 1 kHz, in Harp seconds, as before the device pieces: every pulse width, wait and event time reads it, so a heartbeat clock would round them to 1 s) and HarpClockSet (the first heartbeat within 2 s of UTC), announcing HarpClockSet into ReadyStages. HarpClockSet is declared by ReadyGate, which comes before every device: the board's own log waits for it, so a definition here, built from the board's messages, would depend on itself. Without it the board counts from power-on, and every Harp time and file name follows that count (1904). Stops the workflow, naming the board, if its clock is not set within 10 s or its heartbeats stop for 3 s.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -47,12 +48,6 @@
       <Expression xsi:type="MemberSelector">
         <Selector>Seconds</Selector>
       </Expression>
-      <Expression xsi:type="rx:BehaviorSubject">
-        <Name>Timestamp</Name>
-      </Expression>
-      <Expression xsi:type="SubscribeSubject">
-        <Name>Timestamp</Name>
-      </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:HarpClockSet">
           <dev:ToleranceSeconds>2</dev:ToleranceSeconds>
@@ -69,6 +64,15 @@
       <Expression xsi:type="MulticastSubject">
         <Name>ReadyStages</Name>
       </Expression>
+      <Expression xsi:type="beh:Parse">
+        <harp:Register xsi:type="beh:TimestampedAnalogData" />
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Seconds</Selector>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>Timestamp</Name>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="3" Label="Source2" />
@@ -81,10 +85,12 @@
       <Edge From="7" To="8" Label="Source1" />
       <Edge From="8" To="9" Label="Source1" />
       <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
       <Edge From="11" To="12" Label="Source1" />
       <Edge From="12" To="13" Label="Source1" />
-      <Edge From="13" To="14" Label="Source1" />
+      <Edge From="7" To="14" Label="Source1" />
       <Edge From="14" To="15" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
