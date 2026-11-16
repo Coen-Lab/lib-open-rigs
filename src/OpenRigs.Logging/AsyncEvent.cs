@@ -16,7 +16,7 @@ namespace OpenRigs.Logging
         /// <summary>
         /// Initializes a new instance of the <see cref="AsyncEvent"/> class.
         /// </summary>
-        /// <param name="eventName">What happened, for example RewardLeft. Commas and line breaks are replaced, so the row stays one CSV row.</param>
+        /// <param name="eventName">What happened, for example RewardDelivered. Commas and line breaks are replaced, so the row stays one CSV row.</param>
         /// <param name="detail">Any text that qualifies the event, for example Manual. Commas and line breaks are replaced.</param>
         /// <param name="value">The number the event carries, for example microlitres or steps, or null if it carries none.</param>
         public AsyncEvent(string eventName, string detail, double? value)
@@ -27,7 +27,7 @@ namespace OpenRigs.Logging
         }
 
         /// <summary>
-        /// Gets what happened, for example RewardLeft or SpoutsIn.
+        /// Gets what happened, for example RewardDelivered or SpoutsIn.
         /// </summary>
         public string Event { get; private set; }
 
@@ -79,9 +79,9 @@ namespace OpenRigs.Logging
     public class CreateAsyncEvent
     {
         /// <summary>
-        /// Gets or sets what happened, for example RewardLeft or SpoutsIn.
+        /// Gets or sets what happened, for example RewardDelivered or SpoutsIn.
         /// </summary>
-        [Description("What happened, for example RewardLeft or SpoutsIn.")]
+        [Description("What happened, for example RewardDelivered or SpoutsIn.")]
         public string Event { get; set; } = "Event";
 
         /// <summary>

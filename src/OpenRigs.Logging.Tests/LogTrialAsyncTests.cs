@@ -299,7 +299,7 @@ namespace OpenRigs.Logging.Tests
 
     /// <summary>
     /// LogTrial's and LogAsync's AutoFlush and PublishRows reach the CsvWriter only through two
-    /// ExternalizedMappings in LogData (audit L1-L1, 14 Nov 2026): a run reads the CSV after it has
+    /// ExternalizedMappings in LogData: a run reads the CSV after it has
     /// closed, so a dropped mapping would pass every other test while each row waited in the buffer.
     /// </summary>
     [TestClass]

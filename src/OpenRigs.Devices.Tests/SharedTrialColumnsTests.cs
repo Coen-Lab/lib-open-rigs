@@ -7,7 +7,7 @@ namespace OpenRigs.Devices.Tests
     public class SharedTrialColumnsTests
     {
         // A task's row: the shared block in trial-columns.yml's order, then its own.
-        class OptoRow
+        class OptogeneticsRow
         {
             public int trialNumber;
             public string trialType;
@@ -44,7 +44,7 @@ namespace OpenRigs.Devices.Tests
             public bool penalised;
         }
 
-        class HalfOpto : CoreRow { public int laserCondition; }
+        class HalfOptogenetics : CoreRow { public int laserCondition; }
 
         class NoTimeout { public int trialNumber; }
 
@@ -73,7 +73,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void FillsTheSharedBlockFromTheLoopsTimes()
         {
-            var row = SharedTrialColumns.Fill(new OptoRow { choice = "Left" }, Laser(), Times(12.25), 3, false, true, 6, true);
+            var row = SharedTrialColumns.Fill(new OptogeneticsRow { choice = "Left" }, Laser(), Times(12.25), 3, false, true, 6, true);
             Assert.AreEqual(7, row.trialNumber);
             Assert.AreEqual(10, row.itiStartTime);
             Assert.AreEqual(2.5, row.itiSeconds);
@@ -96,14 +96,14 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void AnUnpenalisedOrUntriggeredTrialLogsNoTimeoutSoundOrPower()
         {
-            var row = SharedTrialColumns.Fill(new OptoRow(), Laser(), Times(double.NaN), 3, true, false, 6, true);
+            var row = SharedTrialColumns.Fill(new OptogeneticsRow(), Laser(), Times(double.NaN), 3, true, false, 6, true);
             Assert.IsTrue(row.rewarded);
             Assert.IsFalse(row.penalised);
             Assert.IsFalse(row.penaltySound);
             Assert.AreEqual(0, row.penaltyTimeoutSeconds);
             Assert.AreEqual(0, row.laserPowerMw, "answered before its trigger: no laser");
             Assert.IsTrue(double.IsNaN(row.laserTriggerTime));
-            var silent = SharedTrialColumns.Fill(new OptoRow(), Laser(), Times(1), 0, false, true, 6, false);
+            var silent = SharedTrialColumns.Fill(new OptogeneticsRow(), Laser(), Times(1), 0, false, true, 6, false);
             Assert.IsFalse(silent.penaltySound, "the sound off");
             Assert.IsTrue(silent.penalised, "penalised whether or not the sound plays");
 
@@ -122,21 +122,21 @@ namespace OpenRigs.Devices.Tests
             };
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), 0, false, false, 0, false)), "has no itiStartTime, itiSeconds");
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), 0, false, false, 0, false)), "rewardOfferedUl, rewarded, penaltySound, penaltyTimeoutSeconds, penalised");
-            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOpto(), Laser(), Times(1), 0, false, false, 0, false)), "not all of laserCondition, laserPowerMw, laserTriggerTime");
+            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOptogenetics(), Laser(), Times(1), 0, false, false, 0, false)), "not all of laserCondition, laserPowerMw, laserTriggerTime");
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new FloatTimes(), Laser(), Times(1), 0, false, false, 0, false)), "itiSeconds is a Single, not a Double");
         }
 
         [TestMethod]
         public void AnOutcomeIsBuiltFromItsFilledRow()
         {
-            var rewarded = new TrialOutcome<OptoRow>(SharedTrialColumns.Fill(new OptoRow { outcome = TrialOutcomes.Correct }, Laser(), Times(1), 3, true, false, 6, true), "right");
+            var rewarded = new TrialOutcome<OptogeneticsRow>(SharedTrialColumns.Fill(new OptogeneticsRow { outcome = TrialOutcomes.Correct }, Laser(), Times(1), 3, true, false, 6, true), "right");
             Assert.AreEqual(13.5, rewarded.Row.Seconds, "stamped with its outcomeTime");
             Assert.IsTrue(rewarded.Rewarded);
             Assert.AreEqual(Tuple.Create("right", 3.0), rewarded.Reward);
             Assert.IsFalse(rewarded.PenaltySound);
             Assert.AreEqual(0, rewarded.PenaltyTimeoutSeconds);
 
-            var penalised = new TrialOutcome<OptoRow>(SharedTrialColumns.Fill(new OptoRow { outcome = TrialOutcomes.Incorrect }, Laser(), Times(1), 3, false, true, 6, true), "left");
+            var penalised = new TrialOutcome<OptogeneticsRow>(SharedTrialColumns.Fill(new OptogeneticsRow { outcome = TrialOutcomes.Incorrect }, Laser(), Times(1), 3, false, true, 6, true), "left");
             Assert.IsNull(penalised.Reward, "no reward unless rewarded, in every task");
             Assert.IsTrue(penalised.PenaltySound);
             Assert.AreEqual(6, penalised.PenaltyTimeoutSeconds);
@@ -147,7 +147,7 @@ namespace OpenRigs.Devices.Tests
         {
             try
             {
-                new TrialOutcome<OptoRow>(SharedTrialColumns.Fill(new OptoRow { outcome = "Hit" }, Laser(), Times(1), 3, true, false, 6, true), "left");
+                new TrialOutcome<OptogeneticsRow>(SharedTrialColumns.Fill(new OptogeneticsRow { outcome = "Hit" }, Laser(), Times(1), 3, true, false, 6, true), "left");
                 Assert.Fail("no refusal");
             }
             catch (InvalidOperationException e)

@@ -82,7 +82,7 @@ namespace OpenRigs.Audio.Tests
             }
         }
 
-        // Round 3 LM2: a filter or the background noise given as a full path was read; every rig.yml file is relative to
+        // A filter or the background noise given as a full path was read; every rig.yml file is relative to
         // its folder (OpenRigs.Core RigConfigDirectory.FilePath), as the projector's and the valves' are.
         [TestMethod]
         public void AFullPathFilterOrBackgroundNoiseIsRefusedNamingItsKey()

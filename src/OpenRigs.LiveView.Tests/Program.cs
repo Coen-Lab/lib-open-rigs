@@ -75,7 +75,7 @@ namespace OpenRigs.LiveView.Tests
                 Check("a string PathPrefix gives the session key and elapsed", plan.HasExperimentFolder, "no experiment folder");
                 Check("nothing to note in a good rig.yml", plan.Notes.Count == 0, string.Join(" | ", plan.Notes));
                 Check("an experiment folder's rows are streamed as logs", plan.StreamsLoggedRows, "not streamed");
-                // Round 3 LL7: an older Logging without LoggedRows was handled, and noted; there is none now.
+                // An older Logging without LoggedRows was handled, and noted; there is none now.
                 var noFolder = LiveViewPlan.Create(root, name => null);
                 Check("a workflow with no experiment folder streams no rows and notes nothing of Logging",
                     !noFolder.StreamsLoggedRows && !noFolder.Notes.Any(n => n.Contains("LoggedRows")), string.Join(" | ", noFolder.Notes));
@@ -90,7 +90,7 @@ namespace OpenRigs.LiveView.Tests
                 Check("data that is the image itself is streamed as it is", camera.ImagePath == "it", camera.ImagePath);
                 var wrong = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n", name => name == "BehaviorBoard-Main.Data" ? typeof(string) : null);
                 Check("a board whose data is not HarpMessage is skipped, saying why", wrong.Skipped.Any(s => s.Contains("is not HarpMessage")), string.Join(" | ", wrong.Skipped));
-                // L2-L2: HarpRig.NotHarp's rule, as RecordHarpDevices records and the manifest expects.
+                // HarpRig.NotHarp's rule, as RecordHarpDevices records and the manifest expects.
                 var idle = Plan(root, "behaviorBoard:\n  idle:\n    portName: null\n", name => name == "BehaviorBoard-Idle.Data" ? typeof(Bonsai.Harp.HarpMessage) : null);
                 Check("a board with portName: null is not streamed, though its data is HarpMessage", !idle.Streamed.Any() && idle.Skipped.Any(s => s.StartsWith("BehaviorBoard-Idle: it has no portName")), string.Join(" | ", idle.Skipped));
                 // Pip, 11 Nov 2026: the Lickety Splits and stepper drivers drawn under the board.
@@ -108,13 +108,13 @@ namespace OpenRigs.LiveView.Tests
                     stepper == null ? "not streamed" : stepper.TemplateValues()["Interval"] + " " + stepper.Summary);
                 var notHarp = Plan(root, "licketySplit:\n  left:\n    portName: COM15\n", name => name == "LicketySplit-Left.Data" ? typeof(string) : null);
                 Check("a Lickety Split whose data is not HarpMessage is skipped", notHarp.Skipped.Any(s => s.Contains("is not HarpMessage")), string.Join(" | ", notHarp.Skipped));
-                // L2-L1: one empty instance hid its whole kind, without a word.
+                // One empty instance hid its whole kind, without a word.
                 var empty = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  overhead:\n    serialNumber: '1'\n",
                     name => name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage) : name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 Check("an empty entry beside a board is noted, naming it, and its kind is not streamed",
                     empty.Notes.Any(n => n == "the rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none is streamed")
                     && string.Join(", ", empty.Streamed.Select(d => d.Name)) == "Camera-Overhead", string.Join(" | ", empty.Notes));
-                // L2-L5: an entry under a device kind that is not a set of settings is named whatever it holds.
+                // An entry under a device kind that is not a set of settings is named whatever it holds.
                 var spares = Plan(root, "behaviorBoard:\n  main:\n    portName: COM3\n  spare: none\ncamera:\n  overhead:\n    serialNumber: '1'\n  off: off\n  list: []\n",
                     name => name == "BehaviorBoard-Main.Data" ? typeof(Bonsai.Harp.HarpMessage) : name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 Check("a device kind's entry holding none, off or [] is named, with what it holds",
@@ -122,7 +122,7 @@ namespace OpenRigs.LiveView.Tests
                     && spares.Notes.Contains("the rig.yml entries camera: off: off, camera: list: [] have no settings, so every camera is passed over and none is streamed"), string.Join(" | ", spares.Notes));
                 var notDevices = Plan(root, "speakerArray:\n  main:\n    channels: 2\n  syncChannel: 3\n", name => null);
                 Check("a kind that is not a device, holding a value beside settings, is not named", !notDevices.Notes.Any(n => n.Contains("speakerArray")), string.Join(" | ", notDevices.Notes));
-                // L2-L3: enabled in YamlDotNet's words, as the workflow's own rig model reads it.
+                // enabled in YamlDotNet's words, as the workflow's own rig model reads it.
                 foreach (var word in new[] { "false", "False", "n", "No", "off", "OFF" })
                 {
                     var disabled = Plan(root, "camera:\n  overhead:\n    liveView:\n      enabled: " + word + "\n", name => name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
@@ -176,11 +176,11 @@ namespace OpenRigs.LiveView.Tests
                 var found = OpenRigs.Shared.WorkflowFile.FullPath(@"src\main.bonsai", src);
                 Check("a relative path given at launch is found from the workflow's folder", found == Path.Combine(src, "main.bonsai"), found);
                 Check("an absolute one is kept", OpenRigs.Shared.WorkflowFile.FullPath(Path.Combine(src, "main.bonsai"), root) == Path.Combine(src, "main.bonsai"), "changed");
-                // Round 5: the live view read every argument, the manifest only the person's. Both now
+                // The live view read every argument, the manifest only the person's. Both now
                 // compile in src\Shared\WorkflowFile.cs; Bonsai's bootstrapper adds its own after --no-boot.
                 var relaunched = OpenRigs.Shared.WorkflowFile.Find(new[] { "Bonsai.exe", "--no-editor", "--no-boot", @"C:\other\x.bonsai", "--@pipe", "p" }, src);
                 Check("a workflow named only after the bootstrapper's --no-boot is not the one launched", relaunched == null, relaunched);
-                // No default ConfigRoot (round 3 LM3): unset, the workflow stops at Start naming it, never streams nothing.
+                // No default ConfigRoot: unset, the workflow stops at Start naming it, never streams nothing.
                 Check("ConfigRoot has no default", new StreamDevicesSettings().ConfigRoot == null, new StreamDevicesSettings().ConfigRoot);
                 var unset = LiveViewPlan.Create("", name => null);
                 Check("an unset ConfigRoot stops the workflow at Start, naming it", unset.StartRefusal != null && unset.StartRefusal.Contains("has no ConfigRoot"), unset.StartRefusal);

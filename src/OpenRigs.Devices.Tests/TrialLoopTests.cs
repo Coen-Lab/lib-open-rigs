@@ -596,7 +596,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ATriggerBeforeTheLastLaserFreesZapitStopsNamingIt()
         {
-            // Audit B1: a 3 s hold after the outcome, a 2 s interval and a 0.5 s lead put trial 2's trigger 1.5 s after
+            // A 3 s hold after the outcome, a 2 s interval and a 0.5 s lead put trial 2's trigger 1.5 s after
             // trial 1's outcome, before Zapit is free: the stop names the laser, not Zapit's answer.
             Func<bool, StubRules> held = hw => new StubRules { Plan = n => Timing(0.5, true, 30), Laser = LaserTiming.UntilOutcome(hw, 3.0, double.PositiveInfinity) };
             var hardware = new LoopRig(held(true));
@@ -638,7 +638,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ACueDroppedAtOutcomeNeverComesAfterIt()
         {
-            // Audit A2: the spouts went in after an early answer had ended the trial.
+            // The spouts went in after an early answer had ended the trial.
             var rules = new StubRules
             {
                 Plan = n => new TrialTiming
@@ -667,7 +667,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void TrialsKeepTheirTicksOnAHarpClockAtFourBillionSeconds()
         {
-            // Audit B12: at 3.9e9 s a double resolves about 5e-7 s, so sums of seconds miss a due tick by more than 1e-9.
+            // At 3.9e9 s a double resolves about 5e-7 s, so sums of seconds miss a due tick by more than 1e-9.
             var rig = new LoopRig(new StubRules { Plan = n => new TrialTiming { ItiSeconds = 2.3, LaserToStimulusSeconds = 0.7, ResponseDelaySeconds = 0.1, ResponseWindowSeconds = 1.3 } }, 3.9e9 + 0.001);
             for (var n = 0; n < 20; n++) rig.RunTo(TrialEventKind.Outcome);
             var starts = rig.Of(TrialEventKind.Start).ToList();
@@ -704,7 +704,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ATrialNeedsZapitsFieldsOnlyWhenItIsALaserTrial()
         {
-            // Audit B13: a task without a laser need not be an IZapitTrial.
+            // A task without a laser need not be an IZapitTrial.
             var plain = new TrialLoop<PlainTrial, string, StubOutcome>(new PlainRules(), true);
             var events = new List<TrialEvent<PlainTrial, string, StubOutcome>>();
             for (var s = 100.0; s < 104; s = Math.Round(s + 0.001, 6)) events.AddRange(plain.OnClock(s));

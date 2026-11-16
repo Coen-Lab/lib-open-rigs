@@ -12,7 +12,7 @@ def test_no_doc_holds_a_control_character():
 
 
 def test_every_name_the_calibration_article_gives_is_in_the_source():
-    # Round 3 LM5: calibration.md had drifted from the code (its layout, its full-path rule). Each backticked CamelCase
+    # calibration.md had drifted from the code (its layout, its full-path rule). Each backticked CamelCase
     # name it gives (an operator, include or type) must be in src.
     import re
 

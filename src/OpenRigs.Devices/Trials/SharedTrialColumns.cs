@@ -6,7 +6,7 @@ using System.Reflection;
 namespace OpenRigs.Devices
 {
     /// <summary>
-    /// The lab's shared block of trial columns (open_rigs.rigs.trials CORE_COLUMNS, QUIET_WAIT_COLUMNS, OPTO_COLUMNS),
+    /// The lab's shared block of trial columns (open_rigs.rigs.trials CORE_COLUMNS, QUIET_WAIT_COLUMNS, OPTOGENETICS_COLUMNS),
     /// filled the same way in every task from the trial loop's <see cref="TrialTimes"/> and the outcome's reward and penalty:
     /// a task's row is a class with one public field per column, in its schemas\trial-columns.yml order, and fills its own
     /// columns (trialType, outcome and the task's) itself.
@@ -19,15 +19,15 @@ namespace OpenRigs.Devices
         /// <summary>The quietWait block: filled when the row has it.</summary>
         public static readonly string[] QuietWait = { "quietWaitSeconds" };
 
-        /// <summary>The opto block: filled when the row has it, all three or none.</summary>
-        public static readonly string[] Opto = { "laserCondition", "laserPowerMw", "laserTriggerTime" };
+        /// <summary>The optogenetics block: filled when the row has it, all three or none.</summary>
+        public static readonly string[] Optogenetics = { "laserCondition", "laserPowerMw", "laserTriggerTime" };
 
         /// <summary>
         /// Fills <paramref name="row"/>'s shared block at the trial's outcome (times.Now): its number; the loop's times;
         /// rewardOfferedUl, the microlitres a reward on this trial gives, on every trial; rewarded, whether the outcome
         /// delivers it (the same value the task's valve command is made from); penaltySound true only when the trial is
         /// penalised and the task's penalty sound is on; penaltyTimeoutSeconds the task's timeout when penalised, else 0;
-        /// penalised itself; with the opto block, the trial's laser condition, its power only if the
+        /// penalised itself; with the optogenetics block, the trial's laser condition, its power only if the
         /// laser was triggered (else 0 mW) and the trigger's time (NaN if none), or 0, 0 and NaN for a trial that is not an
         /// IZapitTrial. Throws naming a missing or mistyped column. Returns the row.
         /// </summary>
@@ -55,10 +55,10 @@ namespace OpenRigs.Devices
             foreach (var name in Core) if (Field(type, name) == null) missing.Add(name);
             if (missing.Count > 0) throw new InvalidOperationException(string.Format("The trial row {0} has no {1}: every row has the lab's core columns as public fields.", type.Name, string.Join(", ", missing.ToArray())));
             if (Field(type, "quietWaitSeconds") != null) values["quietWaitSeconds"] = times.QuietWaitSeconds;
-            var opto = Array.FindAll(Opto, name => Field(type, name) != null);
-            if (opto.Length > 0)
+            var optogenetics = Array.FindAll(Optogenetics, name => Field(type, name) != null);
+            if (optogenetics.Length > 0)
             {
-                if (opto.Length < Opto.Length) throw new InvalidOperationException(string.Format("The trial row {0} has {1} of the opto block, not all of {2}.", type.Name, string.Join(", ", opto), string.Join(", ", Opto)));
+                if (optogenetics.Length < Optogenetics.Length) throw new InvalidOperationException(string.Format("The trial row {0} has {1} of the optogenetics block, not all of {2}.", type.Name, string.Join(", ", optogenetics), string.Join(", ", Optogenetics)));
                 var laser = trial as IZapitTrial;
                 values["laserCondition"] = laser != null ? laser.LaserCondition : 0;
                 values["laserPowerMw"] = laser != null && times.LaserFired ? laser.LaserPowerMw : 0.0;   // answered before its trigger: no laser

@@ -81,7 +81,7 @@ def test_dispense_calibration_round_trips_through_yaml(tmp_path):
 
 
 def test_a_model_s_own_bound_on_a_sized_integer_wins_and_the_type_s_range_holds_otherwise():
-    # Round 3: Int = Annotated[int, Field(ge=..., le=...)] replaced a model's own Field(ge=1), so a task took
+    # Int = Annotated[int, Field(ge=..., le=...)] replaced a model's own Field(ge=1), so a task took
     # thresholdLicks 0 and maxRepeats -1, and the schema said nothing of the bound.
     from typing import Optional
 

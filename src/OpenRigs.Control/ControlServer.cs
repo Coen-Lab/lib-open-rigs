@@ -391,7 +391,7 @@ namespace OpenRigs.Control
         /// Moves the phase forward. A report of an earlier phase is ignored, so a reporter
         /// left on a stream that keeps running (Ready on every frame) cannot undo Recording.
         /// Recording or Finished before Go is refused, as status would then say it of an
-        /// experiment nobody has released (S2-I1).
+        /// experiment nobody has released.
         /// </summary>
         /// <param name="phase">The phase reported.</param>
         /// <exception cref="InvalidOperationException">Recording or Finished reported before Go.</exception>
@@ -425,7 +425,7 @@ namespace OpenRigs.Control
         internal readonly HashSet<string> SetByController = new HashSet<string>();
 
         // How many times each command was taken, for status: after a command whose reply was lost,
-        // a controller compares the count to tell whether it ran (S2-L2).
+        // a controller compares the count to tell whether it ran.
         internal readonly Dictionary<string, int> Taken = new Dictionary<string, int>();
 
         /// <summary>The named declared parameter; an error naming the declared ones if there is none.</summary>
@@ -546,7 +546,7 @@ namespace OpenRigs.Control
         {
             return Observable.Create<ControlEvent>(observer =>
             {
-                // The second of two with one name was shadowed by the first in set and command (S2-L2).
+                // The second of two with one name was shadowed by the first in set and command.
                 var twice = Twice("parameters", Parameters.Select(p => p.Name)) ?? Twice("commands", Commands.Select(c => c.Name));
                 if (twice != null)
                 {
@@ -592,7 +592,7 @@ namespace OpenRigs.Control
             }
             catch (Exception error)
             {
-                // A socket left open holds NetMQ's context, so its cleanup never returns (audit, 11 Nov 2026).
+                // A socket left open holds NetMQ's context, so its cleanup never returns.
                 if (socket != null) socket.Dispose();
                 observer.OnError(error);
                 return;

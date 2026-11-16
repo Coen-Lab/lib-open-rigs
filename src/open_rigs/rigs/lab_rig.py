@@ -25,7 +25,7 @@ from open_rigs.core.rig import Rig
 from open_rigs.devices import CalibratedPulse, HarpTimestampGeneratorGen3, LicketySplit, StepperPositions
 from open_rigs.devices.behavior_board import PulseOutputs
 
-REWARD_VALVE = "RewardValve"
+REWARD_VALVE_DEVICE = "RewardValve"
 ZAPIT_TRIGGER = "ZapitTrigger"
 CAMERA_TRIGGER = "CameraTrigger"
 # The Behavior board lines that can pulse, so can carry a reward valve (OpenRigs.Devices PulseLines).
@@ -34,8 +34,9 @@ WHERE = "(lab rig model, open_rigs.rigs.lab_rig)"
 PLACEHOLDER = "CHANGE-ME"  # rig-template.yml's mark on each value a rig fills in
 # The rig.yml kinds a preflight lists, in its order (OpenRigs.Devices PreflightDevices.AllKinds, held equal by a test): each
 # device whose data the preflight counts. Not zapit: Zapit answers only when commanded, so a preflight has no data to count.
-PREFLIGHT_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera", "speakerArray",
-                   "projectionCalibration")
+# The device kinds are maps of named entries; the single sections are one entry each, which a person confirms.
+PREFLIGHT_DEVICE_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera")
+PREFLIGHT_SINGLE_SECTIONS = ("speakerArray", "projectionCalibration")
 # The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, a RewardValve piece's MaxRewardUl).
 MAX_REWARD_UL = 20
 
@@ -101,7 +102,7 @@ class LabRig(Rig):
         return {"RewardValve-" + _title(line.name): ("BehaviorBoard-" + _title(name), alias)
                 for name, board in self.behavior_board.items() if board.wiring
                 for field, alias in _ALIASES.items()
-                if (line := getattr(board.wiring, field)) is not None and line.device == REWARD_VALVE and line.name}
+                if (line := getattr(board.wiring, field)) is not None and line.device == REWARD_VALVE_DEVICE and line.name}
 
     def reward_valve_lines(self) -> set[str]:
         """The lines (DO1) wiring names as a RewardValve, on any board (for
@@ -114,7 +115,7 @@ class LabRig(Rig):
         for name, board in self.behavior_board.items():
             lines = {alias: getattr(board.wiring, field) for field, alias in _ALIASES.items()} if board.wiring else {}
             lines = {alias: line for alias, line in lines.items() if line is not None}
-            valves = {alias: line for alias, line in lines.items() if line.device == REWARD_VALVE}
+            valves = {alias: line for alias, line in lines.items() if line.device == REWARD_VALVE_DEVICE}
             unnamed = sorted(alias for alias, line in valves.items() if line.name is None)
             if unnamed:
                 raise ValueError(

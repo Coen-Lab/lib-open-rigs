@@ -1,9 +1,9 @@
-"""The lab's trial log: the columns every task shares, and one experiment summarised from its files.
+"""The lab's shared trial columns, and one experiment summarised from its files.
 
 Every task's schemas/trial-columns.yml starts with the shared block, in order, with these types, units and descriptions
 word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
-(QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, opto (OPTO_COLUMNS: laserCondition, laserPowerMw,
+(QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPowerMw,
 laserTriggerTime) after penalised. trialType and outcome are in the core by name, type and place, each described by its
 task. A task's own columns follow the block.
 
@@ -110,7 +110,7 @@ QUIET_WAIT_COLUMNS: List[Column] = [
      "held this trial's start past the end of its interval less the lead; 0 with the waits off or a quiet mouse."),
 ]
 
-OPTO_COLUMNS: List[Column] = [
+OPTOGENETICS_COLUMNS: List[Column] = [
     ("laserCondition", "int", None,
      "The Zapit condition sent to Zapit this trial (its conditions file's number, from 1), laser on or off: every trial "
      "of an optogenetics experiment has one, so laser on is laserPowerMw > 0, not laserCondition > 0. 0 without "
@@ -128,7 +128,7 @@ OPTO_COLUMNS: List[Column] = [
 # Each opt-in block by the name a task gives it, with the core column it follows.
 BLOCKS: Dict[str, Tuple[str, List[Column]]] = {
     "quietWait": ("itiSeconds", QUIET_WAIT_COLUMNS),
-    "opto": ("penalised", OPTO_COLUMNS),
+    "optogenetics": ("penalised", OPTOGENETICS_COLUMNS),
 }
 
 TIME_COLUMN = "harpTime"

@@ -95,7 +95,7 @@ namespace OpenRigs.Shared
         /// <summary>
         /// A scalar's text, trimmed; null when there is none or it is left empty (null, Null, NULL, ~,
         /// empty or blank), as a generated rig.yml writes an unset value and as YamlDotNet and PyYAML read
-        /// YAML's null (S4-L1).
+        /// YAML's null.
         /// </summary>
         public static string Value(YamlNode node)
         {

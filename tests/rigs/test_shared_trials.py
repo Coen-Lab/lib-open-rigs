@@ -161,7 +161,7 @@ def test_a_run_that_never_closed_says_so(tmp_path):
     assert s.outcome == "stopped (not final: the workflow never finished closing)"
 
 
-BOTH = ("opto", "quietWait")
+BOTH = ("optogenetics", "quietWait")
 
 
 def _block(blocks=BOTH):
@@ -187,12 +187,12 @@ def test_each_block_sits_in_its_place_in_the_core():
 def test_a_task_without_a_block_is_held_to_the_core_alone():
     assert shared_block_problems(_block(()), ()) == []
     # A task naming a block its file lacks, or lacking one it names, is told.
-    assert shared_block_problems(_block(()), ("opto",))[0].startswith("the first 17 columns are")
+    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 17 columns are")
     assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 14 columns are")
 
 
 def test_an_unknown_block_is_refused():
-    with pytest.raises(ValueError, match="no shared block laser; the blocks are quietWait, opto"):
+    with pytest.raises(ValueError, match="no shared block laser; the blocks are quietWait, optogenetics"):
         shared_columns(("laser",))
 
 
@@ -204,7 +204,7 @@ def test_a_change_to_the_shared_block_is_named():
         "itiSeconds's description is not the shared block's (open_rigs.rigs.trials)",
         "laserCondition is double, not int",
     ]
-    # Round 3 F12: penaltySound was each task's own words, and two tasks' differed.
+    # penaltySound was each task's own words, and two tasks' differed.
     sound = _block()
     sound["penaltySound"]["description"] = "True when the penalty sound played."
     assert shared_block_problems(sound, BOTH) == ["penaltySound's description is not the shared block's (open_rigs.rigs.trials)"]
@@ -214,7 +214,7 @@ def test_a_change_to_the_shared_block_is_named():
 
 def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):
     # A trial start 5 s off, an outcome that is no outcome, a timeout without the sound and a sound without a timeout were
-    # all passed before (audit, 14 Nov 2026); the penalty is held exactly to penalised from 16 Nov 2026.
+    # all passed before; the penalty is held exactly to penalised.
     trials = _chain(4)
     trials[0]["trialStartTime"] -= 5
     trials[1]["penaltySound"] = False  # penalised, the task's sound on
@@ -298,7 +298,7 @@ def test_performance_is_rig_controls(tmp_path):
 
 
 def test_go_no_go_counts_its_one_spout_a_go_miss_as_incorrect_and_responds_on_go_trials(tmp_path):
-    # Round 3 F1: go/no-go rows are all bothSpouts False, so performance was NaN, and a withheld NoGo counted as responded.
+    # Go/no-go rows are all bothSpouts False, so performance was NaN, and a withheld NoGo counted as responded.
     trials = _chain(5)
     for t, (outcome, target) in zip(trials, [("Correct", "Go"), ("Correct", "NoGo"), ("Incorrect", "NoGo"),
                                              ("NoResponse", "Go"), ("Probe", "NoReward")]):
@@ -306,7 +306,7 @@ def test_go_no_go_counts_its_one_spout_a_go_miss_as_incorrect_and_responds_on_go
     s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["target", "bothSpouts"]))
     assert (s.performance, s.responded) == (0.5, 0.5)  # 2 of 4 Go/NoGo right; 1 of 2 Go trials licked
     typed = [{"outcome": t["outcome"], "target": t["target"], "bothSpouts": False} for t in trials]
-    assert trials_module.performance(typed) == (0.5, 0.5)  # typed rows (open_rigs.trials.read) read the same
+    assert trials_module.performance(typed) == (0.5, 0.5)  # typed rows (open_rigs.trial_log.read) read the same
 
 
 def test_a_probe_trial_is_accepted_and_left_out_of_performance_and_the_response_rate(tmp_path):
@@ -373,23 +373,23 @@ def test_a_task_without_a_stimulus_state_log_has_no_unfinished_trial(tmp_path):
 
 
 def test_the_c_sharp_helper_fills_the_shared_block_these_name():
-    # Audit B5: each task filled the shared block by hand, and two had diverged. OpenRigs.Devices SharedTrialColumns fills
+    # Each task filled the shared block by hand, and two had diverged. OpenRigs.Devices SharedTrialColumns fills
     # every column of it but trialType and outcome, each task's own, and harpTime, the row's time.
     import re
     from pathlib import Path
 
     source = (Path(__file__).parents[2] / "src" / "OpenRigs.Devices" / "Trials" / "SharedTrialColumns.cs").read_text(encoding="utf-8")
-    blocks = {block: re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source) for block in ("Core", "QuietWait", "Opto")}
+    blocks = {block: re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source) for block in ("Core", "QuietWait", "Optogenetics")}
     assert all(blocks.values()), blocks
     named = {block: re.findall(r'"(\w+)"', found.group(1)) for block, found in blocks.items() if found}
     task_s_own = {"harpTime", "trialType", "outcome"}
     assert named["Core"] == [c[0] for c in CORE_COLUMNS if c[0] not in task_s_own]
     assert named["QuietWait"] == [c[0] for c in trials_module.QUIET_WAIT_COLUMNS]
-    assert named["Opto"] == [c[0] for c in trials_module.OPTO_COLUMNS]
+    assert named["Optogenetics"] == [c[0] for c in trials_module.OPTOGENETICS_COLUMNS]
 
 
 def test_summarise_reads_the_trial_log_as_open_rigs_trial_log_does(tmp_path):
-    # Round 3 LL3: summarise had its own reader, whose BonsaiData_Trial*.csv also took BonsaiData_TrialState files and
+    # summarise had its own reader, whose BonsaiData_Trial*.csv also took BonsaiData_TrialState files and
     # a last line still being written.
     trials = _chain(2)
     folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])

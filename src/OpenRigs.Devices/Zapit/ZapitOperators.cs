@@ -101,7 +101,7 @@ namespace OpenRigs.Devices.Zapit
             var fullPath = Path.GetFullPath(path);
             var snapshot = new JObject
             {
-                ["zapitConfigPath"] = fullPath,
+                ["zapitConditionsPath"] = fullPath,
                 ["contents"] = File.ReadAllText(fullPath)
             };
             return snapshot.ToString(Formatting.Indented);

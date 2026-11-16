@@ -52,7 +52,7 @@ def test_template_validates():
 
 
 def test_a_value_left_as_change_me_is_refused_by_its_key():
-    # Round 3 LM1: a rig.yml copied from the template with CHANGE-ME left in passed the model.
+    # A rig.yml copied from the template with CHANGE-ME left in passed the model.
     rig = copy.deepcopy(RIG)
     rig["rootPath"] = "CHANGE-ME"
     rig["licketySplit"]["left"] = {**HARP, "usbSerial": "CHANGE-ME"}
@@ -94,7 +94,7 @@ def test_projector_files_are_relative_to_rig_yml(key, path):
     lambda rig: rig["speakerArray"].update(backgroundNoise="D:/shared/sounds/background_noise.wav"),
 ])
 def test_every_rig_file_is_relative_to_rig_yml(edit):
-    # Round 3 LM2: only the projector's files refused a full path; the valves', the speakers' and the noise's passed.
+    # Only the projector's files refused a full path; the valves', the speakers' and the noise's passed.
     rig = copy.deepcopy(RIG)
     edit(rig)
     with pytest.raises(ValidationError, match="is a full path: give it relative to rig.yml's folder"):
@@ -172,7 +172,7 @@ def test_three_valves_on_any_pulsed_line():
 
 
 def test_reward_valves_on_two_boards():
-    # Each valve fires through its own board's TriggerCalibratedPulse (audit B2 refused this while one board fired them all).
+    # Each valve fires through its own board's TriggerCalibratedPulse.
     rig = copy.deepcopy(RIG)
     main = rig["behaviorBoard"]["main"]
     second = copy.deepcopy(main)
@@ -314,14 +314,14 @@ def test_the_reward_valve_lines_are_wiring_s():
 
 
 def test_the_preflight_kinds_are_one_list_the_c_sharp_holds_too():
-    # Round 3 QF5: the preflight's device kinds were listed three times. PREFLIGHT_KINDS is the one; each is a rig.yml key.
+    # The preflight's kinds are listed once, here, and the C# holds the same; each is a rig.yml key.
     import re
     from pathlib import Path
 
-    from open_rigs.rigs.lab_rig import PREFLIGHT_KINDS
+    from open_rigs.rigs.lab_rig import PREFLIGHT_DEVICE_KINDS, PREFLIGHT_SINGLE_SECTIONS
 
     source = (Path(__file__).parents[2] / "src" / "OpenRigs.Devices" / "Preflight" / "PreflightChecks.cs").read_text(encoding="utf-8")
     found = re.search(r"string\[\] AllKinds = \{([^}]*)\}", source)
-    assert found and tuple(re.findall(r'"(\w+)"', found.group(1))) == PREFLIGHT_KINDS
+    assert found and tuple(re.findall(r'"(\w+)"', found.group(1))) == PREFLIGHT_DEVICE_KINDS + PREFLIGHT_SINGLE_SECTIONS
     keys = {info.alias for info in LabRig.model_fields.values()}
-    assert set(PREFLIGHT_KINDS) <= keys
+    assert set(PREFLIGHT_DEVICE_KINDS + PREFLIGHT_SINGLE_SECTIONS) <= keys

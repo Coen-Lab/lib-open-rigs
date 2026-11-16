@@ -97,7 +97,7 @@ def test_the_resolver_takes_an_assembly_bonsai_config_does_not_locate_from_the_v
 
 @windows_only
 def test_a_workflow_other_than_main_is_checked_when_named(tmp_path):
-    # Audit D3: a QC repo's workflows other than main.bonsai were never built against the filled template.
+    # A QC repo's workflows other than main.bonsai were never built against the filled template.
     repo = environment(tmp_path, {"OpenRigs.Core": "0.1.1-fork-lab.14"}, ["OpenRigs.Core.0.1.1-fork-lab.14"])
     missing = check(repo, "-Workflow", "box.bonsai")
     assert missing.returncode == 1

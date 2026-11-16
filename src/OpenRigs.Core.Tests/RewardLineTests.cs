@@ -90,7 +90,7 @@ namespace OpenRigs.Core.Tests
             return Load(Rig, Fixture);
         }
 
-        // Round 3 LM2: a valve artefact given as a full path was read; every rig.yml file is relative to its folder.
+        // A valve artefact given as a full path was read; every rig.yml file is relative to its folder.
         [TestMethod]
         public void AFullPathArtefactIsRefusedNamingItsKey()
         {
@@ -141,7 +141,7 @@ namespace OpenRigs.Core.Tests
             var line = Calibrated();
             Assert.AreEqual("BehaviorBoard-Main", line.Board);
             Assert.AreEqual("DO1", line.Line);
-            Assert.AreEqual("RewardValve-Left", line.Valve);
+            Assert.AreEqual("RewardValve-Left", line.Piece);
             Assert.AreEqual("left", line.Instance);
             Assert.AreEqual(100, line.PulseGapMs);
             Assert.AreEqual(Fixture, line.CalibrationJson);

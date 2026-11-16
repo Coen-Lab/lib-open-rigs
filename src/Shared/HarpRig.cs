@@ -77,7 +77,7 @@ namespace OpenRigs.Shared
         /// a board that reported none, the one for the WhoAmI its kind expects; none for a kind
         /// whose WhoAmI is not known (expected 0), so the record meets what
         /// <see cref="RegisterMapFor"/> told the manifest to expect, and an unexpected
-        /// &lt;Name&gt;.yml never stands against the device's folder entry (S3-I1).
+        /// &lt;Name&gt;.yml never stands against the device's folder entry.
         /// </summary>
         public static RegisterMap MapToWrite(int? reported, int expected)
         {

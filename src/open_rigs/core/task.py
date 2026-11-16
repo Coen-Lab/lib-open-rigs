@@ -66,26 +66,26 @@ class Optogenetics(TaskBlock):
 
     # The same rules as _power_when_on's, in the JSON schema: the launching app checks the task file against the
     # schema, not this model, so a ticked Zapit with no conditions file was sent at Go and the workflow
-    # stopped at trial 1 (audit, 9 Nov 2026). additionalProperties is spelt out because the launching app closes
+    # stopped at trial 1. additionalProperties is spelt out because the launching app closes
     # every object that lists properties.
     model_config = ConfigDict(
         json_schema_extra={
-            "if": {"properties": {"useZapit": {"const": True}}, "required": ["useZapit"], "additionalProperties": True},
+            "if": {"properties": {"enabled": {"const": True}}, "required": ["enabled"], "additionalProperties": True},
             "then": {
-                "properties": {"zapitConfigPath": {"minLength": 1}, "laserPowerMw": {"type": "number"}},
+                "properties": {"zapitConditionsPath": {"minLength": 1}, "laserPowerMw": {"type": "number"}},
                 "required": ["laserPowerMw"],
                 "additionalProperties": True,
             },
         }
     )
 
-    use_zapit: bool = Field(
+    enabled: bool = Field(
         default=False,
-        description="Whether Zapit runs this experiment: every trial sends it a condition from the conditions file (laser off at 0 mW on laser-off trials: the galvos move and the masking light shows), and the launching app checks Zapit is answering before Go",
+        description="Whether this is an optogenetics experiment, Zapit running it: every trial sends it a condition from the conditions file (laser off at 0 mW on laser-off trials: the galvos move and the masking light shows), and the launching app checks Zapit is answering before Go",
     )
-    zapit_config_path: str = Field(
+    zapit_conditions_path: str = Field(
         default="",
-        description="Path to the Zapit conditions file loaded in Zapit. Its top-level stimLocations01, stimLocations02, ... entries are the conditions, numbered 1 to N with no gaps. Named ...ConfigPath so the launching app keeps a copy beside the task file at Go",
+        description="Path to the Zapit conditions file loaded in Zapit. Its top-level stimLocations01, stimLocations02, ... entries are the conditions, numbered 1 to N with no gaps. The launching app keeps a copy beside the task file at Go",
     )
     laser_power_mw: float | None = Field(
         default=None,
@@ -106,10 +106,10 @@ class Optogenetics(TaskBlock):
 
     @model_validator(mode="after")
     def _power_when_on(self):
-        if self.use_zapit and not self.zapit_config_path:
-            raise ValueError("use_zapit is on but zapit_config_path is empty")
-        if self.use_zapit and self.laser_power_mw is None:
-            raise ValueError("use_zapit is on but laser_power_mw is not set")
+        if self.enabled and not self.zapit_conditions_path:
+            raise ValueError("optogenetics is enabled but zapit_conditions_path is empty")
+        if self.enabled and self.laser_power_mw is None:
+            raise ValueError("optogenetics is enabled but laser_power_mw is not set")
         return self
 
     def check_lead_fits(self, iti_min_seconds: float) -> None:
@@ -132,14 +132,14 @@ class Optogenetics(TaskBlock):
         response_delay_seconds: float = 0.0,
     ) -> None:
         """Refuses laser timing that leaves Zapit busy at the next trial's trigger, less its reply margin (OpenRigs.Devices
-        TrialLoop stops there naming the last laser: the same rule). Off without use_zapit. A task gives its laser's end,
+        TrialLoop stops there naming the last laser: the same rule). Off unless enabled. A task gives its laser's end,
         one of: trigger_hold_seconds (the laser until the outcome, the line held this long past it: LaserTiming.UntilOutcome),
         or laser_duration_seconds with ramp_down_seconds (LaserTiming.ForDuration) and response_delay_seconds, the soonest
         an outcome follows the stimulus. The next trigger comes at the soonest iti_min_seconds - laser_to_stimulus_seconds
         after an outcome, so (lead + response delay + iti_min - lead) after a trigger."""
         if (trigger_hold_seconds is None) == (laser_duration_seconds is None):
             raise TypeError("check_zapit_free_in_time takes one of trigger_hold_seconds and laser_duration_seconds")
-        if not self.use_zapit:
+        if not self.enabled:
             return
         iti, lead, margin = iti_min_seconds, self.laser_to_stimulus_seconds, ZAPIT_REPLY_MARGIN_SECONDS
         if trigger_hold_seconds is not None:

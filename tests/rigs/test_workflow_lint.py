@@ -525,7 +525,7 @@ def task_logic(tmp_path: Path, nodes: str) -> lint.Workflow:
 
 def test_the_rng_seed_event_is_the_lab_s_include_at_task_logic_s_top_level(tmp_path):
     assert lint.rng_seed_problems(task_logic(tmp_path, include(lint.LOG_RNG_SEED))) == []
-    # The tasks' own chain until 16 Nov 2026: a CreateAsyncEvent of RngSeed into AsyncEvents.
+    # A task's own chain, refused: a CreateAsyncEvent of RngSeed into AsyncEvents.
     own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orl:CreateAsyncEvent" '
            'xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"><orl:Event>RngSeed</orl:Event></Combinator></Expression>')
     assert lint.rng_seed_problems(task_logic(tmp_path / "b", own)) == [
@@ -539,7 +539,7 @@ def test_the_task_logs_are_the_lab_s_include_given_the_task_file_as_json(tmp_pat
     edge = '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow></Expression>'
     group = '<Expression xsi:type="GroupWorkflow"><Workflow><Nodes>'
     assert lint.task_logs_problems(workflow(tmp_path, group + serialize + include(lint.TASK_LOGS) + edge)) == []
-    # The tasks' own logs until 16 Nov 2026.
+    # A task's own logs, refused.
     own = (include("OpenRigs.Logging:LogTrial.bonsai") + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Task</Name>")
            + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai"))
     assert lint.task_logs_problems(workflow(tmp_path / "b", own)) == [
@@ -556,7 +556,7 @@ def test_no_include_ends_its_logs_when_a_one_shot_write_completes():
     for path in sorted((ROOT / "src").glob("OpenRigs.*/**/*.bonsai")):
         if not path.relative_to(ROOT / "src").parts[0].endswith(".Tests"):
             assert lint.output_ends_logs_problems(lint.ET.fromstring(path.read_bytes())) == [], path
-    # TaskLogs as it was (16 Nov 2026): its WorkflowOutput fed by Settings_Task, which completes at Go.
+    # A WorkflowOutput fed by Settings_Task, which completes at Go.
     old = block_text(lint.TASK_LOGS).replace('<Edge From="0" To="1" Label="Source1" />',
                                             '<Edge From="0" To="1" Label="Source1" /><Edge From="1" To="4" Label="Source1" />')
     old = old.replace('</Expression>\n    </Nodes>', '</Expression>\n      <Expression xsi:type="WorkflowOutput" />\n    </Nodes>')
@@ -568,7 +568,7 @@ def test_no_include_ends_its_logs_when_a_one_shot_write_completes():
 def test_the_training_stage_is_the_lab_s_include_after_experiment_control(tmp_path):
     control = include(lint.EXPERIMENT_CONTROL, "<Parameters><Parameter><Name>TrainingStage</Name></Parameter></Parameters>")
     assert lint.training_stage_problems(workflow(tmp_path, control + include(lint.TRAINING_STAGE))) == []
-    # The tasks' own chain until 16 Nov 2026.
+    # A task's own chain, refused.
     own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:ParameterValue" ' + CONTROL + '><orcl:Name>TrainingStage</orcl:Name></Combinator></Expression>'
            '<Expression xsi:type="rx:AsyncSubject"><Name>TrainingStage</Name></Expression>'
            '<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:ReportMetric" ' + CONTROL + '><orcl:Name>trainingStage</orcl:Name></Combinator></Expression>')
@@ -583,7 +583,7 @@ def test_the_training_stage_is_the_lab_s_include_after_experiment_control(tmp_pa
 def test_the_penalty_sound_is_the_lab_s_include(tmp_path):
     assert rules.play_penalty_sound_problems(lint.ET.fromstring(block_text(lint.PLAY_PENALTY_SOUND).encode("utf-8"))) == []
     assert lint.penalty_sound_problems(workflow(tmp_path, include(lint.PLAY_PENALTY_SOUND))) == []
-    # The tasks' own chain until 16 Nov 2026.
+    # A task's own chain, refused.
     own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="aud:PenaltySoundBuffer" xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio" /></Expression>'
            '<Expression xsi:type="MulticastSubject"><Name>PenaltySounds</Name></Expression>')
     assert lint.penalty_sound_problems(workflow(tmp_path / "b", own)) == [
@@ -840,7 +840,7 @@ def test_a_workflow_makes_the_experiment_folder_or_uses_no_experiment_folder_nev
         "the workflow includes LaunchSettings and NoExperimentFolder (both declare SubjectId)"]
     published = '<Expression xsi:type="MulticastSubject"><Name>PathPrefix</Name></Expression>'
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "f", log + published)) == ["the workflow publishes PathPrefix itself"]
-    # Round 3 QF10: three QC workflows named their no-mouse subject three ways; NoExperimentFolder has the one.
+    # Three QC workflows named their no-mouse subject three ways; NoExperimentFolder has the one.
     own = include(lint.NO_EXPERIMENT_FOLDER, "<SubjectId>_valve-calibration_</SubjectId>")
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "g", own)) == [
         "NoExperimentFolder's SubjectId is _valve-calibration_, not its own _no-experiment_: delete the workflow's value"]
@@ -883,7 +883,7 @@ def test_each_clock_publishes_timestamp_from_its_fast_register():
 
 
 def test_camera_live_controls_declares_each_camera_s_own_parameters(tmp_path):
-    # Exposure and gain per camera (audit B4): <Camera>.ExposureUs and <Camera>.GainDb, the piece the camera.
+    # Exposure and gain per camera: <Camera>.ExposureUs and <Camera>.GainDb, the piece the camera.
     face = piece(lint.CAMERA_LIVE_CONTROLS, Camera="Camera-Face", Board="BehaviorBoard-Main")
     body = piece(lint.CAMERA_LIVE_CONTROLS, Camera="Camera-Body", Board="BehaviorBoard-Main")
     two = workflow(tmp_path / "two", include(lint.READ_LAB_RIG) + face + body + include(lint.EXPERIMENT_CONTROL))
@@ -918,7 +918,7 @@ def test_camera_live_controls_takes_a_pupil_camera_s_gain_of_20_db():
     assert float(gain.findtext(lint.CONTROL + "Minimum") or "nan") <= 0 and float(gain.findtext(lint.CONTROL + "Maximum") or "nan") >= 20
 
 def test_each_lick_detector_and_wheel_publishes_its_own_subject(tmp_path):
-    # Audit B6: two detectors both on LickStateRight, or two wheels on one subject, passed the lint.
+    # Two detectors both on LickStateRight, or two wheels on one subject, passed the lint.
     swapped = MIXED.replace("<LickStateSubjectName>LickStateLeft<", "<LickStateSubjectName>LickStateRight<")
     assert lint.hardware_problems(workflow(tmp_path / "a", swapped)) == [
         "LicketySplit LicketySplit-Left's LickStateSubjectName is LickStateRight, not LickStateLeft"]
@@ -929,7 +929,7 @@ def test_each_lick_detector_and_wheel_publishes_its_own_subject(tmp_path):
 
 
 def test_the_raw_projector_display_is_a_piece_of_its_own(tmp_path):
-    # Audit B7: RawProjectorDisplay opens the projector's window as ProjectorDisplay does.
+    # RawProjectorDisplay opens the projector's window as ProjectorDisplay does.
     raw = include(lint.RAW_PROJECTOR_DISPLAY)
     assert lint.hardware_problems(workflow(tmp_path / "a", MIXED + raw)) == []
     assert lint.hardware_problems(workflow(tmp_path / "b", MIXED + raw + raw)) == ["the workflow includes RawProjectorDisplay more than once"]
@@ -941,7 +941,7 @@ def test_the_raw_projector_display_is_a_piece_of_its_own(tmp_path):
 
 @pytest.mark.parametrize("log", ["LogVideo", "LogRawVideo"])
 def test_upstream_s_video_logs_are_refused(tmp_path, log):
-    # Audit B14: the files stay for upstream merges; a lab camera logs itself.
+    # The files stay for upstream merges; a lab camera logs itself.
     wf = workflow(tmp_path, MIXED + include(f"OpenRigs.Logging:{log}.bonsai"))
     assert lint.hardware_problems(wf) == [f"the workflow includes {log}, which a lab workflow does not use: each camera piece logs itself (LogVideoFfmpeg)"]
 
@@ -1006,9 +1006,9 @@ def test_a_device_opened_by_hand_is_refused(tmp_path):
     (tmp_path / "b" / "src" / "Extensions" / "Camera.bonsai").write_text(HEAD + nodes.split("</Expression>")[2] + "</Expression></Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
     own = workflow(tmp_path / "b", include("Extensions\\Camera.bonsai") + include(lint.BOARD))
     assert lint.hand_opened_devices(own) == ["OpenRigs.Video.UsbCamera (UsbCamera)"]
-    # Round 3 LM4: the balance camera is a piece too; including it opens nothing by hand.
+    # The balance camera is a piece too; including it opens nothing by hand.
     assert lint.hand_opened_devices(workflow(tmp_path / "d", include(lint.DEVICES + "UsbCamera.bonsai"))) == []
-    # Round 3 LM4: a serial port opened by hand passed.
+    # A serial port opened by hand passed.
     port = 'xmlns:port="clr-namespace:Bonsai.IO.Ports;assembly=Bonsai.System" '
     serial = workflow(tmp_path / "c", ''.join(f'<Expression xsi:type="Combinator" {port}><Combinator xsi:type="port:{t}" /></Expression>'
                                               for t in ("CreateSerialPort", "SerialReadLine", "SerialWriteLine")))
@@ -1025,7 +1025,7 @@ def test_the_live_view_is_the_last_top_level_node_fed_by_nothing(tmp_path):
 
 
 def test_check_workflow_asks_whether_a_workflow_records_nothing_or_logs_trials_of_its_own_includes_too(tmp_path):
-    # Round 3 LL1: check-workflow read NoExperimentFolder and LogTrial from the entry file alone, so a workflow that
+    # check-workflow read NoExperimentFolder and LogTrial from the entry file alone, so a workflow that
     # included either from a file of its own was checked as the other kind.
     assert lint.includes(workflow(tmp_path / "a", "")) == {"records_nothing": False, "logs_trials": False}
     wf = own_include(tmp_path / "b", "", include(lint.NO_EXPERIMENT_FOLDER) + include("OpenRigs.Logging:LogTrial.bonsai"))
@@ -1035,7 +1035,7 @@ def test_check_workflow_asks_whether_a_workflow_records_nothing_or_logs_trials_o
 
 
 def test_a_rig_list_s_description_says_what_rig_it_is_not_its_own_name():
-    # Round 3 LL7: DomeHardware's read "The hardware of a DomeHardware rig", worded round the lab-free test.
+    # DomeHardware's read "The hardware of a DomeHardware rig", worded round the lab-free test.
     for path, signature in lint.RIG_LISTS.items():
         stem = path.split(":")[1].removesuffix(".bonsai")
         text = (ROOT / "src" / "OpenRigs.Devices" / f"{stem}.bonsai").read_text(encoding="utf-8-sig")
@@ -1044,7 +1044,7 @@ def test_a_rig_list_s_description_says_what_rig_it_is_not_its_own_name():
 
 @pytest.mark.parametrize("rig_list", lint.RIG_LISTS)
 def test_each_rig_list_s_taps_tap_its_devices(tmp_path, rig_list):
-    # Round 3 QF6: a preflight names no device; its rig list's taps include taps each one the rig list drives, in order.
+    # A preflight names no device; its rig list's taps include taps each one the rig list drives, in order.
     wf = workflow(tmp_path, include(rig_list))
     expected = [name for name, _ in lint.required_devices(wf)]
     if "OpenRigs.Vision:ProjectorDisplay.bonsai" in (ROOT / "src" / "OpenRigs.Devices" / rig_list.split(":")[1]).read_text(encoding="utf-8-sig"):

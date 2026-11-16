@@ -11,7 +11,7 @@ using OpenRigs.Tests;
 namespace OpenRigs.Logging.Tests
 {
     // A run's Settings JSON is written once at the start; Bonsai killed later (a crash, or a kill
-    // after a stop that did not close) must still leave the whole file (audit, 15 Nov 2026: an empty
+    // after a stop that did not close) must still leave the whole file (an empty
     // Settings JSON from a run that exited before the writer's buffer reached the disk).
     [TestClass]
     public class LogDataSchemaKillTests : LoggingTestBase

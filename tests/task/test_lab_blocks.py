@@ -52,11 +52,11 @@ def test_optogenetics_refuses_a_lead_that_is_not_a_number(lead):
 
 
 def test_optogenetics_needs_a_file_and_a_power_when_on():
-    assert not Optogenetics.model_validate(OPTO).use_zapit
-    with pytest.raises(ValidationError, match="zapit_config_path is empty"):
-        Optogenetics.model_validate({**OPTO, "useZapit": True, "laserPowerMw": 3})
+    assert not Optogenetics.model_validate(OPTO).enabled
+    with pytest.raises(ValidationError, match="zapit_conditions_path is empty"):
+        Optogenetics.model_validate({**OPTO, "enabled": True, "laserPowerMw": 3})
     with pytest.raises(ValidationError, match="laser_power_mw is not set"):
-        Optogenetics.model_validate({**OPTO, "useZapit": True, "zapitConfigPath": "c.yml"})
+        Optogenetics.model_validate({**OPTO, "enabled": True, "zapitConditionsPath": "c.yml"})
     with pytest.raises(ValidationError, match="finite"):
         Optogenetics.model_validate({**OPTO, "laserPowerMw": float("inf")})
 
@@ -70,9 +70,9 @@ def test_optogenetics_has_no_lab_default_for_the_design():
 def test_optogenetics_schema_holds_the_same_rule():
     # The launching app checks a task file against the schema, not the model.
     schema = Optogenetics.model_json_schema(by_alias=True)
-    assert schema["if"]["properties"] == {"useZapit": {"const": True}}
+    assert schema["if"]["properties"] == {"enabled": {"const": True}}
     assert schema["then"]["required"] == ["laserPowerMw"]
-    assert schema["then"]["properties"]["zapitConfigPath"] == {"minLength": 1}
+    assert schema["then"]["properties"]["zapitConditionsPath"] == {"minLength": 1}
 
 
 def test_penalty_sound_is_on_by_default_and_the_timeout_has_no_lab_default():
@@ -122,8 +122,8 @@ def test_optogenetics_lead_and_reply_margin_fit_in_the_shortest_interval(lead, f
 
 
 def test_zapit_must_be_free_before_the_next_trigger_less_the_reply_margin():
-    # Audit B1: a 3 s hold, a 2 s shortest interval and a 0.5 s lead passed every task check and stopped at trial 2.
-    on = Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5, "useZapit": True, "zapitConfigPath": "z.yml", "laserPowerMw": 2})
+    # A 3 s hold, a 2 s shortest interval and a 0.5 s lead passed every task check and stopped at trial 2.
+    on = Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5, "enabled": True, "zapitConditionsPath": "z.yml", "laserPowerMw": 2})
     with pytest.raises(ValueError, match=r"trigger_hold_seconds \(3.0 s\) must be at most 1.3 s"):
         on.check_zapit_free_in_time(2.0, trigger_hold_seconds=3.0)
     on.check_zapit_free_in_time(2.0, trigger_hold_seconds=1.3)

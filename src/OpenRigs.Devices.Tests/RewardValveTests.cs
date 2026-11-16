@@ -61,7 +61,7 @@ namespace OpenRigs.Devices.Tests
 
         static RewardLine Line(string instance)
         {
-            return new RewardLine { Valve = "RewardValve-" + instance, Instance = instance.ToLowerInvariant() };
+            return new RewardLine { Piece = "RewardValve-" + instance, Instance = instance.ToLowerInvariant() };
         }
 
         [TestMethod]

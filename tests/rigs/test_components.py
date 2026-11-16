@@ -24,7 +24,7 @@ def test_pixel_format_kept_by_the_camera_unless_set():
     assert LabRig.model_validate(RIG).camera["overhead"].pixel_format is None
     rig = LabRig.model_validate({**RIG, "camera": {"overhead": {"serialNumber": "12345", "pixelFormat": "Mono8"}}})
     assert rig.camera["overhead"].pixel_format == "Mono8"
-    # LogVideoFfmpeg writes 8-bit frames only (audit, 11 Nov 2026).
+    # LogVideoFfmpeg writes 8-bit frames only.
     with pytest.raises(ValidationError):
         LabRig.model_validate({**RIG, "camera": {"overhead": {"serialNumber": "12345", "pixelFormat": "Mono16"}}})
 
@@ -68,7 +68,7 @@ def test_wiring_by_channel_name():
     assert dumped == board["wiring"], "written back under the board's own channel names"
 
 
-def test_wiring_optional_and_side_checked():
+def test_wiring_optional_and_name_checked():
     no_camera = {key: value for key, value in RIG.items() if key != "camera"}
     plain = {**no_camera, "behaviorBoard": {"main": {"portName": "COM3", "usbSerial": "X"}}}
     assert LabRig.model_validate(plain).behavior_board["main"].wiring is None

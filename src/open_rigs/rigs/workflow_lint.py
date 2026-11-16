@@ -19,6 +19,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path, PurePath, PureWindowsPath
 
+from open_rigs.rigs.lab_rig import PREFLIGHT_DEVICE_KINDS
+
 W = "{https://bonsai-rx.org/2018/workflow}"
 XSI = "{http://www.w3.org/2001/XMLSchema-instance}type"
 RX = "{clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core}"
@@ -1070,8 +1072,7 @@ def task_logs_problems(wf: Workflow) -> list[str]:
 
 def output_ends_logs_problems(root: ET.Element) -> list[str]:
     """No scope's WorkflowOutput is fed by a one-shot settings write (LogDataSchema) while a branch beside it logs: the
-    scope ends its side branches when its output completes, so the write that completes at Go ended the logs (TaskLogs
-    until 16 Nov 2026: no trial rows). `root` is an include's or a workflow's."""
+    scope ends its side branches when its output completes, so the write that completes at Go ended the logs (no trial rows). `root` is an include's or a workflow's."""
     problems = []
     for nodes, edges in _scopes(root):
         for out in (i for i, n in enumerate(nodes) if n.get(XSI) == "WorkflowOutput"):
@@ -1201,7 +1202,7 @@ def filled_rig(wf: Workflow, root: PurePath, machine: str) -> tuple[str, list[st
     rig["rootPath"], rig["rigId"] = str(root), "D1"
     camera = dict(next(iter(rig["camera"].values())), serialNumber="1")
     entry = {name: name.split("-", 1)[1][:1].lower() + name.split("-", 1)[1][1:] for name, _ in devices}
-    for group in ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera"):
+    for group in PREFLIGHT_DEVICE_KINDS:
         wanted = [entry[name] for name, g in devices if g == group]
         if not wanted:
             del rig[group]

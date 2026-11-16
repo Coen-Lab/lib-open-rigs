@@ -86,21 +86,21 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
 
 
 def zapit_for_task_problems(root: ET.Element) -> list[str]:
-    """Zapit.ConnectForTask gives ConnectZapit the task file's optogenetics.zapitConfigPath behind a Condition on
-    optogenetics.useZapit. `root` is OpenRigs.Devices' Zapit/ConnectForTask.bonsai."""
+    """Zapit.ConnectForTask gives ConnectZapit the task file's optogenetics.zapitConditionsPath behind a Condition on
+    optogenetics.enabled. `root` is OpenRigs.Devices' Zapit/ConnectForTask.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     includes = [i for i, n in enumerate(nodes) if n.get("Path") == ZAPIT_INCLUDE]
     if len(includes) != 1:
         return ["ConnectForTask does not include Zapit.ConnectZapit once"]
     path = [nodes[i] for i in upstream(edges, includes[0])]
     problems = []
-    if not any(n.findtext(W + "Selector") == "TaskParameters.Optogenetics.ZapitConfigPath" for n in path):
-        problems.append("ConnectZapit is not given TaskParameters.Optogenetics.ZapitConfigPath")
-    if not any(n.get(XSI) == "rx:Condition" and "Optogenetics.UseZapit" in ET.tostring(n, encoding="unicode") for n in path):
-        problems.append("ConnectZapit is not behind a Condition on Optogenetics.UseZapit")
+    if not any(n.findtext(W + "Selector") == "TaskParameters.Optogenetics.ZapitConditionsPath" for n in path):
+        problems.append("ConnectZapit is not given TaskParameters.Optogenetics.ZapitConditionsPath")
+    if not any(n.get(XSI) == "rx:Condition" and "Optogenetics.Enabled" in ET.tostring(n, encoding="unicode") for n in path):
+        problems.append("ConnectZapit is not behind a Condition on Optogenetics.Enabled")
     flags = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and _name(n) == "Optogenetics"]
-    if len(flags) != 1 or "TaskParameters.Optogenetics.UseZapit" not in {nodes[a].findtext(W + "Selector") for a in upstream(edges, flags[0])}:
-        problems.append("ConnectForTask does not publish Optogenetics from Optogenetics.UseZapit")
+    if len(flags) != 1 or "TaskParameters.Optogenetics.Enabled" not in {nodes[a].findtext(W + "Selector") for a in upstream(edges, flags[0])}:
+        problems.append("ConnectForTask does not publish Optogenetics from Optogenetics.Enabled")
     return problems
 
 

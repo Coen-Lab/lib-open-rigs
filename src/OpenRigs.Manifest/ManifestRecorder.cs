@@ -137,7 +137,7 @@ namespace OpenRigs.Manifest
                         if (finished) return;
                         // The first end is the run's. Finished is set only once the write is done, so
                         // a write that failed (the file held by a reader) is tried again at disposal,
-                        // with the same end (audit, 11 Nov 2026).
+                        // with the same end.
                         end = pending ?? end;
                         pending = end;
                         if (!begun) return;
@@ -186,7 +186,7 @@ namespace OpenRigs.Manifest
                     // The workflow's Finished and the controller's stop are written as soon as they
                     // come, the run still going, as completed or stopped with run.final false:
                     // app-rig-control kills a workflow that has not stopped by its deadline, and the
-                    // end-of-run write never comes (L1-L2). Not final, so app-rig-control keeps an
+                    // end-of-run write never comes. Not final, so app-rig-control keeps an
                     // editor's Bonsai open until the end-of-run write, which sets run.final true.
                     if (control != null) subscriptions.Add(Observable.Interval(StopPoll).Subscribe(_ =>
                     {
@@ -220,7 +220,7 @@ namespace OpenRigs.Manifest
                             // Before the folder exists there is no experiment to record, so the error
                             // goes on at once: held until the folder appeared, a run that failed at
                             // Ready left the workflow standing with a dead run, and a Go then made a
-                            // folder for it (audit, 4 Nov 2026). A completion still waits for the folder.
+                            // folder for it. A completion still waits for the folder.
                             observer.OnError(error);
                         },
                         () =>

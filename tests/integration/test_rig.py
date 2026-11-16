@@ -28,7 +28,7 @@ def test_rig_id():
 
 
 def test_no_model_nothing_drives_is_kept():
-    # Round 3 LL5: the Arduino LED driver and the Arduino lick spout stage (LickSpoutStageDriver, SpoutRigPosition,
+    # The Arduino LED driver and the Arduino lick spout stage (LickSpoutStageDriver, SpoutRigPosition,
     # StageAxisMapping) had no workflow, include or rig.yml key; they went, with their example and generated C#.
     import open_rigs.devices as devices
     from pathlib import Path

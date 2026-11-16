@@ -28,7 +28,7 @@ namespace OpenRigs.HarpDevices.Tests
             if (!ok) failed++;
         }
 
-        // Polled, never a fixed sleep (audit-rigs set B, L2-L2): a record written on the Rx timer
+        // Polled, never a fixed sleep: a record written on the Rx timer
         // thread is waited for up to a bound, so a slow machine passes and a fast one does not wait.
         static void WaitFor(Func<bool> done, int ms = 3000)
         {
@@ -130,7 +130,7 @@ namespace OpenRigs.HarpDevices.Tests
                 Check("Harp.TimestampGeneratorGen3 0.1.1, which carries none, gets the lab's copy of its release's, saying so", tsg != null && tsg.Metadata.Contains("whoAmI: 1158") && tsg.Metadata.Contains("firmwareVersion: \"1.2\"") && tsg.From.StartsWith("Harp.TimestampGeneratorGen3 0.1.1 (device.yml from harp-tech/device.timestampgeneratorgen3 a463d1d"), tsg == null ? "none" : tsg.From);
                 Check("... and no other version does", OpenRigs.Shared.RegisterMaps.LabCopy("Harp.TimestampGeneratorGen3 0.1.2") == null, "found one");
                 Check("every lab copy is embedded", OpenRigs.Shared.RegisterMaps.LabCopies.Keys.All(k => OpenRigs.Shared.RegisterMaps.LabCopy(k) != null), "one is missing");
-                // L2-L2: HarpRig's WhoAmI table is the Python models' who_am_i values, as 7cc06df ties MAX_REWARD_UL.
+                // HarpRig's WhoAmI table is the Python models' who_am_i values, as 7cc06df ties MAX_REWARD_UL.
                 var python = string.Join(", ", new[] { "harp.py", "lickety_split.py" }
                     .SelectMany(f => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(Path.Combine(RepoRoot(), "src", "open_rigs", "devices", f)), @"(?m)^\s+who_am_i: ClassVar\[int\] = (\d+)\r?$")
                         .Cast<System.Text.RegularExpressions.Match>().Select(m => int.Parse(m.Groups[1].Value)))
@@ -191,7 +191,7 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
-                    // L2-I1: a dump still coming at the timeout was recorded as dumped, without a word.
+                    // A dump still coming at the timeout was recorded as dumped, without a word.
                     var messages = new Subject<HarpMessage>();
                     var path = new Subject<string>();
                     var written = new List<string>();
@@ -223,7 +223,7 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
-                    // M2 (audit, 2 Nov 2026): the record was written at register 7, before 12, 13 and 16 had come.
+                    // The record was written at register 7, before 12, 13 and 16 had come.
                     var messages = new Subject<HarpMessage>();
                     var path = new Subject<string>();
                     var written = new List<string>();
@@ -236,12 +236,12 @@ namespace OpenRigs.HarpDevices.Tests
                         var json = written.Count == 1 ? File.ReadAllText(written[0]) : "";
                         Check("a dump with the core's registers after 7 is recorded whole", json.Contains("\"device_name\": \"Behavior\"") && json.Contains("\"harp_serial\": 65535")
                             && json.Contains("\"uid\": \"0102030405060708090a0b0c0d0e0f10\"") && json.Contains("\"dumped\": true"), written.Count + " " + json);
-                        // L2-I1: a wrong kind could stop the workflow before Go only from a WhoAmI at connection.
+                        // A wrong kind could stop the workflow before Go only from a WhoAmI at connection.
                         Check("... and says the kind was checked only after the experiment started, as nothing came at connection", json.Contains("checked only after the experiment started"), json);
                     }
                 }
                 {
-                    // L1: no <Name>.Commands, so no dump to wait for.
+                    // No <Name>.Commands, so no dump to wait for.
                     var messages = new Subject<HarpMessage>();
                     var path = new Subject<string>();
                     var written = new List<string>();
@@ -257,7 +257,7 @@ namespace OpenRigs.HarpDevices.Tests
                 }
                 {
                     // 0.1.0-local.3: a board that reported no WhoAmI still leaves the map the manifest
-                    // expects for its kind (audit, 3 Nov 2026: the experiment was held back every night).
+                    // expects for its kind (the experiment was held back every night).
                     var messages = new Subject<HarpMessage>();
                     var path = new Subject<string>();
                     Exception error = null;
@@ -275,7 +275,7 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
-                    // S3-I1: a kind with no known WhoAmI left <Name>.yml the manifest does not expect,
+                    // A kind with no known WhoAmI left <Name>.yml the manifest does not expect,
                     // which then met the <Name>/ folder entry.
                     var messages = new Subject<HarpMessage>();
                     var path = new Subject<string>();
@@ -294,7 +294,7 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
-                    // L2-L3: an error on the board's messages before any experiment was dropped.
+                    // An error on the board's messages before any experiment was dropped.
                     var messages = new Subject<HarpMessage>();
                     Exception error = null;
                     using (Recorder().Process(messages, new Subject<string>()).Subscribe(_ => { }, ex => error = ex))
@@ -304,7 +304,7 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
-                    // L2: a board of the wrong kind is found from the dump at connection, before Go.
+                    // A board of the wrong kind is found from the dump at connection, before Go.
                     var messages = new Subject<HarpMessage>();
                     Exception error = null;
                     using (Recorder().Process(messages, new Subject<string>()).Subscribe(_ => { }, ex => error = ex))
@@ -334,7 +334,7 @@ namespace OpenRigs.HarpDevices.Tests
                     using (new RequestRegisterDump { Delay = TimeSpan.Zero }.Process(messages, path).Subscribe(sent.Add))
                     {
                         path.OnNext("x");
-                        // L2-I3: polled, not a fixed 100 ms, so a slow machine does not fail it.
+                        // Polled, not a fixed 100 ms, so a slow machine does not fail it.
                         for (var waited = Stopwatch.StartNew(); sent.Count != 1 && waited.ElapsedMilliseconds < 2000; ) Thread.Sleep(10);
                         Check("reads OperationControl when the experiment folder appears", sent.Count == 1 && sent[0].Address == OperationControl.Address && sent[0].MessageType == MessageType.Read, sent.Count.ToString());
                         // Active, heartbeat on, operation LED on: what the device answers with.
@@ -361,11 +361,11 @@ namespace OpenRigs.HarpDevices.Tests
                 var plan = HarpDevicePlan.Create(config, published);
                 var main = plan.Recorded.FirstOrDefault(d => d.Name == "BehaviorBoard-Main");
                 Check("records each serial device the workflow publishes as HarpMessage", string.Join(",", plan.Recorded.Select(d => d.Name)) == "BehaviorBoard-Main,LicketySplit-Left,SoundCard-Main,StepperDriver-A", string.Join(",", plan.Recorded.Select(d => d.Name)));
-                // L2-L2: the fixture has a stepper driver, with wiring, so a kind beside the Behavior board is planned from it.
+                // The fixture has a stepper driver, with wiring, so a kind beside the Behavior board is planned from it.
                 var stepper = plan.Recorded.FirstOrDefault(d => d.Name == "StepperDriver-A");
                 Check("a stepper driver is checked against WhoAmI 1130, its wiring nothing to the plan", stepper != null && stepper.ExpectedWhoAmI == 1130 && stepper.PortName == "COM8" && stepper.ToString() == "StepperDriver-A|stepperDriver|COM8|X|1130|False", stepper == null ? "none" : stepper.ToString());
                 Check("settings with a sub-mapping and a value (speakerArray) are not an empty entry, and nothing refuses", plan.StartRefusal == null && !plan.Notes.Any(n => n.Contains("has no settings")), plan.StartRefusal + " | " + string.Join(" | ", plan.Notes));
-                // L2-L1: one empty instance hid its whole kind, without a word.
+                // One empty instance hid its whole kind, without a word.
                 var emptyConfig = Path.Combine(root, "config-empty");
                 Directory.CreateDirectory(Path.Combine(emptyConfig, Environment.MachineName));
                 File.WriteAllText(Path.Combine(emptyConfig, Environment.MachineName, "rig.yml"),
@@ -376,7 +376,7 @@ namespace OpenRigs.HarpDevices.Tests
                     emptyPlan.StartRefusal != null && emptyPlan.StartRefusal.Contains("the rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none is checked")
                     && emptyPlan.Notes.Any(n => n.StartsWith("the rig.yml entry behaviorBoard: spare:")) && emptyPlan.Recorded.Select(d => d.Name).SequenceEqual(new[] { "LicketySplit-Left" }),
                     emptyPlan.StartRefusal + " | " + string.Join(",", emptyPlan.Recorded.Select(d => d.Name)));
-                // L2-L5: under a Harp kind, an entry holding none, off or [] hides the kind as an empty one does.
+                // Under a Harp kind, an entry holding none, off or [] hides the kind as an empty one does.
                 var spareConfig = Path.Combine(root, "config-spare");
                 Directory.CreateDirectory(Path.Combine(spareConfig, Environment.MachineName));
                 File.WriteAllText(Path.Combine(spareConfig, Environment.MachineName, "rig.yml"),
@@ -384,7 +384,7 @@ namespace OpenRigs.HarpDevices.Tests
                     "licketySplit:\n  left:\n    portName: COM4\n    usbSerial: E664C856C3913E37\n  old: off\n  list: []\n");
                 var sparePlan = HarpDevicePlan.Create(spareConfig, published);
                 var unset = HarpDevicePlan.Create("", published);
-                Check("an unset ConfigRoot stops the workflow at Start, naming it (round 3 LM3: no lab default)",
+                Check("an unset ConfigRoot stops the workflow at Start, naming it (no lab default)",
                     unset.StartRefusal != null && unset.StartRefusal.Contains("has no ConfigRoot") && new RecordHarpDevicesSettings().ConfigRoot == null, unset.StartRefusal);
                 Check("an entry holding none, off or [] beside a board stops the workflow at Start, naming it and what it holds",
                     sparePlan.StartRefusal != null && sparePlan.StartRefusal.Contains("the rig.yml entry behaviorBoard: spare: none has no settings, so every behaviorBoard is passed over")
@@ -397,7 +397,7 @@ namespace OpenRigs.HarpDevices.Tests
                 Check("a kind with no known WhoAmI is recorded unchecked, and noted", soundCard != null && soundCard.ExpectedWhoAmI == 0 && !soundCard.HasCommands && plan.Notes.Any(n => n.Contains("no WhoAmI is known for soundCard")), string.Join(" | ", plan.Notes));
                 Check("a device the workflow does not publish is noted", plan.Notes.Any(n => n.StartsWith("BehaviorBoard-Spare")), string.Join(" | ", plan.Notes));
                 Check("a camera is not a serial device and is passed over", !plan.Notes.Any(n => n.StartsWith("Camera-Overhead")), string.Join(" | ", plan.Notes));
-                // H1/M1: the same rule as OpenRigs.Manifest's (src\Shared\HarpRig.cs), whose tests hold the same entry.
+                // The same rule as OpenRigs.Manifest's (src\Shared\HarpRig.cs), whose tests hold the same entry.
                 Check("... as is a portName: null, though its data is HarpMessage", !plan.Recorded.Any(d => d.Name == "BehaviorBoard-Idle") && !plan.Notes.Any(n => n.StartsWith("BehaviorBoard-Idle")), string.Join(" | ", plan.Notes));
                 var wrongCommands = HarpDevicePlan.Create(config, n => n == "BehaviorBoard-Main.Commands" ? typeof(string) : published(n));
                 Check("Commands of another type asks for no dump, and is noted", !wrongCommands.Recorded.First(d => d.Name == "BehaviorBoard-Main").HasCommands
@@ -405,7 +405,7 @@ namespace OpenRigs.HarpDevices.Tests
                 var noFolder = HarpDevicePlan.Create(config, n => n == "PathPrefix" ? null : published(n));
                 Check("no PathPrefix records nothing, and says so", noFolder.Recorded.Count == 0 && noFolder.Notes.Any(n => n.Contains("PathPrefix")), string.Join(" | ", noFolder.Notes));
                 Check("... and stops the workflow at Start with the note's text", noFolder.StartRefusal != null && noFolder.StartRefusal.Contains(noFolder.Notes[0]), noFolder.StartRefusal);
-                Check("rig.yml's null in any case is no value (S4-L1)",
+                Check("rig.yml's null in any case is no value",
                     new[] { "null", "Null", "NULL", "~", " " }.All(v => OpenRigs.Shared.RigDevices.Value(new YamlDotNet.RepresentationModel.YamlScalarNode(v)) == null)
                     && OpenRigs.Shared.RigDevices.Value(new YamlDotNet.RepresentationModel.YamlScalarNode(" AB0M7PLB ")) == "AB0M7PLB", "wrong");
 
@@ -434,7 +434,7 @@ namespace OpenRigs.HarpDevices.Tests
                     var groups = inner == null ? "" : string.Join(",", inner.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<GroupWorkflowBuilder>().Select(g => g.Name));
                     Check("... with a group for the board, made from rig.yml", groups == "BehaviorBoard-Main", groups);
 
-                    // L2-L2 (7 Nov): placed before PathPrefix it recorded nothing, saying so only in its description.
+                    // Placed before PathPrefix it recorded nothing, saying so only in its description.
                     WorkflowBuilder early;
                     var earlyXml = xml.Replace("<Expression xsi:type=\"rx:BehaviorSubject\" TypeArguments=\"sys:String\"><rx:Name>PathPrefix</rx:Name></Expression>", "")
                         .Replace("<Expression xsi:type=\"SubscribeSubject\"><Name>BehaviorBoard-Main.Identity</Name></Expression>", "");

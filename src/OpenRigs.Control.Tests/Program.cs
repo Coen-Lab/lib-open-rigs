@@ -72,7 +72,7 @@ namespace OpenRigs.Control.Tests
             {
                 var state = ControlState.Current;
                 Check("the running server's state is ControlState.Current", state != null, "null");
-                // S2-I1: status would say Recording or Finished of an experiment nobody released.
+                // Status would say Recording or Finished of an experiment nobody released.
                 var early = Catch(() => state.SetPhase(ExperimentPhase.Recording));
                 var earlyFinished = Catch(() => new ReportPhase { Phase = ExperimentPhase.Finished }.Process(Observable.Return(1)).Wait());
                 Check("Recording or Finished before Go is refused, and the phase stays", early is InvalidOperationException && earlyFinished is InvalidOperationException && earlyFinished.Message.Contains("Finished before Go") && state.Phase == ExperimentPhase.Starting,
@@ -144,7 +144,7 @@ namespace OpenRigs.Control.Tests
                 var before = (int)Ask(socket, new { cmd = "status" })["commands"][0]["taken"];
                 Check("a declared command is taken while recording", Ok(Ask(socket, new { cmd = "command", name = "reward", args = "5" })), "refused");
                 Check("an undeclared one is refused", !Ok(Ask(socket, new { cmd = "command", name = "flash" })), "taken");
-                // S2-L2: after a command whose reply was lost, the count says whether it ran.
+                // After a command whose reply was lost, the count says whether it ran.
                 var after = (int)Ask(socket, new { cmd = "status" })["commands"][0]["taken"];
                 Check("status counts each command taken, from 0", before == 0 && after == 1, before + " then " + after);
                 state.SetPhase(ExperimentPhase.Ready);
@@ -223,7 +223,7 @@ namespace OpenRigs.Control.Tests
 
             Console.WriteLine("Two declared with one name:");
             {
-                // S2-L2: the second was shadowed by the first in set and command.
+                // The second was shadowed by the first in set and command.
                 foreach (var twice in new[] { "parameters", "commands" })
                 {
                     var server = Server("tcp://127.0.0.1:5643");
@@ -353,7 +353,7 @@ namespace OpenRigs.Control.Tests
                 Check("the second ends with an error naming the port in use", second is NetMQ.AddressAlreadyInUseException, second == null ? "no error" : second.GetType().Name);
                 other.Dispose();
                 first.Dispose();
-                // L1-L2 (audit, 11 Nov 2026): the second's socket was never closed, so NetMQ's cleanup
+                // The second's socket was never closed, so NetMQ's cleanup
                 // waited for it forever. Last, as it ends NetMQ for this process.
                 var cleanup = System.Threading.Tasks.Task.Run(() => NetMQConfig.Cleanup(true));
                 Check("... and closes its socket: NetMQ's cleanup returns within 5 s", cleanup.Wait(5000), "it did not");

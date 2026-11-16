@@ -20,7 +20,7 @@ namespace OpenRigs.HarpDevices
         /// Every serial port plugged in now, its name (COM3) to its USB serial, '' for a port with
         /// none (a motherboard COM1, a chip that makes one up). Ports that are not plugged in are
         /// left out: Windows remembers them, and only the board in the socket now matters here.
-        /// Each port's identity is read once, as app-rig-setup's scan reads it (S4-L5): its name from the
+        /// Each port's identity is read once, as app-rig-setup's scan reads it: its name from the
         /// registry's PortName first, and plugged in when its Status is OK.
         /// </summary>
         public static Dictionary<string, string> Present()

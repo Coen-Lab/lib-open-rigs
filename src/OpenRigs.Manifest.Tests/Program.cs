@@ -152,7 +152,7 @@ namespace OpenRigs.Manifest.Tests
             File.WriteAllText(file, "trialType:\n  type: integer\n");
             read = Json.Serialize(TrialColumns.Read(file, root, out note));
             Check("a column whose type is not int, double, bool or string is not copied, and noted", Field(read, "missing") == "true" && note != null && note.Contains("trialType"), read);
-            // L1-L4: YAML's nulls were copied as the text "~" or "null", and names differing only in case passed.
+            // YAML's nulls were copied as the text "~" or "null", and names differing only in case passed.
             File.WriteAllText(file, "a:\n  type: int\n  unit: ~\n  description: null\nb:\n  type: int\n  unit: Null\n  description: NULL\nc:\n  type: int\n  unit:\n  description: 'null'\n");
             read = Json.Serialize(TrialColumns.Read(file, root, out note));
             Check("~, null, Null, NULL and empty are JSON null; a quoted 'null' is text", note == null
@@ -373,7 +373,7 @@ namespace OpenRigs.Manifest.Tests
                 Check("control names who launched the experiment and who sent Go", Field(named, "control.launched_by.id") == "PipC" && Field(named, "control.launched_by.name") == "Pip Coen" && Field(named, "control.go_by.id") == "JoB", named);
                 Check("... and who stopped it", Field(named, "control.stopped_by.name") == "Jo Bloggs" && Field(named, "control.stopped_by.id") == "", Field(named, "control.stopped_by.name"));
                 {
-                    // S3-L3: app-rig-control kills a workflow slow to stop, so the running write is the last.
+                    // app-rig-control kills a workflow slow to stop, so the running write is the last.
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-slow_2026-10-30T19-57-12");
                     var path = new Subject<string>();
@@ -456,7 +456,7 @@ namespace OpenRigs.Manifest.Tests
                 DirtySource(root);
                 TrialColumnsFile(root, finished);
 
-                // Round 5: the manifest reads OpenRigs.Control by name, so that it does not depend on it;
+                // The manifest reads OpenRigs.Control by name, so that it does not depend on it;
                 // the checks above run through that read, and a renamed member fails here too.
                 Check("every ControlState member the manifest reads is there", ControlExperiment.StateMembers.All(m => typeof(ControlState).GetProperty(m) != null),
                     string.Join(", ", ControlExperiment.StateMembers.Where(m => typeof(ControlState).GetProperty(m) == null)));
@@ -496,7 +496,7 @@ namespace OpenRigs.Manifest.Tests
                     Finished(subscription);
                 }
                 {
-                    // L1-L1 (8 Nov 2026): the run's error after Finished or the controller's stop is how the workflow stopped.
+                    // The run's error after Finished or the controller's stop is how the workflow stopped.
                     foreach (var finishedFirst in new[] { true, false })
                     {
                         var control = Controller();
@@ -517,7 +517,7 @@ namespace OpenRigs.Manifest.Tests
                     }
                 }
                 {
-                    // L1-L2 (8 Nov 2026): a workflow killed after its Finished lost its outcome. It is written
+                    // A workflow killed after its Finished lost its outcome. It is written
                     // as Finished comes, not final, and app-rig-control keeps an editor's Bonsai open until the
                     // end-of-run write sets run.final true.
                     var control = Controller();
@@ -608,7 +608,7 @@ namespace OpenRigs.Manifest.Tests
                     Check("... and true by the end-of-run write: it is", on.Contains("\"required\": true,") && !on.Contains("has sent no value"), on.Length.ToString());
                 }
                 {
-                    // S3-L1 (Run 1): another writer's .tmp is not a file of the experiment.
+                    // Another writer's .tmp is not a file of the experiment.
                     var folder = Path.Combine(root, "tmpfiles");
                     Directory.CreateDirectory(Path.Combine(folder, "Board"));
                     File.WriteAllText(Path.Combine(folder, "Board", "Board.yml.tmp"), "x");
@@ -632,12 +632,12 @@ namespace OpenRigs.Manifest.Tests
                     Exception thrown = null;
                     try { path.OnNext(blocked); } catch (Exception e) { thrown = e; }
                     // Thrown, it went back up the thread that delivered the path, ControlServer's from Go,
-                    // and killed Bonsai (round 2 audit, 1 Nov 2026).
+                    // and killed Bonsai.
                     Check("ends the node with its error rather than throwing to whoever named the folder", thrown == null && error is IOException, thrown != null ? "threw " + thrown.GetType().Name : "error " + error);
                     Finished(subscription);
                 }
                 {
-                    // L1-M1 (audit, 11 Nov 2026): an end-of-run write that failed, the file held by a
+                    // An end-of-run write that failed, the file held by a
                     // reader without delete sharing, was never tried again: the manifest stayed running.
                     // The node's error disposes it at once (Observable.Create), so the reader lets go
                     // during the disposal's own attempt.
@@ -734,10 +734,10 @@ namespace OpenRigs.Manifest.Tests
                 Check("... which do not count as the device's data", ExpectedPlan.Matches(harp.Entries[0], new[] { "BehaviorBoard-Main/BehaviorBoard-Main_device.json", "BehaviorBoard-Main/BehaviorBoard-Main.yml" }, harp.Entries) == 0, "counted");
                 var notHarp = ExpectedPlan.Create("harp", rigYml, n => n == "BehaviorBoard-Main.Data" ? typeof(object) : null);
                 Check("... and nothing for a device whose data is not HarpMessage", notHarp.Entries.Count == 0, string.Join(", ", notHarp.Entries.Select(e => e.Path)));
-                // Round 5: rig.yml's devices are read by src\Shared\RigDevices.cs, as the live view reads them.
+                // rig.yml's devices are read by src\Shared\RigDevices.cs, as the live view reads them.
                 var none = ExpectedPlan.Create("auto", Path.Combine(root, "absent", "rig.yml"), n => typeof(object));
                 Check("no rig.yml expects nothing, and says so", none.Entries.Count == 0 && none.Notes.Any(n => n.StartsWith("No rig.yml at") && n.EndsWith("so no device's files are expected.")), string.Join(" | ", none.Notes));
-                // L2-L1: one empty instance hid its whole kind, without a word.
+                // One empty instance hid its whole kind, without a word.
                 var emptyYml = Path.Combine(root, "empty-rig.yml");
                 File.WriteAllText(emptyYml, "behaviorBoard:\n  main:\n    portName: COM3\n  spare:\ncamera:\n  overhead:\n    serialNumber: '1'\n" +
                     "speakerArray:\n  device: { bootDelaySeconds: 3 }\n  syncChannel: 7\n");
@@ -746,7 +746,7 @@ namespace OpenRigs.Manifest.Tests
                     empty.Notes.Count(n => n.Contains("has no settings")) == 1
                     && empty.Notes.Contains("The rig.yml entry behaviorBoard: spare: has no settings, so every behaviorBoard is passed over and none of its files is expected.")
                     && string.Join(", ", empty.Entries.Select(e => e.Path)) == "Camera-Overhead/", string.Join(" | ", empty.Notes));
-                // L1-L1: auto;harp, as every lab workflow sets, wrote the note twice.
+                // auto;harp, as every lab workflow sets, wrote the note twice.
                 var autoHarp = ExpectedPlan.Create("auto;harp", emptyYml, n => typeof(object));
                 Check("auto;harp writes each note once", autoHarp.Notes.Count(n => n.Contains("has no settings")) == 1 && autoHarp.Notes.Distinct().Count() == autoHarp.Notes.Count, string.Join(" | ", autoHarp.Notes));
                 // Version 4: path?Subject is required only while the bool subject Subject is true.
@@ -774,7 +774,7 @@ namespace OpenRigs.Manifest.Tests
                 Console.WriteLine("ConfigRoot:");
                 Check("a ConfigRoot that is not where rig.yml was read is noted", ManifestWriter.ConfigRootNote(@"D:\Test\config", @"D:\Rigs\RIG\rig.yml") != null, "no note");
                 Check("... and one that is, is not", ManifestWriter.ConfigRootNote(@"D:\Rigs", @"D:\Rigs\RIG\rig.yml") == null, "noted");
-                Check("{RigFiles} with no ConfigRoot stops the workflow at Start (round 3 LM3: no lab default)", ManifestWriter.ConfigRootRefusal(ManifestWriter.RigFilesToken, " ") != null, "no refusal");
+                Check("{RigFiles} with no ConfigRoot stops the workflow at Start (no lab default)", ManifestWriter.ConfigRootRefusal(ManifestWriter.RigFilesToken, " ") != null, "no refusal");
                 Check("... and neither a ConfigRoot nor ConfigFiles without {RigFiles} does", ManifestWriter.ConfigRootRefusal(ManifestWriter.RigFilesToken, @"D:\Rigs") == null && ManifestWriter.ConfigRootRefusal("a.yml", null) == null, "refused");
                 Check("ConfigRoot has no default", new ExperimentManifestSettings().ConfigRoot == null, new ExperimentManifestSettings().ConfigRoot);
 

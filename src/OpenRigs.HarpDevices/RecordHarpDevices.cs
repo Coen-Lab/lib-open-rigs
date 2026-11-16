@@ -79,7 +79,7 @@ namespace OpenRigs.HarpDevices
             var built = base.Build(arguments);
             if (plan.StartRefusal == null) return built;
             // Built, so the editor opens the workflow on any desk; it stops when the workflow starts,
-            // as the manifest would otherwise wait every night for Harp files nobody writes (L2-L2, 7 Nov 2026).
+            // as the manifest would otherwise wait every night for Harp files nobody writes.
             return Expression.Call(typeof(Observable), nameof(Observable.Throw), built.Type.GetGenericArguments(),
                 Expression.Constant(new InvalidOperationException(plan.StartRefusal), typeof(Exception)));
         }

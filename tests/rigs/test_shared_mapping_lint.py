@@ -37,7 +37,7 @@ def test_a_mapping_with_its_own_source_is_allowed():
 
 
 def test_a_source_that_feeds_only_the_mapping_and_its_target_is_allowed():
-    # The value comes with each element the target is given (PulseController's pulse widths).
+    # The value comes with each element the target is given (PulseOutputs' pulse widths).
     assert problems(SOURCE + MAPPING + ANNOUNCE, [(0, 1, "Source1"), (1, 2, "Source2"), (0, 2, "Source1")]) == []
 
 

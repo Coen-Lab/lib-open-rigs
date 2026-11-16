@@ -1,4 +1,4 @@
-"""Each config\\*.yml of a workflow against its own schema (settings-files plan, audit M5): the one its
+"""Each config\\*.yml of a workflow against its own schema (settings-files plan): the one its
 `# yaml-language-server: $schema=` line names, a `#/$defs/<Name>` fragment taking that definition;
 else task*.yml against src\\DataSchemas\\*_task.json, valve-calibration.yml against calibration.json and
 rig-template.yml against the other schema there. A task file the generated DeserializeFromYaml would

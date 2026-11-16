@@ -5,7 +5,7 @@
 | Column | Holds |
 |---|---|
 | `harpTime` | the Harp time of the event, in seconds |
-| `Event` | what happened, for example `RewardLeft` or `SpoutsIn` |
+| `Event` | what happened, for example `RewardDelivered` or `SpoutsIn` |
 | `Detail` | any text that qualifies it, for example `Manual`; empty if none |
 | `Value` | the number it carries, for example microlitres or steps; empty if none |
 

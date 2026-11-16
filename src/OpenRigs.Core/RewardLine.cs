@@ -17,7 +17,7 @@ namespace OpenRigs.Core
     public class RewardLine
     {
         /// <summary>Gets or sets the valve's piece, such as RewardValve-Left.</summary>
-        public string Valve { get; set; }
+        public string Piece { get; set; }
 
         /// <summary>Gets or sets the valve's name in rig.yml's wiring, such as left: its instance, what a reward asks for.</summary>
         public string Instance { get; set; }
@@ -151,7 +151,7 @@ namespace OpenRigs.Core
             {
                 throw new InvalidOperationException(where + " is not on a line the board can pulse: a RewardValve goes on " + string.Join(", ", PulseLines) + ".");
             }
-            var line = new RewardLine { Valve = valve, Instance = wired.Name, Board = wired.Board.Name, Line = wired.Line, MaxRewardUl = maxRewardUl };
+            var line = new RewardLine { Piece = valve, Instance = wired.Name, Board = wired.Board.Name, Line = wired.Line, MaxRewardUl = maxRewardUl };
 
             var output = Child(Child(Child(wired.Board.Settings, "pulseController") as YamlMappingNode, "outputs") as YamlMappingNode, wired.Line) as YamlMappingNode;
             if (output == null) throw new InvalidOperationException(where + " has no entry in " + wired.Board.Name + "'s pulseController.outputs.");
@@ -278,14 +278,14 @@ namespace OpenRigs.Core
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
                     "The task asked for a {0} ul reward from {1}, which is not a volume, so the workflow stopped " +
                     "without opening the valve. Check the reward size in the task's settings.",
-                    requestedUl, line.Valve));
+                    requestedUl, line.Piece));
             }
             if (requestedUl > line.MaxRewardUl)
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
                     "The task asked for a {0} ul reward from {1}, more than the {2} ul one reward may give, so the workflow stopped " +
                     "without opening the valve. Check the reward size in the task's settings (30 typed for 3.0?), or raise the valve's MaxRewardUl.",
-                    requestedUl, line.Valve, line.MaxRewardUl));
+                    requestedUl, line.Piece, line.MaxRewardUl));
             }
             if (requestedUl <= 0) return plan;
 
@@ -297,7 +297,7 @@ namespace OpenRigs.Core
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
                     "A {0} ul reward from {1} would take {2} pulses of at most {3} ul each, more than {4}; " +
                     "the valve calibration's linearFit gives too little per pulse. Calibrate the valve again.",
-                    requestedUl, line.Valve, count, largestUl, ushort.MaxValue));
+                    requestedUl, line.Piece, count, largestUl, ushort.MaxValue));
             }
             plan.Pulses = Math.Max(1, (int)count);
             var width = (int)Math.Round((requestedUl / plan.Pulses - fit.Intercept) / fit.Slope, MidpointRounding.AwayFromZero);

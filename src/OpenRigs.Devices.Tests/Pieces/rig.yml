@@ -143,7 +143,7 @@ speakerArray:
       filter: calibration/speaker-centre.json
 
 # Zapit optogenetics server (tcpServer section of the Zapit settings file). Contacted only when the
-# task sets optogenetics.useZapit: true. The trigger is the board's ZapitTrigger line in wiring.
+# task sets optogenetics.enabled: true. The trigger is the board's ZapitTrigger line in wiring.
 zapit:
   host: 127.0.0.1           # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
   port: 1488

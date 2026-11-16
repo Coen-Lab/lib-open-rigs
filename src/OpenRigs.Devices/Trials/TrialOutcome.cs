@@ -33,10 +33,10 @@ namespace OpenRigs.Devices
     {
         /// <summary>
         /// The outcome of <paramref name="row"/>, whose shared block is filled: the reward, when the row is rewarded,
-        /// is its rewardOfferedUl at <paramref name="rewardValve"/> (as rig.yml's wiring names the reward valve), else null.
+        /// is its rewardOfferedUl at <paramref name="valveInstance"/> (as rig.yml's wiring names the reward valve), else null.
         /// Throws when the row's outcome is not one of <see cref="TrialOutcomes.All"/>.
         /// </summary>
-        public TrialOutcome(TRow row, string rewardValve)
+        public TrialOutcome(TRow row, string valveInstance)
         {
             if (row == null) throw new ArgumentNullException("row");
             var outcome = Get<string>(row, "outcome");
@@ -46,7 +46,7 @@ namespace OpenRigs.Devices
             }
             Row = Timestamped.Create(row, Get<double>(row, "outcomeTime"));
             Rewarded = Get<bool>(row, "rewarded");
-            Reward = Rewarded ? Tuple.Create(rewardValve, Get<double>(row, "rewardOfferedUl")) : null;
+            Reward = Rewarded ? Tuple.Create(valveInstance, Get<double>(row, "rewardOfferedUl")) : null;
             PenaltySound = Get<bool>(row, "penaltySound");
             PenaltyTimeoutSeconds = Get<double>(row, "penaltyTimeoutSeconds");
         }

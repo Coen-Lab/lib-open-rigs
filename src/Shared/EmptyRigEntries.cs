@@ -10,7 +10,7 @@ namespace OpenRigs.Shared
     /// The device kinds RigDevices.Read passes over because one instance is left empty
     /// (behaviorBoard: spare: with nothing under it) beside instances with settings: by its shape
     /// rule the whole kind is then not devices, so every one of its devices would go unrecorded,
-    /// unexpected and unstreamed without a word (audit L2-L1, 14 Nov 2026). Kept apart from
+    /// unexpected and unstreamed without a word. Kept apart from
     /// RigDevices so the packages that compile only that file are unchanged.
     /// </summary>
     internal static class EmptyRigEntries

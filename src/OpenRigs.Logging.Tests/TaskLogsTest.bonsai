@@ -44,7 +44,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="scr:ExpressionTransform">
-        <scr:Expression>new(new(new(false as UseZapit, "" as ZapitConfigPath) as Optogenetics) as TaskParameters)</scr:Expression>
+        <scr:Expression>new(new(new(false as Enabled, "" as ZapitConditionsPath) as Optogenetics) as TaskParameters)</scr:Expression>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
         <Name>TaskConfig</Name>

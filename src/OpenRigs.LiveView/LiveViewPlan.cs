@@ -216,7 +216,7 @@ namespace OpenRigs.LiveView
                 plan.Notes.Add(problem);
                 return plan;
             }
-            // An empty entry hides its whole kind from RigDevices.Read (audit L2-L1).
+            // An empty entry hides its whole kind from RigDevices.Read.
             plan.Notes.AddRange(EmptyRigEntries.Find(RigDevices.PathFor(configRoot), DeviceRecipe.All.Select(r => r.Kind)).Select(e => e + " and none is streamed"));
             foreach (var device in devices)
             {
