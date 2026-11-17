@@ -27,7 +27,7 @@ from ruamel.yaml import YAML
 LOG = "WorkflowData_Trials"
 MANIFEST = "manifest.json"
 # Every version keeps `trial_columns` and `source.commit` as they were; any other is refused (records.md, rule 3).
-MANIFEST_VERSIONS = (1, 2, 3)
+MANIFEST_VERSIONS = (1, 2, 3, 4)  # 4 is what OpenRigs.Manifest writes (ManifestWriter.Version)
 REPO_FILE = "schemas/trial-columns.yml"
 
 
