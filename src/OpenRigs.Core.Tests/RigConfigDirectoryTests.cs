@@ -50,7 +50,7 @@ namespace OpenRigs.Core.Tests
         static string Resolve(string directory, string path)
         {
             var resolve = new ResolveRigFile { Setting = "projector.meshPath" };
-            return resolve.Process(Observable.Return(Tuple.Create(directory, path))).Wait();
+            return resolve.Process(Observable.Return(Tuple.Create(Path.Combine(directory, "rig.yml"), path))).Wait();
         }
     }
 }

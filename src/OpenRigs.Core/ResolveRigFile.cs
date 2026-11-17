@@ -1,6 +1,7 @@
 ﻿using Bonsai;
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Reactive.Linq;
 
 namespace OpenRigs.Core
@@ -11,7 +12,7 @@ namespace OpenRigs.Core
     /// </summary>
     [Combinator]
     [DefaultProperty("Directory")]
-    [Description("Turns a path relative to the rig configuration directory, such as calibration/valves.json taken from the rig configuration, into the absolute path of that file, and fails if it does not exist or is a full path. Input is either the relative path alone, resolved against the Directory property, or a Zip of the RigConfigDirectory subject with the relative path, in which case Directory is ignored.")]
+    [Description("Turns a path relative to the rig configuration directory, such as calibration/valves.json taken from the rig configuration, into the absolute path of that file, and fails if it does not exist or is a full path. Input is either the relative path alone, resolved against the Directory property, or a Zip of the RigFile subject (rig.yml's path) with the relative path, resolved against rig.yml's folder, in which case Directory is ignored.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ResolveRigFile
     {
@@ -21,7 +22,7 @@ namespace OpenRigs.Core
         /// <summary>
         /// Gets or sets the rig configuration directory that bare relative paths resolve against.
         /// </summary>
-        [Description("The rig configuration directory to resolve against when the input is a relative path on its own. Leave empty when the input is a Zip of directory and path, which is the usual wiring.")]
+        [Description("The rig configuration directory to resolve against when the input is a relative path on its own. Leave empty when the input is a Zip of RigFile and the path, which is the usual wiring.")]
         [Editor("Bonsai.Design.FolderNameEditor, Bonsai.Design", DesignTypes.UITypeEditor)]
         public string Directory
         {
@@ -51,13 +52,13 @@ namespace OpenRigs.Core
         }
 
         /// <summary>
-        /// Resolves each (directory, relative path) pair, for example from a Zip of the directory and the path.
+        /// Resolves each (rig.yml's path, relative path) pair, from a Zip of the RigFile subject and the path, against rig.yml's folder.
         /// </summary>
         public IObservable<string> Process(IObservable<Tuple<string, string>> source)
         {
             return source.Select(delegate (Tuple<string, string> pair)
             {
-                return RigConfigDirectory.ResolveFile(pair.Item1, pair.Item2, setting);
+                return RigConfigDirectory.ResolveFile(Path.GetDirectoryName(pair.Item1), pair.Item2, setting);
             });
         }
     }

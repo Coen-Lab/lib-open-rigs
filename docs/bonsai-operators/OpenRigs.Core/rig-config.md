@@ -1,8 +1,8 @@
 # Rig Configuration
 
-Every rig workflow starts the same way: find the configuration directory for the machine it is running on, read `rig.yml` from it, and resolve any calibration artefact the configuration points at. `OpenRigs.Core` provides three operators for this so no rig has to carry its own copy. They deal only in paths and text. Deserialising the YAML into the rig's own generated types happens in the rig workflow, where the generated `DeserializeFromYaml` operator lives.
+Every rig workflow starts the same way: find the configuration directory for the machine it is running on, read `rig.yml` from it, and resolve any calibration artefact the configuration points at. `OpenRigs.Core` provides two operators for this so no rig has to carry its own copy. They deal only in paths and text. Deserialising the YAML into the rig's own generated types happens in the rig workflow, where the generated `DeserializeFromYaml` operator lives.
 
-Only one of the three, `ResolveRigConfigDirectory`, knows the directory layout. The other two take a directory as input, so a lab with a different convention replaces that one operator with anything that emits a directory and keeps the rest.
+Only `ResolveRigConfigDirectory` knows the directory layout. `ResolveRigFile` takes `rig.yml`'s path as input, so a lab with a different convention replaces that one operator with anything that emits a directory and keeps the rest.
 
 ---
 
@@ -14,6 +14,7 @@ One directory per machine under a configurable root:
 <ConfigRoot>\
   <MACHINE-NAME>\
     rig.yml
+    LickSpoutPositions.csv
     calibration\
       <artefact>.json
 ```
@@ -36,29 +37,13 @@ Emits `<ConfigRoot>\<MACHINE-NAME>` as an absolute path, or fails at startup if 
 
 ---
 
-## ReadRigConfig
-
-An include that takes the configuration directory as input, reads the rig configuration file from it, and emits the text once.
-
-:::workflow
-![ReadRigConfig](~/assets/workflows/core/ReadRigConfig.svg){data-bonsai="~/src/OpenRigs.Core/ReadRigConfig.bonsai"}
-:::
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `FileName` | `rig.yml` | The name of the rig configuration file inside the directory. |
-
-The usual continuation is the generated `DeserializeFromYaml` for the rig's own `Rig` type, followed by an `AsyncSubject` named after the configuration (for example `RigConfig`) that the rest of the workflow subscribes to. Fails at startup if the file is missing.
-
----
-
 ## ResolveRigFile
 
-A transform that turns a path relative to a configuration directory into an absolute path, and fails if the file does not exist. It accepts either a bare relative path, resolved against the `Directory` property, or a `(directory, path)` pair, for example from a `Zip` of the directory subject and the path.
+A transform that turns a path relative to a configuration directory into an absolute path, and fails if the file does not exist. It accepts either a bare relative path, resolved against the `Directory` property, or a `(rig.yml's path, path)` pair from a `Zip` of the `RigFile` subject and the path, resolved against `rig.yml`'s folder.
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `Directory` | empty | The configuration directory that bare relative paths resolve against. Not used when the input pairs the directory with the path. |
+| `Directory` | empty | The configuration directory that bare relative paths resolve against. Not used when the input pairs `rig.yml`'s path with the path. |
 | `Setting` | empty | The rig.yml key the path is from, named when the path is refused. |
 
 Feed it the relative path of a calibration artefact from the rig configuration (for example `calibration/valves.json`). Consumers then read the file as they need: `ReadAllText` followed by the generated `DeserializeFromJson` for a JSON artefact, or the path itself for an operator that loads a file, such as BonVision's mesh mapping and gamma correction includes. A full path is refused, naming `Setting` (the rig.yml key, such as `projector.meshPath`) when given: every file a rig.yml names is relative to its folder, so the same rig.yml works under any root.
@@ -67,13 +52,12 @@ Feed it the relative path of a calibration artefact from the rig configuration (
 
 ## In a rig
 
-Three lines at the top of the workflow:
+The lab rig model's one reader, `OpenRigs.Devices:ReadLabRig.bonsai`, does it in one include:
 
-1. `ResolveRigConfigDirectory` into an `AsyncSubject` named `RigConfigDirectory`.
-2. `SubscribeSubject RigConfigDirectory`, then `ReadRigConfig`, then the generated `DeserializeFromYaml`, into an `AsyncSubject` named `RigConfig`.
-3. For each artefact: the relative path from `RigConfig`, zipped with `SubscribeSubject RigConfigDirectory`, into `ResolveRigFile`, then the consumer.
+1. `ResolveRigConfigDirectory`, then `rig.yml` in it, into an `AsyncSubject` named `RigFile`.
+2. `SubscribeSubject RigFile`, then `ReadAllText` and the generated `DeserializeFromYaml`, into an `AsyncSubject` named `RigConfigs`.
 
-The two subjects belong to the rig workflow, not the package, so each consumer subscribes to them itself. For the lab rig model, `OpenRigs.Devices:ReadLabRig.bonsai` does steps 1 and 2 in one include, naming the model's subject `RigConfigs`.
+For each artefact a piece reads: the relative path from `RigConfigs`, zipped with `SubscribeSubject RigFile`, into `ResolveRigFile`, then the consumer. Each consumer subscribes to the subjects itself.
 
 ---
 

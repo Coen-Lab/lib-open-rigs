@@ -4,7 +4,7 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Writes a serialized calibration artefact into a rig configuration directory: calibration\&lt;FileName&gt;.json, which the rig configuration points at and which is replaced on every run, plus a dated copy in calibration\history\. Input is a Tuple of the JSON text and the directory, for example SerializeToJson combined with the RigConfigDirectory subject. Output is a message naming the file written and the rig.yml line to paste. WriteAllText reads its Path when it subscribes. The input is therefore held in a scoped AsyncSubject and each sink gets its path through its own subscription and property mapping, declared before the sink's text. The literal Path on each sink is only a placeholder.</Description>
+  <Description>Writes a serialized calibration artefact into a rig configuration directory: calibration\&lt;FileName&gt;.json, which the rig configuration points at and which is replaced on every run, plus a dated copy in calibration\history\. Input is a Tuple of the JSON text and the directory, for example SerializeToJson combined with the folder holding rig.yml. Output is a message naming the file written and the rig.yml line to paste. WriteAllText reads its Path when it subscribes. The input is therefore held in a scoped AsyncSubject and each sink gets its path through its own subscription and property mapping, declared before the sink's text. The literal Path on each sink is only a placeholder.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
