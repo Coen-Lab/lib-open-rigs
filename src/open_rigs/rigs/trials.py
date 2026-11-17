@@ -91,7 +91,7 @@ CORE_COLUMNS: List[Column] = [
      "detectors' logs."),
     ("rewardOfferedUl", "double", "ul",
      "Microlitres a reward on this trial gives, on every trial whether or not it was rewarded: the size the task drew "
-     "for it (its stage's rewardSizeUl, or a larger reward where the task has one); 0 on a trial that offers none. "
+     "for it (the task file's rewardSizeUl, or a larger reward where the task has one); 0 on a trial that offers none. "
      "rewarded says whether it was given; what was delivered is RewardDelivered in WorkflowData_Events."),
     ("rewarded", "bool", None,
      "True when the trial's outcome delivered its reward (rewardOfferedUl, at outcomeTime): the value the workflow's "
