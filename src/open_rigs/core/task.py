@@ -6,6 +6,9 @@ from swc.aeon.schema import BaseSchema
 
 from open_rigs.components.zapit import ZAPIT_REPLY_MARGIN_SECONDS
 
+# The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, a RewardValve piece's MaxRewardUl).
+MAX_REWARD_UL = 20
+
 
 class TaskParameters(BaseSchema):
     rng_seed: Optional[float] = Field(
@@ -18,13 +21,13 @@ class Task(BaseSchema):
 
 
 # The lab's task blocks, one model each so every task names and checks them alike. A task's own
-# model takes QuietWait or Optogenetics by inheritance, which keeps its keys where they are in the
-# task file, and Penalty as its penalty field.
+# model takes QuietWait, Iti, ResponseWindow, AutoReward, RewardSize or Optogenetics by inheritance, which keeps
+# its keys where they are in the task file, and Penalty as its penalty field.
 
 
 class TaskBlock(BaseSchema):
     """A block of a task file whose numbers are all finite: YAML's .inf and .nan are refused, so no wait is endless and
-    no rule's comparison passes a NaN. Every lab block is one, and so is a task's model built on QuietWait or Optogenetics."""
+    no rule's comparison passes a NaN. Every lab block is one, and so is a task's model built on one."""
 
     model_config = ConfigDict(allow_inf_nan=False)
 
@@ -53,6 +56,51 @@ class QuietWait(TaskBlock):
         if (self.wheel_quiet_seconds > 0) != (self.wheel_quiet_cm > 0):
             raise ValueError("wheel_quiet_seconds and wheel_quiet_cm must both be above 0 (the wheel's quiet wait) or both 0 (off)")
         return self
+
+
+class Iti(TaskBlock):
+    """The inter-trial interval, drawn uniformly for every trial between itiMinSeconds and itiMaxSeconds. Where it starts
+    and ends is the task's, said in its own description. No lab default: each task file gives both."""
+
+    iti_min_seconds: float = Field(
+        ge=0, description="Lower bound of the inter-trial interval, drawn uniformly for every trial, in seconds; the stage's quiet waits can only lengthen it (quietWaitSeconds)"
+    )
+    iti_max_seconds: float = Field(ge=0, description="Upper bound of the inter-trial interval, in seconds; at least itiMinSeconds")
+
+    @model_validator(mode="after")
+    def _iti_ordered(self):
+        if self.iti_max_seconds < self.iti_min_seconds:
+            raise ValueError("iti_max_seconds must be >= iti_min_seconds")
+        return self
+
+
+class ResponseWindow(TaskBlock):
+    """The response window: how long a trial waits for the mouse's response, from the start of the task's response
+    period (each task says where that starts)."""
+
+    response_window_seconds: float | None = Field(
+        default=None,
+        gt=0,
+        description="The response window, in seconds from the start of the task's response period; with no response by its end the trial is NoResponse. Null or left out: no limit (a task may refuse it)",
+    )
+
+
+class AutoReward(TaskBlock):
+    """Auto-reward: the chance a trial is rewarded without a correct response. How it is given is the task's."""
+
+    auto_reward_probability: float = Field(
+        ge=0, le=1, description="Probability that a trial is an auto-reward trial, rewarded without a correct response (how is the task's); 0: never, 1: every trial"
+    )
+
+
+class RewardSize(TaskBlock):
+    """The reward's size, planned into valve pulses from the valve's calibration."""
+
+    reward_size_ul: float = Field(
+        gt=0,
+        le=MAX_REWARD_UL,
+        description=f"Reward size, in microlitres, planned into valve pulses from the valve's calibration; at most {MAX_REWARD_UL}, the most one reward may ask for",
+    )
 
 
 class Optogenetics(TaskBlock):

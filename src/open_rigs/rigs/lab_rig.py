@@ -40,8 +40,6 @@ PLACEHOLDER = "CHANGE-ME"  # rig-template.yml's mark on each value a rig fills i
 # The device kinds are maps of named entries; the single sections are one entry each, which a person confirms.
 PREFLIGHT_DEVICE_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera")
 PREFLIGHT_SINGLE_SECTIONS = ("speakerArray", "projector")
-# The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, a RewardValve piece's MaxRewardUl).
-MAX_REWARD_UL = 20
 
 
 class LabRig(Rig):

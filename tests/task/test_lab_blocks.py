@@ -5,7 +5,19 @@ import re
 from pathlib import Path
 
 from open_rigs.core import task
-from open_rigs.core.task import BackgroundNoise, Optogenetics, Penalty, QuietWait, RewardTone, StimulusSound
+from open_rigs.core.task import (
+    MAX_REWARD_UL,
+    AutoReward,
+    BackgroundNoise,
+    Iti,
+    Optogenetics,
+    Penalty,
+    QuietWait,
+    ResponseWindow,
+    RewardSize,
+    RewardTone,
+    StimulusSound,
+)
 
 OPTO = {"laserOnProbability": 0.5, "laserToStimulusSeconds": 0.1, "trialsBeforeLaser": 0}
 
@@ -38,6 +50,38 @@ def test_a_task_s_own_field_on_a_lab_block_is_finite_too():
 
     with pytest.raises(ValidationError, match="finite number"):
         TimedStage.model_validate({"responseWindowSeconds": float("inf")})
+
+
+class Row(Iti, ResponseWindow, AutoReward, RewardSize):
+    label: str
+
+
+ROW = {"label": "a", "itiMinSeconds": 2, "itiMaxSeconds": 3, "autoRewardProbability": 0.5, "rewardSizeUl": 3}
+
+
+def test_trial_blocks_keep_their_keys_where_the_task_puts_them():
+    assert Row.model_validate(ROW).model_dump(by_alias=True) == {**ROW, "responseWindowSeconds": None}
+
+
+def test_trial_blocks_have_no_lab_default_but_the_window():
+    with pytest.raises(ValidationError) as error:
+        Row.model_validate({"label": "a"})
+    assert {e["loc"][0] for e in error.value.errors()} == {"itiMinSeconds", "itiMaxSeconds", "autoRewardProbability", "rewardSizeUl"}
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"itiMaxSeconds": 1}, "iti_max_seconds must be >= iti_min_seconds"),
+        ({"responseWindowSeconds": 0}, "greater than 0"),
+        ({"autoRewardProbability": 1.5}, "less than or equal to 1"),
+        ({"rewardSizeUl": MAX_REWARD_UL + 1}, f"less than or equal to {MAX_REWARD_UL}"),
+        ({"itiMinSeconds": float("nan")}, "finite number"),
+    ],
+)
+def test_trial_blocks_refuse(change, message):
+    with pytest.raises(ValidationError, match=message):
+        Row.model_validate({**ROW, **change})
 
 
 def test_penalty_refuses_an_endless_timeout():
