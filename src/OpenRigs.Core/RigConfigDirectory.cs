@@ -36,7 +36,7 @@ namespace OpenRigs.Core
         /// <summary>
         /// Returns the full path of a file relative to the given rig configuration directory, or throws if it does
         /// not exist or is given as a full path. <paramref name="setting"/>, the rig.yml key the path is from
-        /// (such as projectionCalibration.meshMapPath), is named in each refusal when given.
+        /// (such as projector.meshPath), is named in each refusal when given.
         /// </summary>
         public static string ResolveFile(string directory, string relativePath, string setting = null)
         {

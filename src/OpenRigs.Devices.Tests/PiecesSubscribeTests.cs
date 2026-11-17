@@ -109,13 +109,13 @@ namespace OpenRigs.Devices.Tests
             Check(Run("SpinnakerCamera.bonsai"));
         }
 
-        // Without projectionCalibration, so ProjectorDisplay stops at start before it opens a full-screen window.
+        // Without projector, so ProjectorDisplay stops at start before it opens a full-screen window.
         [TestMethod]
         public void DomeHardware()
         {
             RequireSpinnaker();
-            Check(Run("DomeHardware.bonsai", rig => Regex.Replace(rig, @"(?ms)^projectionCalibration:.*?(?=^\S)", "")),
-                  "projectionCalibration");
+            Check(Run("DomeHardware.bonsai", rig => Regex.Replace(rig, @"(?ms)^projector:.*?(?=^\S)", "")),
+                  "projector");
         }
 
         // The pieces' rig's face camera as the box's overhead one, on the same trigger.

@@ -106,9 +106,9 @@ videoEncoder:
   codec: h264_nvenc
 
 # Relative to this directory, as every file here is; a full path stops the workflow at Start (ProjectorDisplay).
-projectionCalibration:
-  meshMapPath: calibration/MeshMap.csv
-  gammaLutPath: calibration/gammalut.bmp
+projector:
+  meshPath: calibration/Projector-Mesh.csv
+  gammaPath: calibration/Projector-Gamma.bmp
 
 speakerArray:
   device:                   # the mixer and the stimulus loader read these
@@ -122,7 +122,8 @@ speakerArray:
   syncGain: 0.2
   penaltySoundChannel: 2    # the penalty sound's channel
   unusedChannels: [30]      # not connected
-  # the lab's one background noise, from this directory: the server's config\shared copy, kept by the rig's upkeep
+  # the lab's one penalty sound and background noise, from this directory: the server's config\shared copies, kept by the rig's upkeep
+  penaltySound: ../shared/sounds/penalty_tone.wav
   backgroundNoise: ../shared/sounds/background_noise.wav
   # Speakers currently wired on this rig. Position is relative to the subject:
   # azimuth 0 = straight ahead, positive to the right; elevation 0 = horizontal.

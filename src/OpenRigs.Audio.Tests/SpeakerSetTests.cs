@@ -10,7 +10,7 @@ namespace OpenRigs.Audio.Tests
     [TestClass]
     public class SpeakerSetTests
     {
-        static string Rig(string speakers = null, string extra = "  syncChannel: 31\n  penaltySoundChannel: 2\n", double[] taps = null, string machine = "TEST-RIG")
+        static string Rig(string speakers = null, string extra = "  syncChannel: 31\n  penaltySoundChannel: 2\n  penaltySound: penalty_tone.wav\n", double[] taps = null, string machine = "TEST-RIG")
         {
             var folder = Path.Combine(Path.GetTempPath(), "audio-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path.Combine(folder, "calibration"));
@@ -173,9 +173,12 @@ namespace OpenRigs.Audio.Tests
         [TestMethod]
         public void ThePenaltySoundPlaysOnThePenaltyChannelAloneAtTheTasksLevel()
         {
-            var set = SpeakerSet.Load(Rig(taps: new[] { 0.0, 1.0, 0.0 }), "TEST-RIG");
+            var rig = Rig(taps: new[] { 0.0, 1.0, 0.0 });
+            var random = new Random(1);
+            WriteFloatWave(Path.Combine(Path.GetDirectoryName(rig), "penalty_tone.wav"), 48000, Enumerable.Range(0, 48000).Select(_ => (float)(random.NextDouble() - 0.5) * 0.2f).ToArray());
+            var set = SpeakerSet.Load(rig, "TEST-RIG");
+            Assert.AreEqual(Path.Combine(Path.GetDirectoryName(rig), "penalty_tone.wav"), set.PenaltySoundFile);
             var buffer = PenaltySound.Buffer(set, -44.6);
-            using (var tone = PenaltySound.Read(48000))
             using (var row = buffer.GetRow(2))
             {
                 Assert.AreEqual(48000, buffer.Cols);  // one second at 48 kHz
@@ -272,8 +275,12 @@ namespace OpenRigs.Audio.Tests
         [TestMethod]
         public void AWaveAtAnotherRateIsRefused()
         {
-            var ex = Assert.ThrowsException<InvalidDataException>(() => PenaltySound.Read(44100));
-            StringAssert.Contains(ex.Message, "is 48000 Hz, but the audio device runs at 44100 Hz");
+            var rig = Rig();
+            WriteFloatWave(Path.Combine(Path.GetDirectoryName(rig), "penalty_tone.wav"), 44100, 0.25f);
+            var ex = Assert.ThrowsException<InvalidDataException>(() => PenaltySound.Read(SpeakerSet.Load(rig, "TEST-RIG")));
+            StringAssert.Contains(ex.Message, "is 44100 Hz, but the audio device runs at 48000 Hz");
+            var none = Assert.ThrowsException<InvalidOperationException>(() => PenaltySound.Read(SpeakerSet.Load(Rig(extra: "  syncChannel: 31\n  penaltySoundChannel: 2\n"), "TEST-RIG")));
+            StringAssert.Contains(none.Message, "rig.yml's speakerArray has no penaltySound");
         }
     }
 }

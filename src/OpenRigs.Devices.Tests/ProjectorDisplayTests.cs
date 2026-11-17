@@ -89,17 +89,17 @@ namespace OpenRigs.Devices.Tests
         // one naming no file in <ConfigRoot>\<MACHINE>, stops ProjectorDisplay at Start naming the key, as built from rig.yml
         // by ReadLabRig (64 px and windowed on the first display, should a refusal ever let it through).
         [DataTestMethod]
-        [DataRow(@"C:\RigConfigs\RIG\calibration\MeshMap.csv", "rig.yml's projectionCalibration.meshMapPath is a full path")]
-        [DataRow("calibration/MeshMap.csv", "rig.yml's projectionCalibration.meshMapPath names calibration/MeshMap.csv, and there is no such file: {0}")]
-        public void ProjectorDisplayRefusesAFullOrMissingPath_AtStart(string meshMapPath, string refusal)
+        [DataRow(@"C:\RigConfigs\RIG\calibration\Projector-Mesh.csv", "rig.yml's projector.meshPath is a full path")]
+        [DataRow("calibration/Projector-Mesh.csv", "rig.yml's projector.meshPath names calibration/Projector-Mesh.csv, and there is no such file: {0}")]
+        public void ProjectorDisplayRefusesAFullOrMissingPath_AtStart(string meshPath, string refusal)
         {
             if (DisplayDevice.GetDisplay(DisplayIndex.First) == null) Assert.Inconclusive("No display here, so ProjectorDisplay stops on that first.");
             var root = Path.Combine(Path.GetTempPath(), "ProjectorDisplayTests", Guid.NewGuid().ToString("N"));
             var rig = Path.Combine(root, Environment.MachineName);
             Directory.CreateDirectory(Path.Combine(rig, "calibration"));
-            File.WriteAllText(Path.Combine(rig, "calibration", "gammalut.bmp"), "");
+            File.WriteAllText(Path.Combine(rig, "calibration", "Projector-Gamma.bmp"), "");
             File.WriteAllText(Path.Combine(rig, "rig.yml"),
-                "rootPath: " + root + "\nprojectionCalibration:\n  meshMapPath: " + meshMapPath + "\n  gammaLutPath: calibration/gammalut.bmp\n");
+                "rootPath: " + root + "\nprojector:\n  meshPath: " + meshPath + "\n  gammaPath: calibration/Projector-Gamma.bmp\n");
             var xml = $@"<WorkflowBuilder Version=""2.9.0"" xmlns:xsi=""{Xsi}"" xmlns=""{Bonsai}"">
   <Workflow>
     <Nodes>
@@ -110,7 +110,7 @@ namespace OpenRigs.Devices.Tests
         <Name>RigConfigs</Name>
       </Expression>
       <Expression xsi:type=""MemberSelector"">
-        <Selector>ProjectionCalibration</Selector>
+        <Selector>Projector</Selector>
       </Expression>
       <Expression xsi:type=""IncludeWorkflow"" Path=""OpenRigs.Vision:ProjectorDisplay.bonsai"">
         <DisplayDevice>First</DisplayDevice>
@@ -137,14 +137,14 @@ namespace OpenRigs.Devices.Tests
             {
                 using (builder.Workflow.BuildObservable().Subscribe(_ => { }, e => { error = e; stopped.Set(); }, stopped.Set))
                 {
-                    Assert.IsTrue(stopped.Wait(TimeSpan.FromSeconds(10)), "ProjectorDisplay ran on " + meshMapPath + ".");
+                    Assert.IsTrue(stopped.Wait(TimeSpan.FromSeconds(10)), "ProjectorDisplay ran on " + meshPath + ".");
                 }
             }
             finally { try { Directory.Delete(root, true); } catch (IOException) { } }
 
             for (; error?.InnerException != null && !(error is InvalidOperationException); error = error.InnerException) { }
             Assert.IsNotNull(error, "ProjectorDisplay completed instead of refusing.");
-            StringAssert.Contains(error.Message, string.Format(refusal, Path.Combine(rig, "calibration", "MeshMap.csv")));
+            StringAssert.Contains(error.Message, string.Format(refusal, Path.Combine(rig, "calibration", "Projector-Mesh.csv")));
         }
 
         static XDocument Embedded(string name)

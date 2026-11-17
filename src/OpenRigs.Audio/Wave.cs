@@ -82,37 +82,43 @@ namespace OpenRigs.Audio
         }
     }
 
+    /// <summary>A lab-wide sound rig.yml's speakerArray names, read whole as one row.</summary>
+    static class RigSound
+    {
+        /// <summary>The sound, one row as stored; throws, naming the file, when rig.yml names none, it is missing or at another rate.</summary>
+        public static Mat Read(string path, string key, string what, string file, int sampleRate)
+        {
+            if (path == null)
+            {
+                throw new InvalidOperationException("rig.yml's speakerArray has no " + key + ", " + what + ". " +
+                    "Add it: " + key + ": ../shared/sounds/" + file + " (the rig's upkeep copies it from the server's config\\shared).");
+            }
+            if (!File.Exists(path))
+            {
+                throw new InvalidOperationException("The sound rig.yml's speakerArray." + key + " names is missing: " + path +
+                    ". The rig's upkeep copies it from the server's config\\shared; run it, or copy the file there.");
+            }
+            return Wave.Read(path, sampleRate);
+        }
+    }
+
     /// <summary>The lab's background noise, the same file in every task, named by rig.yml's speakerArray.backgroundNoise.</summary>
     public static class BackgroundNoiseSound
     {
         /// <summary>The noise, one row as stored; throws, naming the file, when rig.yml names none, it is missing or at another rate.</summary>
         public static Mat Read(SpeakerSet speakers)
         {
-            var path = speakers.BackgroundNoiseFile;
-            if (path == null)
-            {
-                throw new InvalidOperationException("rig.yml's speakerArray has no backgroundNoise, the lab's background noise every task plays. " +
-                    "Add it: backgroundNoise: ../shared/sounds/background_noise.wav (the rig's upkeep copies it from the server's config\\shared).");
-            }
-            if (!File.Exists(path))
-            {
-                throw new InvalidOperationException("The background noise rig.yml's speakerArray.backgroundNoise names is missing: " + path +
-                    ". The rig's upkeep copies it from the server's config\\shared; run it, or copy the file there.");
-            }
-            return Wave.Read(path, speakers.SampleRate);
+            return RigSound.Read(speakers.BackgroundNoiseFile, "backgroundNoise", "the lab's background noise every task plays", "background_noise.wav", speakers.SampleRate);
         }
     }
 
-    /// <summary>The lab's penalty sound, the same in every task: one second of white noise filtered to about 4 to 21 kHz, at 48 kHz.</summary>
+    /// <summary>The lab's penalty sound, the same file in every task, named by rig.yml's speakerArray.penaltySound.</summary>
     public static class PenaltySound
     {
-        /// <summary>The penalty sound, one row in -1 to 1, at the device's rate (48 kHz; any other stops).</summary>
-        public static Mat Read(int sampleRate)
+        /// <summary>The penalty sound, one row as stored; throws, naming the file, when rig.yml names none, it is missing or at another rate.</summary>
+        public static Mat Read(SpeakerSet speakers)
         {
-            using (var stream = typeof(PenaltySound).Assembly.GetManifestResourceStream("OpenRigs.Audio.penalty_tone.wav"))
-            {
-                return Wave.Read(stream, "OpenRigs.Audio's penalty_tone.wav", sampleRate);
-            }
+            return RigSound.Read(speakers.PenaltySoundFile, "penaltySound", "the lab's penalty sound every task plays", "penalty_tone.wav", speakers.SampleRate);
         }
 
         /// <summary>The mixer's buffer for the penalty sound: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at the task's level in dBFS RMS.</summary>
@@ -122,7 +128,7 @@ namespace OpenRigs.Audio
             {
                 throw new InvalidOperationException("rig.yml's speakerArray has no penaltySoundChannel, the speaker the penalty sound plays on.");
             }
-            using (var sound = Read(speakers.SampleRate))
+            using (var sound = Read(speakers))
             {
                 return speakers.Buffer(sound, new[] { speakers.PenaltySoundChannel.Value }, levelDbfs, what: "The penalty sound at " +
                     levelDbfs.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " dBFS RMS");

@@ -15,7 +15,7 @@ from typing import Any, Dict, Iterator, Optional
 
 from pydantic import Field, ModelWrapValidatorHandler, model_validator
 
-from open_rigs.components import ProjectionCalibration
+from open_rigs.components import Projector
 from open_rigs.components.harp_boards import BehaviorBoard, HarpStepperDriver
 from open_rigs.components.speakers import EqualisedSpeakerArray
 from open_rigs.components.video import SpinnakerCamera, VideoEncoder
@@ -39,7 +39,7 @@ PLACEHOLDER = "CHANGE-ME"  # rig-template.yml's mark on each value a rig fills i
 # device whose data the preflight counts. Not zapit: Zapit answers only when commanded, so a preflight has no data to count.
 # The device kinds are maps of named entries; the single sections are one entry each, which a person confirms.
 PREFLIGHT_DEVICE_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera")
-PREFLIGHT_SINGLE_SECTIONS = ("speakerArray", "projectionCalibration")
+PREFLIGHT_SINGLE_SECTIONS = ("speakerArray", "projector")
 # The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, a RewardValve piece's MaxRewardUl).
 MAX_REWARD_UL = 20
 
@@ -68,7 +68,7 @@ class LabRig(Rig):
         default_factory=dict,
         description="Triggered Spinnaker cameras by name, such as face (Camera-Face), each on the board trigger whose wiring line (device CameraTrigger, DO0 or DO1) names it in targets, at that trigger's frequency.",
     )
-    projection_calibration: Optional[ProjectionCalibration] = Field(
+    projector: Optional[Projector] = Field(
         default=None, description="Mesh-map and gamma-LUT files for the projector's display, each relative to rig.yml's folder."
     )
     speaker_array: Optional[EqualisedSpeakerArray] = Field(default=None, description="Speaker array and audio output device.")

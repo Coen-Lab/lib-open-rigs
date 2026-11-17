@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:vis="clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A projector's raw display, for calibrating the projector: the projector's window (ProjectorWindow), as ProjectorDisplay has it, with no mesh mapping and no gamma correction, so what is drawn reaches the projector untouched, black where nothing is drawn. Stimuli draw on the DrawStimuli subject in the same orthographic view (azimuth -135 to 135, elevation -22.5 to 82.5), which spans the whole window unmapped: a quad of extent 270 by 105 at (0, 30) fills it. Needs no projectionCalibration. Stops the workflow at start, saying so, if DisplayDevice is not a display on this machine (RequireDisplay). Disposed on the render thread (DisposeOnRenderThread).</Description>
+  <Description>A projector's raw display, for calibrating the projector: the projector's window (ProjectorWindow), as ProjectorDisplay has it, with no mesh mapping and no gamma correction, so what is drawn reaches the projector untouched, black where nothing is drawn. Stimuli draw on the DrawStimuli subject in the same orthographic view (azimuth -135 to 135, elevation -22.5 to 82.5), which spans the whole window unmapped: a quad of extent 270 by 105 at (0, 30) fills it. Needs no projector. Stops the workflow at start, saying so, if DisplayDevice is not a display on this machine (RequireDisplay). Disposed on the render thread (DisposeOnRenderThread).</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">

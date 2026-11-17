@@ -61,7 +61,7 @@ A transform that turns a path relative to a configuration directory into an abso
 | `Directory` | empty | The configuration directory that bare relative paths resolve against. Not used when the input pairs the directory with the path. |
 | `Setting` | empty | The rig.yml key the path is from, named when the path is refused. |
 
-Feed it the relative path of a calibration artefact from the rig configuration (for example `calibration/valves.json`). Consumers then read the file as they need: `ReadAllText` followed by the generated `DeserializeFromJson` for a JSON artefact, or the path itself for an operator that loads a file, such as BonVision's mesh mapping and gamma correction includes. A full path is refused, naming `Setting` (the rig.yml key, such as `projectionCalibration.meshMapPath`) when given: every file a rig.yml names is relative to its folder, so the same rig.yml works under any root.
+Feed it the relative path of a calibration artefact from the rig configuration (for example `calibration/valves.json`). Consumers then read the file as they need: `ReadAllText` followed by the generated `DeserializeFromJson` for a JSON artefact, or the path itself for an operator that loads a file, such as BonVision's mesh mapping and gamma correction includes. A full path is refused, naming `Setting` (the rig.yml key, such as `projector.meshPath`) when given: every file a rig.yml names is relative to its folder, so the same rig.yml works under any root.
 
 ---
 

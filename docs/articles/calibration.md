@@ -21,7 +21,7 @@ Artefacts belong to the machine they were measured on. They sit under the machin
   calibration\
     valve-DO1.json
     valve-DO2.json
-    MeshMap.csv, gammalut.bmp   projectionCalibration's meshMapPath and gammaLutPath
+    Projector-Mesh.csv, Projector-Gamma.bmp   projector's meshPath and gammaPath
     speaker-left.json           a speaker's filter
     history\
       valve-DO1_2026-10-05T143012Z.json
@@ -32,7 +32,7 @@ Each calibration replaces the file the rig reads and keeps a dated copy in `hist
 
 ## Running a dispense calibration
 
-The experiment repository provides a workflow that wires its own hardware: for each sample it fires its `pulses` pulses of `pulseWidthMs` with `FirePulses`, then waits with `WeighStable` for the balance to give `settleWindow` consecutive stable readings. Volume per pulse is the gain divided by the repeats and the density. Pick repeats so the gain per sample is at least fifty times the balance's last digit. The points, the gap and the fit go into the `CalibrationCurve`.
+The experiment repository provides a workflow that wires its own hardware: for each sample it fires its `pulses` pulses of `pulseWidthMs` with `FirePulses`, then waits with `WeighStable` for the balance to give `settleReadings` consecutive stable readings. Volume per pulse is the gain divided by the repeats and the density. Pick repeats so the gain per sample is at least fifty times the balance's last digit. The points, the gap and the fit go into the `CalibrationCurve`.
 
 ## The rig side
 

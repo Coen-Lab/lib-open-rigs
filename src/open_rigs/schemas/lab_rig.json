@@ -604,6 +604,23 @@
           "title": "PenaltySoundChannel",
           "type": "integer"
         },
+        "penaltySound": {
+          "anyOf": [
+            {
+              "type": "string",
+              "x-rig-artefact": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The lab's penalty sound, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with a penalty sound plays it (OpenRigs.Audio PenaltySoundBuffer), which stops at Start when it is missing.",
+          "examples": [
+            "../shared/sounds/penalty_tone.wav"
+          ],
+          "title": "PenaltySound"
+        },
         "backgroundNoise": {
           "anyOf": [
             {
@@ -810,10 +827,10 @@
           "title": "Camera",
           "type": "object"
         },
-        "projectionCalibration": {
+        "projector": {
           "anyOf": [
             {
-              "$ref": "#/$defs/ProjectionCalibration"
+              "$ref": "#/$defs/Projector"
             },
             {
               "type": "null"
@@ -821,7 +838,7 @@
           ],
           "default": null,
           "description": "Mesh-map and gamma-LUT files for the projector's display, each relative to rig.yml's folder.",
-          "title": "ProjectionCalibration"
+          "title": "Projector"
         },
         "speakerArray": {
           "anyOf": [
@@ -983,33 +1000,33 @@
       "title": "LiveView",
       "type": "object"
     },
-    "ProjectionCalibration": {
+    "Projector": {
       "description": "File-based calibration assets for mesh-mapped projection displays.",
       "properties": {
-        "meshMapPath": {
+        "meshPath": {
           "description": "The mesh-mapping interpolation file (CSV), relative to rig.yml's folder. A full path stops the workflow at Start (OpenRigs.Core ResolveRigFile).",
           "examples": [
-            "calibration/MeshMap.csv"
+            "calibration/Projector-Mesh.csv"
           ],
-          "title": "MeshMapPath",
+          "title": "MeshPath",
           "type": "string",
           "x-rig-artefact": true
         },
-        "gammaLutPath": {
+        "gammaPath": {
           "description": "The gamma lookup-table image (BMP), relative to rig.yml's folder. A full path stops the workflow at Start (OpenRigs.Core ResolveRigFile).",
           "examples": [
-            "calibration/gammalut.bmp"
+            "calibration/Projector-Gamma.bmp"
           ],
-          "title": "GammaLutPath",
+          "title": "GammaPath",
           "type": "string",
           "x-rig-artefact": true
         }
       },
       "required": [
-        "meshMapPath",
-        "gammaLutPath"
+        "meshPath",
+        "gammaPath"
       ],
-      "title": "ProjectionCalibration",
+      "title": "Projector",
       "type": "object"
     },
     "PulseController": {

@@ -159,7 +159,7 @@ namespace OpenRigs.Devices
     public class PreflightDevices
     {
         /// <summary>Every kind a preflight lists, in its order.</summary>
-        public static readonly string[] AllKinds = { "behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera", "speakerArray", "projectionCalibration" };
+        public static readonly string[] AllKinds = { "behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera", "speakerArray", "projector" };
 
         /// <summary>The rig.yml keys to list, separated by commas.</summary>
         [Description("The rig.yml keys to list, separated by commas.")]
@@ -185,7 +185,7 @@ namespace OpenRigs.Devices
                     case "licketySplit": devices.AddRange(Each(kind, rig.LicketySplit, "messages")); break;
                     case "camera": devices.AddRange(Each(kind, rig.Camera, "frames")); break;
                     case "speakerArray": if (rig.SpeakerArray != null) devices.Add(Device(kind, Pascal(kind), "sounds")); break;
-                    case "projectionCalibration": if (rig.ProjectionCalibration != null) devices.Add(Device(kind, Pascal(kind), "frames")); break;
+                    case "projector": if (rig.Projector != null) devices.Add(Device(kind, Pascal(kind), "frames")); break;
                     default: throw new InvalidOperationException("PreflightDevices' Kinds names '" + kind + "', which is not one of " + string.Join(", ", AllKinds) + ".");
                 }
             }

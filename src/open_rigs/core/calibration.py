@@ -127,7 +127,7 @@ class DispenseProcedure(CalibrationSchema):
     density_g_per_ml: data_types.Double = Field(
         default=1.0, gt=0, description="Density used to turn the weighed grams into microlitres. Water = 1.0."
     )
-    settle_window: int = Field(
+    settle_readings: int = Field(
         default=10, ge=1, description="Consecutive stable readings, after the last pulse, before a weight is taken."
     )
     weigh_timeout_seconds: data_types.Double = Field(

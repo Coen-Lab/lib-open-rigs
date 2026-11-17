@@ -5,7 +5,7 @@ from open_rigs.components.audio import (
     SpeakerArray,
     SpeakerFilter,
 )
-from open_rigs.components.calibration import ProjectionCalibration
+from open_rigs.components.projector import Projector
 
 __all__ = [
     "SphericalPosition",
@@ -13,5 +13,5 @@ __all__ = [
     "AudioDevice",
     "SpeakerArray",
     "SpeakerFilter",
-    "ProjectionCalibration",
+    "Projector",
 ]

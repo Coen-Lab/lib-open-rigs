@@ -570,7 +570,7 @@ namespace OpenRigs.Core.Calibration
     
         private double _densityGPerMl;
     
-        private int _settleWindow;
+        private int _settleReadings;
     
         private double _weighTimeoutSeconds;
     
@@ -580,7 +580,7 @@ namespace OpenRigs.Core.Calibration
             _xName = "pulse_width";
             _primingPulses = 5;
             _densityGPerMl = 1D;
-            _settleWindow = 10;
+            _settleReadings = 10;
             _weighTimeoutSeconds = 60D;
         }
     
@@ -591,7 +591,7 @@ namespace OpenRigs.Core.Calibration
             _primingPulses = other._primingPulses;
             _primingPulseWidthMs = other._primingPulseWidthMs;
             _densityGPerMl = other._densityGPerMl;
-            _settleWindow = other._settleWindow;
+            _settleReadings = other._settleReadings;
             _weighTimeoutSeconds = other._weighTimeoutSeconds;
         }
     
@@ -689,18 +689,18 @@ namespace OpenRigs.Core.Calibration
         /// <summary>
         /// Consecutive stable readings, after the last pulse, before a weight is taken.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("settleWindow")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="settleWindow")]
+        [Newtonsoft.Json.JsonPropertyAttribute("settleReadings")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="settleReadings")]
         [System.ComponentModel.DescriptionAttribute("Consecutive stable readings, after the last pulse, before a weight is taken.")]
-        public int SettleWindow
+        public int SettleReadings
         {
             get
             {
-                return _settleWindow;
+                return _settleReadings;
             }
             set
             {
-                _settleWindow = value;
+                _settleReadings = value;
             }
         }
     
@@ -739,7 +739,7 @@ namespace OpenRigs.Core.Calibration
             stringBuilder.Append("PrimingPulses = " + _primingPulses + ", ");
             stringBuilder.Append("PrimingPulseWidthMs = " + _primingPulseWidthMs + ", ");
             stringBuilder.Append("DensityGPerMl = " + _densityGPerMl + ", ");
-            stringBuilder.Append("SettleWindow = " + _settleWindow + ", ");
+            stringBuilder.Append("SettleReadings = " + _settleReadings + ", ");
             stringBuilder.Append("WeighTimeoutSeconds = " + _weighTimeoutSeconds);
             return true;
         }

@@ -22,10 +22,10 @@ namespace OpenRigs.Core.Tests
         {
             var rig = Path.Combine(Path.GetTempPath(), "RigConfigDirectoryTests", Guid.NewGuid().ToString("N"), "RIG");
             Directory.CreateDirectory(Path.Combine(rig, "calibration"));
-            File.WriteAllText(Path.Combine(rig, "calibration", "MeshMap.csv"), "");
+            File.WriteAllText(Path.Combine(rig, "calibration", "Projector-Mesh.csv"), "");
             try
             {
-                Assert.AreEqual(Path.Combine(rig, "calibration", "MeshMap.csv"), Resolve(rig, "calibration/MeshMap.csv"));
+                Assert.AreEqual(Path.Combine(rig, "calibration", "Projector-Mesh.csv"), Resolve(rig, "calibration/Projector-Mesh.csv"));
             }
             finally { Directory.Delete(Path.GetDirectoryName(rig), true); }
         }
@@ -33,23 +33,23 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void AFullPathIsRefused_NamingTheSetting()
         {
-            var ex = Assert.ThrowsException<InvalidOperationException>(() => Resolve(@"C:\Configs\RIG", @"C:\RigConfigs\RIG\calibration\MeshMap.csv"));
-            StringAssert.Contains(ex.Message, "rig.yml's projectionCalibration.meshMapPath is a full path, C:\\RigConfigs\\RIG\\calibration\\MeshMap.csv");
-            StringAssert.Contains(ex.Message, "as calibration/MeshMap.csv");
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => Resolve(@"C:\Configs\RIG", @"C:\RigConfigs\RIG\calibration\Projector-Mesh.csv"));
+            StringAssert.Contains(ex.Message, "rig.yml's projector.meshPath is a full path, C:\\RigConfigs\\RIG\\calibration\\Projector-Mesh.csv");
+            StringAssert.Contains(ex.Message, "as calibration/Projector-Mesh.csv");
         }
 
         [TestMethod]
         public void AMissingFileIsRefused_NamingWhereItWasLookedFor()
         {
             var rig = Path.Combine(Path.GetTempPath(), "RigConfigDirectoryTests", Guid.NewGuid().ToString("N"), "RIG");
-            var ex = Assert.ThrowsException<InvalidOperationException>(() => Resolve(rig, "calibration/MeshMap.csv"));
-            StringAssert.Contains(ex.Message, "rig.yml's projectionCalibration.meshMapPath names calibration/MeshMap.csv");
-            StringAssert.Contains(ex.Message, Path.Combine(rig, "calibration", "MeshMap.csv"));
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => Resolve(rig, "calibration/Projector-Mesh.csv"));
+            StringAssert.Contains(ex.Message, "rig.yml's projector.meshPath names calibration/Projector-Mesh.csv");
+            StringAssert.Contains(ex.Message, Path.Combine(rig, "calibration", "Projector-Mesh.csv"));
         }
 
         static string Resolve(string directory, string path)
         {
-            var resolve = new ResolveRigFile { Setting = "projectionCalibration.meshMapPath" };
+            var resolve = new ResolveRigFile { Setting = "projector.meshPath" };
             return resolve.Process(Observable.Return(Tuple.Create(directory, path))).Wait();
         }
     }

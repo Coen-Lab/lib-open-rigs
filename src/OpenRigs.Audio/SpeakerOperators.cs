@@ -64,12 +64,12 @@ namespace OpenRigs.Audio
 
     /// <summary>The lab's penalty sound as the mixer's buffer (<see cref="PenaltySound.Buffer"/>).</summary>
     [Combinator]
-    [Description("The lab's penalty sound (OpenRigs.Audio's penalty_tone.wav, the same in every task) as the mixer's buffer: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at LevelDbfs (the task's penalty.sound.levelDbfs). Stops the workflow when its peak reaches -1 dBFS after equalisation. Input: the speakers.")]
+    [Description("The lab's penalty sound (rig.yml's speakerArray.penaltySound, relative to rig.yml's folder: ../shared/sounds/penalty_tone.wav, the server's copy, kept on the rig by its upkeep; the same in every task) as the mixer's buffer: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at LevelDbfs (the task's penalty.sound.levelDbfs). Stops the workflow, naming the file, when rig.yml names none, the file is missing or not at the audio device's rate, and when its peak reaches -1 dBFS after equalisation. Input: the speakers.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PenaltySoundBuffer
     {
         /// <summary>The penalty sound's level in dBFS RMS: map it from the task file.</summary>
-        [Description("The penalty sound's level in dBFS RMS (the task's penalty.sound.levelDbfs). The lab's default, -30, until mapped.")]
+        [Description("The penalty sound's level in dBFS RMS: map it from the task's penalty.sound.levelDbfs.")]
         public double LevelDbfs { get; set; } = SoundLevel.PenaltyDbfs;
 
         /// <summary>The buffer for each input.</summary>

@@ -9,7 +9,6 @@
 
   <!-- SpeakerMixer.bonsai uses Bonsai.Mixer, which every workflow that plays sound has in its own Bonsai.config. -->
   <ItemGroup>
-    <EmbeddedResource Include="penalty_tone.wav" LogicalName="OpenRigs.Audio.penalty_tone.wav" />
     <EmbeddedResource Include="**\*.bonsai" />
   </ItemGroup>
 

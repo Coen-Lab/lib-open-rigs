@@ -210,11 +210,11 @@
           "title": "DensityGPerMl",
           "type": "number"
         },
-        "settleWindow": {
+        "settleReadings": {
           "default": 10,
           "description": "Consecutive stable readings, after the last pulse, before a weight is taken.",
           "minimum": 1,
-          "title": "SettleWindow",
+          "title": "SettleReadings",
           "type": "integer"
         },
         "weighTimeoutSeconds": {

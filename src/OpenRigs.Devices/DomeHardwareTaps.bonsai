@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>DomeHardware's devices as a preflight's ticks: each piece's data (its Name.Data) and the projector's frames (DrawStimuli, as ProjectionCalibration), each through PreflightTap into DeviceTicks, which PreflightChecks declares, so a preflight on DomeHardware names no device itself. After PreflightChecks.</Description>
+  <Description>DomeHardware's devices as a preflight's ticks: each piece's data (its Name.Data) and the projector's frames (DrawStimuli, as Projector), each through PreflightTap into DeviceTicks, which PreflightChecks declares, so a preflight on DomeHardware names no device itself. After PreflightChecks.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -110,7 +110,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:PreflightTap">
-          <dev:Device>ProjectionCalibration</dev:Device>
+          <dev:Device>Projector</dev:Device>
         </Combinator>
       </Expression>
       <Expression xsi:type="MulticastSubject">

@@ -1047,11 +1047,11 @@ def test_each_rig_list_s_taps_tap_its_devices(tmp_path, rig_list):
     wf = workflow(tmp_path, include(rig_list))
     expected = [name for name, _ in lint.required_devices(wf)]
     if "OpenRigs.Vision:ProjectorDisplay.bonsai" in (ROOT / "src" / "OpenRigs.Devices" / rig_list.split(":")[1]).read_text(encoding="utf-8-sig"):
-        expected.append("ProjectionCalibration")
+        expected.append("Projector")
     text = (ROOT / "src" / "OpenRigs.Devices" / lint.RIG_LIST_TAPS[rig_list].split(":")[1]).read_text(encoding="utf-8-sig")
     taps = re.findall(r"<Name>([\w.-]+)</Name>\s*</Expression>\s*<Expression xsi:type=\"Combinator\">\s*<Combinator xsi:type=\"dev:PreflightTap\">\s*<dev:Device>([\w-]+)</dev:Device>", text)
     assert [device for _, device in taps] == expected
-    assert [source for source, _ in taps] == [f"{d}.Data" if d != "ProjectionCalibration" else "DrawStimuli" for d in expected]
+    assert [source for source, _ in taps] == [f"{d}.Data" if d != "Projector" else "DrawStimuli" for d in expected]
     assert text.count("<Name>DeviceTicks</Name>") == len(expected)
 
 

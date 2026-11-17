@@ -36,7 +36,7 @@ namespace OpenRigs.Devices.Rigs
     
         private System.Collections.Generic.Dictionary<string, SpinnakerCamera> _camera;
     
-        private ProjectionCalibration _projectionCalibration;
+        private Projector _projector;
     
         private EqualisedSpeakerArray _speakerArray;
     
@@ -59,7 +59,7 @@ namespace OpenRigs.Devices.Rigs
             _stepperDriver = other._stepperDriver;
             _licketySplit = other._licketySplit;
             _camera = other._camera;
-            _projectionCalibration = other._projectionCalibration;
+            _projector = other._projector;
             _speakerArray = other._speakerArray;
             _lickSpoutDefaultPosition = other._lickSpoutDefaultPosition;
             _zapit = other._zapit;
@@ -209,19 +209,19 @@ namespace OpenRigs.Devices.Rigs
         /// Mesh-map and gamma-LUT files for the projector's display, each relative to rig.yml's folder.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("projectionCalibration")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="projectionCalibration")]
+        [Newtonsoft.Json.JsonPropertyAttribute("projector")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="projector")]
         [System.ComponentModel.DescriptionAttribute("Mesh-map and gamma-LUT files for the projector\'s display, each relative to rig.ym" +
             "l\'s folder.")]
-        public ProjectionCalibration ProjectionCalibration
+        public Projector Projector
         {
             get
             {
-                return _projectionCalibration;
+                return _projector;
             }
             set
             {
-                _projectionCalibration = value;
+                _projector = value;
             }
         }
     
@@ -322,7 +322,7 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("StepperDriver = " + _stepperDriver + ", ");
             stringBuilder.Append("LicketySplit = " + _licketySplit + ", ");
             stringBuilder.Append("Camera = " + _camera + ", ");
-            stringBuilder.Append("ProjectionCalibration = " + _projectionCalibration + ", ");
+            stringBuilder.Append("Projector = " + _projector + ", ");
             stringBuilder.Append("SpeakerArray = " + _speakerArray + ", ");
             stringBuilder.Append("LickSpoutDefaultPosition = " + _lickSpoutDefaultPosition + ", ");
             stringBuilder.Append("Zapit = " + _zapit + ", ");
@@ -1558,6 +1558,8 @@ namespace OpenRigs.Devices.Rigs
     
         private int _penaltySoundChannel;
     
+        private string _penaltySound;
+    
         private string _backgroundNoise;
     
         public EqualisedSpeakerArray()
@@ -1576,6 +1578,7 @@ namespace OpenRigs.Devices.Rigs
             _syncGain = other._syncGain;
             _unusedChannels = other._unusedChannels;
             _penaltySoundChannel = other._penaltySoundChannel;
+            _penaltySound = other._penaltySound;
             _backgroundNoise = other._backgroundNoise;
         }
     
@@ -1691,6 +1694,24 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
+        /// The lab's penalty sound, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with a penalty sound plays it (OpenRigs.Audio PenaltySoundBuffer), which stops at Start when it is missing.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("penaltySound")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="penaltySound")]
+        [System.ComponentModel.DescriptionAttribute(@"The lab's penalty sound, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with a penalty sound plays it (OpenRigs.Audio PenaltySoundBuffer), which stops at Start when it is missing.")]
+        public string PenaltySound
+        {
+            get
+            {
+                return _penaltySound;
+            }
+            set
+            {
+                _penaltySound = value;
+            }
+        }
+    
+        /// <summary>
         /// The lab's background noise, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with sound plays it (OpenRigs.Audio BackgroundNoise), which stops at Start when it is missing.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("backgroundNoise")]
@@ -1726,6 +1747,7 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("SyncGain = " + _syncGain + ", ");
             stringBuilder.Append("UnusedChannels = " + _unusedChannels + ", ");
             stringBuilder.Append("PenaltySoundChannel = " + _penaltySoundChannel + ", ");
+            stringBuilder.Append("PenaltySound = " + _penaltySound + ", ");
             stringBuilder.Append("BackgroundNoise = " + _backgroundNoise);
             return true;
         }
@@ -2394,75 +2416,75 @@ namespace OpenRigs.Devices.Rigs
     [System.ComponentModel.DescriptionAttribute("File-based calibration assets for mesh-mapped projection displays.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
-    public partial class ProjectionCalibration
+    public partial class Projector
     {
     
-        private string _meshMapPath;
+        private string _meshPath;
     
-        private string _gammaLutPath;
+        private string _gammaPath;
     
-        public ProjectionCalibration()
+        public Projector()
         {
         }
     
-        protected ProjectionCalibration(ProjectionCalibration other)
+        protected Projector(Projector other)
         {
-            _meshMapPath = other._meshMapPath;
-            _gammaLutPath = other._gammaLutPath;
+            _meshPath = other._meshPath;
+            _gammaPath = other._gammaPath;
         }
     
         /// <summary>
         /// The mesh-mapping interpolation file (CSV), relative to rig.yml's folder. A full path stops the workflow at Start (OpenRigs.Core ResolveRigFile).
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("meshMapPath", Required=Newtonsoft.Json.Required.Always)]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="meshMapPath")]
+        [Newtonsoft.Json.JsonPropertyAttribute("meshPath", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="meshPath")]
         [System.ComponentModel.DescriptionAttribute("The mesh-mapping interpolation file (CSV), relative to rig.yml\'s folder. A full p" +
             "ath stops the workflow at Start (OpenRigs.Core ResolveRigFile).")]
-        public string MeshMapPath
+        public string MeshPath
         {
             get
             {
-                return _meshMapPath;
+                return _meshPath;
             }
             set
             {
-                _meshMapPath = value;
+                _meshPath = value;
             }
         }
     
         /// <summary>
         /// The gamma lookup-table image (BMP), relative to rig.yml's folder. A full path stops the workflow at Start (OpenRigs.Core ResolveRigFile).
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("gammaLutPath", Required=Newtonsoft.Json.Required.Always)]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="gammaLutPath")]
+        [Newtonsoft.Json.JsonPropertyAttribute("gammaPath", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="gammaPath")]
         [System.ComponentModel.DescriptionAttribute("The gamma lookup-table image (BMP), relative to rig.yml\'s folder. A full path sto" +
             "ps the workflow at Start (OpenRigs.Core ResolveRigFile).")]
-        public string GammaLutPath
+        public string GammaPath
         {
             get
             {
-                return _gammaLutPath;
+                return _gammaPath;
             }
             set
             {
-                _gammaLutPath = value;
+                _gammaPath = value;
             }
         }
     
-        public System.IObservable<ProjectionCalibration> Generate()
+        public System.IObservable<Projector> Generate()
         {
-            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new ProjectionCalibration(this)));
+            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new Projector(this)));
         }
     
-        public System.IObservable<ProjectionCalibration> Generate<TSource>(System.IObservable<TSource> source)
+        public System.IObservable<Projector> Generate<TSource>(System.IObservable<TSource> source)
         {
-            return System.Reactive.Linq.Observable.Select(source, _ => new ProjectionCalibration(this));
+            return System.Reactive.Linq.Observable.Select(source, _ => new Projector(this));
         }
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
-            stringBuilder.Append("MeshMapPath = " + _meshMapPath + ", ");
-            stringBuilder.Append("GammaLutPath = " + _gammaLutPath);
+            stringBuilder.Append("MeshPath = " + _meshPath + ", ");
+            stringBuilder.Append("GammaPath = " + _gammaPath);
             return true;
         }
     
@@ -4648,9 +4670,9 @@ namespace OpenRigs.Devices.Rigs
             return Process<LiveView>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<ProjectionCalibration> source)
+        public System.IObservable<string> Process(System.IObservable<Projector> source)
         {
-            return Process<ProjectionCalibration>(source);
+            return Process<Projector>(source);
         }
 
         public System.IObservable<string> Process(System.IObservable<PulseController> source)
@@ -4744,7 +4766,7 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<HarpTimestampGeneratorGen3>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LicketySplit>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LiveView>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<ProjectionCalibration>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Projector>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseController>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutput>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutputs>))]
@@ -4979,9 +5001,9 @@ namespace OpenRigs.Devices.Rigs
             return Process<LiveView>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<ProjectionCalibration> source)
+        public System.IObservable<string> Process(System.IObservable<Projector> source)
         {
-            return Process<ProjectionCalibration>(source);
+            return Process<Projector>(source);
         }
 
         public System.IObservable<string> Process(System.IObservable<PulseController> source)
@@ -5075,7 +5097,7 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<HarpTimestampGeneratorGen3>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LicketySplit>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LiveView>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<ProjectionCalibration>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Projector>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseController>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutput>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutputs>))]

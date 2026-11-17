@@ -28,7 +28,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:PreflightDevices">
-          <dev:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,speakerArray,projectionCalibration</dev:Kinds>
+          <dev:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,speakerArray,projector</dev:Kinds>
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">

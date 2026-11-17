@@ -56,6 +56,9 @@ namespace OpenRigs.Audio
         /// <summary>The lab's background noise (speakerArray.backgroundNoise), its full path from rig.yml's folder, or null.</summary>
         public string BackgroundNoiseFile { get; private set; }
 
+        /// <summary>The lab's penalty sound, rig.yml's speakerArray.penaltySound as a full path; null when rig.yml names none.</summary>
+        public string PenaltySoundFile { get; private set; }
+
         /// <summary>Every speaker, in rig.yml's order.</summary>
         public IList<Speaker> Speakers { get; private set; }
 
@@ -214,6 +217,8 @@ namespace OpenRigs.Audio
             var folder = Path.GetDirectoryName(path);
             var noise = Text(Child(array, "backgroundNoise"));
             if (noise != null) set.BackgroundNoiseFile = RigConfigDirectory.FilePath(folder, noise, "speakerArray.backgroundNoise");
+            var penalty = Text(Child(array, "penaltySound"));
+            if (penalty != null) set.PenaltySoundFile = RigConfigDirectory.FilePath(folder, penalty, "speakerArray.penaltySound");
             foreach (var entry in entries)
             {
                 var position = Child(entry.Settings, "position") as YamlMappingNode;

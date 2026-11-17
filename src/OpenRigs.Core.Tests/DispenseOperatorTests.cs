@@ -27,7 +27,7 @@ namespace OpenRigs.Core.Tests
         public void WeighStable_WeighsAfterTheStepCompletesAndTheBalanceSettles()
         {
             var step = Observable.Timer(TimeSpan.FromMilliseconds(50)).Select(_ => "burst");
-            var weight = new WeighStable { SettleWindow = 3, TimeoutSeconds = 10 }.Process(step, Readings(1.25)).ToList().Timeout(TimeSpan.FromSeconds(30)).Wait();
+            var weight = new WeighStable { SettleReadings = 3, TimeoutSeconds = 10 }.Process(step, Readings(1.25)).ToList().Timeout(TimeSpan.FromSeconds(30)).Wait();
             Assert.AreEqual(1, weight.Count);
             Assert.AreEqual(1.25, weight[0], 1e-6);
         }
@@ -35,7 +35,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void WeighStable_AnEmptyStepStillWeighs()
         {
-            var weight = new WeighStable { SettleWindow = 2, TimeoutSeconds = 10 }.Process(Observable.Empty<int>(), Readings(0.5)).ToList().Timeout(TimeSpan.FromSeconds(30)).Wait();
+            var weight = new WeighStable { SettleReadings = 2, TimeoutSeconds = 10 }.Process(Observable.Empty<int>(), Readings(0.5)).ToList().Timeout(TimeSpan.FromSeconds(30)).Wait();
             Assert.AreEqual(0.5, weight.Single(), 1e-6);
         }
 
@@ -48,7 +48,7 @@ namespace OpenRigs.Core.Tests
             var readings = new BehaviorSubject<WeightMeasurement>(new WeightMeasurement(0, 99f, 1f));
             var step = Observable.Timer(TimeSpan.FromMilliseconds(30)).Select(_ => 0)
                 .Finally(() => Observable.Timer(TimeSpan.FromMilliseconds(50)).Subscribe(_ => readings.OnNext(new WeightMeasurement(1, 1f, 1f))));
-            var weight = new WeighStable { SettleWindow = 1, TimeoutSeconds = 10 }.Process(step, readings).ToList().Timeout(TimeSpan.FromSeconds(30)).Wait();
+            var weight = new WeighStable { SettleReadings = 1, TimeoutSeconds = 10 }.Process(step, readings).ToList().Timeout(TimeSpan.FromSeconds(30)).Wait();
             Assert.AreEqual(1.0, weight.Single(), 1e-6);
         }
 
@@ -57,7 +57,7 @@ namespace OpenRigs.Core.Tests
         {
             try
             {
-                new WeighStable { SettleWindow = 2, TimeoutSeconds = 0.2 }.Process(Observable.Empty<int>(), Readings(1, stable: false)).ToList().Wait();
+                new WeighStable { SettleReadings = 2, TimeoutSeconds = 0.2 }.Process(Observable.Empty<int>(), Readings(1, stable: false)).ToList().Wait();
                 Assert.Fail("expected a timeout");
             }
             catch (TimeoutException ex)
@@ -74,14 +74,14 @@ namespace OpenRigs.Core.Tests
             var procedure = new DispenseProcedure
             {
                 Samples = new List<DispenseSample> { Sample(20), Sample(40), Sample(60) },
-                PrimingPulses = 2, SettleWindow = 2, WeighTimeoutSeconds = 10,
+                PrimingPulses = 2, SettleReadings = 2, WeighTimeoutSeconds = 10,
             };
             var requests = new Subject<Tuple<string, int>>();
             var grams = new double[1];
             var readings = new BehaviorSubject<WeightMeasurement>(new WeightMeasurement(0, 0, 1));
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var clock = Observable.Interval(TimeSpan.FromMilliseconds(1)).Select(_ => stopwatch.Elapsed.TotalSeconds).Publish().RefCount();
-            var weigh = new WeighStable { SettleWindow = 2, TimeoutSeconds = 10 };
+            var weigh = new WeighStable { SettleReadings = 2, TimeoutSeconds = 10 };
 
             Func<int, int, int, IObservable<double>> fireThenWeigh = (width, count, gap) => Observable.Defer(() =>
                 weigh.Process(new FirePulses { PulseWidthMs = width, Pulses = count, PulseGapMs = gap }

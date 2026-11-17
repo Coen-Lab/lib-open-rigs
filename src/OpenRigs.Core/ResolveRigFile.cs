@@ -32,7 +32,7 @@ namespace OpenRigs.Core
         /// <summary>
         /// Gets or sets the rig.yml key the path is from, named when the path is refused.
         /// </summary>
-        [Description("The rig.yml key the path is from, such as projectionCalibration.meshMapPath, named when the path is refused. Empty: the refusal names the path alone.")]
+        [Description("The rig.yml key the path is from, such as projector.meshPath, named when the path is refused. Empty: the refusal names the path alone.")]
         public string Setting
         {
             get { return setting; }

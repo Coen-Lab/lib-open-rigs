@@ -29,7 +29,7 @@ RIG = {
     "stepperDriver": {"a": HARP, "b": HARP},
     "licketySplit": {"left": HARP, "right": HARP},
     "camera": {"face": {"serialNumber": "1"}, "pupil": {"serialNumber": "2"}, "body": {"serialNumber": "3"}},
-    "projectionCalibration": {"meshMapPath": "calibration/MeshMap.csv", "gammaLutPath": "calibration/gammalut.bmp"},
+    "projector": {"meshPath": "calibration/Projector-Mesh.csv", "gammaPath": "calibration/Projector-Gamma.bmp"},
     "speakerArray": {
         "device": {"deviceName": "Speakers"},
         "speakers": {"centre": {"position": {"azimuth": 0, "elevation": 15}, "channel": 2, "filter": "calibration/speaker-centre.json"}},
@@ -71,19 +71,19 @@ def test_the_background_noise_is_a_rig_file_the_speaker_array_names():
     assert LabRig.model_validate(RIG).speaker_array.background_noise is None
 
 
-@pytest.mark.parametrize("key, path", [("meshMapPath", "C:\\RigConfigs\\RIG\\calibration\\MeshMap.csv"),
-                                       ("gammaLutPath", "/calibration/gammalut.bmp")])
+@pytest.mark.parametrize("key, path", [("meshPath", "C:\\RigConfigs\\RIG\\calibration\\Projector-Mesh.csv"),
+                                       ("gammaPath", "/calibration/Projector-Gamma.bmp")])
 def test_projector_files_are_relative_to_rig_yml(key, path):
     # ProjectorDisplay resolves them against rig.yml's folder and refuses a full path at Start.
     from open_rigs.core.artefacts import rig_artefacts
 
     found = rig_artefacts(LabRig.model_validate(RIG))
-    assert found["projectionCalibration.meshMapPath"] == "calibration/MeshMap.csv"
-    assert found["projectionCalibration.gammaLutPath"] == "calibration/gammalut.bmp"
+    assert found["projector.meshPath"] == "calibration/Projector-Mesh.csv"
+    assert found["projector.gammaPath"] == "calibration/Projector-Gamma.bmp"
     rig = copy.deepcopy(RIG)
-    rig["projectionCalibration"][key] = path
+    rig["projector"][key] = path
     name = path.replace("\\", "/").rsplit("/", 1)[1]
-    with pytest.raises(ValidationError, match=f"projectionCalibration.{key}\n.* is a full path") as refused:
+    with pytest.raises(ValidationError, match=f"projector.{key}\n.* is a full path") as refused:
         LabRig.model_validate(rig)
     assert f"`calibration/{name}`" in str(refused.value)
 
@@ -136,7 +136,7 @@ def test_people_only_wiring_keys_kept():
 def test_every_part_optional():
     # Each workflow takes the parts it drives: a rig.yml with none of them, or a box's two, is a rig.
     rig = LabRig.model_validate({"rootPath": "C:/Data"})
-    assert (rig.behavior_board, rig.camera, rig.speaker_array, rig.zapit, rig.projection_calibration) == ({}, {}, None, None, None)
+    assert (rig.behavior_board, rig.camera, rig.speaker_array, rig.zapit, rig.projector) == ({}, {}, None, None, None)
     trigger = {"wiring": {"DO0": {"device": "CameraTrigger", "targets": ["Camera-Overhead"]}}}
     box = LabRig.model_validate({"rootPath": "C:/Data", "behaviorBoard": {"main": {**HARP, **trigger}}, "camera": {"overhead": {"serialNumber": "1"}}})
     assert list(box.camera) == ["overhead"] and list(box.behavior_board) == ["main"]

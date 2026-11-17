@@ -1,4 +1,4 @@
-"""The lab's speaker array: every speaker played equalised, and a channel for the lab's one penalty sound."""
+"""The lab's speaker array: every speaker played equalised, the lab's one penalty sound and its channel, and the background noise."""
 from pydantic import Field, model_validator
 
 from open_rigs.components.audio import SpeakerArray
@@ -8,6 +8,11 @@ from open_rigs.core.artefacts import ArtefactPath
 class EqualisedSpeakerArray(SpeakerArray):
     __doc__ = SpeakerArray.__doc__
     penalty_sound_channel: int = Field(ge=0, description="Mixer output channel the penalty sound plays on.")
+    penalty_sound: ArtefactPath | None = Field(
+        default=None,
+        examples=["../shared/sounds/penalty_tone.wav"],
+        description="The lab's penalty sound, one mono WAV at the device's rate, relative to rig.yml's folder: the server's config/shared copy, which the rig's upkeep keeps in shared/ beside the rig's folder. Every task with a penalty sound plays it (OpenRigs.Audio PenaltySoundBuffer), which stops at Start when it is missing.",
+    )
     background_noise: ArtefactPath | None = Field(
         default=None,
         examples=["../shared/sounds/background_noise.wav"],

@@ -31,7 +31,7 @@ namespace OpenRigs.Core.Calibration
     /// <see cref="ManualTimeoutSeconds"/> to type it.
     /// </summary>
     [Combinator]
-    [Description("Sets the settings' balance port to the one given at run time (second input), as written: a COM port, or 'manual' (written in lower case) for a balance read by eye, which also makes each weighing take the one weight typed (settleWindow 1) and wait ManualTimeoutSeconds for it. An empty port fails, naming both choices. Input is a Tuple of the DispenseCalibration settings and the port.")]
+    [Description("Sets the settings' balance port to the one given at run time (second input), as written: a COM port, or 'manual' (written in lower case) for a balance read by eye, which also makes each weighing take the one weight typed (settleReadings 1) and wait ManualTimeoutSeconds for it. An empty port fails, naming both choices. Input is a Tuple of the DispenseCalibration settings and the port.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ApplyBalancePort
     {
@@ -58,7 +58,7 @@ namespace OpenRigs.Core.Calibration
             if (BalancePort.IsManual(port))
             {
                 settings.Balance.PortName = BalancePort.Manual;
-                settings.Procedure.SettleWindow = 1;
+                settings.Procedure.SettleReadings = 1;
                 settings.Procedure.WeighTimeoutSeconds = manualTimeoutSeconds;
             }
             else
