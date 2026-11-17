@@ -315,7 +315,7 @@ namespace OpenRigs.Devices.Tests
             XNamespace xsi = "http://www.w3.org/2001/XMLSchema-instance";
             XNamespace bonsai = "https://bonsai-rx.org/2018/workflow";
             XDocument workflow;
-            using (var stream = typeof(ZapitClient).Assembly.GetManifestResourceStream("OpenRigs.Devices.Zapit.ConnectZapit.bonsai"))
+            using (var stream = typeof(ZapitClient).Assembly.GetManifestResourceStream("OpenRigs.Devices.ConnectZapit.bonsai"))
             {
                 workflow = XDocument.Load(stream);
             }

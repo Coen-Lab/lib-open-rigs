@@ -58,7 +58,7 @@ In Python the same board is `LabRig(behavior_board={"main": BehaviorBoard(port_n
 ## Bonsai workflow
 
 :::workflow
-![BehaviorBoard](~/assets/workflows/devices/BehaviorBoard/BehaviorBoard.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/BehaviorBoard.bonsai"}
+![BehaviorBoard](~/assets/workflows/devices/BehaviorBoard.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard.bonsai"}
 :::
 
 `BehaviorBoard` is the board's device piece (see [Building Blocks](../../articles/building-blocks.md)): `Name` (`BehaviorBoard-<Entry>`) picks its entry under `behaviorBoard` in `rig.yml`, published as the `AsyncSubject` `<Name>`. It opens the board on its `portName` behind `<Name>.Data` and `<Name>.Commands` (a `BehaviorSubject`, so a per-trial graph that sends a command and completes leaves it open) and logs the board as `<Name>` once the experiment folder exists and the Harp clock is set. However the workflow stops, it clears the lines `wiring` gives a `ZapitTrigger` once the board has closed its port (`ClearOutputsOnStop`). The board's lines are driven by the line pieces below, each taking the board's `Name` as `Board`.
@@ -68,19 +68,19 @@ In Python the same board is `LabRig(behavior_board={"main": BehaviorBoard(port_n
 ### PulseOutputs
 
 :::workflow
-![PulseOutputs](~/assets/workflows/devices/BehaviorBoard/PulseOutputs.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/PulseOutputs.bonsai"}
+![PulseOutputs](~/assets/workflows/devices/PulseOutputs.svg){data-bonsai="~/src/OpenRigs.Devices/PulseOutputs.bonsai"}
 :::
 
-`PulseOutputs` (`BehaviorBoard.PulseOutputs.bonsai`) is a board's pulsed lines: 0.5 s after the board's first message it closes DO1 to DO3 and the pulsed lines, then pulse-enables the lines `rig.yml`'s `outputPulseEnable` names without the ZapitTrigger's (`PulseEnabledLines`, `PulseSetupWrites`), then announces `PulsesEnabled`. It declares the board's `<Board>.TriggerCalibratedPulse` (`Tuple<string, int>`: a line such as `DO1` and the width in milliseconds) and fires each pulse sent into it (`CalibratedPulseWrites`): the width to that line's `PulseDO` or `PulseDOPort` register, then the line set, in that order on the board's command subject, so the board applies the new width before it fires. Any line the board can pulse takes one: DO0 to DO3 and DOPort0 to DOPort2. It stops the workflow at Start if a line `wiring` gives a `RewardValve` is not pulse-enabled, as a reward would then open the valve and leave it open. Each `RewardValve` piece sends its rewards through its own board's subject ([Building Blocks](../../articles/building-blocks.md#task-side-includes)); a calibration fires its own `FirePulses` into it.
+`PulseOutputs` (`PulseOutputs.bonsai`) is a board's pulsed lines: 0.5 s after the board's first message it closes DO1 to DO3 and the pulsed lines, then pulse-enables the lines `rig.yml`'s `outputPulseEnable` names without the ZapitTrigger's (`PulseEnabledLines`, `PulseSetupWrites`), then announces `PulsesEnabled`. It declares the board's `<Board>.TriggerCalibratedPulse` (`Tuple<string, int>`: a line such as `DO1` and the width in milliseconds) and fires each pulse sent into it (`CalibratedPulseWrites`): the width to that line's `PulseDO` or `PulseDOPort` register, then the line set, in that order on the board's command subject, so the board applies the new width before it fires. Any line the board can pulse takes one: DO0 to DO3 and DOPort0 to DOPort2. It stops the workflow at Start if a line `wiring` gives a `RewardValve` is not pulse-enabled, as a reward would then open the valve and leave it open. Each `RewardValve` piece sends its rewards through its own board's subject ([Building Blocks](../../articles/building-blocks.md#task-side-includes)); a calibration fires its own `FirePulses` into it.
 
 ### ZapitTriggerLine
 
-`BehaviorBoard.ZapitTriggerLine.bonsai` publishes the line `wiring` gives the `ZapitTrigger` as the `AsyncSubject` `ZapitTriggerLine`, which Zapit's trials hold high. It is never pulsed, and the board piece clears it at stop. Stops the workflow at Start unless exactly one line on the board has the `ZapitTrigger` and it is DO1, DO2 or DO3.
+`ZapitTriggerLine.bonsai` publishes the line `wiring` gives the `ZapitTrigger` as the `AsyncSubject` `ZapitTriggerLine`, which Zapit's trials hold high. It is never pulsed, and the board piece clears it at stop. Stops the workflow at Start unless exactly one line on the board has the `ZapitTrigger` and it is DO1, DO2 or DO3.
 
 ### CameraTriggerController
 
 :::workflow
-![CameraTriggerController](~/assets/workflows/devices/BehaviorBoard/CameraTriggerController.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/CameraTriggerController.bonsai"}
+![CameraTriggerController](~/assets/workflows/devices/CameraTriggerController.svg){data-bonsai="~/src/OpenRigs.Devices/CameraTriggerController.bonsai"}
 :::
 
 Emits camera trigger pulses on `CameraOutput0` and `CameraOutput1` at the configured frequencies, started by `StartCameras`. The lab's `CameraTriggers` core include opens it with `rig.yml`'s `cameraTriggerController` and sends `StartCameras` once every camera has begun acquiring; each camera takes the trigger whose `CameraTrigger` wiring line names it (see [Triggered Spinnaker](triggered-spinnaker.md)).
@@ -88,7 +88,7 @@ Emits camera trigger pulses on `CameraOutput0` and `CameraOutput1` at the config
 ### RunningWheel
 
 :::workflow
-![RunningWheel](~/assets/workflows/devices/BehaviorBoard/RunningWheel.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/RunningWheel.bonsai"}
+![RunningWheel](~/assets/workflows/devices/RunningWheel.svg){data-bonsai="~/src/OpenRigs.Devices/RunningWheel.bonsai"}
 :::
 
 Once the board sends its first message, enables the encoder on port 2 in position mode and zeroes it, in that order, then publishes the distance run, in cm, on `WheelDistanceSubjectName`, from the board's `runningWheel.countsPerRev` and `runningWheel.wheelDiameterMm` in `rig.yml`.
@@ -96,7 +96,7 @@ Once the board sends its first message, enables the encoder on port 2 in positio
 ### ClockFromBoard
 
 :::workflow
-![ClockFromBoard](~/assets/workflows/devices/BehaviorBoard/ClockFromBoard.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard/ClockFromBoard.bonsai"}
+![ClockFromBoard](~/assets/workflows/devices/ClockFromBoard.svg){data-bonsai="~/src/OpenRigs.Devices/ClockFromBoard.bonsai"}
 :::
 
 The rig's clock from the board's own Harp clock, for a rig with no timestamp generator; a workflow has exactly one clock. Sets the board's clock to the PC's UTC time and re-sends the write at each heartbeat until one agrees (`SetHarpClock`: a write is lost about one start in four), publishes `Timestamp` (the time of each of the board's `AnalogData` events, 1 kHz) and `HarpClockSet` (the first heartbeat within 2 s of UTC), and announces `HarpClockSet` into `ReadyStages`. Without it the board counts from power-on, and every Harp time and file name follows that count (1904). It also announces `HarpClockRead` at the board's first heartbeat. Stops the workflow, naming the board, if its clock is not set within 10 s of its first heartbeat, it sends no heartbeat within 30 s, or its heartbeats stop for 3 s.

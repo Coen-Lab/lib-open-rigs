@@ -39,13 +39,13 @@
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Tuple(sys:String,sys:Int32)">
         <rx:Name>BehaviorBoard-Main.TriggerCalibratedPulse</rx:Name>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.Rewards.bonsai" />
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.RewardValve.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:Rewards.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RewardValve.bonsai">
         <Name>RewardValve-Left</Name>
         <Board>BehaviorBoard-Main</Board>
         <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.RewardValve.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RewardValve.bonsai">
         <Name>RewardValve-Right</Name>
         <Board>BehaviorBoard-Main</Board>
         <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>

@@ -18,29 +18,29 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadyGate.bonsai">
         <PieceStages>HarpClockSet</PieceStages>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.bonsai">
         <Name>BehaviorBoard-Main</Name>
         <CommandsSubjectName>BehaviorBoard-Main.Commands</CommandsSubjectName>
         <DataSubjectName>BehaviorBoard-Main.Data</DataSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ClockFromBoard.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ClockFromBoard.bonsai">
         <Board>BehaviorBoard-Main</Board>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.PulseOutputs.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:PulseOutputs.bonsai">
         <Board>BehaviorBoard-Main</Board>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.RunningWheel.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RunningWheel.bonsai">
         <Board>BehaviorBoard-Main</Board>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <WheelDistanceSubjectName>WheelDistanceCm</WheelDistanceSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ZapitTriggerLine.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitTriggerLine.bonsai">
         <Board>BehaviorBoard-Main</Board>
       </Expression>
     </Nodes>

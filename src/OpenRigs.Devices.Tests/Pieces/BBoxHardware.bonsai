@@ -15,7 +15,7 @@
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:String">
         <rx:Name>PathPrefix</rx:Name>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoxHardware.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BBoxHardware.bonsai" />
     </Nodes>
     <Edges>
     </Edges>

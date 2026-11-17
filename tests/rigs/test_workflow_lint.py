@@ -219,9 +219,9 @@ def test_a_broken_combination_is_named(tmp_path):
     late = broken.replace(gate, "") + gate + named(lint.CLOCK_FROM_GENERATOR, "TimestampGeneratorGen3-Main")
     assert lint.hardware_problems(workflow(tmp_path, late)) == [
         "the workflow has 2 clocks, not one (ClockFromTimestampGenerator or ClockFromBoard)",
-        "BehaviorBoard.BehaviorBoard BehaviorBoard-Main comes before ReadyGate",
-        "BehaviorBoard.ClockFromBoard BehaviorBoard-Main comes before ReadyGate",
-        "BehaviorBoard.RunningWheel BehaviorBoard-Main comes before ReadyGate",
+        "BehaviorBoard BehaviorBoard-Main comes before ReadyGate",
+        "ClockFromBoard BehaviorBoard-Main comes before ReadyGate",
+        "RunningWheel BehaviorBoard-Main comes before ReadyGate",
         "LicketySplit LicketySplit-Left comes before ReadyGate",
         "LicketySplit LicketySplit-Right comes before ReadyGate",
         "LickSpoutStage comes before ReadyGate",
@@ -251,8 +251,8 @@ def test_a_piece_s_kind_board_and_camera_are_its_own(tmp_path):
 
 
 def test_a_rig_list_given_a_property_it_does_not_expose_is_refused(tmp_path):
-    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BehaviorBoxHardware.bonsai", "<PieceStages>HarpClockSet</PieceStages>"))
-    assert lint.hardware_problems(wf) == ["BehaviorBoxHardware is given PieceStages, which it does not expose (Binning, WorkflowStages)"]
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BBoxHardware.bonsai", "<PieceStages>HarpClockSet</PieceStages>"))
+    assert lint.hardware_problems(wf) == ["BBoxHardware is given PieceStages, which it does not expose (Binning, WorkflowStages)"]
 
 
 def own_include(tmp_path: Path, nodes: str, inner: str, edges: str = "") -> lint.Workflow:
@@ -456,7 +456,7 @@ def manifest_node(expected: str) -> str:
 LOGS = (include("OpenRigs.Logging:LogTrials.bonsai") + include("OpenRigs.Logging:LogEvents.bonsai")
         + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Rig</Name>")
         + include("OpenRigs.Logging:LogWorkflowData.bonsai", "<LogName>WorkflowData_StimulusState</LogName>")
-        + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai") + include("OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai")
+        + include("OpenRigs.Devices:ZapitLogs.bonsai") + include("OpenRigs.Devices:BehaviorBoard.bonsai")
         + '<Expression xsi:type="hd:RecordHarpDevices" xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices" />')
 EXPECTED = ("auto;harp;Settings/Settings_Rig_;WorkflowData/WorkflowData_Trials_;WorkflowData/WorkflowData_Events_;WorkflowData/WorkflowData_StimulusState_;"
             "Settings/Settings_ZapitConditions_?Optogenetics")
@@ -513,7 +513,7 @@ def block_text(path: str) -> str:
 def test_the_fixed_logs_are_the_names_their_blocks_write():
     for path, logs in lint.FIXED_LOGS.items():
         text = block_text(path)
-        for inner in ("OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:Zapit.ZapitLogs.bonsai"):
+        for inner in ("OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai"):
             if f'Path="{inner}"' in text:  # a block that includes another writes its logs too
                 text += block_text(inner)
         assert all(f">{name}<" in text for name, _ in logs), path
@@ -541,7 +541,7 @@ def test_the_task_logs_are_the_lab_s_include_given_the_task_file_as_json(tmp_pat
     assert lint.task_logs_problems(workflow(tmp_path, group + serialize + include(lint.TASK_LOGS) + edge)) == []
     # A task's own logs, refused.
     own = (include("OpenRigs.Logging:LogTrials.bonsai") + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Task</Name>")
-           + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai"))
+           + include("OpenRigs.Devices:ZapitLogs.bonsai"))
     assert lint.task_logs_problems(workflow(tmp_path / "b", own)) == [
         "the workflow includes TaskLogs 0 times, not once", "the workflow includes LogTrials itself (TaskLogs does)",
         "the workflow includes ZapitLogs itself (TaskLogs does)", "the workflow logs Settings_Task itself (TaskLogs does)"]
@@ -599,8 +599,8 @@ def test_the_zapit_trigger_line_is_set_and_cleared_by_the_lab_s_include(tmp_path
            '<Expression xsi:type="rx:AsyncSubject"><Name>Optogenetics</Name></Expression>' + include(lint.SET_ZAPIT_TRIGGER_LINE)
            + line.replace("BehaviorBoard-Main.Commands", "BehaviorBoard-Main.Data"))
     assert lint.zapit_include_problems(workflow(tmp_path / "b", board + own)) == [
-        "the workflow declares Optogenetics itself (Zapit.ConnectForTask does)",
-        "the workflow writes the ZapitTrigger line itself (BehaviorBoard.SetZapitTriggerLine does)",
+        "the workflow declares Optogenetics itself (ConnectForTask does)",
+        "the workflow writes the ZapitTrigger line itself (SetZapitTriggerLine does)",
         "a SetZapitTriggerLine does not state Set",
         "a SetZapitTriggerLine's BoardCommandsSubjectName is not set, not a BehaviorBoard piece's <Name>.Commands (BehaviorBoard-Main.Commands)",
         "a SetZapitTriggerLine's BoardCommandsSubjectName is BehaviorBoard-Main.Data, not a BehaviorBoard piece's <Name>.Commands (BehaviorBoard-Main.Commands)"]
@@ -609,7 +609,7 @@ def test_the_zapit_trigger_line_is_set_and_cleared_by_the_lab_s_include(tmp_path
 
 
 def test_the_behaviour_box_rig_list_is_expanded_with_the_workflow_s_binning(tmp_path):
-    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BehaviorBoxHardware.bonsai", "<Binning>2</Binning>"))
+    wf = workflow(tmp_path, include(lint.READ_LAB_RIG) + include(lint.DEVICES + "BBoxHardware.bonsai", "<Binning>2</Binning>"))
     assert lint.hardware_problems(wf) == []
     assert lint.required_devices(wf) == [("BehaviorBoard-Main", "behaviorBoard"), ("Camera-Overhead", "camera")]
     assert dict(lint.hardware(wf))[lint.CAMERA]["Binning"] == "2"
@@ -634,8 +634,8 @@ def test_each_include_read_from_the_package_is_found_by_its_description(tmp_path
 def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     def root(resource: str) -> lint.ET.Element:
         return lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
-    assert rules.zapit_for_task_problems(root("Zapit/ConnectForTask.bonsai")) == []
-    assert rules.manual_rewards_drop_problems(root("BehaviorBoard/RewardValve.bonsai")) == []
+    assert rules.zapit_for_task_problems(root("ConnectForTask.bonsai")) == []
+    assert rules.manual_rewards_drop_problems(root("RewardValve.bonsai")) == []
     group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
     wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.REWARDS) + VALVES + group)
     # Each RewardValve declares its own manual drop (DeclareDeviceControls, RewardValve-Left.Reward): the task declares none.
@@ -686,7 +686,7 @@ def test_the_spout_step_size_is_the_lick_spout_stage_s_and_the_workflow_declares
 def test_a_task_without_its_pieces_copies_passes_and_one_with_them_does_not(tmp_path, monkeypatch):
     # As a workflow repo reads them: from the OpenRigs.Devices package Bonsai.config pins, the rig list's pieces inside it.
     dll = b"MZ"
-    for resource in ("DomeHardware.bonsai", "LickSpoutStage.bonsai", "BehaviorBoard/RewardValve.bonsai"):
+    for resource in ("DomeHardware.bonsai", "LickSpoutStage.bonsai", "RewardValve.bonsai"):
         dll += b"\x00\x10" + (ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes()
     (tmp_path / ".bonsai").mkdir()
     (tmp_path / ".bonsai" / "Bonsai.config").write_text('<Packages><Package id="OpenRigs.Devices" version="0.1.1-x.2" /></Packages>')
@@ -877,7 +877,7 @@ def test_each_clock_publishes_timestamp_from_its_fast_register():
         while not (nodes[at].get(lint.XSI) or "").endswith(":Parse"):
             at = edges[at]
         return next(iter(nodes[at])).get(lint.XSI) or ""
-    assert register_into_timestamp("BehaviorBoard/ClockFromBoard.bonsai") == "beh:TimestampedAnalogData"
+    assert register_into_timestamp("ClockFromBoard.bonsai") == "beh:TimestampedAnalogData"
     assert register_into_timestamp("ClockFromTimestampGenerator.bonsai") == "tsg:TimestampedTimer"
 
 
@@ -945,7 +945,7 @@ def test_upstream_s_video_logs_are_refused(tmp_path, log):
     assert lint.hardware_problems(wf) == [f"the workflow includes {log}, which a lab workflow does not use: each camera piece logs itself (LogVideoFfmpeg)"]
 
 def test_rewards_checks_each_request_against_the_valves_and_logs_each_delivery():
-    text = (ROOT / "src" / "OpenRigs.Devices" / "BehaviorBoard" / "Rewards.bonsai").read_text(encoding="utf-8-sig")
+    text = (ROOT / "src" / "OpenRigs.Devices" / "Rewards.bonsai").read_text(encoding="utf-8-sig")
     root = lint.ET.fromstring(text.encode("utf-8"))
     nodes, edges = lint.nodes_and_edges(lint.child(root, lint.W + "Workflow"))
     check = next(i for i, n in enumerate(nodes) if lint.kind(n) == "dev:RequireRewardValve")
@@ -1057,10 +1057,10 @@ def test_each_rig_list_s_taps_tap_its_devices(tmp_path, rig_list):
 
 def test_a_preflight_taps_through_its_rig_list_s_taps(tmp_path):
     checks = include(lint.PREFLIGHT_CHECKS)
-    box, taps = (include(lint.DEVICES + name) for name in ("BehaviorBoxHardware.bonsai", "BehaviorBoxHardwareTaps.bonsai"))
+    box, taps = (include(lint.DEVICES + name) for name in ("BBoxHardware.bonsai", "BBoxHardwareTaps.bonsai"))
     own = '<Expression xsi:type="Combinator"><Combinator xsi:type="dev:PreflightTap" /></Expression>'
     assert lint.preflight_tap_problems(workflow(tmp_path, checks + box + taps)) == []
     assert lint.preflight_tap_problems(workflow(tmp_path / "b", box)) == [], "not a preflight"
     assert lint.preflight_tap_problems(workflow(tmp_path / "c", checks + box + own)) == [
-        "the preflight includes BehaviorBoxHardware 1 and BehaviorBoxHardwareTaps 0 times: the taps once with their rig list",
+        "the preflight includes BBoxHardware 1 and BBoxHardwareTaps 0 times: the taps once with their rig list",
         "the preflight taps a device itself (PreflightTap): its rig list's taps include taps every device"]

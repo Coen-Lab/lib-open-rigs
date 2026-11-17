@@ -25,7 +25,7 @@
         <Property Name="BehaviorCommandsSubjectName" DisplayName="BoardCommandsSubjectName" Description="Board.Commands: the subject the board takes its commands from." />
         <Property Name="BehaviorEventsSubjectName" DisplayName="BoardDataSubjectName" Description="Board.Data: the subject the board's messages are published on." />
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.CameraTriggerController.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:CameraTriggerController.bonsai">
         <EnableTrigger0>false</EnableTrigger0>
         <EnableTrigger1>false</EnableTrigger1>
         <Trigger0Frequency>0</Trigger0Frequency>

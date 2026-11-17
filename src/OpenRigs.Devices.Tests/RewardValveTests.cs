@@ -98,8 +98,8 @@ namespace OpenRigs.Devices.Tests
         public void TheValveDeclaresTheCommandItHears()
         {
             string text;
-            using (var stream = typeof(LoadRewardLine).Assembly.GetManifestResourceStream("OpenRigs.Devices.BehaviorBoard.RewardValve.bonsai")
-                ?? typeof(RewardForValve).Assembly.GetManifestResourceStream("OpenRigs.Devices.BehaviorBoard.RewardValve.bonsai"))
+            using (var stream = typeof(LoadRewardLine).Assembly.GetManifestResourceStream("OpenRigs.Devices.RewardValve.bonsai")
+                ?? typeof(RewardForValve).Assembly.GetManifestResourceStream("OpenRigs.Devices.RewardValve.bonsai"))
             using (var reader = new StreamReader(stream)) text = reader.ReadToEnd();
             WorkflowBuilder builder;
             using (var reader = XmlReader.Create(new StringReader(text))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);

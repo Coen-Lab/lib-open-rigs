@@ -12,17 +12,17 @@
         <PieceStages>HarpClockSet, Camera-Overhead</PieceStages>
         <WorkflowStages />
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.bonsai">
         <Name>BehaviorBoard-Main</Name>
         <CommandsSubjectName>BehaviorBoard-Main.Commands</CommandsSubjectName>
         <DataSubjectName>BehaviorBoard-Main.Data</DataSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ClockFromBoard.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ClockFromBoard.bonsai">
         <Board>BehaviorBoard-Main</Board>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.RunningWheel.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RunningWheel.bonsai">
         <Board>BehaviorBoard-Main</Board>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>

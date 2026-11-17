@@ -75,7 +75,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ClockFromBoardWithSetClockFalse()
         {
-            var path = "OpenRigs.Devices:BehaviorBoard.ClockFromBoard.bonsai";
+            var path = "OpenRigs.Devices:ClockFromBoard.bonsai";
             Func<string, string> unset = xml => xml
                 .Replace("Path=\"" + path + "\">", "Path=\"" + path + "\"><SetClock>false</SetClock>")
                 .Replace("<PieceStages>HarpClockSet</PieceStages>", "<PieceStages>HarpClockRead</PieceStages>");
@@ -120,10 +120,10 @@ namespace OpenRigs.Devices.Tests
 
         // The pieces' rig's face camera as the box's overhead one, on the same trigger.
         [TestMethod]
-        public void BehaviorBoxHardware()
+        public void BBoxHardware()
         {
             RequireSpinnaker();
-            Check(Run("BehaviorBoxHardware.bonsai", rig => rig.Replace("  face:", "  overhead:").Replace("Camera-Face", "Camera-Overhead")));
+            Check(Run("BBoxHardware.bonsai", rig => rig.Replace("  face:", "  overhead:").Replace("Camera-Face", "Camera-Overhead")));
         }
 
         // A workflow on a rig list (a thin entry per rig kind) gives the rig list its own stages, which the rig list
@@ -131,7 +131,7 @@ namespace OpenRigs.Devices.Tests
         // <WorkflowStages /> written on the rig list's ReadyGate node, Bonsai 2.9 dropped the value silently (16 Nov 2026).
         [DataTestMethod]
         [DataRow("DomeHardware")]
-        [DataRow("BehaviorBoxHardware")]
+        [DataRow("BBoxHardware")]
         public void EachRigListPassesTheWorkflowStagesToItsReadyGate(string rigList)
         {
             RequireSpinnaker();
@@ -155,8 +155,8 @@ namespace OpenRigs.Devices.Tests
         public void TheBehaviourBoxRigListPassesBinningToItsCamera()
         {
             RequireSpinnaker();
-            var path = "OpenRigs.Devices:BehaviorBoxHardware.bonsai";
-            var xml = File.ReadAllText(Path.Combine(Folder, "BehaviorBoxHardware.bonsai"))
+            var path = "OpenRigs.Devices:BBoxHardware.bonsai";
+            var xml = File.ReadAllText(Path.Combine(Folder, "BBoxHardware.bonsai"))
                 .Replace("Path=\"" + path + "\" />", "Path=\"" + path + "\"><Binning>2</Binning></Expression>");
             WorkflowBuilder builder;
             using (var reader = XmlReader.Create(new StringReader(xml)))

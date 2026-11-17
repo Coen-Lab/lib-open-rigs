@@ -35,10 +35,10 @@ PER_ELEMENT = {"rx:SelectMany", "rx:CreateObservable", "rx:Concat", "rx:Switch"}
 # The subjects a lab block declares for the workflow, and their kind: a multicast into them is not seen in the workflow's XML.
 SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
 SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
-ZAPIT_INCLUDE = "OpenRigs.Devices:Zapit.ConnectZapit.bonsai"
-ZAPIT_FOR_TASK = "OpenRigs.Devices:Zapit.ConnectForTask.bonsai"
-REWARDS = "OpenRigs.Devices:BehaviorBoard.Rewards.bonsai"
-MANUAL_PULSES = "OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai"
+ZAPIT_INCLUDE = "OpenRigs.Devices:ConnectZapit.bonsai"
+ZAPIT_FOR_TASK = "OpenRigs.Devices:ConnectForTask.bonsai"
+REWARDS = "OpenRigs.Devices:Rewards.bonsai"
+MANUAL_PULSES = "OpenRigs.Devices:ManualPulses.bonsai"
 BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
 EXPERIMENT_RECORDS = "OpenRigs.Logging:ExperimentRecords.bonsai"
 LAUNCH_SETTINGS = "OpenRigs.Control:LaunchSettings.bonsai"
@@ -48,7 +48,7 @@ NO_EXPERIMENT_FOLDER = "OpenRigs.Logging:NoExperimentFolder.bonsai"
 NO_EXPERIMENT_SUBJECT = "_no-experiment_"
 EXPERIMENT_CONTROL = "OpenRigs.Control:ExperimentControl.bonsai"
 PLAY_PENALTY_SOUND = "OpenRigs.Audio:PlayPenaltySound.bonsai"
-SET_ZAPIT_TRIGGER_LINE = "OpenRigs.Devices:BehaviorBoard.SetZapitTriggerLine.bonsai"
+SET_ZAPIT_TRIGGER_LINE = "OpenRigs.Devices:SetZapitTriggerLine.bonsai"
 LOG_RNG_SEED = "OpenRigs.Logging:LogRngSeed.bonsai"
 TASK_LOGS = "OpenRigs.Logging:TaskLogs.bonsai"
 TRAINING_STAGE = "OpenRigs.Control:TrainingStage.bonsai"
@@ -57,9 +57,9 @@ DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
 READY_GATE = DEVICES + "ReadyGate.bonsai"
 CLOCK_FROM_GENERATOR = DEVICES + "ClockFromTimestampGenerator.bonsai"
-CLOCK_FROM_BOARD = DEVICES + "BehaviorBoard.ClockFromBoard.bonsai"
+CLOCK_FROM_BOARD = DEVICES + "ClockFromBoard.bonsai"
 CLOCKS = (CLOCK_FROM_GENERATOR, CLOCK_FROM_BOARD)
-BOARD = DEVICES + "BehaviorBoard.BehaviorBoard.bonsai"
+BOARD = DEVICES + "BehaviorBoard.bonsai"
 LICKETY_SPLIT = DEVICES + "LicketySplit.bonsai"
 LICK_SPOUT_STAGE = DEVICES + "LickSpoutStage.bonsai"
 CAMERA = DEVICES + "SpinnakerCamera.bonsai"
@@ -67,9 +67,9 @@ CAMERA_TRIGGERS = DEVICES + "CameraTriggers.bonsai"
 CAMERA_LIVE_CONTROLS = DEVICES + "CameraLiveControls.bonsai"
 PROJECTOR_DISPLAY = "OpenRigs.Vision:ProjectorDisplay.bonsai"
 RAW_PROJECTOR_DISPLAY = "OpenRigs.Vision:RawProjectorDisplay.bonsai"  # the same window unmapped: one or the other
-PULSE_OUTPUTS = DEVICES + "BehaviorBoard.PulseOutputs.bonsai"
-RUNNING_WHEEL = DEVICES + "BehaviorBoard.RunningWheel.bonsai"
-REWARD_VALVE = DEVICES + "BehaviorBoard.RewardValve.bonsai"
+PULSE_OUTPUTS = DEVICES + "PulseOutputs.bonsai"
+RUNNING_WHEEL = DEVICES + "RunningWheel.bonsai"
+REWARD_VALVE = DEVICES + "RewardValve.bonsai"
 # What each piece takes: Name, Board and Camera name a device; X.Commands / X.Data are the subject properties
 # (CommandsSubjectName, BoardDataSubjectName, ...) that must equal that device's name plus the suffix.
 PIECES = {
@@ -78,7 +78,7 @@ PIECES = {
     BOARD: ("Name", "Name.Commands", "Name.Data"),
     PULSE_OUTPUTS: ("Board", "Board.Commands", "Board.Data", "Board.TriggerCalibratedPulse"),
     REWARD_VALVE: ("Name", "Board", "Board.TriggerCalibratedPulse"),
-    DEVICES + "BehaviorBoard.ZapitTriggerLine.bonsai": ("Board",),
+    DEVICES + "ZapitTriggerLine.bonsai": ("Board",),
     RUNNING_WHEEL: ("Board", "Board.Commands", "Board.Data"),
     LICKETY_SPLIT: ("Name", "Name.Commands", "Name.Data"),
     LICK_SPOUT_STAGE: (),
@@ -118,7 +118,7 @@ WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDrive
 LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage's C# drives drivers a and b
 # Lab includes read from the package (never from the workflow), found in OpenRigs.Devices.dll by the start of their
 # Description: a rig list holds only pieces, and is expanded in place.
-RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The hardware of a two-spout rig with a lick spout stage, projector and speakers", DEVICES + "BehaviorBoxHardware.bonsai": "The behaviour boxes' hardware"}
+RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The hardware of a two-spout rig with a lick spout stage, projector and speakers", DEVICES + "BBoxHardware.bonsai": "The behaviour boxes' hardware"}
 # A preflight's check, the same for every rig kind: it declares the Confirm command (DeclareControls).
 PREFLIGHT_CHECKS = DEVICES + "PreflightChecks.bonsai"
 # Each rig list's taps: its devices' data as a preflight's ticks (PreflightTap into DeviceTicks), so a preflight names none.
@@ -662,20 +662,20 @@ def experiment_log_problems(wf: Workflow) -> list[str]:
 
 
 def zapit_include_problems(wf: Workflow) -> list[str]:
-    """Zapit is lib-open-rigs' Zapit.ConnectForTask, included once (ConnectZapit given the task's conditions file in an
+    """Zapit is lib-open-rigs' ConnectForTask, included once (ConnectZapit given the task's conditions file in an
     optogenetics experiment), and nothing of its connect, check and refusal chain is built in the workflow, nor its
     subjects ZapitCommands and ZapitReplies declared."""
-    problems = [] if wf.text.count(f'Path="{ZAPIT_FOR_TASK}"') == 1 else ["the workflow does not include Zapit.ConnectForTask once"]
+    problems = [] if wf.text.count(f'Path="{ZAPIT_FOR_TASK}"') == 1 else ["the workflow does not include ConnectForTask once"]
     if f'Path="{ZAPIT_INCLUDE}"' in wf.text:
-        problems.append("the workflow includes Zapit.ConnectZapit itself (Zapit.ConnectForTask does)")
+        problems.append("the workflow includes ConnectZapit itself (ConnectForTask does)")
     kinds = {kind(n) for n in wf.root.iter(W + "Expression")}
     problems += [f"the workflow builds {local} itself" for local in ("zap:ZapitClient", "zap:CheckZapitConditionCount") if local in kinds]
     problems += [f"the workflow declares {name}, which ConnectZapit declares" for name in ("ZapitCommands", "ZapitReplies")
                  if _order(wf.root, _declares(name)) is not None]
     if _order(wf.root, _declares("Optogenetics")) is not None:
-        problems.append("the workflow declares Optogenetics itself (Zapit.ConnectForTask does)")
+        problems.append("the workflow declares Optogenetics itself (ConnectForTask does)")
     if "zap:ZapitLineMessage" in kinds:
-        problems.append("the workflow writes the ZapitTrigger line itself (BehaviorBoard.SetZapitTriggerLine does)")
+        problems.append("the workflow writes the ZapitTrigger line itself (SetZapitTriggerLine does)")
     commands = {props.get("Name", "") + ".Commands" for p, props in hardware(wf) if p == BOARD}
     for n in wf.root.iter(W + "Expression"):
         if n.get("Path") == SET_ZAPIT_TRIGGER_LINE:
@@ -818,7 +818,7 @@ def live_view_problems(wf: Workflow) -> list[str]:
 
 
 def reward_problems(wf: Workflow) -> list[str]:
-    """Every reward is OpenRigs.Devices' BehaviorBoard.Rewards' and one BehaviorBoard.RewardValve piece's per valve:
+    """Every reward is OpenRigs.Devices' Rewards' and one RewardValve piece's per valve:
     Rewards declares RewardRequests, RewardValves and RewardDelivered, refuses a reward for a valve no piece fires and
     logs each delivery; each valve's piece loads its calibration, gives its own manual drop (<Name>.Reward) and fires the
     rewards asked of it. A workflow that sends a reward (a multicast into RewardRequests) or has a valve includes Rewards
@@ -1060,7 +1060,7 @@ def task_logs_problems(wf: Workflow) -> list[str]:
     count = wf.text.count(f'Path="{TASK_LOGS}"')
     problems = [] if count == 1 else [f"the workflow includes TaskLogs {count} times, not once"]
     problems += [f"the workflow includes {path.split(':')[1].removesuffix('.bonsai').split('.')[-1]} itself (TaskLogs does)"
-                 for path in ("OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:Zapit.ZapitLogs.bonsai") if f'Path="{path}"' in wf.text]
+                 for path in ("OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai") if f'Path="{path}"' in wf.text]
     if "<Name>Settings_Task</Name>" in wf.text:
         problems.append("the workflow logs Settings_Task itself (TaskLogs does)")
     for nodes, edges in _scopes(wf.root):
@@ -1114,9 +1114,9 @@ FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is
     "OpenRigs.Logging:LogTrials.bonsai": [("WorkflowData_Trials", None)],
     "OpenRigs.Logging:LogEvents.bonsai": [("WorkflowData_Events", None)],
     "OpenRigs.Logging:ExperimentLogs.bonsai": [("Settings_Rig", None), ("Settings_Experiment", None), ("WorkflowData_Events", None)],
-    "OpenRigs.Devices:Zapit.ZapitLogs.bonsai": [("Settings_ZapitConditions", "Optogenetics")],  # its replies are Events rows
+    "OpenRigs.Devices:ZapitLogs.bonsai": [("Settings_ZapitConditions", "Optogenetics")],  # its replies are Events rows
 }
-FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrials.bonsai"], *FIXED_LOGS["OpenRigs.Devices:Zapit.ZapitLogs.bonsai"]]
+FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrials.bonsai"], *FIXED_LOGS["OpenRigs.Devices:ZapitLogs.bonsai"]]
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
                *DEVICE_GROUPS, LICK_SPOUT_STAGE, REWARD_VALVE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)

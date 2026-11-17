@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>BehaviorBoxHardware's devices as a preflight's ticks: each piece's data (its Name.Data), each through PreflightTap into DeviceTicks, which PreflightChecks declares, so a preflight on BehaviorBoxHardware names no device itself. After PreflightChecks.</Description>
+  <Description>BBoxHardware's devices as a preflight's ticks: each piece's data (its Name.Data), each through PreflightTap into DeviceTicks, which PreflightChecks declares, so a preflight on BBoxHardware names no device itself. After PreflightChecks.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">

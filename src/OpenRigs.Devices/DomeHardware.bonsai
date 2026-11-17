@@ -17,21 +17,21 @@
         <CommandsSubjectName>TimestampGeneratorGen3-Main.Commands</CommandsSubjectName>
         <DataSubjectName>TimestampGeneratorGen3-Main.Data</DataSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.bonsai">
         <Name>BehaviorBoard-Main</Name>
         <CommandsSubjectName>BehaviorBoard-Main.Commands</CommandsSubjectName>
         <DataSubjectName>BehaviorBoard-Main.Data</DataSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.PulseOutputs.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:PulseOutputs.bonsai">
         <Board>BehaviorBoard-Main</Board>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ZapitTriggerLine.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitTriggerLine.bonsai">
         <Board>BehaviorBoard-Main</Board>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.RunningWheel.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RunningWheel.bonsai">
         <Board>BehaviorBoard-Main</Board>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
         <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>

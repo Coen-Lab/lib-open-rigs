@@ -86,12 +86,12 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
 
 
 def zapit_for_task_problems(root: ET.Element) -> list[str]:
-    """Zapit.ConnectForTask gives ConnectZapit the task file's optogenetics.zapitConditionsPath behind a Condition on
-    optogenetics.enabled. `root` is OpenRigs.Devices' Zapit/ConnectForTask.bonsai."""
+    """ConnectForTask gives ConnectZapit the task file's optogenetics.zapitConditionsPath behind a Condition on
+    optogenetics.enabled. `root` is OpenRigs.Devices' ConnectForTask.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     includes = [i for i, n in enumerate(nodes) if n.get("Path") == ZAPIT_INCLUDE]
     if len(includes) != 1:
-        return ["ConnectForTask does not include Zapit.ConnectZapit once"]
+        return ["ConnectForTask does not include ConnectZapit once"]
     path = [nodes[i] for i in upstream(edges, includes[0])]
     problems = []
     if not any(n.findtext(W + "Selector") == "TaskParameters.Optogenetics.ZapitConditionsPath" for n in path):
@@ -105,7 +105,7 @@ def zapit_for_task_problems(root: ET.Element) -> list[str]:
 
 
 def manual_rewards_drop_problems(root: ET.Element) -> list[str]:
-    """A valve's manual drop is MANUAL_REWARD_DROP_UL. `root` is OpenRigs.Devices' BehaviorBoard/RewardValve.bonsai."""
+    """A valve's manual drop is MANUAL_REWARD_DROP_UL. `root` is OpenRigs.Devices' RewardValve.bonsai."""
     drops = [float(_value(n)) for n in root.iter(W + "Expression") if kind(n) == "DoubleProperty"]
     return [] if drops == [MANUAL_REWARD_DROP_UL] else [f"RewardValve's manual drop is {drops} ul, not {MANUAL_REWARD_DROP_UL}"]
 
