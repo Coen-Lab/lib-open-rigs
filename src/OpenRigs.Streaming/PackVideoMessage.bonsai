@@ -54,7 +54,7 @@
         <PayloadType>Image</PayloadType>
       </Expression>
       <Expression xsi:type="MulticastSubject">
-        <Name>VideoMessage</Name>
+        <Name>OutgoingMessage</Name>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
     </Nodes>

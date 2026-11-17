@@ -1,6 +1,6 @@
 # Receive Stream
 
-`ReceiveStream` subscribes to a single stream on a remote machine and unpacks each arriving message into its topic, header and payload. It has the reverse behaviour to [Pack Data Message](pack-data-message.md), and is normally followed by `SelectStreamPayload`, which turns the raw payload back into the type that was sent.
+`ReceiveStream` subscribes to a single stream on a remote machine and unpacks each arriving message into its topic, header and payload. It is followed by an unpacker matching what the rig packed: `UnpackDataMessage` for a value from [Pack Data Message](pack-data-message.md), or [Unpack Video Message](unpack-video-message.md) for frames from [Pack Video Message](pack-video-message.md). One `ReceiveStream` per stream, each on its own subscription.
 
 ---
 
@@ -21,19 +21,19 @@ A message whose header cannot be parsed is marked `Valid = false` and passed thr
 |----------|---------|-------------|
 | `RigId` | `MyRig` | Identifier of the rig to subscribe to. Must match the publisher's `RigId` |
 | `StreamName` | `data` | Stream to subscribe to. Must match the publisher's `StreamName` |
-| `ConnectionString` | `>tcp://127.0.0.1:5556` | Publisher endpoint to connect to |
+| `ConnectionString` | `>tcp://127.0.0.1:5556` | Publisher endpoint to connect to, for example `>tcp://rig-machine:5556`. Every stream from a rig is on this one port |
 
 ---
 
 ## Selecting the payload type
 
-`ReceiveStream` alone gives raw bytes. Follow it with `SelectStreamPayload` and set `Type` to what the publisher sent, and the output reduces to three useful fields — `SessionKey`, `Index` and `Value` — with `Value` already the right type.
+`ReceiveStream` alone gives raw bytes. Follow it with `UnpackDataMessage` and set `Type` to what the publisher sent, and the output reduces to three useful fields, `SessionKey`, `Index` and `Value`, with `Value` already the right type.
 
 :::workflow
 ![StreamingReceive](~/workflows/StreamingReceive.bonsai)
 :::
 
-The type must match what was published; the `type` header field records what that was. The selectable types are declared as attributes on the operator and the list is maintained by hand, so a type that is not yet listed cannot be chosen until it is added. See [OpenRigs.Streaming.SelectStreamPayload](xref:OpenRigs.Streaming.SelectStreamPayload).
+The type must match what was published, and the `type` header field records what that was. A mismatch stops the workflow with an error naming the stream and both types, for example `Stream MyRig/data/second/ carries Double but the receiver is set to Int32.` The selectable types are declared as attributes on the operator and the list is maintained by hand, so a type that is not yet listed cannot be chosen until it is added. See [OpenRigs.Streaming.UnpackDataMessage](xref:OpenRigs.Streaming.UnpackDataMessage).
 
 `Index` increments per stream, so you can detect dropped messages from non-monotonic increments. Note that gaps are not neccessarily a fault. The publisher drops messages instead of blocking when a subscriber cannot keep up. So dropped frames at the remote monitor does not mean dropped frames at the rig.
 

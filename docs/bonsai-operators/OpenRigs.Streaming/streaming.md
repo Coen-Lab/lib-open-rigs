@@ -9,16 +9,18 @@ This can be useful for remote monitoring and control of an ongoing experiment, a
 
 | Operator | Role |
 |----------|------|
-| `StreamController` | Opens the sockets, declares data and video `Subjects` and defines and publishes rig/session identity. |
+| `StreamController` | Opens the publisher socket, declares the `OutgoingMessage` subject and defines and publishes rig/session identity. |
 | `PackDataMessage` | Serializes a value and packs it into a message with Topic, JSON header and payload. |
 | `PackVideoMessage` | Decimates, resizes, encodes and packs video frames into ZeroMQ messages. |
 | `ReceiveStream` | Subscribes to a named stream and unpacks to a `StreamMessage`. |
-| `SelectStreamPayload` | Deserializes the payload into `SessionKey`, `Index` and `Value`. |
-| `ReceiveVideo` | As `ReceiveStream`, but decodes frames to an image. |
+| `UnpackDataMessage` | Deserializes the payload into `SessionKey`, `Index` and `Value`. |
+| `UnpackVideoMessage` | Decodes a JPEG payload into an image with `SessionKey` and `Index`. |
 
 Sending is `value` -> `PackDataMessage` -> `MulticastSubject`, with `StreamController` owning the
-socket. Receiving is `ReceiveStream` -> `SelectStreamPayload`, where the expected type is set on the
-second node.
+socket. Receiving is `ReceiveStream` -> `UnpackDataMessage`, where the expected type is set on the
+second node. Video follows the same pair: `PackVideoMessage` on the rig, `ReceiveStream` ->
+`UnpackVideoMessage` on the viewer. Every stream, whatever its encoding, travels on the one socket and
+is told apart by its stream name.
 
 ---
 
@@ -40,7 +42,7 @@ again:
 ![StreamingReceive](~/workflows/StreamingReceive.bonsai)
 :::
 
-`SelectStreamPayload` parses each message to `SessionKey`, `Index` and `Value`, where `Value` has the type the publisher sent rather than a JSON string.
+`UnpackDataMessage` parses each message to `SessionKey`, `Index` and `Value`, where `Value` has the type the publisher sent rather than a JSON string.
 
 ---
 
@@ -99,6 +101,6 @@ not cover.
 Bind and connect are different: `@tcp://…` binds, `>tcp://…` connects. A publisher binds and a
 subscriber connects. A useful side effect of this behaviour is that it does not cost the network time or bandwidth to publish any stream if there is no subscriber. 
 
-Set `0.0.0.0` on the publishing machine. This binds the stream to the local machine Network Interface Card, using the IP address assigned to that machine. The subscribing machine can then connect to this using the IP address of the publishing machine, and the same port (5556 for data, 5558 for video). You can find the IP address from the publishing machine in the command prompt by typing ipconfig /all. Look for the IPv4 address.
+Set `0.0.0.0` on the publishing machine. This binds the stream to the local machine Network Interface Card, using the IP address assigned to that machine. The subscribing machine can then connect to this using the IP address of the publishing machine and port 5556, which carries every stream. You can find the IP address from the publishing machine in the command prompt by typing ipconfig /all. Look for the IPv4 address.
 
 ---

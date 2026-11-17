@@ -1,7 +1,7 @@
 # Pack Data Message
 
 `PackDataMessage` serializes a value to JSON, wraps it in a topic and header, and publishes it on
-the data socket held by [Stream Controller](stream-controller.md). It accepts any type, so a stream
+the socket held by [Stream Controller](stream-controller.md). It accepts any type, so a stream
 can carry a number, a string, a tuple or a schema type without an operator per case. One instance is
 needed per logical stream.
 
@@ -18,7 +18,7 @@ Each value passes through three steps:
 - **SerializeStream** - serializes the value to JSON and records the name of its runtime type.
 - **BuildMessage** - attaches the topic and header, with `Encoding` fixed to `json` and
   `PayloadType` taken from the serialized type name.
-- **MulticastSubject** - publishes on `DataMessage`, the subject the controller's socket subscribes
+- **MulticastSubject** - publishes on `OutgoingMessage`, the subject the controller's socket subscribes
   to.
 
 ### Externalized properties

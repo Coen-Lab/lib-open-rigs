@@ -51,8 +51,8 @@
     href: OpenRigs.Streaming/pack-video-message.md
   - name: Receive Stream
     href: OpenRigs.Streaming/receive-stream.md
-  - name: Receive Video
-    href: OpenRigs.Streaming/receive-video.md
+  - name: Unpack Video Message
+    href: OpenRigs.Streaming/unpack-video-message.md
 - name: OpenRigs.Vision
   items:
   - name: Sync Quad

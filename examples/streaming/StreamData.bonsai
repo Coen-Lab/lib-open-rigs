@@ -82,7 +82,7 @@
           </Edges>
         </Workflow>
       </Expression>
-      <Expression xsi:type="p1:SelectStreamPayload">
+      <Expression xsi:type="p1:UnpackDataMessage">
         <p1:Type xsi:type="TypeMapping" TypeArguments="sys:Int32" />
       </Expression>
       <Expression xsi:type="MemberSelector">
@@ -118,8 +118,8 @@
           </Edges>
         </Workflow>
       </Expression>
-      <Expression xsi:type="p1:SelectStreamPayload">
-        <p1:Type xsi:type="TypeMapping" TypeArguments="sys:Int32" />
+      <Expression xsi:type="p1:UnpackDataMessage">
+        <p1:Type xsi:type="TypeMapping" TypeArguments="sys:Double" />
       </Expression>
       <Expression xsi:type="MemberSelector">
         <Selector>Value</Selector>
@@ -132,8 +132,8 @@
         <StreamName>timer</StreamName>
         <ConnectionString>&gt;tcp://127.0.0.1:5556</ConnectionString>
       </Expression>
-      <Expression xsi:type="p1:SelectStreamPayload">
-        <p1:Type xsi:type="TypeMapping" TypeArguments="sys:Double" />
+      <Expression xsi:type="p1:UnpackDataMessage">
+        <p1:Type xsi:type="TypeMapping" TypeArguments="sys:Int64" />
       </Expression>
       <Expression xsi:type="MemberSelector">
         <Selector>Value</Selector>
@@ -153,10 +153,12 @@
         <Interpolation>Linear</Interpolation>
         <StreamName>video</StreamName>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:ReceiveVideo.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:ReceiveStream.bonsai">
         <RigId>MyRig</RigId>
         <StreamName>video</StreamName>
-        <ConnectionString>&gt;tcp://127.0.0.1:5558</ConnectionString>
+        <ConnectionString>&gt;tcp://127.0.0.1:5556</ConnectionString>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:UnpackVideoMessage.bonsai">
         <Mode>Unchanged</Mode>
       </Expression>
     </Nodes>
@@ -177,6 +179,7 @@
       <Edge From="18" To="19" Label="Source1" />
       <Edge From="19" To="20" Label="Source1" />
       <Edge From="21" To="22" Label="Source1" />
+      <Edge From="23" To="24" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

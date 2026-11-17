@@ -37,7 +37,7 @@
         <PayloadType>unknown</PayloadType>
       </Expression>
       <Expression xsi:type="MulticastSubject">
-        <Name>DataMessage</Name>
+        <Name>OutgoingMessage</Name>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
     </Nodes>

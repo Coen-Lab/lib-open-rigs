@@ -8,8 +8,9 @@ namespace OpenRigs.Streaming
     /// <summary>
     /// Represents an operator that attaches the session key and message index of a received
     /// message to a value derived from it, producing the same shape as
-    /// <see cref="SelectStreamPayload"/>. Use where the payload is decoded by a dedicated
-    /// operator rather than deserialized, such as an image.
+    /// <see cref="UnpackDataMessage"/>. Use where the payload is decoded by a dedicated
+    /// operator rather than deserialized, such as an image inside the UnpackVideoMessage
+    /// workflow.
     /// </summary>
     [Combinator]
     [Description("Attaches the session key and message index of a received message to a value derived from it.")]

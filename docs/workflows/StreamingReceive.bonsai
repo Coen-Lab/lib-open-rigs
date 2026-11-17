@@ -41,7 +41,7 @@
           </Edges>
         </Workflow>
       </Expression>
-      <Expression xsi:type="p1:SelectStreamPayload">
+      <Expression xsi:type="p1:UnpackDataMessage">
         <p1:Type xsi:type="TypeMapping" TypeArguments="sys:Int32" />
       </Expression>
       <Expression xsi:type="MemberSelector">
@@ -73,7 +73,7 @@
           </Edges>
         </Workflow>
       </Expression>
-      <Expression xsi:type="p1:SelectStreamPayload">
+      <Expression xsi:type="p1:UnpackDataMessage">
         <p1:Type xsi:type="TypeMapping" TypeArguments="sys:Double" />
       </Expression>
       <Expression xsi:type="MemberSelector">
