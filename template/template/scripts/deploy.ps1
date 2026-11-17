@@ -25,7 +25,7 @@ Write-Output "Synchronizing environment..."
 &uv sync
 
 # The dotnet tools first: regenerate-schemas runs bonsai.sgen, which a fresh rig
-# does not have until they are restored (coen-behaviour-box, 14 Nov 2026).
+# does not have until they are restored.
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw "The 'dotnet' command was not found. Install the .NET SDK: https://dotnet.microsoft.com/download"
 }
