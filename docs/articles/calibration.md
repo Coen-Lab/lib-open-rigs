@@ -58,7 +58,7 @@ behaviorBoard:
 
 To be built. Each fits the same schema and shape: measured points or a payload file in an artefact with provenance, stored per machine, read by the rig at startup.
 
-- **Projector gamma**: display level against measured luminance, with the lookup table bitmap as the payload.
+- **Projector gamma**: display level against luminance measured by the Photodiode on the Behavior board's `ADC0` (the same sensor that reads the sync square on `DIPort0`), with the lookup table bitmap as the payload.
 - **Projection mesh**: the mesh CSV as the payload.
 
 Speaker filters are built: each speaker's `SpeakerFilter` artefact (`open_rigs.components.audio`), the FIR taps for the device's sample rate, in `calibration\` beside `rig.yml`, which OpenRigs.Audio's `LoadSpeakers` reads at start.

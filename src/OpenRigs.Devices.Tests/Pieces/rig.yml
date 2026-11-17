@@ -36,7 +36,8 @@ behaviorBoard:
             calibration/RewardValve-Right.json}
         DO3: {discriminatorType: FixedPulse, pulseWidthMs: 0}
     # What each line drives (lab rig model, open_rigs.rigs.lab_rig): each RewardValve by its name
-    # (name: left is the piece RewardValve-Left), one ZapitTrigger and the Photodiode on the screen's sync square.
+    # (name: left is the piece RewardValve-Left), one ZapitTrigger and the Photodiode on the screen's sync square
+    # (DIPort0; the projector's gamma calibration reads the same Photodiode on ADC0, so it needs no line here).
     # The workflow reads the reward and Zapit lines from here.
     wiring:
       DIPort0: {device: Photodiode}
