@@ -24,15 +24,17 @@ if (Test-Path -Path ./.venv) {
 Write-Output "Synchronizing environment..."
 &uv sync
 
-Write-Output "Regenerating JSON schema from pydantic models..."
-&uv run regenerate-schemas
-
+# The dotnet tools first: regenerate-schemas runs bonsai.sgen, which a fresh rig
+# does not have until they are restored (coen-behaviour-box, 14 Nov 2026).
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw "The 'dotnet' command was not found. Install the .NET SDK: https://dotnet.microsoft.com/download"
 }
 
 Write-Output "Restoring dotnet tools..."
 &dotnet tool restore
+
+Write-Output "Regenerating JSON schema from pydantic models..."
+&uv run regenerate-schemas
 
 # Derive C# namespace from schema filename (snake_case -> PascalCase).
 $schemaFile = Get-ChildItem ".\src\DataSchemas\*.json" | Select-Object -First 1
