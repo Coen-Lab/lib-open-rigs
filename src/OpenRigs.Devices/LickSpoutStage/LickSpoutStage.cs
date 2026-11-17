@@ -18,9 +18,9 @@ namespace OpenRigs.Devices
         /// <summary>Both spouts drawn back and down.</summary>
         SpoutsOut,
         /// <summary>The left spout in, the right drawn back and down.</summary>
-        LeftIn,
+        LeftOnly,
         /// <summary>The right spout in, the left drawn back and down.</summary>
-        RightIn,
+        RightOnly,
         /// <summary>Writes the mouse's in positions to its file.</summary>
         SaveSpoutPositions,
         /// <summary>Left elevation up one step size.</summary>
@@ -32,13 +32,13 @@ namespace OpenRigs.Devices
         /// <summary>Right elevation down one step size.</summary>
         RightDown,
         /// <summary>Left radial in (towards the mouse) one step size.</summary>
-        LeftFront,
+        LeftIn,
         /// <summary>Left radial out one step size.</summary>
-        LeftBack,
+        LeftOut,
         /// <summary>Right radial in (towards the mouse) one step size.</summary>
-        RightFront,
+        RightIn,
         /// <summary>Right radial out one step size.</summary>
-        RightBack,
+        RightOut,
         /// <summary>Base transverse one step size one way.</summary>
         BaseLeft,
         /// <summary>Base transverse one step size the other way.</summary>
@@ -53,7 +53,7 @@ namespace OpenRigs.Devices
     /// and places the spouts in; SaveSpoutPositions writes the file and outputs nothing.
     /// </summary>
     [Combinator]
-    [Description("Turns lick spout stage commands into the stage's targets, in steps: loads the mouse's in positions from PositionsFile (rig.yml's lickSpoutDefaultPosition if there is none), nudges them by StepSize, resets them to rig.yml's default (SpoutsDefault), saves them, and places the spouts home, in, out, left in or right in.")]
+    [Description("Turns lick spout stage commands into the stage's targets, in steps: loads the mouse's in positions from PositionsFile (rig.yml's lickSpoutDefaultPosition if there is none), nudges them by StepSize, resets them to rig.yml's default (SpoutsDefault), saves them, and places the spouts home, in, out, left only or right only.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class LickSpoutStage
     {
@@ -115,8 +115,8 @@ namespace OpenRigs.Devices
                     case LickSpoutCommand.SpoutsHome:
                     case LickSpoutCommand.SpoutsIn:
                     case LickSpoutCommand.SpoutsOut:
-                    case LickSpoutCommand.LeftIn:
-                    case LickSpoutCommand.RightIn:
+                    case LickSpoutCommand.LeftOnly:
+                    case LickSpoutCommand.RightOnly:
                         Placement = command;
                         return Target(retractSteps);
                     case LickSpoutCommand.SpoutsDefault:
@@ -130,10 +130,10 @@ namespace OpenRigs.Devices
                     case LickSpoutCommand.LeftDown: values[3] -= stepSize; break;
                     case LickSpoutCommand.RightUp: values[4] += stepSize; break;
                     case LickSpoutCommand.RightDown: values[4] -= stepSize; break;
-                    case LickSpoutCommand.LeftFront: values[1] += stepSize; break;
-                    case LickSpoutCommand.LeftBack: values[1] -= stepSize; break;
-                    case LickSpoutCommand.RightFront: values[2] += stepSize; break;
-                    case LickSpoutCommand.RightBack: values[2] -= stepSize; break;
+                    case LickSpoutCommand.LeftIn: values[1] += stepSize; break;
+                    case LickSpoutCommand.LeftOut: values[1] -= stepSize; break;
+                    case LickSpoutCommand.RightIn: values[2] += stepSize; break;
+                    case LickSpoutCommand.RightOut: values[2] -= stepSize; break;
                     case LickSpoutCommand.BaseLeft: values[0] += stepSize; break;
                     case LickSpoutCommand.BaseRight: values[0] -= stepSize; break;
                     default: throw new ArgumentOutOfRangeException(nameof(command), command, null);
@@ -149,7 +149,7 @@ namespace OpenRigs.Devices
                     case LickSpoutCommand.SpoutsHome: return new SpoutPositions();
                     case LickSpoutCommand.SpoutsIn: return In;
                     case LickSpoutCommand.SpoutsOut: return In.Retract(true, true, retractSteps);
-                    case LickSpoutCommand.LeftIn: return In.Retract(false, true, retractSteps);
+                    case LickSpoutCommand.LeftOnly: return In.Retract(false, true, retractSteps);
                     default: return In.Retract(true, false, retractSteps);
                 }
             }

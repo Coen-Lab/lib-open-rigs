@@ -9,7 +9,7 @@
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The two-driver lick spout stage, a device piece: StepperDriver-A and StepperDriver-B from their entries a and b under stepperDriver in rig.yml (RigConfigs), each opened behind its .Data and .Commands subjects and logged under its name once the experiment folder exists and the Harp clock is set. Sets the drivers up, homes all five motors (LickSpoutStage.Homed once done, announced into ReadyStages as SpoutsHomed, then the spouts go in), and moves the stage for the controller's spout commands and for LickSpoutCommand values sent to LickSpoutStage.Commands. Each target is published on LickSpoutStage.Target. The mouse's in positions come from calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml (RigConfigDirectory), else rig.yml's lickSpoutDefaultPosition (RigFile). Stops the workflow at start, naming the entries rig.yml has, if it lacks a or b. A nudge moves the stage by the experiment parameter SpoutStepSize, in motor steps, taken live as the controller sets it (OnParameterSet) and 150 until then; one second after Start, once the controller's server is up, the controller is shown 150 as its value (ParameterDefault). The piece declares its own parameter SpoutStepSize and commands to the controller (DeclareControls), so the workflow declares none of them: SpoutsHome, SpoutsIn, SpoutsOut, SpoutsDefault, SaveSpoutPositions, LeftUp, LeftDown, RightUp, RightDown, LeftFront, LeftBack, RightFront, RightBack, BaseLeft, BaseRight.</Description>
+  <Description>The two-driver lick spout stage, a device piece: StepperDriver-A and StepperDriver-B from their entries a and b under stepperDriver in rig.yml (RigConfigs), each opened behind its .Data and .Commands subjects and logged under its name once the experiment folder exists and the Harp clock is set. Sets the drivers up, homes all five motors (LickSpoutStage.Homed once done, announced into ReadyStages as SpoutsHomed, then the spouts go in), and moves the stage for the controller's spout commands and for LickSpoutCommand values sent to LickSpoutStage.Commands. Each target is published on LickSpoutStage.Target. The mouse's in positions come from calibration\LickSpoutPositions\&lt;SubjectId&gt;.csv beside rig.yml (RigConfigDirectory), else rig.yml's lickSpoutDefaultPosition (RigFile). Stops the workflow at start, naming the entries rig.yml has, if it lacks a or b. A nudge moves the stage by the experiment parameter SpoutStepSize, in motor steps, taken live as the controller sets it (OnParameterSet) and 150 until then; one second after Start, once the controller's server is up, the controller is shown 150 as its value (ParameterDefault). The piece declares its own parameter SpoutStepSize and commands to the controller (DeclareControls), so the workflow declares none of them: SpoutsHome, SpoutsIn, SpoutsOut, SpoutsDefault, SaveSpoutPositions, LeftUp, LeftDown, RightUp, RightDown, LeftIn, LeftOut, RightIn, RightOut, BaseLeft, BaseRight.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
@@ -346,42 +346,42 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orcl:OnCommand">
-          <orcl:Name>LeftFront</orcl:Name>
+          <orcl:Name>LeftIn</orcl:Name>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:ToLickSpoutCommand">
-          <dev:Command>LeftFront</dev:Command>
+          <dev:Command>LeftIn</dev:Command>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orcl:OnCommand">
-          <orcl:Name>LeftBack</orcl:Name>
+          <orcl:Name>LeftOut</orcl:Name>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:ToLickSpoutCommand">
-          <dev:Command>LeftBack</dev:Command>
+          <dev:Command>LeftOut</dev:Command>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orcl:OnCommand">
-          <orcl:Name>RightFront</orcl:Name>
+          <orcl:Name>RightIn</orcl:Name>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:ToLickSpoutCommand">
-          <dev:Command>RightFront</dev:Command>
+          <dev:Command>RightIn</dev:Command>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orcl:OnCommand">
-          <orcl:Name>RightBack</orcl:Name>
+          <orcl:Name>RightOut</orcl:Name>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:ToLickSpoutCommand">
-          <dev:Command>RightBack</dev:Command>
+          <dev:Command>RightOut</dev:Command>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
@@ -631,20 +631,20 @@
               <orcl:Description>Nudge the right spout down by SpoutStepSize.</orcl:Description>
             </orcl:Command>
             <orcl:Command>
-              <orcl:Name>LeftFront</orcl:Name>
-              <orcl:Description>Nudge the left spout forward by SpoutStepSize.</orcl:Description>
+              <orcl:Name>LeftIn</orcl:Name>
+              <orcl:Description>Nudge the left spout in by SpoutStepSize.</orcl:Description>
             </orcl:Command>
             <orcl:Command>
-              <orcl:Name>LeftBack</orcl:Name>
-              <orcl:Description>Nudge the left spout back by SpoutStepSize.</orcl:Description>
+              <orcl:Name>LeftOut</orcl:Name>
+              <orcl:Description>Nudge the left spout out by SpoutStepSize.</orcl:Description>
             </orcl:Command>
             <orcl:Command>
-              <orcl:Name>RightFront</orcl:Name>
-              <orcl:Description>Nudge the right spout forward by SpoutStepSize.</orcl:Description>
+              <orcl:Name>RightIn</orcl:Name>
+              <orcl:Description>Nudge the right spout in by SpoutStepSize.</orcl:Description>
             </orcl:Command>
             <orcl:Command>
-              <orcl:Name>RightBack</orcl:Name>
-              <orcl:Description>Nudge the right spout back by SpoutStepSize.</orcl:Description>
+              <orcl:Name>RightOut</orcl:Name>
+              <orcl:Description>Nudge the right spout out by SpoutStepSize.</orcl:Description>
             </orcl:Command>
             <orcl:Command>
               <orcl:Name>BaseLeft</orcl:Name>

@@ -50,8 +50,20 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual("0,0,0,0,0", state.Apply(LickSpoutCommand.SpoutsHome, 150, 1500).ToString());
             Assert.AreEqual("10,2000,2100,3000,3100", state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500).ToString());
             Assert.AreEqual("10,500,600,1500,1600", state.Apply(LickSpoutCommand.SpoutsOut, 150, 1500).ToString());
-            Assert.AreEqual("10,2000,600,3000,1600", state.Apply(LickSpoutCommand.LeftIn, 150, 1500).ToString());
-            Assert.AreEqual("10,500,2100,1500,3100", state.Apply(LickSpoutCommand.RightIn, 150, 1500).ToString());
+            Assert.AreEqual("10,2000,600,3000,1600", state.Apply(LickSpoutCommand.LeftOnly, 150, 1500).ToString());
+            Assert.AreEqual("10,500,2100,1500,3100", state.Apply(LickSpoutCommand.RightOnly, 150, 1500).ToString());
+        }
+
+        [TestMethod]
+        public void OnlyPlacementsHoldThroughInAndOutNudges()
+        {
+            var state = LickSpoutStage.Start(RigFile(TempFolder()), Path.Combine(TempFolder(), "none.csv"));
+            state.Apply(LickSpoutCommand.LeftOnly, 150, 1500);
+            Assert.AreEqual("10,2010,600,3000,1600", state.Apply(LickSpoutCommand.LeftIn, 10, 1500).ToString(), "left in: towards the mouse, the right stays out");
+            Assert.AreEqual("10,2010,590,3000,1600", state.Apply(LickSpoutCommand.RightOut, 10, 1500).ToString(), "right out: away from the mouse, still retracted");
+            state.Apply(LickSpoutCommand.RightOnly, 150, 1500);
+            Assert.AreEqual(LickSpoutCommand.RightOnly, state.Placement);
+            Assert.AreEqual("10,510,2090,1500,3100", state.Apply(LickSpoutCommand.RightIn, 0, 1500).ToString());
         }
 
         [TestMethod]
@@ -76,7 +88,7 @@ namespace OpenRigs.Devices.Tests
             state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
             var moves = new[]
             {
-                LickSpoutCommand.BaseLeft, LickSpoutCommand.LeftFront, LickSpoutCommand.RightBack,
+                LickSpoutCommand.BaseLeft, LickSpoutCommand.LeftIn, LickSpoutCommand.RightOut,
                 LickSpoutCommand.LeftDown, LickSpoutCommand.RightUp
             }.Select(command => state.Apply(command, 10, 1500).ToString()).ToArray();
             CollectionAssert.AreEqual(new[]
