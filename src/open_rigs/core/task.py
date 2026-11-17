@@ -75,13 +75,13 @@ class Iti(TaskBlock):
 
 
 class ResponseWindow(TaskBlock):
-    """The response window: how long a trial waits for the mouse's response, from the start of the task's response
-    period (each task says where that starts)."""
+    """The response window: how long a trial waits for the mouse's response, from when a lick first counts (each task
+    says when that is)."""
 
     response_window_seconds: float | None = Field(
         default=None,
         gt=0,
-        description="The response window, in seconds from the start of the task's response period; with no response by its end the trial is NoResponse. Null or left out: no limit (a task may refuse it)",
+        description="The response window, in seconds from when a lick first counts (the task says when); with no response by its end the trial is NoResponse. Null or left out: no limit (a task may refuse it)",
     )
 
 

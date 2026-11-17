@@ -183,3 +183,10 @@ def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
     # Each buffer's peak is checked as it is built; two sounds playing at once on one speaker add up.
     help_text = StimulusSound.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]
     assert "Sounds overlapping on a speaker share its headroom: each buffer's peak is checked, not their mix" in help_text
+
+
+def test_max_reward_ul_is_the_csharp_default():
+    source = (Path(__file__).parents[2] / "src" / "OpenRigs.Core" / "RewardLine.cs").read_text(encoding="utf-8")
+    match = re.search(r"public const double DefaultMaxRewardUl = ([0-9.]+);", source)
+    assert match, "RewardLine.cs has no DefaultMaxRewardUl"
+    assert float(match.group(1)) == MAX_REWARD_UL
