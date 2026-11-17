@@ -23,7 +23,7 @@ namespace OpenRigs.Video
     /// only powers of two of a second, so the nearest is used. No gain: a USB camera's has no unit
     /// common to its models, and exposure is what makes a display readable.
     /// </summary>
-    [Description("A USB (DirectShow) camera that is not the rig's own: the first whose device path carries none of rig.yml's camera serial numbers and no FLIR or Basler vendor id (or the one DevicePath names), streamed free-running. ExposureTime is taken live, at the nearest power of two of a second.")]
+    [Description("A USB (DirectShow) camera that is not the rig's own: the first whose device path carries none of rig.yml's camera serial numbers and no FLIR or Basler vendor id (or the one DevicePath names), streamed free-running. ExposureUs is taken live, at the nearest power of two of a second.")]
     public class UsbCamera : Source<IplImage>
     {
         // Settings a PropertyMapping writes while the camera streams, applied by the thread that
@@ -57,7 +57,7 @@ namespace OpenRigs.Video
 
         /// <summary>Gets or sets the exposure, in microseconds; NaN leaves the camera's automatic exposure.</summary>
         [Description("The exposure in microseconds, taken live at the nearest power of two of a second DirectShow allows (15625 is 1/64 s); NaN leaves the camera's automatic exposure.")]
-        public double ExposureTime
+        public double ExposureUs
         {
             get { lock (gate) return exposure; }
             set { lock (gate) { exposure = value; exposureChanged = true; } }

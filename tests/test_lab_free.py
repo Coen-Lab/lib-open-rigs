@@ -46,7 +46,7 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "src/OpenRigs.HarpDevices/README.md": 7,
     "src/OpenRigs.HarpDevices/UsbSerials.cs": 3,
     "src/OpenRigs.LiveView.Tests/Program.cs": 2,
-    "src/OpenRigs.LiveView/LiveViewPlan.cs": 2,
+    "src/OpenRigs.LiveView/LiveViewPlan.cs": 1,
     "src/OpenRigs.LiveView/OpenRigs.LiveView.csproj": 1,
     "src/OpenRigs.LiveView/README.md": 8,
     "src/OpenRigs.LiveView/Templates/StreamController.xml": 1,

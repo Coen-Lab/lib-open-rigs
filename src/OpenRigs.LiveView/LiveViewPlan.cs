@@ -177,20 +177,20 @@ namespace OpenRigs.LiveView
 
         /// <summary>
         /// The instance name of a device a workflow brings itself, different on every rig and in
-        /// no rig.yml (Pip, 10 Nov 2026: a calibration's camera plugged in for the run): published
-        /// as &lt;Kind&gt;-Temporary.Data, such as Camera-Temporary.Data, it is streamed by its kind's
+        /// no rig.yml (a calibration's camera on the balance, plugged in for the run): published
+        /// as &lt;Kind&gt;-Balance.Data, such as Camera-Balance.Data, it is streamed by its kind's
         /// recipe with no liveView settings.
         /// </summary>
-        public const string TemporaryInstance = "Temporary";
+        public const string BalanceInstance = "Balance";
 
         public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType)
         {
             var plan = new LiveViewPlan();
             foreach (var recipe in DeviceRecipe.All.Where(r => !r.Harp))
             {
-                var name = char.ToUpperInvariant(recipe.Kind[0]) + recipe.Kind.Substring(1) + "-" + TemporaryInstance;
+                var name = char.ToUpperInvariant(recipe.Kind[0]) + recipe.Kind.Substring(1) + "-" + BalanceInstance;
                 if (publishedType(name + ".Data") == null) continue;  // none: nothing to say
-                plan.Consider(new RigDevice { Kind = recipe.Kind, Instance = TemporaryInstance, Name = name, Settings = new YamlMappingNode() },
+                plan.Consider(new RigDevice { Kind = recipe.Kind, Instance = BalanceInstance, Name = name, Settings = new YamlMappingNode() },
                     publishedType);
             }
             // The machine name, not rig.yml's two-letter rigId, on purpose: the live-view windows

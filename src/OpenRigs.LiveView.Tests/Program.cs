@@ -138,17 +138,17 @@ namespace OpenRigs.LiveView.Tests
                 var none = LiveViewPlan.Create(Path.Combine(root, "nowhere"), name => null);
                 Check("no rig.yml streams nothing, with a note, and does not throw", none.Streamed.Count == 0 && none.Notes.Any(n => n.StartsWith("no rig.yml at")), string.Join(" | ", none.Notes));
 
-                Console.WriteLine("Temporary devices, in no rig.yml:");
+                Console.WriteLine("Balance devices, in no rig.yml:");
                 var also = LiveViewPlan.Create(Path.Combine(root, "nowhere"),
-                    name => name == "Camera-Temporary.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                    name => name == "Camera-Balance.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 var extra = also.Streamed.SingleOrDefault();
-                Check("a published Camera-Temporary.Data is streamed by the camera recipe, with no rig.yml",
-                    extra != null && extra.Name == "Camera-Temporary" && extra.Rate == 5 && extra.ImagePath == "it", extra == null ? string.Join(" | ", also.Skipped) : extra.ToString());
-                Check("a temporary device not published is not mentioned", !none.Skipped.Any(s => s.Contains("Temporary")), string.Join(" | ", none.Skipped));
+                Check("a published Camera-Balance.Data is streamed by the camera recipe, with no rig.yml",
+                    extra != null && extra.Name == "Camera-Balance" && extra.Rate == 5 && extra.ImagePath == "it", extra == null ? string.Join(" | ", also.Skipped) : extra.ToString());
+                Check("a balance device not published is not mentioned", !none.Skipped.Any(s => s.Contains("Balance")), string.Join(" | ", none.Skipped));
                 var withRig = Plan(root, "camera:\n  overhead:\n    serialNumber: '1'\n",
-                    name => name == "Camera-Temporary.Data" || name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
+                    name => name == "Camera-Balance.Data" || name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 var both = string.Join(", ", withRig.Streamed.Select(d => d.Stream));
-                Check("a temporary camera streams beside rig.yml's", both == "Camera-Temporary.video, Camera-Overhead.video", both);
+                Check("a balance camera streams beside rig.yml's", both == "Camera-Balance.video, Camera-Overhead.video", both);
                 Check("a temporary device changes the plan's signature", also.Signature(5556, 5558) != none.Signature(5556, 5558), "same signature");
 
                 Console.WriteLine("Board channels:");
