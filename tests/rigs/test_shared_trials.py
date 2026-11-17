@@ -170,7 +170,7 @@ def _block(blocks=BOTH):
 
 
 def test_a_task_that_starts_with_the_shared_block_passes():
-    columns = {**_block(), "endReason": {"type": "string", "description": "the task's own"}}
+    columns = {**_block(), "outcomeReason": {"type": "string", "description": "the task's own"}}
     assert shared_block_problems(columns, BOTH) == []
 
 
@@ -329,7 +329,7 @@ def test_videos_are_checked_when_asked(tmp_path):
                           "(1 missing from the video)"]
 
 
-def _stimulus_state(folder, rows, columns=("harpTime", "trialNumber", "positionCm", "stimulusActive")):
+def _stimulus_state(folder, rows, columns=("harpTime", "trialNumber", "positionCm", "auditoryOn", "visualOn")):
     with open(folder / "WorkflowData" / "WorkflowData_StimulusState_2026-11-14T01-00-00.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(columns)
@@ -340,7 +340,8 @@ def test_a_run_stopped_mid_trial_reports_the_unfinished_trial_and_its_interval(t
     trials = _chain(1)
     end = trials[0]["outcomeTime"]
     folder = _experiment(tmp_path, trials, [(end, 2.0)], outcome="stopped")
-    _stimulus_state(folder, [[end - 1, 1, 0, True], [end + 1.0, 2, 0, False], [end + 2.19, 2, 0, True], [end + 2.24, 2, 1, True]])
+    # visual alone on at 2.19 is the onset: either stimulus on counts
+    _stimulus_state(folder, [[end - 1, 1, 0, True, True], [end + 1.0, 2, 0, False, False], [end + 2.19, 2, 0, False, True], [end + 2.24, 2, 1, True, True]])
     s = summarise(folder)
     assert s.unfinished == 2 and s.problems == [] and s.notes == []
     assert [round(x, 6) for x in s.interval_seconds] == [2.19]
@@ -351,7 +352,7 @@ def test_a_run_stopped_mid_trial_reports_the_unfinished_trial_and_its_interval(t
 def test_stimulus_state_of_finished_trials_only_is_no_unfinished_trial(tmp_path):
     trials = _chain(2)
     folder = _experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)])
-    _stimulus_state(folder, [[t["stimulusOnsetTime"], t["trialNumber"], 0, True] for t in trials])
+    _stimulus_state(folder, [[t["stimulusOnsetTime"], t["trialNumber"], 0, True, True] for t in trials])
     s = summarise(folder)
     assert s.unfinished is None and s.problems == []
     assert [round(x, 6) for x in s.interval_seconds] == [2.5]
@@ -361,7 +362,7 @@ def test_stimulus_state_of_finished_trials_only_is_no_unfinished_trial(tmp_path)
 def test_an_unfinished_trial_without_a_stimulus_yet_has_no_interval(tmp_path):
     trials = _chain(1)
     folder = _experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)], outcome="stopped")
-    _stimulus_state(folder, [[trials[0]["outcomeTime"] + 1, 2, 0, False]])
+    _stimulus_state(folder, [[trials[0]["outcomeTime"] + 1, 2, 0, False, False]])
     s = summarise(folder)
     assert s.unfinished == 2 and s.interval_seconds == []
 
