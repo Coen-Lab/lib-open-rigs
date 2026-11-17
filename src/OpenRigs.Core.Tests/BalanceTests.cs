@@ -69,7 +69,7 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void TheTareStaysFirstWhenTheThreadPoolIsBusy()
         {
-            // CI (15 Nov 2026): on a loaded runner a print was sent before the tare.
+            // On a loaded CI runner a print was sent before the tare.
             int workers, io;
             System.Threading.ThreadPool.GetMinThreads(out workers, out io);
             for (var i = 0; i < 10; i++)

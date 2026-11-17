@@ -1,7 +1,6 @@
 """A subject named Kind-Instance (BehaviorBoard-Main.Commands) is a rig.yml device's: the lab's names check holds every
-such name to the lab's device names, so a piece's own subjects never take that form. LickSpoutStage-Main.* did on
-16 Nov 2026, though the stage's rig.yml entry had been replaced by StepperDriver a and b on 5 Nov, and every workflow
-with the stage was refused at launch. A reward valve is the one piece named from rig.yml's wiring (name: left is
+such name to the lab's device names, so a piece's own subjects never take that form (a stage subject named
+LickSpoutStage-Main.*, with no such rig.yml entry, had every workflow with the stage refused at launch). A reward valve is the one piece named from rig.yml's wiring (name: left is
 RewardValve-Left), not from a device group."""
 
 import re

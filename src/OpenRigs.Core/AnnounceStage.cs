@@ -30,7 +30,7 @@ namespace OpenRigs.Core
                 if (string.IsNullOrWhiteSpace(stage)) throw new InvalidOperationException("AnnounceStage has no Stage to announce.");
                 // Never Take(1): it would dispose the source inside its first OnNext, so a source that completes
                 // right after (HarpClockSet's Take(1)) loses its completion, and an AsyncSubject multicast before
-                // this never completes (rig test, 16 Nov 2026: every Harp log waited on HarpClockSet forever).
+                // this never completes (on a rig, every Harp log waited on HarpClockSet forever).
                 return Observable.Create<string>(observer =>
                 {
                     var announced = 0;

@@ -185,8 +185,8 @@ namespace OpenRigs.Manifest
                     }
                     // The workflow's Finished and the controller's stop are written as soon as they
                     // come, the run still going, as completed or stopped with run.final false:
-                    // app-rig-control kills a workflow that has not stopped by its deadline, and the
-                    // end-of-run write never comes. Not final, so app-rig-control keeps an
+                    // A controller kills a workflow that has not stopped by its deadline, and the
+                    // end-of-run write never comes. Not final, so the controller keeps an
                     // editor's Bonsai open until the end-of-run write, which sets run.final true.
                     if (control != null) subscriptions.Add(Observable.Interval(StopPoll).Subscribe(_ =>
                     {
@@ -238,7 +238,7 @@ namespace OpenRigs.Manifest
                 // video once its queue drains and ffmpeg exits), so the final write waits for every file
                 // to read closed, at most CloseWait, on a thread of its own: disposal does not block,
                 // and a foreground thread keeps a headless Bonsai open until the file is written. Written
-                // at once, every camera's CSV read closed: false (16 Nov 2026).
+                // at once, every camera's CSV read closed: false.
                 subscriptions.Add(Disposable.Create(() =>
                 {
                     RunEnd end;
@@ -317,7 +317,7 @@ namespace OpenRigs.Manifest
         /// <summary>
         /// The end when the workflow stops with the run unfinished. With a controller: completed
         /// if the workflow reported Finished (even if the controller stopped it after, as
-        /// app-rig-control does after every run), stopped if the controller stopped it before, otherwise
+        /// a controller does after every run), stopped if the controller stopped it before, otherwise
         /// the run ended early from something this node cannot see (an error elsewhere, the
         /// editor's Stop button). Without one, stopped: the editor's Stop is how such a run ends.
         /// </summary>

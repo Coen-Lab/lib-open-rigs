@@ -138,7 +138,7 @@ namespace OpenRigs.Manifest.Tests
             Directory.Delete(repo, true);
         }
 
-        // Stage 3 (6 Nov 2026): the workflow's trial columns file, copied into the manifest at Start.
+        // The workflow's trial columns file, copied into the manifest at Start.
         static void TrialColumnsFile(string root, string blankManifest)
         {
             Console.WriteLine("Trial columns:");
@@ -292,7 +292,7 @@ namespace OpenRigs.Manifest.Tests
 
         // The one name two languages make (claude-tools docs\architecture\records.md, Experiment folder name):
         // fixtures\experiment-folder\v1\names.json holds this package's reader and LogController's format, as it
-        // holds app-rig-control's rename.
+        // holds each other reader's.
         static void ExperimentFolder(string repo)
         {
             Console.WriteLine("The experiment folder's name:");
@@ -348,7 +348,7 @@ namespace OpenRigs.Manifest.Tests
 
                 Console.WriteLine("How the run ended, with no run input:");
                 var finishedThenStopped = RunExperiment(root, "a", Controller(), c => { c.SetPhase(ExperimentPhase.Finished); Stop(c, "run finished"); });
-                Check("a run that finished, then was stopped by app-rig-control, is completed", Field(finishedThenStopped, "run.outcome") == "completed", Field(finishedThenStopped, "run.outcome"));
+                Check("a run that finished, then was stopped by the controller, is completed", Field(finishedThenStopped, "run.outcome") == "completed", Field(finishedThenStopped, "run.outcome"));
                 Check("... in a folder named ses-<Session>_<DateTime>, its session read from the name", Field(finishedThenStopped, "session.id") == "a" && Field(finishedThenStopped, "session.subject") == "TC002" && Field(finishedThenStopped, "session.started") == "2026-10-30T19:57:12Z", Field(finishedThenStopped, "session.id") + " " + Field(finishedThenStopped, "session.started"));
                 Check("... with no stop reason", Field(finishedThenStopped, "run.stop_reason") == "null", Field(finishedThenStopped, "run.stop_reason"));
                 var finished = RunExperiment(root, "b", Controller(), c => c.SetPhase(ExperimentPhase.Finished));
@@ -362,18 +362,18 @@ namespace OpenRigs.Manifest.Tests
                 var alone = RunExperiment(root, "e", null, null);
                 Check("without ExperimentControl it is stopped", Field(alone, "run.outcome") == "stopped" && Field(alone, "control") == "null", Field(alone, "run.outcome"));
                 Check("the parameters at Go are not in the manifest (they are Settings_Experiment's)", !finished.Contains("\"parameters\"") && Field(finished, "control.subject_id") != null, Field(finished, "control"));
-                // 0.1.0-local.5: who launched, released and stopped the experiment, as the controller named them.
+                // Who launched, released and stopped the experiment, as the controller named them.
                 var named = RunExperiment(root, "h", Controller(), c =>
                 {
-                    Set(c, "LaunchedBy", new Person { Id = "PipC", Name = "Pip Coen" });
+                    Set(c, "LaunchedBy", new Person { Id = "AnnO", Name = "Ann Other" });
                     Set(c, "GoBy", new Person { Id = "JoB", Name = "Jo Bloggs" });
                     Set(c, "StoppedBy", new Person { Id = "", Name = "Jo Bloggs" });
                     Stop(c, "stopped by Jo Bloggs");
                 });
-                Check("control names who launched the experiment and who sent Go", Field(named, "control.launched_by.id") == "PipC" && Field(named, "control.launched_by.name") == "Pip Coen" && Field(named, "control.go_by.id") == "JoB", named);
+                Check("control names who launched the experiment and who sent Go", Field(named, "control.launched_by.id") == "AnnO" && Field(named, "control.launched_by.name") == "Ann Other" && Field(named, "control.go_by.id") == "JoB", named);
                 Check("... and who stopped it", Field(named, "control.stopped_by.name") == "Jo Bloggs" && Field(named, "control.stopped_by.id") == "", Field(named, "control.stopped_by.name"));
                 {
-                    // app-rig-control kills a workflow slow to stop, so the running write is the last.
+                    // A controller may kill a workflow slow to stop, so the running write is the last.
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-slow_2026-10-30T19-57-12");
                     var path = new Subject<string>();
@@ -398,15 +398,15 @@ namespace OpenRigs.Manifest.Tests
                 }
                 Check("a controller that names nobody leaves them null", Field(finished, "control.launched_by") == "null" && Field(finished, "control.go_by") == "null" && Field(finished, "control.stopped_by") == "null", Field(finished, "control.launched_by"));
                 Check("rig.os is the real Windows version, not the 6.2 Windows tells an undeclared program", !Field(finished, "rig.os").Contains("6.2.9200"), Field(finished, "rig.os"));
-                // 0.1.0-local.6: rig.yml is in config_files only, not copied again into rig.
+                // rig.yml is in config_files only, not copied again into rig.
                 var rigKeys = string.Join(",", ManifestWriter.RigSection().Select(p => p.Key));
                 Check("rig is the machine alone", rigKeys == "machine,user,os", rigKeys);
-                // 0.1.0-local.7: a config file by path and hash; its settings are the workflow's to log.
+                // A config file by path and hash; its settings are the workflow's to log.
                 var cfgPath = Path.Combine(root, "cfg.yml");
                 File.WriteAllText(cfgPath, "a: 1\n");
                 var cfgKeys = string.Join(",", ManifestWriter.ConfigFile(cfgPath, root).Select(p => p.Key));
                 Check("a config file is its path and sha256, not its text", cfgKeys == "path,sha256", cfgKeys);
-                // 0.1.1-coen.6: a mouse's own file by {SubjectId}, and a folder as every file in it.
+                // A mouse's own file by {SubjectId}, and a folder as every file in it.
                 Directory.CreateDirectory(Path.Combine(root, "Spouts"));
                 File.WriteAllText(Path.Combine(root, "Spouts", "M7.csv"), "1,2");
                 var mine = ManifestWriter.ConfigFiles(@"Spouts\{SubjectId}.csv", root, "M7");
@@ -450,14 +450,14 @@ namespace OpenRigs.Manifest.Tests
                 Check("a folder is not met by a file another entry names", ExpectedPlan.Matches(board, new[] { "Board/Board.yml" }, both) == 0
                     && ExpectedPlan.Matches(map, new[] { "Board/Board.yml" }, both) == 1, "the register map stood in for the board's data");
                 Check("... and is by any other file in it", ExpectedPlan.Matches(board, new[] { "Board/Board.yml", "Board/Board_44_x.bin" }, both) == 1, "not met");
-                // 0.1.1-coen.5: each settings file expected on its own, by a prefix entry (in Schemas/ until coen.7, Settings/ since).
+                // Each settings file expected on its own, by a prefix entry, in Settings/.
                 var schemas = ExpectedPlan.Create("Settings/Settings_Rig_;Settings/Settings_Task_;Settings/", null, n => null).Entries;
                 var inSchemas = new[] { "Settings/Settings_Rig_2026-11-07T09-30-12.json" };
                 Check("a prefix entry is met by a file whose path starts with it, and only by one", ExpectedPlan.Matches(schemas[0], inSchemas, schemas) == 1
                     && ExpectedPlan.Matches(schemas[1], inSchemas, schemas) == 0, "the rig's file met the task's entry, or not its own");
                 Check("... and does not keep that file from meeting its folder", ExpectedPlan.Matches(schemas[2], inSchemas, schemas) == 1, "the folder was not met");
-                // 0.1.0-local.10: the writer and its version, and what a dirty checkout changed.
-                // The version the build stamped: open-rigs' build sets it (app-rig-setup's workflows\build-package.ps1
+                // The writer and its version, and what a dirty checkout changed.
+                // The version the build stamped: open-rigs' build sets it (a package build
                 // passes the .csproj's <Version>; a plain build is 42.42.42-dev0).
                 var built = ((AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(typeof(ManifestWriter).Assembly, typeof(AssemblyInformationalVersionAttribute))).InformationalVersion.Split('+')[0];
                 Check("writer names the package and its version as built", Field(finished, "writer.package") == "OpenRigs.Manifest" && Field(finished, "writer.version") == built, Field(finished, "writer.version") + " vs " + built);
@@ -490,7 +490,7 @@ namespace OpenRigs.Manifest.Tests
                     Check("... and its session is read from the folder's name", Field(text, "session.id") == "f" && Field(text, "session.started") == "2026-10-30T19:57:12Z", Field(text, "session.id") + " " + Field(text, "session.started"));
                     Check("... and the node completes", completed, "no OnCompleted");
                     // A run that fails before the folder exists: nothing to record, and the error goes
-                    // on at once, so the workflow does not stand at Ready with a dead run (4 Nov 2026).
+                    // on at once, so the workflow does not stand at Ready with a dead run.
                     var failedFolder = Path.Combine(root, "sub-TC002", "ses-f2_2026-10-30T19-57-12");
                     var failedPath = new Subject<string>();
                     var failedRun = new Subject<int>();
@@ -526,7 +526,7 @@ namespace OpenRigs.Manifest.Tests
                 }
                 {
                     // A workflow killed after its Finished lost its outcome. It is written
-                    // as Finished comes, not final, and app-rig-control keeps an editor's Bonsai open until the
+                    // as Finished comes, not final, and a controller keeps an editor's Bonsai open until the
                     // end-of-run write sets run.final true.
                     var control = Controller();
                     var folder = Path.Combine(root, "sub-TC002", "ses-fin_2026-10-30T19-57-12");
@@ -552,7 +552,7 @@ namespace OpenRigs.Manifest.Tests
                     Check("... and the end-of-run write is completed and final", Field(last, "run.outcome") == "completed" && Field(last, "run.final") == "true", Field(last, "run.outcome") + " " + Field(last, "run.final"));
                 }
                 {
-                    // 16 Nov 2026: every camera's CSV read closed: false, the final write made at disposal
+                    // Every camera's CSV read closed: false, the final write made at disposal
                     // while ffmpeg's recording still held it. The write waits, at most CloseWait, for every
                     // file to read closed, on a thread of its own, so disposal does not block.
                     foreach (var closes in new[] { true, false })
@@ -691,7 +691,7 @@ namespace OpenRigs.Manifest.Tests
                 ManifestWriter.WriteAtomically(file, "two");
                 Check("a second write replaces the first and leaves no .tmp", File.ReadAllText(file) == "two" && Directory.GetFiles(root, "atomic.json.*.tmp").Length == 0, File.ReadAllText(file));
                 {
-                    // A reader without delete sharing, as Python's open() is (app-rig-control polls manifest.json every second).
+                    // A reader without delete sharing, as Python's open() is (a controller polls manifest.json every second).
                     var opened = new System.Threading.ManualResetEventSlim();
                     var reader = new System.Threading.Thread(() =>
                     {
@@ -722,7 +722,7 @@ namespace OpenRigs.Manifest.Tests
                 Check("a leading ./ is dropped, as the overnight copy names the file", outsidePaths == "RigSchema/x.json", outsidePaths);
                 Check("... and a rooted entry or one with .. is noted, not expected", outside.Notes.Count == 4 && outside.Notes.All(n => n.EndsWith("not a path inside the experiment folder.")), string.Join(" | ", outside.Notes));
                 // A Harp device's data is HarpMessage, told by name: the manifest does not reference Bonsai.Harp.
-                // 0.1.0-local.9: which entries are Harp devices is src\Shared\HarpRig.cs, the rule RecordHarpDevices
+                // Which entries are Harp devices is src\Shared\HarpRig.cs, the rule RecordHarpDevices
                 // uses (a portName: null is none), and the register map is expected only when a loaded package decodes the kind.
                 var harpYml = Path.Combine(root, "harp-rig.yml");
                 File.WriteAllText(harpYml, "behaviorBoard:\n  main:\n    portName: COM3\n  idle:\n    portName: null\n" +

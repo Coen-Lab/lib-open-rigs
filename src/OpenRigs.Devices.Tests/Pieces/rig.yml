@@ -52,7 +52,7 @@ behaviorBoard:
       trigger1Enabled: false    # camera trigger 1 shares the DO1 pin, a reward valve's
       trigger1Frequency: 50     # Hz, used only if trigger 1 is enabled
     runningWheel:
-      wheelDiameterMm: 75       # mm; the measured wheel (9 Nov 2026)
+      wheelDiameterMm: 75       # mm; the measured wheel
       countsPerRev: 4096
 
 timestampGeneratorGen3:

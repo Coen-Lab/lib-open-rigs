@@ -7,7 +7,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace OpenRigs.Core.Tests
 {
     // Values are sent from the test's own thread, never a thread-pool timer, so a loaded runner
-    // (CI, 15 Nov 2026) cannot make a value miss its gap.
+    // (CI) cannot make a value miss its gap.
     [TestClass]
     public class GapWatchdogTests
     {

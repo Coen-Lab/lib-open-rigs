@@ -30,8 +30,8 @@ namespace OpenRigs.Manifest
         /// <summary>
         /// ExpectedFiles' word for the Harp devices' records: for each Harp device in rig.yml (HarpRig:
         /// a portName, its &lt;Name&gt;.Data published as HarpMessage), the files OpenRigs.HarpDevices'
-        /// RecordHarpDevices writes beside its data (0.1.0-local.8): the record, and the register map
-        /// when a loaded Harp package decodes the kind's WhoAmI (0.1.0-local.9). Decided by the same
+        /// RecordHarpDevices writes beside its data: the record, and the register map
+        /// when a loaded Harp package decodes the kind's WhoAmI. Decided by the same
         /// shared rule as RecordHarpDevices, from rig.yml and the devices' subjects, not from
         /// RecordHarpDevices itself: Bonsai may build this node before that one, whatever their
         /// order in the workflow (a node fed from one built earlier is built sooner).
@@ -163,7 +163,7 @@ namespace OpenRigs.Manifest
                 var entry = "rig.yml " + device.Kind + ": " + device.Instance + ":";
                 if (harp)
                 {
-                    // HarpRig's rule, as RecordHarpDevices decides it (0.1.0-local.9): a portName
+                    // HarpRig's rule, as RecordHarpDevices decides it: a portName
                     // that is not null, and the register map only when a loaded package decodes the kind.
                     if (HarpRig.NotHarp(device, publishedType) != null) continue;
                     var why = entry + " is a Harp device (" + name + ".Data is HarpMessage): RecordHarpDevices' ";
@@ -185,9 +185,9 @@ namespace OpenRigs.Manifest
 
         /// <summary>
         /// The files under the experiment folder an entry matches: the file itself, every file whose path starts
-        /// with a prefix entry (ending in _, 0.1.1-coen.5: each of the three settings files, in Schemas/ until coen.7
-        /// and Settings/ since, expected on its own, as one folder entry was met by any one of them), or every file in the folder that no other
-        /// entry names (0.1.0-local.7), so a device's register map, expected by name in the device's folder,
+        /// with a prefix entry (ending in _: each of the three settings files in Settings/, expected on its own, as
+        /// one folder entry was met by any one of them), or every file in the folder that no other
+        /// entry names, so a device's register map, expected by name in the device's folder,
         /// never stands in for the device's data.
         /// </summary>
         public static int Matches(ExpectedEntry entry, IEnumerable<string> relativePaths, IEnumerable<ExpectedEntry> entries)

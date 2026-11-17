@@ -269,7 +269,7 @@ def _scopes(root: ET.Element):
 
 
 def wall_clock_waits(wf: Workflow, group: str = "TaskLogic") -> list[str]:
-    """Every wall-clock wait in `group` (plan v11: a task waits on the Harp clock, Core HarpDelay on Timestamp), as
+    """Every wall-clock wait in `group` (a task waits on the Harp clock, Core HarpDelay on Timestamp), as
     "<name or type> (<type>)"."""
     found = [f"{e.findtext(W + 'Name') or kind(e)} ({kind(e)})" for e in wf.named(group).iter(W + "Expression") if kind(e) in WALL_CLOCK]
     if "TimeOfDay" in ET.tostring(wf.named(group), encoding="unicode"):
@@ -292,7 +292,7 @@ def harp_delays_off_the_clock(wf: Workflow, group: str = "TaskLogic") -> tuple[i
 
 def finite_event_senders(wf: Workflow) -> tuple[int, list[str]]:
     """(the multicasts into Events, the finite operators upstream of any): a MulticastSubject passes on its source's
-    completion, so a Take ahead of it completed the shared subject at trial 1 (9 Nov 2026). A sender that
+    completion, so a Take ahead of it completed the shared subject at trial 1. A sender that
     logs once takes its one value after the multicast."""
     senders, finite = 0, []
     for nodes, edges in _scopes(wf.root):
@@ -306,7 +306,7 @@ def finite_event_senders(wf: Workflow) -> tuple[int, list[str]]:
 def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
     """Each MulticastSubject inside a per-element nested graph whose subject is not a BehaviorSubject declared in the
     workflow, by a lab block it includes, or inside that graph. Bonsai 2.9 passes a multicast source's completion to a
-    PublishSubject or ReplaySubject, so the first trial's graph closes it for good (seen on a rig, 14 Nov 2026)."""
+    PublishSubject or ReplaySubject, so the first trial's graph closes it for good (seen on a rig)."""
     declared: dict[str, str] = {}
     pieces = hardware(wf)
     carried = {inner for outer, inner in CARRIED_BLOCKS.items() if f'Path="{outer}"' in wf.text}
@@ -581,7 +581,7 @@ def shared_mapping_problems(root: ET.Element) -> list[str]:
     """No PropertyMapping is fed by a node with another successor. Bonsai shares such a node's output once every
     successor has subscribed, and a PropertyMapping subscribes just before its target, so a value ready at Start (a
     completed AsyncSubject's) reaches the target only after it has read its properties: it keeps its XML default
-    (SpinnakerCamera's Stage, 16 Nov 2026). Give each mapping its own source. Allowed: a node that feeds only the
+    (SpinnakerCamera's Stage). Give each mapping its own source. Allowed: a node that feeds only the
     mapping and the mapping's own targets (the value comes with each element), and WorkflowInput (an include's input
     arrives from its caller). `root` is a workflow or a lab include."""
     problems = []
@@ -602,7 +602,7 @@ def shared_mapping_problems(root: ET.Element) -> list[str]:
 
 def ready_announcer_problems(root: ET.Element) -> list[str]:
     """Every multicast into ReadyStages is fed by an AnnounceStage alone: ReadyStages is a ReplaySubject, so an announcer
-    that completes (a Take(1)) closes it for every stage after (seen headless, 15 Nov 2026). `root` is a workflow or a
+    that completes (a Take(1)) closes it for every stage after (seen headless). `root` is a workflow or a
     lab include."""
     problems = []
     for nodes, edges in _scopes(root):
@@ -713,7 +713,7 @@ def spout_step_size_problems(wf: Workflow) -> list[str]:
 def background_noise_problems(wf: Workflow) -> list[str]:
     """Every task with sound has background noise: OpenRigs.Audio's BackgroundNoise, included once, after the task
     declares LaunchTaskConfig and TaskConfig, which it reads; the workflow sends nothing into BackgroundNoise and reads
-    no backgroundNoise itself. The noise is the lab's one file, rig.yml's speakerArray.backgroundNoise (16 Nov 2026), so
+    no backgroundNoise itself. The noise is the lab's one file, rig.yml's speakerArray.backgroundNoise, so
     the include takes no file and the task keeps no noise WAV."""
     count = wf.text.count(f'Path="{BACKGROUND_NOISE}"')
     mixer = any(p == SPEAKER_MIXER for p, _ in hardware(wf))

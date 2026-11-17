@@ -241,7 +241,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>One ConfigFiles entry's files: the file, or every file in a folder (calibration\AuditoryStimuli),
-        /// in order, each with its sha256 (0.1.1-coen.6). {SubjectId} is the launch's; with none, the entry is missing.</summary>
+        /// in order, each with its sha256. {SubjectId} is the launch's; with none, the entry is missing.</summary>
         public static List<JsonObject> ConfigFiles(string configured, string baseFolder, string subject)
         {
             if (configured.Contains(SubjectToken))
@@ -396,7 +396,7 @@ namespace OpenRigs.Manifest
             {
                 File.WriteAllText(tmp, text, new UTF8Encoding(false));
                 // Windows refuses the rename while a reader holds the file without delete sharing
-                // (Python's open(); app-rig-control polls manifest.json every second): wait it out, about 0.5 s.
+                // (Python's open(); a controller polls manifest.json every second): wait it out, about 0.5 s.
                 for (var attempt = 1; ; attempt++)
                 {
                     try
@@ -418,7 +418,7 @@ namespace OpenRigs.Manifest
             }
         }
 
-        /// <summary>The machine. Its rig.yml is named in config_files only (0.1.0-local.6); version 1 also copied it here.</summary>
+        /// <summary>The machine. Its rig.yml is named in config_files only; version 1 also copied it here.</summary>
         public static JsonObject RigSection()
         {
             var rig = new JsonObject();
@@ -430,7 +430,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>
-        /// One configuration file as it was at Start: path and sha256, or missing. Not its text (0.1.0-local.7):
+        /// One configuration file as it was at Start: path and sha256, or missing. Not its text:
         /// the workflow logs the settings it parsed from it into the experiment (the Open Rigs logging spec's
         /// settings JSON), and the manifest names which file that was.
         /// </summary>
@@ -536,8 +536,8 @@ namespace OpenRigs.Manifest
         /// <summary>The experiment controller's record: the id the controller passed for this launch (the
         /// LaunchId property, null when none was), subject, session, when Go was taken, and who
         /// launched it, sent Go and stopped it. Null without ExperimentControl. The parameters at Go are
-        /// in the experiment's Settings_Experiment file (OpenRigs.Control's ExperimentSettings, since
-        /// 0.1.1-coen.5; Schemas_Experiment until coen.7), so the settings live once, in the experiment folder.</summary>
+        /// in the experiment's Settings_Experiment file (OpenRigs.Control's ExperimentSettings), so the
+        /// settings live once, in the experiment folder.</summary>
         public static JsonObject ControlSection(ControlExperiment control, string launchId)
         {
             if (control == null) return null;

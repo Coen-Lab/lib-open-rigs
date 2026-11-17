@@ -17,9 +17,9 @@ namespace OpenRigs.Video
 {
     /// <summary>
     /// A USB (DirectShow) camera plugged in for a while, such as a calibration's camera on the
-    /// balance (Pip, 10 Nov 2026): found as the one camera that is not the rig's own, streamed as
+    /// balance: found as the one camera that is not the rig's own, streamed as
     /// it comes, its exposure taken live while it streams, as TriggeredSpinnaker's is. Exposure is in
-    /// microseconds, as the rig cameras' is, one setting for one meaning (Pip): DirectShow takes
+    /// microseconds, as the rig cameras' is, one setting for one meaning: DirectShow takes
     /// only powers of two of a second, so the nearest is used. No gain: a USB camera's has no unit
     /// common to its models, and exposure is what makes a display readable.
     /// </summary>
@@ -94,7 +94,7 @@ namespace OpenRigs.Video
                         if (frame == null)
                         {
                             // A long exposure or its change can miss a frame (a rig's USB
-                            // camera at 1 s, 10 Nov 2026): unplugged only once none comes for longer.
+                            // camera at 1 s): unplugged only once none comes for longer.
                             if (since.Elapsed.TotalSeconds > NoFrameSeconds())
                                 throw new InvalidOperationException("The calibration camera stopped giving frames: was it unplugged?");
                             Thread.Sleep(10);  // not a busy loop if it answers null at once
@@ -153,8 +153,8 @@ namespace OpenRigs.Video
         }
 
         // The vendor ids of cameras that belong to rigs and are never a calibration camera: FLIR
-        // (Spinnaker) and Basler (the Zapit camera, which no rig.yml lists), as app-rig-control's
-        // still_camera.py has them.
+        // (Spinnaker) and Basler (the Zapit camera, which no rig.yml lists), as a controller's
+        // still camera has them.
         static readonly string[] RigVendors = { "vid_1e10", "vid_2676" };
 
         /// <summary>Whether a camera's device path is one of the rig's own: none, a rig vendor's, or carrying a rig.yml serial.</summary>

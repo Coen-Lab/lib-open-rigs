@@ -20,7 +20,7 @@ namespace OpenRigs.Devices.Tests
     /// subscribe the source again from there, which takes its connection lock. A subscription to the
     /// source from the workflow's own subscription at that moment takes the connection lock first and
     /// then waits for the replay lock: neither thread moves, the workflow never finishes starting, and
-    /// no error can stop it (a rig, 16 Nov 2026: two launches in ten, Bonsai left in Starting until
+    /// no error can stop it (on a rig, two launches in ten, Bonsai left in Starting until
     /// killed). ProjectorWindow, the window of ProjectorDisplay and RawProjectorDisplay, is therefore created only once the workflow has subscribed.
     /// </summary>
     [TestClass]

@@ -333,7 +333,7 @@ LIVE_VIEW = '<Expression xsi:type="lv:StreamDevices" xmlns:lv="clr-namespace:Ope
 
 
 def thin_entry(tmp_path: Path, rig_list: str, settings: str = "") -> lint.Workflow:
-    """The rule since 16 Nov 2026: one thin entry per rig kind (its rig list) over one shared include of the workflow's
+    """The rule: one thin entry per rig kind (its rig list) over one shared include of the workflow's
     own, which holds the job and the live view; the job's spouts, a file beside it, announce CalibrationReady."""
     own_file(tmp_path, "Extensions/Spouts.bonsai", CALIBRATION_READY, ANNOUNCED)
     own_file(tmp_path, "Extensions/Job.bonsai", include("Extensions\\Spouts.bonsai") + LIVE_VIEW)
@@ -732,7 +732,7 @@ def test_every_task_with_sound_has_the_lab_s_background_noise_once_after_its_tas
     rig = include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai")
     noise = include(lint.BACKGROUND_NOISE)
     assert lint.background_noise_problems(workflow(tmp_path, rig + task_files() + noise)) == []
-    # The noise is rig.yml's speakerArray.backgroundNoise (16 Nov 2026): a file named on the include, or a noise WAV kept in the task, is refused.
+    # The noise is rig.yml's speakerArray.backgroundNoise: a file named on the include, or a noise WAV kept in the task, is refused.
     own_file = workflow(tmp_path / "f", rig + task_files() + include(lint.BACKGROUND_NOISE, "<FileName>waveforms\\background_noise.wav</FileName>"))
     (tmp_path / "f" / "src" / "waveforms").mkdir()
     (tmp_path / "f" / "src" / "waveforms" / "Background_Noise.wav").write_bytes(b"RIFF")
@@ -830,7 +830,7 @@ def test_a_workflow_makes_the_experiment_folder_or_uses_no_experiment_folder_nev
         "the workflow includes ExperimentLogs 1 and NoExperimentFolder 1 times: one of the two once"]
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "d", "")) == [
         "the workflow includes ExperimentLogs 0 and NoExperimentFolder 0 times: one of the two once"]
-    # The QC workflows' stand-ins before 16 Nov 2026: a never-published PathPrefix, and a SubjectId in a file of their own.
+    # The QC workflows' old stand-ins: a never-published PathPrefix, and a SubjectId in a file of their own.
     path_prefix = '<Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:String"><rx:Name>PathPrefix</rx:Name></Expression>'
     own_file(tmp_path / "e", "Extensions/Spouts.bonsai", '<Expression xsi:type="rx:BehaviorSubject"><Name>SubjectId</Name></Expression>')
     spouts = workflow(tmp_path / "e", path_prefix + none + include(lint.LAUNCH_SETTINGS) + include("Extensions\\Spouts.bonsai"))
@@ -868,7 +868,7 @@ def test_a_board_not_named_main_is_filled_from_the_template_s_first_board(tmp_pa
 
 
 def test_each_clock_publishes_timestamp_from_its_fast_register():
-    # Every pulse width, wait and event time reads Timestamp: a 1 Hz heartbeat clock rounds them to whole seconds (16 Nov 2026).
+    # Every pulse width, wait and event time reads Timestamp: a 1 Hz heartbeat clock rounds them to whole seconds.
     def register_into_timestamp(resource: str) -> str:
         root = lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
         nodes = list(root.find(f"{lint.W}Workflow/{lint.W}Nodes") or [])

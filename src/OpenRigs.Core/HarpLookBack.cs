@@ -15,7 +15,7 @@ namespace OpenRigs.Core
     /// </summary>
     /// <remarks>
     /// A camera frame reaches its log about 75 ms after the board trigger it is stamped with
-    /// (rig test, 16 Nov 2026), so a Harp log that starts only when the experiment folder exists
+    /// (on a rig), so a Harp log that starts only when the experiment folder exists
     /// misses the triggers of the first frames. The window is in Harp time, not arrival time, so a
     /// slow or bursty thread cannot widen or narrow it.
     /// </remarks>

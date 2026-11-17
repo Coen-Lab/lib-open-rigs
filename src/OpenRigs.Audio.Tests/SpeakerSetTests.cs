@@ -97,7 +97,7 @@ namespace OpenRigs.Audio.Tests
             StringAssert.Contains(noise.Message, "rig.yml's speakerArray.backgroundNoise is a full path");
         }
 
-        // The lab's one background noise is rig.yml's speakerArray.backgroundNoise (16 Nov 2026), relative to rig.yml's
+        // The lab's one background noise is rig.yml's speakerArray.backgroundNoise, relative to rig.yml's
         // folder (../shared/sounds/background_noise.wav on a rig), read as stored; refused, naming the file, when rig.yml
         // names none, it is missing or it is at another rate.
         [TestMethod]

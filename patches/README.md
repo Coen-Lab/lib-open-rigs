@@ -34,4 +34,4 @@ When open-rigs releases every "Not reported" and issue row above, with the confi
 
 ## Proposed upstream
 
-`TriggeredSpinnaker` `PixelFormat`: withdrawn 15 Nov 2026; the lab adopted upstream's meaning (blank keeps the camera's stored format). Upstream's branch `triggered-spinnaker` (to 12 Nov 2026) carries the format (`518ca24`), the chunk copy inside the callback (`7a441c2`, ucl-open#67), the region reset after binning (`1d0b4a2`, ucl-open#66) and a start signal for the cameras (`6f81c6c`). Converging the two is open.
+`TriggeredSpinnaker` `PixelFormat`: withdrawn; the lab adopted upstream's meaning (blank keeps the camera's stored format). Upstream's branch `triggered-spinnaker` carries the format (`518ca24`), the chunk copy inside the callback (`7a441c2`, ucl-open#67), the region reset after binning (`1d0b4a2`, ucl-open#66) and a start signal for the cameras (`6f81c6c`). Converging the two is open.

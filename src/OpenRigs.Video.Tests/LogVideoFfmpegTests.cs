@@ -62,7 +62,7 @@ namespace OpenRigs.Video.Tests
 
         // The frames as OpenRigs.Devices' TriggeredSpinnaker include gives them, and so as every
         // workflow's LogVideo takes them: a dynamic type its ExpressionTransform makes, not a
-        // VideoDataFrame (the first rig run of LogVideoFfmpeg failed to build on this, 14 Nov 2026).
+        // VideoDataFrame (a rig run of LogVideoFfmpeg failed to build on this).
         const string SpinnakerHarness = @"<?xml version=""1.0"" encoding=""utf-8""?>
 <WorkflowBuilder Version=""2.9.0""
                  xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""

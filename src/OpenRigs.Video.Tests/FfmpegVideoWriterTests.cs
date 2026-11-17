@@ -240,7 +240,7 @@ namespace OpenRigs.Video.Tests
             Assert.AreEqual(121, File.ReadAllLines(recording.CsvFileName).Length);
         }
 
-        // ExperimentManifest's final write read every camera's CSV as open (16 Nov 2026): it was closed
+        // ExperimentManifest's final write read every camera's CSV as open: it was closed
         // after ffmpeg exited. A stand-in that reads its stdin to the end and then takes 3 s to exit
         // shows the CSV closed while it still runs: closed as the queue drained, not after ffmpeg.
         [TestMethod]
@@ -299,7 +299,7 @@ namespace OpenRigs.Video.Tests
             Assert.AreEqual(problem + Environment.NewLine, File.ReadAllText(recording.ErrorFileName));
         }
 
-        // CI (15 Nov 2026): on a loaded runner the kill came seconds late. The deadline and the
+        // On a loaded CI runner the kill came seconds late. The deadline and the
         // read of ffmpeg's output must not wait for a thread-pool thread. "was killed" is the proof:
         // a kill later than Finish's own limit (the stop timeout and a second) returns "did not
         // finish" instead. The clock's bound is looser than that limit, as the test above's is: at

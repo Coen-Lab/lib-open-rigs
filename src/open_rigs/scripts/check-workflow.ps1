@@ -347,7 +347,7 @@ else {
 "3. Building $Workflow with Bonsai's builders, against the filled template..."
 # The camera pieces load SpinnakerNET, which needs the Spinnaker SDK's native Spinnaker_v140.dll on PATH. The SDK
 # is a login-gated download, so a GitHub runner has none and main.bonsai cannot be read there ("There is an error in
-# XML document" at the camera include's first property; CI, 15 Nov 2026). Skipped only then; every rig and lab
+# XML document" at the camera include's first property; CI). Skipped only then; every rig and lab
 # machine with the SDK runs it, as update-workflows.ps1 does before each push.
 $spinnaker = @($env:Path -split ';' | Where-Object { $_ -and (Test-Path (Join-Path $_ 'Spinnaker_v140.dll')) })
 if (-not $spinnaker.Count) { "  SKIPPED: no Spinnaker SDK (Spinnaker_v140.dll on PATH), so $Workflow cannot be built here" }

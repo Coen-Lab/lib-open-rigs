@@ -1,8 +1,9 @@
 """lib-open-rigs holds nothing lab-only: no lab app, path or person in its files.
 
-The files listed below already named the lab when the rule began (v8), each with the number of its
-lines that do; cleaning them is separate work, and each count falls, and the file leaves the list, as it
-is cleaned. A listed file may not gain a line. Every other tracked text file names the lab on none.
+The files listed below name the lab on purpose, each with the number of its lines that do: the fork's own notice,
+each package's lab version (0.1.1-coen-lab.N) and the build rule that keeps it, and the version 3 manifest fixtures,
+real records that readers still test on. A listed file may not gain a line. Every other tracked text file names the
+lab on none.
 """
 
 import re
@@ -20,11 +21,9 @@ LAB_ONLY = re.compile(
     r"|\b[A-Z]+-(?:OPTO|DOME|BBOX)\b|\bBBOX-?\d|(?i:\bdomes?\b)"
 )
 
-NAMED_THE_LAB_BEFORE_THE_RULE = {
+NAMES_THE_LAB = {
     "README.md": 1,
     "build/Common.csproj.targets": 2,
-    "docs/bonsai-operators/OpenRigs.Logging/log-events.md": 1,
-    "docs/bonsai-operators/OpenRigs.Logging/log-trials.md": 3,
     "fixtures/manifest/v3/completed.json": 10,
     "fixtures/manifest/v3/ended-early.json": 10,
     "fixtures/manifest/v3/no-controller.json": 9,
@@ -34,37 +33,18 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "fixtures/manifest/v3/running.json": 9,
     "fixtures/manifest/v3/stopped-not-final.json": 10,
     "patches/README.md": 1,
-    "src/OpenRigs.Control.Tests/Program.cs": 3,
-    "src/OpenRigs.Control/ControlServer.cs": 3,
     "src/OpenRigs.Control/OpenRigs.Control.csproj": 1,
-    "src/OpenRigs.Control/README.md": 7,
     "src/OpenRigs.Audio/OpenRigs.Audio.csproj": 1,
     "src/OpenRigs.Core/OpenRigs.Core.csproj": 1,
     "src/OpenRigs.Devices/OpenRigs.Devices.csproj": 1,
-    "src/OpenRigs.HarpDevices.Tests/Program.cs": 2,
     "src/OpenRigs.HarpDevices/OpenRigs.HarpDevices.csproj": 1,
-    "src/OpenRigs.HarpDevices/README.md": 7,
-    "src/OpenRigs.HarpDevices/UsbSerials.cs": 3,
-    "src/OpenRigs.LiveView.Tests/Program.cs": 2,
-    "src/OpenRigs.LiveView/LiveViewPlan.cs": 1,
     "src/OpenRigs.LiveView/OpenRigs.LiveView.csproj": 1,
-    "src/OpenRigs.LiveView/README.md": 8,
-    "src/OpenRigs.LiveView/Templates/StreamController.xml": 1,
-    "src/OpenRigs.Logging/CsvWriter.cs": 1,
     "src/OpenRigs.Logging/OpenRigs.Logging.csproj": 1,
-    "src/OpenRigs.Manifest.Tests/Program.cs": 10,
-    "src/OpenRigs.Manifest/ExpectedFiles.cs": 1,
-    "src/OpenRigs.Manifest/FORMAT.md": 3,
-    "src/OpenRigs.Manifest/ManifestRecorder.cs": 3,
-    "src/OpenRigs.Manifest/ManifestWriter.cs": 3,
     "src/OpenRigs.Manifest/OpenRigs.Manifest.csproj": 1,
-    "src/OpenRigs.Manifest/README.md": 8,
     "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj": 1,
+    "src/OpenRigs.Trials/OpenRigs.Trials.csproj": 1,
     "src/OpenRigs.Video/OpenRigs.Video.csproj": 1,
-    "src/OpenRigs.Video/UsbCamera.cs": 3,
     "src/OpenRigs.Vision/OpenRigs.Vision.csproj": 1,  # the lab's package version, as every lab package's
-    "src/Shared/GroupNode.cs": 1,
-    "src/Shared/Json.cs": 1,
 }
 
 
@@ -82,14 +62,14 @@ def test_no_file_names_the_lab_on_more_lines_than_listed():
         if b"\0" in data:
             continue  # binary
         hits = lab_text(data.decode("utf-8", errors="replace"))
-        allowed = NAMED_THE_LAB_BEFORE_THE_RULE.get(name, 0)
+        allowed = NAMES_THE_LAB.get(name, 0)
         if len(hits) != allowed:
             found.append(f"{name}: {len(hits)} lab line(s), {allowed} listed:\n  " + "\n  ".join(hits))
     assert not found, "lab-only text in lib-open-rigs (a lower count is cleaning: lower the listed number):\n" + "\n".join(found)
 
 
 def test_listed_files_are_still_there():
-    missing = [name for name in NAMED_THE_LAB_BEFORE_THE_RULE if not (ROOT / name).is_file()]
+    missing = [name for name in NAMES_THE_LAB if not (ROOT / name).is_file()]
     assert not missing, f"take these off the list: {missing}"
 
 

@@ -23,7 +23,7 @@ namespace OpenRigs.Logging
             var formatted = parsed.ToString(Formatting.Indented);
             writer.WriteLine(formatted);
             // Flushed at once: a settings file is one write, and a workflow that ends right after it must not lose it
-            // (an empty Settings file on CI, 15 Nov 2026, when the write was still buffered at exit).
+            // (an empty Settings file on CI, when the write was still buffered at exit).
             writer.Flush();
         }
     }

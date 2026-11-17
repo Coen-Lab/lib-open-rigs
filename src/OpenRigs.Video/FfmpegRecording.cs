@@ -149,7 +149,7 @@ namespace OpenRigs.Video
         {
             End();
             // Once the deadline has killed ffmpeg the writer only has to see it exit: up to 5 s more for that, as
-            // a loaded CI runner took over a second (15 Nov 2026), and the report then says it was killed.
+            // a loaded CI runner took over a second, and the report then says it was killed.
             if (!done.Wait(stopTimeout + TimeSpan.FromSeconds(1)) && !(DeadlinePassed && done.Wait(TimeSpan.FromSeconds(5))))
             {
                 return "The recording of " + fileName + " did not finish within " + stopTimeout.TotalSeconds + " s of its end.";
@@ -169,7 +169,7 @@ namespace OpenRigs.Video
                 if (ending) return;
                 ending = true;
                 // The file must close by then, or ffmpeg is killed so the writer can end. A thread of its
-                // own, not a timer: a busy thread pool ran a timer's kill seconds late (CI, 15 Nov 2026).
+                // own, not a timer: a busy thread pool ran a timer's kill seconds late (CI).
                 deadline = new Thread(() => { if (!done.Wait(stopTimeout)) Expire(); }) { IsBackground = true, Name = "ffmpeg deadline " + Path.GetFileName(fileName) };
                 deadline.Start();
             }
@@ -219,7 +219,7 @@ namespace OpenRigs.Video
                 }
                 // Every row is written and flushed once the queue has drained: the CSV is closed now,
                 // not after ffmpeg exits, since ExperimentManifest's final write, which does not wait
-                // for ffmpeg, reads a file still open as closed: false (16 Nov 2026).
+                // for ffmpeg, reads a file still open as closed: false.
                 CloseCsv();
                 Close();
             }

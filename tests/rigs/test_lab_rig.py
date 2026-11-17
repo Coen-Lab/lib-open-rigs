@@ -61,7 +61,7 @@ def test_a_value_left_as_change_me_is_refused_by_its_key():
 
 
 def test_the_background_noise_is_a_rig_file_the_speaker_array_names():
-    # The lab's one noise (16 Nov 2026): RigConfigs\shared beside the rig's folder, listed with the rig's other files.
+    # The lab's one noise: RigConfigs\shared beside the rig's folder, listed with the rig's other files.
     from open_rigs.core.artefacts import rig_artefacts
 
     rig = copy.deepcopy(RIG)

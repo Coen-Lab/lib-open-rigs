@@ -8,14 +8,14 @@ using OpenRigs.LiveView;
 // be tested without Bonsai.Harp or OpenCV.Net installed.
 namespace Bonsai.Harp { public class HarpMessage { } }
 namespace OpenCV.Net { public class IplImage { } }
-// OpenRigs.Logging's LoggedRows (0.1.0-bbox.5 on), found by full name among the loaded assemblies.
+// OpenRigs.Logging's LoggedRows, found by full name among the loaded assemblies.
 namespace OpenRigs.Logging { public class LoggedRows { } }
 
 // Decides StreamDevices' plan from a rig.yml in a temporary folder, without Bonsai's editor or
 // hardware: exit 0 when every check passes. dotnet run --project src\OpenRigs.LiveView.Tests
 namespace OpenRigs.LiveView.Tests
 {
-    // A camera's frame paired with its trigger, as coen-behaviour-box publishes Camera-Overhead.Data.
+    // A camera's frame paired with its trigger, as a task publishes Camera-Overhead.Data.
     public class Paired { public Frame Value { get; set; } public long Trigger { get; set; } }
     public class Frame { public OpenCV.Net.IplImage Image { get; set; } }
 
@@ -93,7 +93,7 @@ namespace OpenRigs.LiveView.Tests
                 // HarpRig.NotHarp's rule, as RecordHarpDevices records and the manifest expects.
                 var idle = Plan(root, "behaviorBoard:\n  idle:\n    portName: null\n", name => name == "BehaviorBoard-Idle.Data" ? typeof(Bonsai.Harp.HarpMessage) : null);
                 Check("a board with portName: null is not streamed, though its data is HarpMessage", !idle.Streamed.Any() && idle.Skipped.Any(s => s.StartsWith("BehaviorBoard-Idle: it has no portName")), string.Join(" | ", idle.Skipped));
-                // Pip, 11 Nov 2026: the Lickety Splits and stepper drivers drawn under the board.
+                // The Lickety Splits and stepper drivers drawn under the board.
                 var harp = Plan(root, "licketySplit:\n  left:\n    portName: COM15\n  right:\n    portName: null\n" +
                                       "stepperDriver:\n  a:\n    portName: COM14\n",
                     name => name.EndsWith(".Data") ? typeof(Bonsai.Harp.HarpMessage) : null);

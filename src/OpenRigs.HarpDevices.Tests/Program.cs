@@ -46,7 +46,7 @@ namespace OpenRigs.HarpDevices.Tests
             return HarpMessage.FromByte(address, MessageType.Read, value);
         }
 
-        // What a rig's Behavior board reported on 2 Nov 2026: WhoAmI 1216, hardware 1.2,
+        // What a rig's Behavior board reported: WhoAmI 1216, hardware 1.2,
         // core 1.11, firmware 3.1, Harp serial unset (65535), and no unique id (core before 1.12).
         static IEnumerable<HarpMessage> Board(int whoAmI)
         {
@@ -80,7 +80,7 @@ namespace OpenRigs.HarpDevices.Tests
             };
         }
 
-        // The dump as a rig's board sent it on 2 Nov 2026 (ses-909's .bin): each core register
+        // The dump as a rig's board sent it (an experiment's .bin): each core register
         // followed by the device's own at 32 on, so the device name, Harp serial and unique id
         // come after FirmwareVersionLow (7). Here with a unique id, as a core from 1.12 has.
         static IEnumerable<HarpMessage> Interleaved(int whoAmI)
@@ -113,7 +113,7 @@ namespace OpenRigs.HarpDevices.Tests
             Directory.CreateDirectory(root);
             try
             {
-                Console.WriteLine("USB serials, as app-rig-setup's scan reads them:");
+                Console.WriteLine("USB serials, as a machine scan reads them:");
                 Check("an FTDI chip's is its parent's id's last part", UsbSerials.FromIds(@"FTDIBUS\VID_0403+PID_6001+AB0M7PLBA\0000", @"USB\VID_0403&PID_6001\AB0M7PLB") == "AB0M7PLB", "wrong");
                 Check("a Pico's, a composite device's interface, is its parent's", UsbSerials.FromIds(@"USB\VID_2E8A&PID_000A&MI_00\6&2B157701&0&0000", @"USB\VID_2E8A&PID_000A\E664C856C3913E37") == "E664C856C3913E37", "wrong");
                 Check("a plain USB device's is its own", UsbSerials.FromIds(@"USB\VID_1234&PID_0001\SER123", @"USB\ROOT_HUB30\4&1&0&0") == "SER123", "wrong");
@@ -256,7 +256,7 @@ namespace OpenRigs.HarpDevices.Tests
                     }
                 }
                 {
-                    // 0.1.0-local.3: a board that reported no WhoAmI still leaves the map the manifest
+                    // A board that reported no WhoAmI still leaves the map the manifest
                     // expects for its kind (the experiment was held back every night).
                     var messages = new Subject<HarpMessage>();
                     var path = new Subject<string>();
@@ -455,8 +455,8 @@ namespace OpenRigs.HarpDevices.Tests
                     var rebuilt = Error(() => builder.Workflow.Build());
                     Check("... and the reloaded workflow builds", rebuilt == null, rebuilt);
 
-                    // A workflow property mapped onto it, as coen-behaviour-box's ConfigRoot: Bonsai's build
-                    // refused one while the generated inner workflow externalized nothing (3 Nov 2026).
+                    // A workflow property mapped onto it, as a task maps its ConfigRoot: Bonsai's build
+                    // refuses one unless the generated inner workflow externalizes it.
                     var mappedXml = xml.Replace("</Nodes><Edges /></Workflow>\n</WorkflowBuilder>",
                         "<Expression xsi:type=\"ExternalizedMapping\"><Property Name=\"ConfigRoot\" /></Expression>" +
                         "</Nodes><Edges><Edge From=\"4\" To=\"2\" Label=\"Source1\" /></Edges></Workflow>\n</WorkflowBuilder>");

@@ -85,7 +85,7 @@ namespace OpenRigs.Control.Tests
                 Check("a parameter without limits takes any text", Ok(Ask(socket, new { cmd = "set", name = "Note", value = "left eye shut" })), "refused");
                 Check("an undeclared parameter is refused", !Ok(Ask(socket, new { cmd = "set", name = "Nope", value = "1" })), "taken");
 
-                // 0.1.0-local.10: a set is an event, for settings the hardware takes live while ready.
+                // A set is an event, for settings the hardware takes live while ready.
                 Console.WriteLine("Live parameters before Go:");
                 Thread.Sleep(200);
                 ControlEvent[] sets;
@@ -110,21 +110,21 @@ namespace OpenRigs.Control.Tests
                 Console.WriteLine("Go:");
                 Check("Go is refused before Ready", !Ok(Ask(socket, new { cmd = "go" })), "taken");
                 state.SetPhase(ExperimentPhase.Ready);
-                // 0.1.0-local.11: a value taken before the workflow learned the limit is refused at Go, not recorded.
+                // A value taken before the workflow learned the limit is refused at Go, not recorded.
                 Check("a set within the limit as it stands is taken", Ok(Ask(socket, new { cmd = "set", name = "RewardUl", value = "4" })), "refused");
                 new ParameterMaximum { Name = "RewardUl" }.Process(Observable.Return(3.0)).Wait();
                 var stale = Ask(socket, new { cmd = "go" });
                 Check("Go is refused while a value is above a maximum learned after it, naming it", !Ok(stale) && ((string)stale["why"]).Contains("RewardUl must be") && ((string)stale["why"]).Contains("from 0 to 3") && ((string)stale["why"]).Contains("'4' is not"), stale.ToString());
                 Check("... and not requested", !state.GoRequested, "requested");
-                // A parameter with limits that nothing has set (coen-behaviour-box's ExposureTime until rig.yml fills it) does not block Go.
+                // A parameter with limits that nothing has set (a value rig.yml fills in later) does not block Go.
                 state.Parameters.Add(new Parameter { Name = "Blank", Value = "", Description = "", Minimum = 1, Maximum = 2 });
                 Check("an empty value is refused as a set", new Parameter { Name = "Blank", Minimum = 1, Maximum = 2 }.Refusal("") != null, "taken");
                 Check("set again within it, Go goes on", Ok(Ask(socket, new { cmd = "set", name = "RewardUl", value = "2" })), "refused");
-                Check("Go is taken once Ready", Ok(Ask(socket, new { cmd = "go", by = new { id = "JoB", name = "Jo Bloggs" }, launched_by = new { id = "PipC", name = "Pip Coen" } })), "refused");
-                // 0.1.0-local.9: who launched and released the experiment, for the manifest.
-                Check("Go keeps who launched the experiment and who sent it", state.LaunchedBy?.ToString() == "Pip Coen (PipC)" && state.GoBy?.ToString() == "Jo Bloggs (JoB)", state.LaunchedBy + " / " + state.GoBy);
+                Check("Go is taken once Ready", Ok(Ask(socket, new { cmd = "go", by = new { id = "JoB", name = "Jo Bloggs" }, launched_by = new { id = "AnnO", name = "Ann Other" } })), "refused");
+                // Who launched and released the experiment, for the manifest.
+                Check("Go keeps who launched the experiment and who sent it", state.LaunchedBy?.ToString() == "Ann Other (AnnO)" && state.GoBy?.ToString() == "Jo Bloggs (JoB)", state.LaunchedBy + " / " + state.GoBy);
                 var named = Ask(socket, new { cmd = "status" });
-                Check("status names them", (string)named["launched_by"]["id"] == "PipC" && (string)named["go_by"]["name"] == "Jo Bloggs" && named["stopped_by"].Type == JTokenType.Null, named.ToString());
+                Check("status names them", (string)named["launched_by"]["id"] == "AnnO" && (string)named["go_by"]["name"] == "Jo Bloggs" && named["stopped_by"].Type == JTokenType.Null, named.ToString());
                 Check("... and only once", !Ok(Ask(socket, new { cmd = "go" })), "taken twice");
                 Check("parameters cannot change after Go", !Ok(Ask(socket, new { cmd = "set", name = "Note", value = "x" })), "taken");
                 Thread.Sleep(200);
@@ -134,7 +134,7 @@ namespace OpenRigs.Control.Tests
                 Check("ControlState.Go is that event", state.Go == go, "differs");
                 var settings = ExperimentSettings.Settings(go, state, new JObject { ["workflow"] = "src/main.bonsai", ["commit"] = "abc123" });
                 Check("ExperimentSettings has the subject, session, rig and workflow", (string)settings["subject_id"] == "TC002" && (string)settings["session_id"] == "003B1" && (string)settings["rig"] == Environment.MachineName && (string)settings["workflow"] == "src/main.bonsai" && (string)settings["commit"] == "abc123", settings.ToString());
-                Check("... who launched it and sent Go, and when", (string)settings["launched_by"]["id"] == "PipC" && (string)settings["go_by"]["name"] == "Jo Bloggs" && ((string)settings["go"]).EndsWith("Z"), settings.ToString());
+                Check("... who launched it and sent Go, and when", (string)settings["launched_by"]["id"] == "AnnO" && (string)settings["go_by"]["name"] == "Jo Bloggs" && ((string)settings["go"]).EndsWith("Z"), settings.ToString());
                 Check("... and every parameter at Go, in order", string.Join(",", ((JObject)settings["parameters"]).Properties().Select(p => p.Name + "=" + p.Value)) == "RunLengthMinutes=45,RewardUl=2,Note=left eye shut,Blank=", settings["parameters"].ToString());
                 var written = new ExperimentSettings().Process(new[] { go }.ToObservable()).ToList().Wait();
                 Check("ExperimentSettings gives one JSON text for the Go event, with the repository read at Start", written.Count == 1 && JObject.Parse(written[0])["parameters"]["RunLengthMinutes"].ToString() == "45" && JObject.Parse(written[0]).Property("commit") != null, string.Join(" | ", written));
@@ -155,7 +155,7 @@ namespace OpenRigs.Control.Tests
                 var status = Ask(socket, new { cmd = "status" });
                 Check("status reports the phase, which only moves forward", (string)status["phase"] == "Recording", (string)status["phase"]);
                 Check("a metric is reported in the invariant culture, whatever the rig's", (string)status["metrics"]["water_ml"] == "0.25", status["metrics"]?.ToString());
-                // Before 0.1.0-local.13 the second frame was left unread, the reply threw and the experiment ended.
+                // A second frame left unread made the reply throw, which ended the experiment.
                 socket.SendMoreFrame("{\"cmd\": \"status\"}").SendFrame("{\"cmd\": \"status\"}");
                 string twoFrames;
                 var gotTwoFrames = socket.TryReceiveFrameString(TimeSpan.FromSeconds(5), out twoFrames);
@@ -168,7 +168,7 @@ namespace OpenRigs.Control.Tests
                 stoppedAt.WaitOne(5000);
                 Check("... then ends the sequence with ExperimentStoppedException", ended is ExperimentStoppedException, ended == null ? "no error" : ended.GetType().Name);
                 while (ControlState.Current != null && watch.ElapsedMilliseconds < 5000) Thread.Sleep(5);
-                // Before 0.1.0-local.7 the server joined its own thread here and waited out the 2 s timeout.
+                // The server must not join its own thread here, which waited out the 2 s timeout.
                 Check("... and the server is gone within a second, not after a 2 s wait on itself", watch.ElapsedMilliseconds < 1000, watch.ElapsedMilliseconds + " ms");
                 Check("the stop's reason is kept", state.StopReason == "mouse unwell", state.StopReason);
                 Check("... and who sent it, a name alone taken as a name", state.StoppedBy?.Name == "Jo Bloggs" && state.StoppedBy.Id == "", state.StoppedBy?.ToString());
@@ -176,7 +176,7 @@ namespace OpenRigs.Control.Tests
 
             Console.WriteLine("A controller that names nobody:");
             Check("no field, a JSON null, an empty object or a list is nobody", new JToken[] { null, JValue.CreateNull(), new JObject(), new JArray("x"), new JObject { ["id"] = new JObject() } }.All(t => Person.From(t) == null), "a person");
-            Check("an ID alone is kept", Person.From(new JObject { ["id"] = "PipC" })?.Id == "PipC", "lost");
+            Check("an ID alone is kept", Person.From(new JObject { ["id"] = "AnnO" })?.Id == "AnnO", "lost");
             subscription.Dispose();
 
             Console.WriteLine("Work downstream of Go or a command:");

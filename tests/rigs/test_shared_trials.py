@@ -78,7 +78,7 @@ def test_a_task_without_quiet_waits_or_optogenetics_is_checked_by_the_core(tmp_p
 
 
 def test_a_file_without_outcomeTime_is_one_problem_not_a_crash(tmp_path):
-    # Files from before 14 Nov 2026 have no outcomeTime; they are restructured, not read as they are.
+    # Files with no outcomeTime are restructured, not read as they are.
     trials = _chain(4)
     s = summarise(_experiment(tmp_path, trials, [], columns=[c for c in COLUMNS if c != "outcomeTime"]))
     assert s.problems == ["WorkflowData_Trials has no outcomeTime column"]

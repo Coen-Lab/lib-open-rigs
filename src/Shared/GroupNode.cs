@@ -91,7 +91,7 @@ namespace OpenRigs.Shared
         /// property can be mapped onto the group (--property:ConfigRoot reaching every node that reads
         /// rig.yml). Bonsai's build looks a mapping onto a group up among its inner workflow's
         /// externalized properties, and a generated workflow had none: "The specified property
-        /// 'ConfigRoot' was not found in the nested workflow" (coen-behaviour-box, 3 Nov 2026). Added
+        /// 'ConfigRoot' was not found in the nested workflow". Added
         /// once, beside the settings; the group's Generate keeps it.
         /// </summary>
         public static void Externalize(ExpressionBuilderGraph workflow, ExpressionBuilder settings, params string[] names)

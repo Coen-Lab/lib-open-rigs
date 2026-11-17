@@ -128,7 +128,7 @@ namespace OpenRigs.Devices.Tests
 
         // A workflow on a rig list (a thin entry per rig kind) gives the rig list its own stages, which the rig list
         // passes to its ReadyGate's watchdog, so Ready waits for them too: built as a rig builds it. Without the
-        // <WorkflowStages /> written on the rig list's ReadyGate node, Bonsai 2.9 dropped the value silently (16 Nov 2026).
+        // <WorkflowStages /> written on the rig list's ReadyGate node, Bonsai 2.9 dropped the value silently.
         [DataTestMethod]
         [DataRow("DomeHardware")]
         [DataRow("BBoxHardware")]

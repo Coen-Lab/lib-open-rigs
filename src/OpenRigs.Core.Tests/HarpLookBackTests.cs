@@ -13,7 +13,7 @@ namespace OpenRigs.Core.Tests
         static HarpMessage At(double seconds) => HarpMessage.FromByte(44, seconds, MessageType.Event, 1);
 
         // (Harp times are in 32 us ticks.) 3 s of 1 kHz messages before the start: only the last 0.5 s (by Harp time) come out, then every
-        // later one (rig test, 16 Nov 2026: a camera frame's trigger is ~75 ms older than the frame).
+        // later one (on a rig, a camera frame's trigger is ~75 ms older than the frame).
         [TestMethod]
         public void HeldMessages_AreTheLastLookBackSecondsByHarpTime_ThenLive()
         {

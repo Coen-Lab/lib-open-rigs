@@ -25,7 +25,7 @@ def test_no_lab_workflow_maps_a_property_from_a_shared_source():
 
 
 def test_a_mapping_whose_source_also_feeds_another_node_is_refused():
-    # SpinnakerCamera before 16 Nov 2026: the camera's subject fed its Zip and the Stage mapping, so AnnounceStage
+    # As SpinnakerCamera once was: the camera's subject fed its Zip and the Stage mapping, so AnnounceStage
     # read its Stage before the value came ("AnnounceStage has no Stage to announce").
     assert problems(SOURCE + MAPPING + ANNOUNCE + ZIP, [(0, 1, "Source1"), (1, 2, "Source2"), (0, 3, "Source1")]) == [
         "the PropertyMapping of Stage onto AnnounceStage shares its source (SubscribeSubject Camera-Face) with another node: give it its own"]

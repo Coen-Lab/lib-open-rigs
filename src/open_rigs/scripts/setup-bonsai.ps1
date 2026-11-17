@@ -26,7 +26,7 @@ if (!(Test-Path "./Bonsai.exe")) {
     Remove-Item -Path "temp.zip"
 }
 # The workflow's layout (config\main.layout), when it has one, into the editor's per-machine file. A rig's setup
-# runs this again when the layout changes (3 Nov 2026: a node added in front of Hardware moved its window index). A
+# runs this again when the layout changes (a node added in front of Hardware moved its window index). A
 # different one already here is kept beside it as main.saved.layout.
 $layout = ".\Settings\src\main.layout"
 $tracked = "..\config\main.layout"
@@ -40,7 +40,7 @@ if (Test-Path $tracked) {
 & .\Bonsai.exe --no-editor
 $restoreExit = $LASTEXITCODE
 # After a good restore, each package folder Bonsai.config no longer names goes: the restore adds a folder per version
-# and never removes one, so every package bump left the old one behind (15 Nov 2026: one rig held three old versions
+# and never removes one, so every package bump left the old one behind (one rig held three old versions
 # beside the current ones). Bonsai loads from the AssemblyLocation paths only, so none was in use. A
 # folder keeps the package's own version, which NuGet may have normalised in Bonsai.config (openal.redist.2.0.7.0 for
 # 2.0.7), so trailing .0 parts are not compared. A folder not named <id>.<version> is left alone.

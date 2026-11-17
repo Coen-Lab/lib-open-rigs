@@ -107,7 +107,7 @@ namespace OpenRigs.Control
 
     /// <summary>
     /// A person a controller names on a request: who launched the experiment, sent Go or stopped it.
-    /// The controller vouches for them (app-rig-control checks a PIN first); the workflow only records.
+    /// The controller vouches for them (its rig agent checks a PIN first); the workflow only records.
     /// </summary>
     public class Person
     {
@@ -272,8 +272,8 @@ namespace OpenRigs.Control
         public Person StoppedBy { get; internal set; }
 
         /// <summary>When the workflow reported Finished; null if it never did. Kept because the
-        /// phase moves on to Stopping when the controller stops a finished experiment, as app-rig-control
-        /// does after every run, and a run that finished is still one that finished.</summary>
+        /// phase moves on to Stopping when the controller stops a finished experiment, as a controller
+        /// may after every run, and a run that finished is still one that finished.</summary>
         public DateTime? FinishedAt { get; private set; }
 
         // The pieces' declarations (DeclareControls) subscribed in this process, and the lock that
@@ -707,8 +707,7 @@ namespace OpenRigs.Control
                         if (state.GoRequested) return "Go has already been requested";
                         foreach (var p in state.Parameters)
                         {
-                            // An empty value is one nothing set (coen-behaviour-box's ExposureTime and
-                            // Gain until rig.yml fills them): the workflow's own default, as before.
+                            // An empty value is one nothing set: the workflow's own default.
                             if (string.IsNullOrEmpty(p.Value)) continue;
                             outOfRange = p.Refusal(p.Value);
                             if (outOfRange != null) return outOfRange + "; set it again";
@@ -762,7 +761,7 @@ namespace OpenRigs.Control
                 case "stop":
                 {
                     var why = (string)request["why"] ?? "stopped by the controller";
-                    // The person first: the Manifest's stop poll (local.14) fires on StopReason and
+                    // The person first: the Manifest's stop poll fires on StopReason and
                     // then reads StoppedBy, so the other order could write the stop without them.
                     state.StoppedBy = Person.From(request["by"]);
                     state.StopReason = why;

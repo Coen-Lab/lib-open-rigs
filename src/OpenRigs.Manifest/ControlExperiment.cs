@@ -16,7 +16,7 @@ namespace OpenRigs.Manifest
         /// <summary>The ControlState members read here, for the test to check against OpenRigs.Control.</summary>
         internal static readonly string[] StateMembers = { "Current", "SubjectId", "SessionId", "Go", "StopReason", "FinishedAt", "LaunchedBy", "GoBy", "StoppedBy" };
 
-        /// <summary>The Person members read here (OpenRigs.Control 0.1.0-local.9).</summary>
+        /// <summary>The Person members read here (OpenRigs.Control's).</summary>
         internal static readonly string[] PersonMembers = { "Id", "Name" };
 
         /// <summary>The ControlEvent members of the Go event read here.</summary>
@@ -54,7 +54,7 @@ namespace OpenRigs.Manifest
         public DateTime? FinishedAt { get { return Read(state, "FinishedAt") as DateTime?; } }
 
         /// <summary>Who the controller said launched the experiment, as (ID, name); null if it named
-        /// nobody, or OpenRigs.Control is older than 0.1.0-local.9.</summary>
+        /// nobody.</summary>
         public KeyValuePair<string, string>? LaunchedBy { get { return Person("LaunchedBy"); } }
 
         /// <summary>Who the controller said sent Go, as (ID, name); null if it named nobody.</summary>
