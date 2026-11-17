@@ -41,6 +41,11 @@ class CameraTriggerController(BaseSchema):
         examples=["50"],
         description="The frequency, in Hz, at which to emit camera triggers on Trigger1 (DO1, CameraOutput1). Only matters when trigger 1 is enabled.",
     )
+    camera_count: int = Field(
+        default=0,
+        ge=0,
+        description="The number of triggered cameras that must report ready before the triggers start. Zero starts the triggers without waiting.",
+    )
 
 
 class FixedPulse(DiscriminatorTypeMixin, BaseSchema):

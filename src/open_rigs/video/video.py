@@ -22,6 +22,10 @@ class SpinnakerCamera(DiscriminatorTypeMixin, BaseSchema):
     serial_number: str | None = Field(default="00000", description="The serial number of the camera.")
     gain: float = Field(default=1, ge=0, description="The camera gain.")
     binning: int = Field(default=1, ge=1, description="The binning setting for the camera.")
+    pixel_format: str = Field(
+        default="Mono8",
+        description="The Spinnaker pixel format set before acquisition starts (e.g. Mono8, Mono16). Empty keeps the camera's current format.",
+    )
 
 
 class Camera(

@@ -20,3 +20,14 @@ def test_flags_serialise_in_camel_case():
     assert data["trigger0Enabled"] is True
     assert data["trigger1Enabled"] is True
     assert data["trigger0Frequency"] == 30
+
+
+def test_camera_count_defaults_to_no_wait():
+    controller = CameraTriggerController(trigger0_frequency=50, trigger1_frequency=50)
+    assert controller.camera_count == 0
+    assert CameraTriggerController(trigger0_frequency=50, trigger1_frequency=50, camera_count=3).model_dump(by_alias=True)["cameraCount"] == 3
+
+
+def test_camera_count_cannot_be_negative():
+    with pytest.raises(ValidationError):
+        CameraTriggerController(trigger0_frequency=50, trigger1_frequency=50, camera_count=-1)

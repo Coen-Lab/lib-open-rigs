@@ -23,13 +23,24 @@ namespace OpenRigs.Video
     public struct VideoChunkData
     {
         public VideoChunkData(long frameID, long timestamp)
+            : this(frameID, timestamp, double.NaN, double.NaN)
+        {
+        }
+
+        public VideoChunkData(long frameID, long timestamp, double exposureTime, double gain)
         {
             FrameID = frameID;
             Timestamp = timestamp;
+            ExposureTime = exposureTime;
+            Gain = gain;
         }
 
         public long FrameID { get; }
 
         public long Timestamp { get; }
+
+        public double ExposureTime { get; }
+
+        public double Gain { get; }
     }
 }

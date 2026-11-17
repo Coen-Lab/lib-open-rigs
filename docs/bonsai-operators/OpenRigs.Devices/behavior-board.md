@@ -18,7 +18,7 @@ The Behavior Board (`who_am_i = 1216`) is a Harp board commonly used as an I/O h
 Sub-modules:
 
 - `PulseController`: `output_pulse_enable` (the `DO1`/`DO2`/`DO3` lines enabled) and `outputs`, one entry per line saying what drives its pulse width: a `FixedPulse` with `pulse_width_ms` set in the rig configuration, or a `CalibratedPulse` naming the calibration curve that converts a requested quantity, such as a reward volume, to a width at run time. All three lines are listed; an unused line is a `FixedPulse` of width 0.
-- `CameraTriggerController`: `trigger0_frequency` and `trigger1_frequency` (Hz) for `CameraOutput0` and `CameraOutput1`.
+- `CameraTriggerController`: `trigger0_frequency` and `trigger1_frequency` (Hz) for `CameraOutput0` and `CameraOutput1`, and `camera_count`, the number of triggered cameras the triggers wait for (see [Start order](triggered-spinnaker.md#start-order)).
 - `RunningWheel`: `counts_per_rev` and `wheel_diameter_mm`.
 
 ### Configuration example
@@ -92,6 +92,8 @@ Both subject names are externalized, so a rig can rename them to match its own.
 :::
 
 Emits camera trigger pulses on `CameraOutput0` and `CameraOutput1` at the configured frequencies. Pair with a triggered camera module (such as [Triggered Spinnaker](triggered-spinnaker.md)) to align video to the Harp clock.
+
+A `StartCameras` request is held until `CameraCount` cameras have reported on the shared `CameraReady` subject, then sent 0.1 s later. If they have not all reported within `CameraReadyTimeout` (30 s by default), the workflow stops with an error naming how many did. A `CameraCount` of zero starts the triggers without waiting.
 
 ### RunningWheel
 

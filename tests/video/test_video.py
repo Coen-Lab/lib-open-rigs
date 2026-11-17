@@ -50,3 +50,10 @@ def test_camera_discriminator(klass: type[CameraRig], parameter: Dict[str, Camer
 def test_camera_exclusion(klass: type[CameraRig], parameter: Dict[str, Camera], expected: type):
     with pytest.raises(expected):
         klass(root_path="", cameras=parameter)
+
+
+def test_spinnaker_pixel_format_round_trip():
+    inst = CameraRig(root_path="", cameras={"spinnaker": SpinnakerCamera.model_validate({"pixel_format": "Mono16"})})
+    deserialized = CameraRig.model_validate_json(inst.model_dump_json())
+    assert SpinnakerCamera().pixel_format == "Mono8"
+    assert deserialized.cameras["spinnaker"].root.pixel_format == "Mono16"
