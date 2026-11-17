@@ -181,7 +181,7 @@ GO_NO_GO = ("Go", "NoGo", "NoReward")  # a go/no-go task's targets: one spout by
 def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
     """Performance and the response rate of trial rows (text or typed cells), each NaN with no trial to count.
 
-    Performance is Correct / (Correct + Incorrect) over the trials both spouts were offered (bothSpouts, True where the
+    Performance is Correct / (Correct + Incorrect) over the trials both spouts were offered (bothSpoutsOffered, True where the
     task does not record it) and every go/no-go trial (target Go or NoGo; one spout by design), a Go trial with no lick
     (NoResponse) counted Incorrect. The response rate is the share of trials the mouse responded to: in a go/no-go task
     (a target Go, NoGo or NoReward) the Go trials it licked on, as withholding is a NoGo's answer; else the trials not
@@ -193,7 +193,7 @@ def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
     for r in rows:
         target, outcome = str(r.get("target")), r["outcome"]
         go_miss = target == "Go" and outcome == "NoResponse"
-        if (_true(r.get("bothSpouts", True)) or target in ("Go", "NoGo")) and (outcome in ("Correct", "Incorrect") or go_miss):
+        if (_true(r.get("bothSpoutsOffered", True)) or target in ("Go", "NoGo")) and (outcome in ("Correct", "Incorrect") or go_miss):
             counted += 1
             correct += outcome == "Correct"
     asked = [r for r in rows if (str(r.get("target")) == "Go" if go_no_go else r["outcome"] != "Probe")]

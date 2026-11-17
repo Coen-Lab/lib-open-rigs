@@ -17,7 +17,7 @@ COLUMNS = {
     "outcome": {"type": "string", "values": ["Correct", "Incorrect", "NoResponse"]},
     "stimulusOnsetTime": {"type": "double", "unit": "s"},
     "choiceTime": {"type": "double", "unit": "s"},
-    "bothSpouts": {"type": "bool"},
+    "bothSpoutsOffered": {"type": "bool"},
 }
 
 YAML_TEXT = "trialNumber:\n  type: int\ntrialType:\n  type: int\n  values: {0: Visual, 1: Audio}\n"
@@ -36,7 +36,7 @@ def test_the_file_reads_typed_with_codes(tmp_path):
     manifest(tmp_path, trial_columns={"path": "x", "sha256": "0", "columns": COLUMNS})
     # One file for the experiment, over an hour; its last row is still being written (no newline).
     write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-14-17.csv",
-          "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,bothSpouts,extra\n"
+          "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,bothSpoutsOffered,extra\n"
           "12.5,1,2,Correct,10.1,11.0,True,x\n"
           "3600.2,2,4,NoResponse,3598.0,NaN,False,y\n"
           "3610.0,3,0,Inco")
@@ -44,8 +44,8 @@ def test_the_file_reads_typed_with_codes(tmp_path):
     assert len(rows) == 2
     first, second = rows
     assert first == {"Seconds": 12.5, "trialNumber": 1, "trialType": "AVCoherent", "outcome": "Correct",
-                     "stimulusOnsetTime": 10.1, "choiceTime": 11.0, "bothSpouts": True, "extra": "x"}
-    assert second["trialType"] == "Neutral" and second["bothSpouts"] is False
+                     "stimulusOnsetTime": 10.1, "choiceTime": 11.0, "bothSpoutsOffered": True, "extra": "x"}
+    assert second["trialType"] == "Neutral" and second["bothSpoutsOffered"] is False
     assert math.isnan(second["choiceTime"])
     assert trial_log.read(tmp_path, decode=False)[0]["trialType"] == 2
 
@@ -53,8 +53,8 @@ def test_the_file_reads_typed_with_codes(tmp_path):
 def test_a_cell_of_the_wrong_type_is_named(tmp_path):
     manifest(tmp_path, trial_columns={"columns": COLUMNS})
     write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv",
-          "Seconds,trialNumber,bothSpouts\n1.0,1,maybe\n")
-    with pytest.raises(ValueError, match="line 2, bothSpouts"):
+          "Seconds,trialNumber,bothSpoutsOffered\n1.0,1,maybe\n")
+    with pytest.raises(ValueError, match="line 2, bothSpoutsOffered"):
         trial_log.read(tmp_path)
 
 
