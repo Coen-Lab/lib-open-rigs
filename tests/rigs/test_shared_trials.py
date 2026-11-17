@@ -373,12 +373,12 @@ def test_a_task_without_a_stimulus_state_log_has_no_unfinished_trial(tmp_path):
 
 
 def test_the_c_sharp_helper_fills_the_shared_block_these_name():
-    # Each task filled the shared block by hand, and two had diverged. OpenRigs.Devices SharedTrialColumns fills
+    # One filler for every task, so no two tasks diverge: OpenRigs.Trials SharedTrialColumns fills
     # every column of it but trialType and outcome, each task's own, and harpTime, the row's time.
     import re
     from pathlib import Path
 
-    source = (Path(__file__).parents[2] / "src" / "OpenRigs.Devices" / "Trials" / "SharedTrialColumns.cs").read_text(encoding="utf-8")
+    source = (Path(__file__).parents[2] / "src" / "OpenRigs.Trials" / "SharedTrialColumns.cs").read_text(encoding="utf-8")
     blocks = {block: re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source) for block in ("Core", "QuietWait", "Optogenetics")}
     assert all(blocks.values()), blocks
     named = {block: re.findall(r'"(\w+)"', found.group(1)) for block, found in blocks.items() if found}
@@ -401,6 +401,6 @@ def test_summarise_reads_the_trial_log_as_open_rigs_trial_log_does(tmp_path):
 
 
 def test_the_csharp_outcomes_are_outcomes():
-    source = (Path(__file__).parents[2] / "src/OpenRigs.Devices/Trials/TrialOutcome.cs").read_text(encoding="utf-8")
+    source = (Path(__file__).parents[2] / "src/OpenRigs.Trials/TrialOutcome.cs").read_text(encoding="utf-8")
     constants = re.findall(r'public const string (\w+) = "(\w+)";', source)
     assert constants == [(o, o) for o in OUTCOMES]

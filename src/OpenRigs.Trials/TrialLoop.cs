@@ -7,7 +7,7 @@ using System.ComponentModel;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
-namespace OpenRigs.Devices
+namespace OpenRigs.Trials
 {
     /// <summary>
     /// A task's trials on the Harp clock, the same for every task: each trial drawn at its interval's start (the last

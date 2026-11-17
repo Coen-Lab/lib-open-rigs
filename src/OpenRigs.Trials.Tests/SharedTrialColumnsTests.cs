@@ -1,7 +1,7 @@
 using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace OpenRigs.Devices.Tests
+namespace OpenRigs.Trials.Tests
 {
     [TestClass]
     public class SharedTrialColumnsTests

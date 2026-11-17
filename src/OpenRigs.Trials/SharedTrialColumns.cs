@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace OpenRigs.Devices
+namespace OpenRigs.Trials
 {
     /// <summary>
     /// The lab's shared block of trial columns (open_rigs.rigs.trials CORE_COLUMNS, QUIET_WAIT_COLUMNS, OPTOGENETICS_COLUMNS),

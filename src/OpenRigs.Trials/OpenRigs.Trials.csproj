@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>A package providing the trial loop every Open Rigs task runs: its rules, timing, outcome and the trial row's shared columns.</Description>
+    <PackageTags>$(PackageTags) Trials</PackageTags>
+    <TargetFrameworks>net472</TargetFrameworks>
+    <Version>0.1.1-coen-lab.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenRigs.Devices\OpenRigs.Devices.csproj" />
+  </ItemGroup>
+
+</Project>

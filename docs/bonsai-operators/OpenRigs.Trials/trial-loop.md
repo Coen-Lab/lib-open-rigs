@@ -1,6 +1,6 @@
 # Trial Loop
 
-`TrialLoop` runs a task's trials on the Harp clock: one state machine for what every task shares (the interval, the quiet waits, the trial start, the laser's arming, lead and trigger, the stimulus, the response window, the outcome and its timeout), with the task's own part (the draw, the stimulus, the response rule, the outcome) given as an `ITrialRules`. It is tested C#, driven in its tests tick by tick, so two tasks never time a trial two ways.
+`TrialLoop` runs a task's trials on the Harp clock: one state machine for what every task shares (the interval, the quiet waits, the trial start, the laser's arming, lead and trigger, the stimulus, the response window, the outcome and its timeout), with the task's own part (the draw, the stimulus, the response rule, the outcome) given as an `ITrialRules`. It is tested C#, driven in its tests tick by tick, so two tasks never time a trial two ways. Its types are the OpenRigs.Trials package's (namespace `OpenRigs.Trials`), which depends on OpenRigs.Devices for Zapit.
 
 ---
 
@@ -43,6 +43,6 @@ public class RunTrials
 
 The lick inputs are one per spout, spout 0 the first (the `spout` the rules' `Lick` is given); the wheel is optional, left out (null) on a rig without one, where a trial with a wheel quiet wait is refused. The clock ending ends the trials; a lick input or the wheel ending stops the workflow naming it.
 
-`TrialOutcome<TRow>` is built from the row `SharedTrialColumns.Fill` filled, with the task's `outcome` one of `TrialOutcomes` (`Correct`, `Incorrect`, `NoResponse`, `Probe`, open_rigs' `OUTCOMES`) and the rewarded valve's `rig.yml` wiring name: `Row` (stamped with `outcomeTime`, for `LogTrials`), `Rewarded`, `Reward` (valve and microlitres, null unless rewarded, for `RewardRequests`), `PenaltySoundOn` and `PenaltyTimeoutSeconds`, so `TaskLogic` takes `Outcome.Row`, `Outcome.Reward` and `Outcome.PenaltySound` the same way in every task.
+`TrialOutcome<TRow>` is built from the row `SharedTrialColumns.Fill` filled, with the task's `outcome` one of `TrialOutcomes` (`Correct`, `Incorrect`, `NoResponse`, `Probe`, open_rigs' `OUTCOMES`) and the rewarded valve's `rig.yml` wiring name: `Row` (stamped with `outcomeTime`, for `LogTrials`), `Rewarded`, `Reward` (valve and microlitres, null unless rewarded, for `RewardRequests`), `PenaltySoundOn` and `PenaltyTimeoutSeconds`, so `TaskLogic` takes `Outcome.Row`, `Outcome.Reward` and `Outcome.PenaltySoundOn` the same way in every task.
 
-`TaskLogic` gives `RunTrials` the rules from `OnNextTick`, multicasts its events into `TrialEvents` (a `PublishSubject`), and picks each kind with `PickTrialEvents` (`Kind`, and `Cue` for one cue by name).
+`TaskLogic` gives `RunTrials` the rules from `OnNextTick`, multicasts its events into `TrialEvents` (a `PublishSubject`), and picks each kind with `PickTrialEvents` (`Kind`, and `Cue` for one cue by name). `ZapitTrialCommand` makes each laser trial's StartStimulus from its `IZapitTrial`, from the `Arm` events on a hardware-triggered rig, else from the `Trigger` events.

@@ -2,7 +2,7 @@ using Bonsai.Harp;
 using System;
 using System.Reflection;
 
-namespace OpenRigs.Devices
+namespace OpenRigs.Trials
 {
     /// <summary>The trial log's outcome values, every task's (open_rigs.rigs.trials OUTCOMES).</summary>
     public static class TrialOutcomes

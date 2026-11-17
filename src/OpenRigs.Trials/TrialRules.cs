@@ -2,7 +2,7 @@ using OpenRigs.Devices.Zapit;
 using System;
 using System.Collections.Generic;
 
-namespace OpenRigs.Devices
+namespace OpenRigs.Trials
 {
     /// <summary>What a <see cref="TrialLoop{TTrial, TUpdate, TOutcome}"/> event is.</summary>
     public enum TrialEventKind

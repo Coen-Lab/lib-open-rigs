@@ -6,7 +6,7 @@ using System.Reactive.Subjects;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Devices.Zapit;
 
-namespace OpenRigs.Devices.Tests
+namespace OpenRigs.Trials.Tests
 {
     class StubTrial : IZapitTrial
     {

@@ -131,7 +131,7 @@ class Optogenetics(TaskBlock):
         ramp_down_seconds: float = 0.0,
         response_delay_seconds: float = 0.0,
     ) -> None:
-        """Refuses laser timing that leaves Zapit busy at the next trial's trigger, less its reply margin (OpenRigs.Devices
+        """Refuses laser timing that leaves Zapit busy at the next trial's trigger, less its reply margin (OpenRigs.Trials
         TrialLoop stops there naming the last laser: the same rule). Off unless enabled. A task gives its laser's end,
         one of: trigger_hold_seconds (the laser until the outcome, the line held this long past it: LaserTiming.UntilOutcome),
         or laser_duration_seconds with ramp_down_seconds (LaserTiming.ForDuration) and response_delay_seconds, the soonest

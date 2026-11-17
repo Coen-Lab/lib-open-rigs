@@ -148,54 +148,6 @@ namespace OpenRigs.Devices.Zapit
         }
     }
 
-    /// <summary>What <see cref="ZapitTrialCommand"/> reads from a task's trial: the trial's number (ITrial) and its laser.</summary>
-    public interface IZapitTrial : ITrial
-    {
-        /// <summary>Gets the trial's condition in the conditions file, 1 to 254.</summary>
-        int LaserCondition { get; }
-
-        /// <summary>Gets whether the laser fires on this trial.</summary>
-        bool LaserOn { get; }
-
-        /// <summary>Gets the laser power on a laser-on trial, in mW.</summary>
-        double LaserPowerMw { get; }
-    }
-
-    /// <summary>A trial's StartStimulus (<see cref="ZapitTrial.Command"/>), sent when the rig's triggering needs it.</summary>
-    [Combinator]
-    [Description("A trial's Zapit StartStimulus: its condition, the laser on or off (galvos and masking light either way, 0 mW off). " +
-        "Inputs: the trial as its laser may be armed, the trial at its trigger. On a hardware-triggered rig it is sent from the first, " +
-        "as the DAQ then waits for the trigger line; otherwise from the second, as Zapit then starts the laser on receipt.")]
-    [WorkflowElementCategory(ElementCategory.Combinator)]
-    public class ZapitTrialCommand
-    {
-        /// <summary>Gets or sets whether the Zapit DAQ waits for the trigger line.</summary>
-        [Description("Whether the Zapit DAQ waits for the trigger line. Map it from the rig file's zapit.hardwareTriggered.")]
-        public bool HardwareTriggered { get; set; }
-
-        /// <summary>Gets or sets how long the stimulus lasts, in seconds; 0 plays until StopStimulus.</summary>
-        [Description("How long the stimulus lasts, in seconds; 0 plays until StopStimulus.")]
-        public double DurationSeconds { get; set; }
-
-        /// <summary>Each trial's StartStimulus, from the input the rig's triggering needs; the properties are read at subscription.</summary>
-        public IObservable<ZapitCommand> Process<TTrial>(IObservable<TTrial> arm, IObservable<TTrial> trigger) where TTrial : IZapitTrial
-        {
-            return Observable.Defer(() =>
-            {
-                var hardwareTriggered = HardwareTriggered;
-                var duration = DurationSeconds;
-                return SendAt(arm, trigger, hardwareTriggered).Select(trial =>
-                    ZapitTrial.Command(trial.TrialNumber, trial.LaserCondition, trial.LaserOn, trial.LaserPowerMw, hardwareTriggered, duration));
-            });
-        }
-
-        /// <summary>When the command goes: as the trial's laser may be armed on a hardware-triggered rig, else at the trigger.</summary>
-        public static IObservable<TTrial> SendAt<TTrial>(IObservable<TTrial> arm, IObservable<TTrial> trigger, bool hardwareTriggered)
-        {
-            return hardwareTriggered ? arm : trigger;
-        }
-    }
-
     /// <summary>Stops the workflow on an error reply or on Zapit having no conditions file loaded (<see cref="ZapitTrial.CheckReply"/>).</summary>
     [Combinator]
     [Description("Stops the workflow on any Zapit error reply, or an IsStimConfigLoaded reply saying no conditions file is loaded. Passes the reply on.")]
