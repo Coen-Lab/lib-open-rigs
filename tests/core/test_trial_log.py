@@ -1,4 +1,4 @@
-"""open_rigs.trial_log joins an experiment's hourly BonsaiData_Trial files into one typed table, by the
+"""open_rigs.trial_log reads an experiment's WorkflowData_Trials file as one typed table, by the
 trial columns its manifest carries, or the workflow repository's file."""
 
 import json
@@ -32,22 +32,19 @@ def manifest(folder, **fields):
     write(folder, "manifest.json", json.dumps({"version": 2, **fields}))
 
 
-def test_hour_files_join_typed_with_codes(tmp_path):
+def test_the_file_reads_typed_with_codes(tmp_path):
     manifest(tmp_path, trial_columns={"path": "x", "sha256": "0", "columns": COLUMNS})
-    data = tmp_path / "BonsaiData"
-    # The second hour is still being written (no newline).
-    write(data, "BonsaiData_Trial_2026-11-05T10-00-00.csv",
-          "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,bothSpouts,extra\n"
-          "12.5,1,2,Correct,10.1,True,x\n")
-    write(data, "BonsaiData_Trial_2026-11-05T11-00-00.csv",
-          "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,bothSpouts\n"
-          "3600.2,2,4,NoResponse,3598.0,NaN,False\n"
+    # One file for the experiment, over an hour; its last row is still being written (no newline).
+    write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-14-17.csv",
+          "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,bothSpouts,extra\n"
+          "12.5,1,2,Correct,10.1,11.0,True,x\n"
+          "3600.2,2,4,NoResponse,3598.0,NaN,False,y\n"
           "3610.0,3,0,Inco")
     rows = trial_log.read(tmp_path)
     assert len(rows) == 2
     first, second = rows
     assert first == {"Seconds": 12.5, "trialNumber": 1, "trialType": "AVCoherent", "outcome": "Correct",
-                     "stimulusOnsetTime": 10.1, "bothSpouts": True, "extra": "x"}
+                     "stimulusOnsetTime": 10.1, "choiceTime": 11.0, "bothSpouts": True, "extra": "x"}
     assert second["trialType"] == "Neutral" and second["bothSpouts"] is False
     assert math.isnan(second["choiceTime"])
     assert trial_log.read(tmp_path, decode=False)[0]["trialType"] == 2
@@ -55,7 +52,7 @@ def test_hour_files_join_typed_with_codes(tmp_path):
 
 def test_a_cell_of_the_wrong_type_is_named(tmp_path):
     manifest(tmp_path, trial_columns={"columns": COLUMNS})
-    write(tmp_path / "BonsaiData", "BonsaiData_Trial_2026-11-05T10-00-00.csv",
+    write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv",
           "Seconds,trialNumber,bothSpouts\n1.0,1,maybe\n")
     with pytest.raises(ValueError, match="line 2, bothSpouts"):
         trial_log.read(tmp_path)
@@ -82,7 +79,7 @@ def test_an_older_experiment_reads_the_repo_at_its_commit(tmp_path):
     write(repo / "schemas", "trial-columns.yml", YAML_TEXT.replace("Audio", "Changed"))
     experiment = tmp_path / "ses"
     manifest(experiment, source={"commit": commit})
-    write(experiment / "BonsaiData", "BonsaiData_Trial_2026-11-05T10-00-00.csv", "trialNumber,trialType\n1,1\n")
+    write(experiment / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv", "trialNumber,trialType\n1,1\n")
     assert trial_log.read(experiment, repo=repo)[0]["trialType"] == "Audio"
     # With no manifest, the repo's current file.
     (experiment / "manifest.json").unlink()
@@ -90,7 +87,7 @@ def test_an_older_experiment_reads_the_repo_at_its_commit(tmp_path):
 
 
 def test_no_columns_anywhere_is_an_error(tmp_path):
-    write(tmp_path / "BonsaiData", "BonsaiData_Trial_2026-11-05T10-00-00.csv", "trialNumber\n1\n")
+    write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv", "trialNumber\n1\n")
     with pytest.raises(ValueError, match="no manifest.json"):
         trial_log.read(tmp_path)
     manifest(tmp_path, trial_columns={"path": "x", "missing": True, "why": "not found"})

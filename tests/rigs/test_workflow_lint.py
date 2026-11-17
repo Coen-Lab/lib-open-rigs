@@ -453,13 +453,13 @@ def manifest_node(expected: str) -> str:
     return f'<Expression xsi:type="mf:ExperimentManifest" {MF}><mf:ExpectedFiles>{expected}</mf:ExpectedFiles></Expression>'
 
 
-LOGS = (include("OpenRigs.Logging:LogTrial.bonsai") + include("OpenRigs.Logging:LogAsync.bonsai")
+LOGS = (include("OpenRigs.Logging:LogTrials.bonsai") + include("OpenRigs.Logging:LogEvents.bonsai")
         + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Rig</Name>")
-        + include("OpenRigs.Logging:LogData.bonsai", "<LogName>BonsaiData_StimulusState</LogName>")
+        + include("OpenRigs.Logging:LogWorkflowData.bonsai", "<LogName>WorkflowData_StimulusState</LogName>")
         + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai") + include("OpenRigs.Devices:BehaviorBoard.BehaviorBoard.bonsai")
         + '<Expression xsi:type="hd:RecordHarpDevices" xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices" />')
-EXPECTED = ("auto;harp;Settings/Settings_Rig_;BonsaiData/BonsaiData_Trial_;BonsaiData/BonsaiData_Async_;BonsaiData/BonsaiData_StimulusState_;"
-            "BonsaiData/BonsaiData_ZapitReplies_?Optogenetics;Settings/Settings_ZapitConditions_?Optogenetics")
+EXPECTED = ("auto;harp;Settings/Settings_Rig_;WorkflowData/WorkflowData_Trials_;WorkflowData/WorkflowData_Events_;WorkflowData/WorkflowData_StimulusState_;"
+            "Settings/Settings_ZapitConditions_?Optogenetics")
 
 
 def test_every_file_a_workflow_writes_is_named_in_expected_files_with_its_condition(tmp_path):
@@ -467,11 +467,11 @@ def test_every_file_a_workflow_writes_is_named_in_expected_files_with_its_condit
 
 
 def test_a_folder_entry_in_place_of_each_log_is_refused(tmp_path):
-    folder = EXPECTED.replace("BonsaiData/BonsaiData_Trial_;BonsaiData/BonsaiData_Async_;", "BonsaiData/;")
+    folder = EXPECTED.replace("WorkflowData/WorkflowData_Trials_;WorkflowData/WorkflowData_Events_;", "WorkflowData/;")
     assert lint.expected_files_problems(workflow(tmp_path, LOGS + manifest_node(folder))) == [
-        "BonsaiData/BonsaiData_Trial_ is written but not in ExpectedFiles (name it, not BonsaiData/)",
-        "BonsaiData/BonsaiData_Async_ is written but not in ExpectedFiles (name it, not BonsaiData/)",
-        "ExpectedFiles names BonsaiData/, which no node in the workflow writes (name each log instead)"]
+        "WorkflowData/WorkflowData_Trials_ is written but not in ExpectedFiles (name it, not WorkflowData/)",
+        "WorkflowData/WorkflowData_Events_ is written but not in ExpectedFiles (name it, not WorkflowData/)",
+        "ExpectedFiles names WorkflowData/, which no node in the workflow writes (name each log instead)"]
 
 
 def test_a_log_written_under_a_condition_must_be_named_with_it(tmp_path):
@@ -513,7 +513,7 @@ def block_text(path: str) -> str:
 def test_the_fixed_logs_are_the_names_their_blocks_write():
     for path, logs in lint.FIXED_LOGS.items():
         text = block_text(path)
-        for inner in ("OpenRigs.Logging:LogAsync.bonsai", "OpenRigs.Logging:LogTrial.bonsai", "OpenRigs.Devices:Zapit.ZapitLogs.bonsai"):
+        for inner in ("OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:Zapit.ZapitLogs.bonsai"):
             if f'Path="{inner}"' in text:  # a block that includes another writes its logs too
                 text += block_text(inner)
         assert all(f">{name}<" in text for name, _ in logs), path
@@ -525,13 +525,13 @@ def task_logic(tmp_path: Path, nodes: str) -> lint.Workflow:
 
 def test_the_rng_seed_event_is_the_lab_s_include_at_task_logic_s_top_level(tmp_path):
     assert lint.rng_seed_problems(task_logic(tmp_path, include(lint.LOG_RNG_SEED))) == []
-    # A task's own chain, refused: a CreateAsyncEvent of RngSeed into AsyncEvents.
-    own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orl:CreateAsyncEvent" '
+    # A task's own chain, refused: a CreateEvent of RngSeed into Events.
+    own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orl:CreateEvent" '
            'xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"><orl:Event>RngSeed</orl:Event></Combinator></Expression>')
     assert lint.rng_seed_problems(task_logic(tmp_path / "b", own)) == [
         "LogRngSeed is included 0 times, 0 at TaskLogic's top level; it is once, there", "the workflow makes its own RngSeed event (LogRngSeed does)"]
     text = block_text(lint.LOG_RNG_SEED)
-    assert "<orl:Event>RngSeed</orl:Event>" in text and text.index("<Name>AsyncEvents</Name>") < text.index("rx:Take")
+    assert "<orl:Event>RngSeed</orl:Event>" in text and text.index("<Name>Events</Name>") < text.index("rx:Take")
 
 
 def test_the_task_logs_are_the_lab_s_include_given_the_task_file_as_json(tmp_path):
@@ -540,15 +540,14 @@ def test_the_task_logs_are_the_lab_s_include_given_the_task_file_as_json(tmp_pat
     group = '<Expression xsi:type="GroupWorkflow"><Workflow><Nodes>'
     assert lint.task_logs_problems(workflow(tmp_path, group + serialize + include(lint.TASK_LOGS) + edge)) == []
     # A task's own logs, refused.
-    own = (include("OpenRigs.Logging:LogTrial.bonsai") + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Task</Name>")
+    own = (include("OpenRigs.Logging:LogTrials.bonsai") + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Task</Name>")
            + include("OpenRigs.Devices:Zapit.ZapitLogs.bonsai"))
     assert lint.task_logs_problems(workflow(tmp_path / "b", own)) == [
-        "the workflow includes TaskLogs 0 times, not once", "the workflow includes LogTrial itself (TaskLogs does)",
+        "the workflow includes TaskLogs 0 times, not once", "the workflow includes LogTrials itself (TaskLogs does)",
         "the workflow includes ZapitLogs itself (TaskLogs does)", "the workflow logs Settings_Task itself (TaskLogs does)"]
     assert lint.task_logs_problems(workflow(tmp_path / "c", include(lint.TASK_LOGS))) == [
         "TaskLogs is not given the task file as JSON (the task's SerializeToJson)"]
-    expected = ("Settings/Settings_Task_;BonsaiData/BonsaiData_Trial_;BonsaiData/BonsaiData_ZapitReplies_?Optogenetics;"
-                "Settings/Settings_ZapitConditions_?Optogenetics")
+    expected = "Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;Settings/Settings_ZapitConditions_?Optogenetics"
     assert lint.expected_files_problems(workflow(tmp_path / "d", include(lint.TASK_LOGS) + manifest_node(expected))) == []
 
 
@@ -558,11 +557,11 @@ def test_no_include_ends_its_logs_when_a_one_shot_write_completes():
             assert lint.output_ends_logs_problems(lint.ET.fromstring(path.read_bytes())) == [], path
     # A WorkflowOutput fed by Settings_Task, which completes at Go.
     old = block_text(lint.TASK_LOGS).replace('<Edge From="0" To="1" Label="Source1" />',
-                                            '<Edge From="0" To="1" Label="Source1" /><Edge From="1" To="4" Label="Source1" />')
-    old = old.replace('</Expression>\n    </Nodes>', '</Expression>\n      <Expression xsi:type="WorkflowOutput" />\n    </Nodes>')
-    old = old.replace('</Expression>\r\n    </Nodes>', '</Expression>\r\n      <Expression xsi:type="WorkflowOutput" />\r\n    </Nodes>')
+                                            '<Edge From="0" To="1" Label="Source1" /><Edge From="1" To="5" Label="Source1" />')
+    old = old.replace('\n    </Nodes>', '\n      <Expression xsi:type="WorkflowOutput" />\n    </Nodes>')
     assert lint.output_ends_logs_problems(lint.ET.fromstring(old.encode("utf-8"))) == [
-        "TrialAndZapitLogs logs beside a WorkflowOutput fed by a one-shot LogDataSchema, which ends it when the write completes"]
+        f"{name} logs beside a WorkflowOutput fed by a one-shot LogDataSchema, which ends it when the write completes"
+        for name in ("TrialLogs", "IncludeWorkflow")]
 
 
 def test_the_training_stage_is_the_lab_s_include_after_experiment_control(tmp_path):
@@ -651,19 +650,19 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
 
 
 def test_the_shared_experiment_logs_are_the_lab_s_two_includes(tmp_path):
-    both = include("OpenRigs.Logging:LogLabExperiment.bonsai") + include("OpenRigs.Logging:LogControlEvents.bonsai")
+    both = include("OpenRigs.Logging:ExperimentLogs.bonsai") + include("OpenRigs.Logging:LogControlEvents.bonsai")
     assert lint.experiment_log_problems(workflow(tmp_path, both)) == []
     own = include("OpenRigs.Logging:LogController.bonsai") + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Rig</Name>")
     assert lint.experiment_log_problems(workflow(tmp_path / "b", own)) == [
-        "the workflow does not include LogLabExperiment once", "the workflow does not include LogControlEvents once",
-        "the workflow includes LogController itself (LogLabExperiment does)", "the workflow logs Settings_Rig itself (LogLabExperiment does)"]
-    # LogLabExperiment is its own top-level node, before the hardware (every device's log waits for its PathPrefix).
+        "the workflow does not include ExperimentLogs once", "the workflow does not include LogControlEvents once",
+        "the workflow includes LogController itself (ExperimentLogs does)", "the workflow logs Settings_Rig itself (ExperimentLogs does)"]
+    # ExperimentLogs is its own top-level node, before the hardware (every device's log waits for its PathPrefix).
     gate = include(lint.READY_GATE)
-    assert lint.experiment_log_problems(workflow(tmp_path / "d", gate + both)) == ["LogLabExperiment comes after the hardware"]
+    assert lint.experiment_log_problems(workflow(tmp_path / "d", gate + both)) == ["ExperimentLogs comes after the hardware"]
     grouped = f'<Expression xsi:type="GroupWorkflow"><Workflow><Nodes>{both}</Nodes><Edges /></Workflow></Expression>'
-    assert lint.experiment_log_problems(workflow(tmp_path / "e", grouped + gate)) == ["LogLabExperiment is not a top-level node of its own"]
+    assert lint.experiment_log_problems(workflow(tmp_path / "e", grouped + gate)) == ["ExperimentLogs is not a top-level node of its own"]
     assert lint.experiment_log_problems(workflow(tmp_path / "f", both + gate)) == []
-    assert lint.expected_files_problems(workflow(tmp_path / "c", both + manifest_node("BonsaiData/BonsaiData_Async_;Settings/Settings_Rig_;Settings/Settings_Experiment_"))) == []
+    assert lint.expected_files_problems(workflow(tmp_path / "c", both + manifest_node("WorkflowData/WorkflowData_Events_;Settings/Settings_Rig_;Settings/Settings_Experiment_"))) == []
 
 
 CONTROL = 'xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"'
@@ -766,12 +765,12 @@ def test_the_background_noise_plays_from_ready_at_the_launch_s_level_and_go_refu
         "the noise is not rig.yml's backgroundNoise (ReadBackgroundNoise)"]
 
 
-RECORDS = include(lint.EXPERIMENT_RECORDS, "<ConfigRoot>C:\\Root</ConfigRoot><IngestScript>task</IngestScript><ExpectedFiles>auto;harp;Settings/Settings_Rig_;Settings/Settings_Experiment_;BonsaiData/BonsaiData_Async_</ExpectedFiles>")
+RECORDS = include(lint.EXPERIMENT_RECORDS, "<ConfigRoot>C:\\Root</ConfigRoot><IngestScript>task</IngestScript><ExpectedFiles>auto;harp;Settings/Settings_Rig_;Settings/Settings_Experiment_;WorkflowData/WorkflowData_Events_</ExpectedFiles>")
 LIVE = '<Expression xsi:type="lv:StreamDevices" xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView" />'
 
 
 def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_path):
-    logs = include("OpenRigs.Logging:LogLabExperiment.bonsai") + include(lint.BOARD)
+    logs = include("OpenRigs.Logging:ExperimentLogs.bonsai") + include(lint.BOARD)
     wf = workflow(tmp_path, logs + RECORDS + LIVE)
     assert lint.experiment_records_problems(wf) == [] and lint.experiment_log_problems(wf) == [] and lint.expected_files_problems(wf) == []
     late = workflow(tmp_path / "b", logs + RECORDS + include(lint.REWARDS) + VALVES + LIVE)
@@ -828,9 +827,9 @@ def test_a_workflow_makes_the_experiment_folder_or_uses_no_experiment_folder_nev
     assert lint.no_experiment_folder_problems(workflow(tmp_path, log + include(lint.LAUNCH_SETTINGS))) == []
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "b", none)) == []
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "c", log + none)) == [
-        "the workflow includes LogLabExperiment 1 and NoExperimentFolder 1 times: one of the two once"]
+        "the workflow includes ExperimentLogs 1 and NoExperimentFolder 1 times: one of the two once"]
     assert lint.no_experiment_folder_problems(workflow(tmp_path / "d", "")) == [
-        "the workflow includes LogLabExperiment 0 and NoExperimentFolder 0 times: one of the two once"]
+        "the workflow includes ExperimentLogs 0 and NoExperimentFolder 0 times: one of the two once"]
     # The QC workflows' stand-ins before 16 Nov 2026: a never-published PathPrefix, and a SubjectId in a file of their own.
     path_prefix = '<Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:String"><rx:Name>PathPrefix</rx:Name></Expression>'
     own_file(tmp_path / "e", "Extensions/Spouts.bonsai", '<Expression xsi:type="rx:BehaviorSubject"><Name>SubjectId</Name></Expression>')
@@ -1025,13 +1024,13 @@ def test_the_live_view_is_the_last_top_level_node_fed_by_nothing(tmp_path):
 
 
 def test_check_workflow_asks_whether_a_workflow_records_nothing_or_logs_trials_of_its_own_includes_too(tmp_path):
-    # check-workflow read NoExperimentFolder and LogTrial from the entry file alone, so a workflow that
+    # check-workflow read NoExperimentFolder and LogTrials from the entry file alone, so a workflow that
     # included either from a file of its own was checked as the other kind.
     assert lint.includes(workflow(tmp_path / "a", "")) == {"records_nothing": False, "logs_trials": False}
-    wf = own_include(tmp_path / "b", "", include(lint.NO_EXPERIMENT_FOLDER) + include("OpenRigs.Logging:LogTrial.bonsai"))
+    wf = own_include(tmp_path / "b", "", include(lint.NO_EXPERIMENT_FOLDER) + include("OpenRigs.Logging:LogTrials.bonsai"))
     assert lint.includes(wf) == {"records_nothing": True, "logs_trials": True}
     script = (ROOT / "src" / "open_rigs" / "scripts" / "check-workflow.ps1").read_text(encoding="utf-8")
-    assert "NoExperimentFolder.bonsai" not in script and "LogTrial.bonsai" not in script
+    assert "NoExperimentFolder.bonsai" not in script and "LogTrials.bonsai" not in script
 
 
 def test_a_rig_list_s_description_says_what_rig_it_is_not_its_own_name():

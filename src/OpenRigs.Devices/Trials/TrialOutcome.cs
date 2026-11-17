@@ -51,7 +51,7 @@ namespace OpenRigs.Devices
             PenaltyTimeoutSeconds = Get<double>(row, "penaltyTimeoutSeconds");
         }
 
-        /// <summary>Gets the trial row, stamped with the outcome's Harp time, for LogTrial.</summary>
+        /// <summary>Gets the trial row, stamped with the outcome's Harp time, for LogTrials.</summary>
         public Timestamped<TRow> Row { get; private set; }
 
         /// <summary>Gets whether the trial is rewarded (the row's rewarded).</summary>

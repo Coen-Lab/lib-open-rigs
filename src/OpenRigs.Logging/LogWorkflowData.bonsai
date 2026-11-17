@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Writes the workflow's own timestamped rows (trials, events, a task's stimulus state) into one CSV file for the whole experiment: WorkflowData\&lt;LogName&gt;_&lt;start&gt;.csv under PathPrefix, where start is the experiment folder's start time (GroupByExperiment), so a run over an hour is still one file. LogName starts WorkflowData_ (WorkflowData_Trials, WorkflowData_Events, WorkflowData_StimulusState). LogData, by the hour, is for device logs.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PathPrefix</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orl:GroupByExperiment" />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="LogName" Description="The log's name, without time or extension: WorkflowData_ and what it holds." />
+        <Property Name="Selector" />
+        <Property Name="AutoFlush" />
+        <Property Name="PublishRows" />
+      </Expression>
+      <Expression xsi:type="rx:CreateObservable">
+        <Name>LogWorkflowData</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="rx:AsyncSubject">
+              <Name>Data</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Data</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Merge" />
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Data</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Key</Selector>
+            </Expression>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="Name" />
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:FormatFileName.bonsai">
+              <Name>WorkflowData</Name>
+              <Extension>csv</Extension>
+            </Expression>
+            <Expression xsi:type="PropertyMapping">
+              <PropertyMappings>
+                <Property Name="FileName" />
+              </PropertyMappings>
+            </Expression>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="Selector" />
+              <Property Name="AutoFlush" />
+              <Property Name="PublishRows" />
+            </Expression>
+            <Expression xsi:type="orl:CsvWriter">
+              <io:FileName />
+              <io:Append>true</io:Append>
+              <io:Overwrite>false</io:Overwrite>
+              <io:Suffix>None</io:Suffix>
+              <io:IncludeHeader>true</io:IncludeHeader>
+              <io:Selector />
+              <orl:AutoFlush>false</orl:AutoFlush>
+              <orl:PublishRows>false</orl:PublishRows>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="2" To="3" Label="Source1" />
+            <Edge From="3" To="10" Label="Source1" />
+            <Edge From="4" To="5" Label="Source1" />
+            <Edge From="5" To="7" Label="Source1" />
+            <Edge From="6" To="7" Label="Source2" />
+            <Edge From="7" To="8" Label="Source1" />
+            <Edge From="8" To="10" Label="Source2" />
+            <Edge From="9" To="10" Label="Source3" />
+            <Edge From="10" To="11" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Switch" />
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="2" Label="Source1" />
+      <Edge From="1" To="2" Label="Source2" />
+      <Edge From="2" To="4" Label="Source1" />
+      <Edge From="3" To="4" Label="Source2" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

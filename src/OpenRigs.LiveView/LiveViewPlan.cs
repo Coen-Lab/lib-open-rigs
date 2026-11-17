@@ -162,7 +162,7 @@ namespace OpenRigs.LiveView
     {
         public string RigId;
         public bool HasExperimentFolder;
-        // Whether every row a log with PublishRows writes (LogTrial, LogAsync) is streamed as `logs`:
+        // Whether every row a log with PublishRows writes (LogTrials, LogEvents) is streamed as `logs`:
         // a workflow with an experiment folder.
         public bool StreamsLoggedRows;
 
@@ -200,7 +200,7 @@ namespace OpenRigs.LiveView
             plan.HasExperimentFolder = pathPrefix == typeof(string);
             if (pathPrefix != null && pathPrefix != typeof(string))
                 plan.Notes.Add("PathPrefix is " + pathPrefix.Name + ", not a path: the session key stays ready and elapsed is not sent");
-            // An experiment folder is OpenRigs.Logging's LogLabExperiment, whose logs publish their rows (LoggedRows).
+            // An experiment folder is OpenRigs.Logging's ExperimentLogs, whose logs publish their rows (LoggedRows).
             plan.StreamsLoggedRows = plan.HasExperimentFolder;
 
             if (string.IsNullOrWhiteSpace(configRoot))

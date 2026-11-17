@@ -42,7 +42,7 @@ MANUAL_PULSES = "OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai"
 BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
 EXPERIMENT_RECORDS = "OpenRigs.Logging:ExperimentRecords.bonsai"
 LAUNCH_SETTINGS = "OpenRigs.Control:LaunchSettings.bonsai"
-LOG_LAB_EXPERIMENT = "OpenRigs.Logging:LogLabExperiment.bonsai"
+LOG_LAB_EXPERIMENT = "OpenRigs.Logging:ExperimentLogs.bonsai"
 NO_EXPERIMENT_FOLDER = "OpenRigs.Logging:NoExperimentFolder.bonsai"
 # The subject every NoExperimentFolder workflow's pieces see: no mouse's, one name for them all.
 NO_EXPERIMENT_SUBJECT = "_no-experiment_"
@@ -290,14 +290,14 @@ def harp_delays_off_the_clock(wf: Workflow, group: str = "TaskLogic") -> tuple[i
     return count, off
 
 
-def finite_async_event_senders(wf: Workflow) -> tuple[int, list[str]]:
-    """(the multicasts into AsyncEvents, the finite operators upstream of any): a MulticastSubject passes on its source's
+def finite_event_senders(wf: Workflow) -> tuple[int, list[str]]:
+    """(the multicasts into Events, the finite operators upstream of any): a MulticastSubject passes on its source's
     completion, so a Take ahead of it completed the shared subject at trial 1 (9 Nov 2026). A sender that
     logs once takes its one value after the multicast."""
     senders, finite = 0, []
     for nodes, edges in _scopes(wf.root):
         for i, node in enumerate(nodes):
-            if node.get(XSI) == "MulticastSubject" and node.findtext(W + "Name") == "AsyncEvents":
+            if node.get(XSI) == "MulticastSubject" and node.findtext(W + "Name") == "Events":
                 senders += 1
                 finite += [kind(nodes[a]) for a in upstream(edges, i) if kind(nodes[a]) in FINITE]
     return senders, finite
@@ -475,7 +475,7 @@ def required_devices(wf: Workflow) -> list[tuple[str, str]]:
 def hardware_problems(wf: Workflow) -> list[str]:
     """The workflow's devices are the lab's pieces, put together so that any combination builds and runs: ReadLabRig
     and ReadyGate once each, ReadLabRig first (a rig list holds none: a piece's log waits for PathPrefix, whose
-    LogLabExperiment reads RigConfigs), ReadyGate before every piece (a board's log waits for HarpClockSet, which ReadyGate
+    ExperimentLogs reads RigConfigs), ReadyGate before every piece (a board's log waits for HarpClockSet, which ReadyGate
     declares); exactly one clock; each piece's Name unique and its subject properties that Name's .Commands and .Data;
     every Board a Behavior board piece and every Camera a camera piece; one CameraTriggers exactly when there is a
     camera, expecting every camera; ReadyGate's PieceStages exactly the stages the pieces announce (HarpClockSet, or
@@ -636,28 +636,28 @@ def fixed_width_pulses_on_reward_valves(wf: Workflow, valve_lines: set[str]) -> 
 
 
 def experiment_log_problems(wf: Workflow) -> list[str]:
-    """The experiment's shared logs are OpenRigs.Logging's LogLabExperiment (folder, BonsaiData_Async, Settings_Rig,
+    """The experiment's shared logs are OpenRigs.Logging's ExperimentLogs (folder, WorkflowData_Events, Settings_Rig,
     Settings_Experiment, Recording) and LogControlEvents (the controller's events, in ExperimentRecords or alone), each
     included once; the workflow builds none of them itself."""
     records = wf.text.count(f'Path="{EXPERIMENT_RECORDS}"')
-    problems = [f"the workflow does not include {name} once" for name in ("LogLabExperiment", "LogControlEvents")
+    problems = [f"the workflow does not include {name} once" for name in ("ExperimentLogs", "LogControlEvents")
                 if wf.text.count(f'Path="OpenRigs.Logging:{name}.bonsai"') + (records if name == "LogControlEvents" else 0) != 1]
-    problems += [f"the workflow includes {name} itself (LogLabExperiment does)" for name in ("LogController", "LogAsync")
+    problems += [f"the workflow includes {name} itself (ExperimentLogs does)" for name in ("LogController", "LogEvents")
                  if f'Path="OpenRigs.Logging:{name}.bonsai"' in wf.text]
-    problems += [f"the workflow logs {name} itself (LogLabExperiment does)" for name in ("Settings_Rig", "Settings_Experiment")
+    problems += [f"the workflow logs {name} itself (ExperimentLogs does)" for name in ("Settings_Rig", "Settings_Experiment")
                  if f"<Name>{name}</Name>" in wf.text]
     # Every device's log waits for PathPrefix, and Bonsai builds a subject's whole top-level node when a subscriber comes
-    # first: LogLabExperiment inside a group with a Timestamp reader, or after the pieces, is defined in terms of itself.
+    # first: ExperimentLogs inside a group with a Timestamp reader, or after the pieces, is defined in terms of itself.
     top = _top(wf)[0]
     paths = [n.get("Path") for n in top]
-    log = "OpenRigs.Logging:LogLabExperiment.bonsai"
+    log = "OpenRigs.Logging:ExperimentLogs.bonsai"
     if log in wf.text and log not in paths:
-        problems.append("LogLabExperiment is not a top-level node of its own")
+        problems.append("ExperimentLogs is not a top-level node of its own")
     elif log in paths:
         first_piece = next((i for i, n in enumerate(top) for e in n.iter(W + "Expression")
                             if e.get("Path") in set(PIECES) | set(RIG_LISTS) | {READY_GATE}), None)
         if first_piece is not None and first_piece < paths.index(log):
-            problems.append("LogLabExperiment comes after the hardware")
+            problems.append("ExperimentLogs comes after the hardware")
     return problems
 
 
@@ -852,12 +852,12 @@ def reward_problems(wf: Workflow) -> list[str]:
 
 
 def launch_settings_problems(wf: Workflow) -> list[str]:
-    """SubjectId, TaskFilePath and RunSettings are OpenRigs.Control's LaunchSettings, included once after
+    """SubjectId, TaskPath and ExperimentIds are OpenRigs.Control's LaunchSettings, included once after
     ExperimentControl (whose ExperimentGo it reads), with the task file's TaskPath; the workflow declares none itself."""
     count = wf.text.count(f'Path="{LAUNCH_SETTINGS}"')
     if count != 1:
         return [f"the workflow includes LaunchSettings {count} times, not once"]
-    problems = [f"the workflow declares {name} itself (LaunchSettings does)" for name in ("SubjectId", "TaskFilePath", "RunSettings")
+    problems = [f"the workflow declares {name} itself (LaunchSettings does)" for name in ("SubjectId", "TaskPath", "ExperimentIds")
                 if _order(wf.root, _declares(name)) is not None]
     at = _order(wf.root, lambda n: n.get("Path") == LAUNCH_SETTINGS)
     control = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_CONTROL)
@@ -894,13 +894,13 @@ def launch_id_problems(wf: Workflow) -> list[str]:
 
 
 def no_experiment_folder_problems(wf: Workflow) -> list[str]:
-    """The workflow makes the experiment folder (OpenRigs.Logging's LogLabExperiment, with LaunchSettings) or makes none
+    """The workflow makes the experiment folder (OpenRigs.Logging's ExperimentLogs, with LaunchSettings) or makes none
     (NoExperimentFolder: a calibration, a preflight), one of the two once, and stands in for neither itself: no own
     PathPrefix declared or published, and with NoExperimentFolder no LaunchSettings, no own SubjectId (in its own
     included files too), and its SubjectId left at NoExperimentFolder's own, NO_EXPERIMENT_SUBJECT."""
     log, none = (wf.text.count(f'Path="{path}"') for path in (LOG_LAB_EXPERIMENT, NO_EXPERIMENT_FOLDER))
     if log + none != 1:
-        return [f"the workflow includes LogLabExperiment {log} and NoExperimentFolder {none} times: one of the two once"]
+        return [f"the workflow includes ExperimentLogs {log} and NoExperimentFolder {none} times: one of the two once"]
     nodes = list(wf.root.iter(W + "Expression"))
     problems = [f"the workflow {what} {name} itself" for what, name, found in (
         ("declares", "PathPrefix", _declares("PathPrefix")),
@@ -1056,11 +1056,11 @@ def rng_seed_problems(wf: Workflow) -> list[str]:
 
 def task_logs_problems(wf: Workflow) -> list[str]:
     """A task's trial log, Settings_Task and Zapit's logs are OpenRigs.Logging's TaskLogs, included once and given the
-    task file as JSON; the workflow includes no LogTrial or ZapitLogs and logs no Settings_Task itself."""
+    task file as JSON; the workflow includes no LogTrials or ZapitLogs and logs no Settings_Task itself."""
     count = wf.text.count(f'Path="{TASK_LOGS}"')
     problems = [] if count == 1 else [f"the workflow includes TaskLogs {count} times, not once"]
     problems += [f"the workflow includes {path.split(':')[1].removesuffix('.bonsai').split('.')[-1]} itself (TaskLogs does)"
-                 for path in ("OpenRigs.Logging:LogTrial.bonsai", "OpenRigs.Devices:Zapit.ZapitLogs.bonsai") if f'Path="{path}"' in wf.text]
+                 for path in ("OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:Zapit.ZapitLogs.bonsai") if f'Path="{path}"' in wf.text]
     if "<Name>Settings_Task</Name>" in wf.text:
         problems.append("the workflow logs Settings_Task itself (TaskLogs does)")
     for nodes, edges in _scopes(wf.root):
@@ -1108,14 +1108,15 @@ def training_stage_problems(wf: Workflow) -> list[str]:
 
 # The blocks that write an experiment's files, and what each writes. A log's file is FormatFileName's
 # <LogName up to the first _>/<LogName>_<time>.<ext>, so the start of its path is known from its name.
-NAMED_LOGS = ("OpenRigs.Logging:LogData.bonsai", "OpenRigs.Logging:LogDataSchema.bonsai")  # the name is the node's LogName or Name
+NAMED_LOGS = ("OpenRigs.Logging:LogData.bonsai", "OpenRigs.Logging:LogWorkflowData.bonsai",
+              "OpenRigs.Logging:LogDataSchema.bonsai")  # the name is the node's LogName or Name
 FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is written, or None)]
-    "OpenRigs.Logging:LogTrial.bonsai": [("BonsaiData_Trial", None)],
-    "OpenRigs.Logging:LogAsync.bonsai": [("BonsaiData_Async", None)],
-    "OpenRigs.Logging:LogLabExperiment.bonsai": [("Settings_Rig", None), ("Settings_Experiment", None), ("BonsaiData_Async", None)],
-    "OpenRigs.Devices:Zapit.ZapitLogs.bonsai": [("BonsaiData_ZapitReplies", "Optogenetics"), ("Settings_ZapitConditions", "Optogenetics")],
+    "OpenRigs.Logging:LogTrials.bonsai": [("WorkflowData_Trials", None)],
+    "OpenRigs.Logging:LogEvents.bonsai": [("WorkflowData_Events", None)],
+    "OpenRigs.Logging:ExperimentLogs.bonsai": [("Settings_Rig", None), ("Settings_Experiment", None), ("WorkflowData_Events", None)],
+    "OpenRigs.Devices:Zapit.ZapitLogs.bonsai": [("Settings_ZapitConditions", "Optogenetics")],  # its replies are Events rows
 }
-FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrial.bonsai"], *FIXED_LOGS["OpenRigs.Devices:Zapit.ZapitLogs.bonsai"]]
+FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrials.bonsai"], *FIXED_LOGS["OpenRigs.Devices:Zapit.ZapitLogs.bonsai"]]
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
                *DEVICE_GROUPS, LICK_SPOUT_STAGE, REWARD_VALVE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)
@@ -1249,9 +1250,9 @@ def main() -> None:
 
 def includes(wf: Workflow) -> dict[str, bool]:
     """What check-workflow asks of the workflow with its own included files: records_nothing (it includes
-    NoExperimentFolder) and logs_trials (it includes LogTrial)."""
+    NoExperimentFolder) and logs_trials (it includes LogTrials)."""
     return {"records_nothing": f'Path="{NO_EXPERIMENT_FOLDER}"' in wf.text,
-            "logs_trials": 'Path="OpenRigs.Logging:LogTrial.bonsai"' in wf.text}
+            "logs_trials": 'Path="OpenRigs.Logging:LogTrials.bonsai"' in wf.text}
 
 
 if __name__ == "__main__":

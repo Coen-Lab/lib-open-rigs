@@ -68,13 +68,15 @@ Rationale: a single file per device per session does not scale to video or elect
 
 Loggers MAY expose `ChunkSize` so that a rig can choose a different whole-hour chunk size. They MUST NOT offer an option to disable chunking.
 
+Exception in this fork: the workflow's own logs, a row per trial or event, are small, so they are one file per experiment. They are written by `LogWorkflowData` (`GroupByExperiment` in place of `GroupByTime`) into `WorkflowData/WorkflowData_<What>_<DateTime>.csv`, where `<DateTime>` is the session directory's own start time, not a chunk's: `WorkflowData_Trials` (`LogTrials`), `WorkflowData_Events` (`LogEvents`) and a task's own, such as `WorkflowData_StimulusState`. Device logs keep the hourly chunks.
+
 ## 4. Timestamps
 
 Every logged record MUST carry a timestamp column named `harpTime`, in seconds on the Harp clock (seconds since 1904-01-01T00:00:00 UTC). For tabular formats it MUST be the first column. For Harp binary files the timestamp is part of the message encoding.
 
 The column is named for its clock, so a file itself says which clock its times are on (14 Nov 2026). Upstream ucl-open names it `Seconds`, after Bonsai.Harp's `Timestamped.Seconds`; this fork's readers take only `harpTime`. `LogVideo` and `LogRawVideo` are upstream's and still write `Seconds`, and `LogVideo` names its files `<Name>\<Name>.<extension>`, without the `_<DateTime>` of section 2, so its second chunk's file already exists (15 Nov 2026: no lab workflow uses them; cameras log through `LogVideoFfmpeg`).
 
-`harpTime` is the time the record was complete: the event's time for an event, the outcome for a trial (a trial's row is built and written once, when its outcome is known). It is for splitting files by the hour (section 3) and lining files up with each other. A record spanning several moments, such as a trial, also names each moment as its own column ending in `Time` (`trialStartTime`, `stimulusOnsetTime`, `outcomeTime`), so an analysis reads a moment by its name, never by what the record's timestamp happens to be.
+`harpTime` is the time the record was complete: the event's time for an event, the outcome for a trial (a trial's row is built and written once, when its outcome is known). It is for splitting a device's files by the hour (section 3) and lining files up with each other. A record spanning several moments, such as a trial, also names each moment as its own column ending in `Time` (`trialStartTime`, `stimulusOnsetTime`, `outcomeTime`), so an analysis reads a moment by its name, never by what the record's timestamp happens to be.
 
 ## 5. Device metadata (YAML)
 

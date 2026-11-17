@@ -21,11 +21,11 @@ namespace OpenRigs.Logging
         /// </summary>
         public string Session { get; set; }
 
-        /// <summary>Gets or sets the log's name, such as BonsaiData_Trial: its file name without the hour or extension.</summary>
+        /// <summary>Gets or sets the log's name, such as WorkflowData_Trials: its file name without the time or extension.</summary>
         public string Log { get; set; }
 
         /// <summary>
-        /// Gets or sets the row's number in its log, from 0, counted across the log's hourly files
+        /// Gets or sets the row's number in its log, from 0, counted across the log's files (an hourly log's several)
         /// in this experiment, so it is the row's index in the log read whole.
         /// </summary>
         public long Row { get; set; }
@@ -43,14 +43,14 @@ namespace OpenRigs.Logging
     /// </summary>
     /// <remarks>
     /// A live view needs an experiment's trials as they happen, and the rows are written deep in a
-    /// workflow (a task's LogTrial can sit inside a SelectMany, whose subjects nothing at the top
+    /// workflow (a task's LogTrials can sit inside a SelectMany, whose subjects nothing at the top
     /// level can see). So the rows go through one place in the process instead of a subject: every
     /// CsvWriter with PublishRows on hands its rows here, and OpenRigs.LiveView's StreamDevices,
     /// last in the workflow, streams them without the workflow wiring anything. One Bonsai runs one
     /// workflow, so the process is the experiment.
     /// </remarks>
     [XmlType(Namespace = "clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging")]
-    [Description("Emits every row a log with PublishRows on writes (LogTrial and LogAsync turn it on), as it is written, from anywhere in the workflow: its experiment, log name, row number, header and line.")]
+    [Description("Emits every row a log with PublishRows on writes (LogTrials and LogEvents turn it on), as it is written, from anywhere in the workflow: its experiment, log name, row number, header and line.")]
     public class LoggedRows : Source<LoggedRow>
     {
         static readonly object Gate = new object();
@@ -115,16 +115,16 @@ namespace OpenRigs.Logging
         }
 
         /// <summary>
-        /// A log's name from one of its files: LogData names them &lt;Log&gt;_&lt;hour&gt;.&lt;extension&gt;
-        /// (FormatFileName), and the hour holds no underscore, so the name is everything before the last one.
+        /// A log's name from one of its files: LogData and LogWorkflowData name them &lt;Log&gt;_&lt;time&gt;.&lt;extension&gt;
+        /// (FormatFileName), and the time holds no underscore, so the name is everything before the last one.
         /// </summary>
         /// <param name="path">The log file's path.</param>
         /// <returns>The log's name.</returns>
         public static string LogName(string path)
         {
             var name = Path.GetFileNameWithoutExtension(path);
-            var hour = name.LastIndexOf('_');
-            return hour > 0 ? name.Substring(0, hour) : name;
+            var time = name.LastIndexOf('_');
+            return time > 0 ? name.Substring(0, time) : name;
         }
     }
 }

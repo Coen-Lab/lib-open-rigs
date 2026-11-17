@@ -5,7 +5,7 @@ namespace OpenRigs.Logging.Tests
 {
     /// <summary>
     /// CsvWriter.ColumnNames gives the header's columns for an element type without writing, so
-    /// check-workflow-builds can hold BonsaiData_Trial to lab_names.yml.
+    /// check-workflow-builds can hold WorkflowData_Trials to lab_names.yml.
     /// </summary>
     [TestClass]
     public class ColumnNamesTests

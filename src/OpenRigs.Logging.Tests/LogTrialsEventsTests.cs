@@ -9,19 +9,19 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace OpenRigs.Logging.Tests
 {
     /// <summary>
-    /// LogTrial writes a trial record into BonsaiData_Trial with every field as a column, the way
+    /// LogTrials writes a trial record into WorkflowData_Trials with every field as a column, the way
     /// LogData does with an empty Selector.
     /// </summary>
     [TestClass]
-    public class LogTrialTests : LoggingTestBase
+    public class LogTrialsTests : LoggingTestBase
     {
         const int Count = 5;
         static readonly string[] ExpectedHeader = { "harpTime", "Label", "Count", "IsEven", "Maybe" };
 
-        protected override string WorkflowFileName => "LogTrialTest.bonsai";
+        protected override string WorkflowFileName => "LogTrialsTest.bonsai";
 
         [TestMethod]
-        public void LogTrial_WritesOneRowPerTrialIntoBonsaiDataTrial()
+        public void LogTrials_WritesOneRowPerTrialIntoWorkflowDataTrials()
         {
             var result = RunWorkflow(new Dictionary<string, string>
             {
@@ -30,9 +30,11 @@ namespace OpenRigs.Logging.Tests
             var logFile = GetSingleLogFile("*.csv", result);
 
             var below = AssertSessionFolders(logFile, result);
-            // FormatFileName names the folder by the log name up to its first underscore, so both files share BonsaiData.
-            Assert.AreEqual("BonsaiData", below[0], $"Expected the BonsaiData folder.{result.Describe()}");
-            StringAssert.StartsWith(Path.GetFileName(logFile), "BonsaiData_Trial_", result.Describe());
+            // FormatFileName names the folder by the log name up to its first underscore, so both files share WorkflowData.
+            Assert.AreEqual("WorkflowData", below[0], $"Expected the WorkflowData folder.{result.Describe()}");
+            // One file for the experiment, named by the experiment folder's start time.
+            var session = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(logFile)));
+            Assert.AreEqual("WorkflowData_Trials_" + session.Substring(session.LastIndexOf('_') + 1) + ".csv", Path.GetFileName(logFile), result.Describe());
 
             var rows = ReadCsvLog(logFile, ExpectedHeader, Count, result);
             for (var trial = 0; trial < Count; trial++)
@@ -43,26 +45,26 @@ namespace OpenRigs.Logging.Tests
     }
 
     /// <summary>
-    /// LogAsync declares AsyncEvents and writes every event sent to it into BonsaiData_Async, as
+    /// LogEvents declares Events and writes every event sent to it into WorkflowData_Events, as
     /// harpTime,Event,Detail,Value.
     /// </summary>
     [TestClass]
-    public class LogAsyncTests : LoggingTestBase
+    public class LogEventsTests : LoggingTestBase
     {
         const int Count = 4;
         static readonly string[] ExpectedHeader = { "harpTime", "Event", "Detail", "Value" };
 
-        protected override string WorkflowFileName => "LogAsyncTest.bonsai";
+        protected override string WorkflowFileName => "LogEventsTest.bonsai";
 
         [TestMethod]
-        public void LogAsync_WritesEveryEventIntoBonsaiDataAsync()
+        public void LogEvents_WritesEveryEventIntoWorkflowDataEvents()
         {
             var result = RunWorkflow(new Dictionary<string, string>());
             var logFile = GetSingleLogFile("*.csv", result);
 
             var below = AssertSessionFolders(logFile, result);
-            Assert.AreEqual("BonsaiData", below[0], $"Expected the BonsaiData folder.{result.Describe()}");
-            StringAssert.StartsWith(Path.GetFileName(logFile), "BonsaiData_Async_", result.Describe());
+            Assert.AreEqual("WorkflowData", below[0], $"Expected the WorkflowData folder.{result.Describe()}");
+            StringAssert.StartsWith(Path.GetFileName(logFile), "WorkflowData_Events_", result.Describe());
 
             var rows = ReadCsvLog(logFile, ExpectedHeader, Count, result);
             var previous = double.NegativeInfinity;
@@ -80,8 +82,8 @@ namespace OpenRigs.Logging.Tests
     }
 
     /// <summary>
-    /// LogRngSeed logs only the first seed it is given, as the RngSeed row, and leaves AsyncEvents
-    /// open: a Take(1) before its multicast would close AsyncEvents and lose every later row.
+    /// LogRngSeed logs only the first seed it is given, as the RngSeed row, and leaves Events
+    /// open: a Take(1) before its multicast would close Events and lose every later row.
     /// </summary>
     [TestClass]
     public class LogRngSeedTests : LoggingTestBase
@@ -104,7 +106,7 @@ namespace OpenRigs.Logging.Tests
     /// <summary>
     /// TaskLogs keeps logging trials after Settings_Task is written: its input (the task file at Go) sends
     /// once and completes, and an include whose output completes disposes its side branches, so a
-    /// WorkflowOutput fed by Settings_Task ended LogTrial and Zapit's logs before trial 1.
+    /// WorkflowOutput fed by Settings_Task ended LogTrials and Zapit's logs before trial 1.
     /// </summary>
     [TestClass]
     public class TaskLogsTests : LoggingTestBase
@@ -118,18 +120,18 @@ namespace OpenRigs.Logging.Tests
         {
             var result = RunWorkflow(new Dictionary<string, string> { { "Count", Count.ToString(CultureInfo.InvariantCulture) } });
             Assert.AreEqual(1, FindLogFiles("Settings_Task_*.json", result).Length, result.Describe());
-            ReadCsvLog(GetSingleLogFile("BonsaiData_Trial_*.csv", result), new[] { "harpTime", "Trial" }, Count, result);
+            ReadCsvLog(GetSingleLogFile("WorkflowData_Trials_*.csv", result), new[] { "harpTime", "Trial" }, Count, result);
         }
     }
     /// <summary>
-    /// CreateAsyncEvent and AsyncEvent without Bonsai: what each kind of element becomes.
+    /// CreateEvent and EventRow without Bonsai: what each kind of element becomes.
     /// </summary>
     [TestClass]
-    public class AsyncEventTests
+    public class EventRowTests
     {
-        static AsyncEvent Make<T>(T element, string detail = null)
+        static EventRow Make<T>(T element, string detail = null)
         {
-            var create = new CreateAsyncEvent { Event = "Flush", Detail = detail };
+            var create = new CreateEvent { Event = "Flush", Detail = detail };
             return create.Process(Observable.Return(element)).Wait();
         }
 
@@ -185,10 +187,26 @@ namespace OpenRigs.Logging.Tests
         [TestMethod]
         public void LineBreaksAndCommas_NeverSplitTheRow()
         {
-            var e = new AsyncEvent("A,B", "x\r\ny", 1);
+            var e = new EventRow("A,B", "x\r\ny", 1);
             Assert.AreEqual("A;B", e.Event);
             Assert.IsFalse(e.Detail.Contains("\n") || e.Detail.Contains("\r"));
             Assert.AreEqual("A;B,x  y,1", e.ToString());
+        }
+
+        [TestMethod]
+        public void AZapitReply_IsAZapitReplyRow_ItsResultTheValue()
+        {
+            // ZapitLogs' row: everything the reply carries, in one Events row.
+            var reply = new OpenRigs.Devices.Zapit.ZapitReply
+            {
+                Command = OpenRigs.Devices.Zapit.ZapitCommandType.StartStimulus, Value = 3, LaserOn = 1, ServerDatenum = 739000.5
+            };
+            var e = new CreateEvent { Event = "ZapitReply" }.Process(Observable.Return(reply)).Wait();
+            Assert.AreEqual("ZapitReply", e.Event);
+            Assert.AreEqual(3.0, e.Value);
+            Assert.AreEqual("StartStimulus laserOn=1 serverDatenum=739000.5", e.Detail);
+            reply.IsError = true;
+            Assert.AreEqual("StartStimulus laserOn=1 serverDatenum=739000.5 error", reply.Detail);
         }
     }
 
@@ -206,7 +224,7 @@ namespace OpenRigs.Logging.Tests
         {
             experiment = Path.Combine(Path.GetTempPath(), "OpenRigs.Logging.Tests", Guid.NewGuid().ToString("N"),
                 "sub-test", "ses-001D1_2026-11-05T08-53-26");
-            Directory.CreateDirectory(Path.Combine(experiment, "BonsaiData"));
+            Directory.CreateDirectory(Path.Combine(experiment, "WorkflowData"));
         }
 
         [TestCleanup]
@@ -216,9 +234,11 @@ namespace OpenRigs.Logging.Tests
             catch (IOException) { }
         }
 
-        string LogFile(string log, string hour)
+        // FormatFileName's layout: <log up to its first _>\<log>_<time>.csv.
+        string LogFile(string log, string time)
         {
-            return Path.Combine(experiment, "BonsaiData", log + "_" + hour + ".csv");
+            var folder = Directory.CreateDirectory(Path.Combine(experiment, log.Split('_')[0])).FullName;
+            return Path.Combine(folder, log + "_" + time + ".csv");
         }
 
         // The file as another reader sees it while the writer still holds it open.
@@ -234,7 +254,7 @@ namespace OpenRigs.Logging.Tests
         [TestMethod]
         public void AutoFlush_PutsEachRowOnDiskBeforeTheFileCloses()
         {
-            var path = LogFile("BonsaiData_Trial", "2026-11-05T08-00-00");
+            var path = LogFile("WorkflowData_Trials", "2026-11-05T08-00-00");
             using (var writer = new StreamWriter(path))
             {
                 LoggedRows.WriteRow(writer, "1.5,Correct", "harpTime,response", flush: true, publish: false);
@@ -246,7 +266,7 @@ namespace OpenRigs.Logging.Tests
         public void WithoutAutoFlush_ARowWaitsInTheBuffer()
         {
             // What the trial log did before: a reader saw nothing until 4 KB had built up or the file closed.
-            var path = LogFile("BonsaiData_Trial", "2026-11-05T08-00-00");
+            var path = LogFile("WorkflowData_Trials", "2026-11-05T08-00-00");
             using (var writer = new StreamWriter(path))
             {
                 LoggedRows.WriteRow(writer, "1.5,Correct", "harpTime,response", flush: false, publish: false);
@@ -255,26 +275,27 @@ namespace OpenRigs.Logging.Tests
         }
 
         [TestMethod]
-        public void PublishRows_NamesTheSessionAndLog_AndNumbersRowsAcrossHourlyFiles()
+        public void PublishRows_NamesTheSessionAndLog_AndNumbersRowsAcrossALogsFiles()
         {
             var rows = new List<LoggedRow>();
             using (new LoggedRows().Generate().Subscribe(rows.Add))
             {
-                using (var first = new StreamWriter(LogFile("BonsaiData_Trial", "2026-11-05T08-00-00")))
+                // An hourly log (LogData) with PublishRows on, in two files.
+                using (var first = new StreamWriter(LogFile("Wheel_Rows", "2026-11-05T08-00-00")))
                 {
                     LoggedRows.WriteRow(first, "1,Correct", "harpTime,response", true, true);
                     LoggedRows.WriteRow(first, "2,Incorrect", "harpTime,response", true, true);
                 }
-                using (var async = new StreamWriter(LogFile("BonsaiData_Async", "2026-11-05T08-00-00")))
+                using (var events = new StreamWriter(LogFile("WorkflowData_Events", "2026-11-05T08-53-26")))
                 {
-                    LoggedRows.WriteRow(async, "1.2,Go,,", "harpTime,Event,Detail,Value", true, true);
+                    LoggedRows.WriteRow(events, "1.2,Go,,", "harpTime,Event,Detail,Value", true, true);
                 }
-                using (var second = new StreamWriter(LogFile("BonsaiData_Trial", "2026-11-05T09-00-00")))
+                using (var second = new StreamWriter(LogFile("Wheel_Rows", "2026-11-05T09-00-00")))
                 {
                     LoggedRows.WriteRow(second, "3,NoResponse", "harpTime,response", true, true);
                 }
                 // A log with PublishRows off is written and not published.
-                using (var quiet = new StreamWriter(LogFile("BonsaiData_Other", "2026-11-05T08-00-00")))
+                using (var quiet = new StreamWriter(LogFile("WorkflowData_Other", "2026-11-05T08-00-00")))
                 {
                     LoggedRows.WriteRow(quiet, "4,x", "harpTime,a", true, false);
                 }
@@ -282,28 +303,28 @@ namespace OpenRigs.Logging.Tests
 
             Assert.AreEqual(4, rows.Count);
             Assert.IsTrue(rows.All(r => r.Session == "sub-test/ses-001D1_2026-11-05T08-53-26"), rows[0].Session);
-            CollectionAssert.AreEqual(new[] { "BonsaiData_Trial", "BonsaiData_Trial", "BonsaiData_Async", "BonsaiData_Trial" }, rows.Select(r => r.Log).ToArray());
-            // The trial log's rows go on from 0 to 2 across its two hourly files; the async log counts its own.
+            CollectionAssert.AreEqual(new[] { "Wheel_Rows", "Wheel_Rows", "WorkflowData_Events", "Wheel_Rows" }, rows.Select(r => r.Log).ToArray());
+            // The hourly log's rows go on from 0 to 2 across its two files; the events log counts its own.
             CollectionAssert.AreEqual(new long[] { 0, 1, 0, 2 }, rows.Select(r => r.Row).ToArray());
             Assert.AreEqual("3,NoResponse", rows[3].Line);
             Assert.AreEqual("harpTime,Event,Detail,Value", rows[2].Header);
         }
 
         [TestMethod]
-        public void LogName_IsTheFileNameBeforeItsHour()
+        public void LogName_IsTheFileNameBeforeItsTime()
         {
-            Assert.AreEqual("BonsaiData_Trial", LoggedRows.LogName(@"C:\s\BonsaiData\BonsaiData_Trial_2026-11-05T08-00-00.csv"));
+            Assert.AreEqual("WorkflowData_Trials", LoggedRows.LogName(@"C:\s\WorkflowData\WorkflowData_Trials_2026-11-05T08-00-00.csv"));
             Assert.AreEqual("Data", LoggedRows.LogName(@"C:\s\Data\Data.csv"));
         }
     }
 
     /// <summary>
-    /// LogTrial's and LogAsync's AutoFlush and PublishRows reach the CsvWriter only through two
-    /// ExternalizedMappings in LogData: a run reads the CSV after it has
+    /// LogTrials' and LogEvents' AutoFlush and PublishRows reach the CsvWriter only through two
+    /// ExternalizedMappings in LogWorkflowData: a run reads the CSV after it has
     /// closed, so a dropped mapping would pass every other test while each row waited in the buffer.
     /// </summary>
     [TestClass]
-    public class LogTrialAsyncMappingTests
+    public class LogTrialsEventsMappingTests
     {
         static readonly System.Xml.Linq.XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
         static readonly string[] Settings = { "AutoFlush", "PublishRows" };
@@ -339,23 +360,53 @@ namespace OpenRigs.Logging.Tests
         }
 
         [DataTestMethod]
-        [DataRow("LogTrial.bonsai")]
-        [DataRow("LogAsync.bonsai")]
+        [DataRow("LogTrials.bonsai")]
+        [DataRow("LogEvents.bonsai")]
         public void AutoFlushAndPublishRows_AreOnInTheInclude(string file)
         {
-            var include = Embedded(file).Descendants().Single(e => Type(e) == "IncludeWorkflow" && (string)e.Attribute("Path") == "OpenRigs.Logging:LogData.bonsai");
+            var include = Embedded(file).Descendants().Single(e => Type(e) == "IncludeWorkflow" && (string)e.Attribute("Path") == "OpenRigs.Logging:LogWorkflowData.bonsai");
             foreach (var setting in Settings)
                 Assert.AreEqual("true", (string)include.Elements().SingleOrDefault(e => e.Name.LocalName == setting), $"{file}'s {setting}.");
         }
 
-        [TestMethod]
-        public void LogData_MapsAutoFlushAndPublishRows_OntoItsCsvWriter()
+        [DataTestMethod]
+        [DataRow("LogData.bonsai")]
+        [DataRow("LogWorkflowData.bonsai")]
+        public void MapsAutoFlushAndPublishRows_OntoItsCsvWriter(string file)
         {
-            var outer = Embedded("LogData.bonsai").Root.Elements().Single(e => e.Name.LocalName == "Workflow");
+            var outer = Embedded(file).Root.Elements().Single(e => e.Name.LocalName == "Workflow");
             var create = outer.Descendants().First(e => Type(e) == "rx:CreateObservable");
-            AssertMappedInto(outer, n => n == create, "LogData");
+            AssertMappedInto(outer, n => n == create, file);
             var inner = create.Elements().Single(e => e.Name.LocalName == "Workflow");
-            AssertMappedInto(inner, n => Type(n) == "orl:CsvWriter", "LogData's CreateObservable");
+            AssertMappedInto(inner, n => Type(n) == "orl:CsvWriter", file + "'s CreateObservable");
+        }
+    }
+
+    /// <summary>
+    /// GroupByExperiment without Bonsai: every row of an experiment, over any number of hours, in
+    /// one group keyed by the experiment folder's start time.
+    /// </summary>
+    [TestClass]
+    public class GroupByExperimentTests
+    {
+        [TestMethod]
+        public void RowsOverSeveralHours_AreOneGroup_KeyedByTheFolderStart()
+        {
+            var hour = 3600.0;
+            var rows = new[] { 1.0, hour + 1, 2 * hour + 1 }.Select(s => Bonsai.Harp.Timestamped.Create(s.ToString(CultureInfo.InvariantCulture), s));
+            var keyed = new GroupByExperiment()
+                .Process(rows.ToObservable(), Observable.Return(@"D:\Data\sub-AM009\ses-01201_2026-11-16T04-14-17"))
+                .SelectMany((group, index) => group.Select(row => Tuple.Create(index, group.Key)))
+                .ToList().Wait();
+            Assert.AreEqual(3, keyed.Count);
+            Assert.IsTrue(keyed.All(k => k.Item1 == 0 && k.Item2 == new DateTime(2026, 11, 16, 4, 14, 17)));
+        }
+
+        [TestMethod]
+        public void AFolderWithoutAStart_IsRefusedByName()
+        {
+            var error = Assert.ThrowsException<InvalidOperationException>(() => GroupByExperiment.Start(@"D:\Data\sub-x\scratch"));
+            StringAssert.Contains(error.Message, "'scratch'");
         }
     }
 }

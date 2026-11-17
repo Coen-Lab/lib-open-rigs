@@ -21,8 +21,8 @@
       <Expression xsi:type="rx:PublishSubject" TypeArguments="ctl:ControlEvent">
         <rx:Name>ControlEvents</rx:Name>
       </Expression>
-      <Expression xsi:type="rx:ReplaySubject" TypeArguments="harp:Timestamped(orl:AsyncEvent)">
-        <rx:Name>AsyncEvents</rx:Name>
+      <Expression xsi:type="rx:ReplaySubject" TypeArguments="harp:Timestamped(orl:EventRow)">
+        <rx:Name>Events</rx:Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Timer">

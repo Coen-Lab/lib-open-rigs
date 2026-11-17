@@ -2,8 +2,8 @@
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
-                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Workflow>
     <Nodes>
@@ -21,6 +21,13 @@
         <SessionId>001</SessionId>
         <Path />
       </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogEvents.bonsai" />
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>4</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Timer">
           <rx:DueTime>PT0S</rx:DueTime>
@@ -42,12 +49,14 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:ElementIndex" />
       </Expression>
-      <Expression xsi:type="scr:ExpressionTransform">
-        <scr:Expression>new(
-Index.ToString() as Label,
-Index as Count,
-Index % 2 == 0 as IsEven,
-(Index % 2 == 0 ? Int32?(Index) : null) as Maybe)</scr:Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Index</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orl:CreateEvent">
+          <orl:Event>RewardLeft</orl:Event>
+          <orl:Detail>Manual, test</orl:Detail>
+        </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Zip" />
@@ -55,16 +64,14 @@ Index % 2 == 0 as IsEven,
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="harp:CreateTimestamped" />
       </Expression>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Count" />
-      </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Take">
-          <rx:Count>5</rx:Count>
+          <rx:Count>4</rx:Count>
         </Combinator>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogTrial.bonsai" />
-      <Expression xsi:type="WorkflowOutput" />
+      <Expression xsi:type="MulticastSubject">
+        <Name>Events</Name>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="3" Label="Source1" />
@@ -72,16 +79,17 @@ Index % 2 == 0 as IsEven,
       <Edge From="2" To="3" Label="Source3" />
       <Edge From="4" To="5" Label="Source1" />
       <Edge From="5" To="6" Label="Source1" />
-      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
       <Edge From="8" To="9" Label="Source1" />
-      <Edge From="8" To="11" Label="Source2" />
       <Edge From="9" To="10" Label="Source1" />
-      <Edge From="10" To="11" Label="Source1" />
       <Edge From="11" To="12" Label="Source1" />
-      <Edge From="12" To="14" Label="Source1" />
-      <Edge From="13" To="14" Label="Source2" />
+      <Edge From="11" To="15" Label="Source2" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
       <Edge From="14" To="15" Label="Source1" />
       <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

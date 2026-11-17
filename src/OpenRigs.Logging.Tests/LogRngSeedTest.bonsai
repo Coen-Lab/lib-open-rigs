@@ -20,7 +20,7 @@
         <SessionId>001</SessionId>
         <Path />
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogAsync.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogEvents.bonsai" />
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Take">
           <rx:Count>4</rx:Count>
@@ -61,7 +61,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orl:CreateAsyncEvent">
+        <Combinator xsi:type="orl:CreateEvent">
           <orl:Event>Later</orl:Event>
         </Combinator>
       </Expression>
@@ -69,7 +69,7 @@
         <Name>Timestamp</Name>
       </Expression>
       <Expression xsi:type="MulticastSubject">
-        <Name>AsyncEvents</Name>
+        <Name>Events</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Take">

@@ -7,7 +7,7 @@ The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses,
 laserTriggerTime) after penalised. trialType and outcome are in the core by name, type and place, each described by its
 task. A task's own columns follow the block.
 
-summarise reads one experiment's BonsaiData/BonsaiData_Trial_*.csv, BonsaiData/BonsaiData_Async_*.csv (each
+summarise reads one experiment's WorkflowData/WorkflowData_Trials_*.csv, WorkflowData/WorkflowData_Events_*.csv (each
 RewardDelivered row, Value the microlitres delivered and Detail the microlitres requested=), Settings/Settings_Task_*.json
 (the lead and the penalty) and manifest.json (how the run ended), and checks the rows against each other and the task:
 
@@ -23,8 +23,8 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
 - each rewarded trial (rewarded) has a RewardDelivered row at its outcome requesting its rewardOfferedUl, and no
   RewardDelivered comes at the outcome of a trial not rewarded.
 
-These checks run on finished trials, the rows of BonsaiData_Trial. A run stopped mid-trial has no row for that trial, but
-a task that logs BonsaiData/BonsaiData_StimulusState_*.csv (harpTime, trialNumber, stimulusActive) shows it: rows for the
+These checks run on finished trials, the rows of WorkflowData_Trials. A run stopped mid-trial has no row for that trial, but
+a task that logs WorkflowData/WorkflowData_StimulusState_*.csv (harpTime, trialNumber, stimulusActive) shows it: rows for the
 trial after the last finished one are an unfinished trial, reported in the summary (never a problem), and the first of
 them with stimulusActive True is its stimulus onset, which gives the last outcome's interval to the next stimulus. A task
 without that log has no unfinished trial.
@@ -91,7 +91,7 @@ CORE_COLUMNS: List[Column] = [
     ("rewardOfferedUl", "double", "ul",
      "Microlitres a reward on this trial gives, on every trial whether or not it was rewarded: the size the task drew "
      "for it (its stage's rewardSizeUl, or a larger reward where the task has one); 0 on a trial that offers none. "
-     "rewarded says whether it was given; what was delivered is RewardDelivered in BonsaiData_Async."),
+     "rewarded says whether it was given; what was delivered is RewardDelivered in WorkflowData_Events."),
     ("rewarded", "bool", None,
      "True when the trial's outcome delivered its reward (rewardOfferedUl, at outcomeTime): the value the workflow's "
      "reward command is made from. Which outcomes are rewarded is the task's (its note)."),
@@ -240,9 +240,9 @@ def _true(text: Any) -> bool:
     return str(text).strip().lower() == "true"
 
 
-# The columns summarise reads: of a trial row, and of an async row.
+# The columns summarise reads: of a trial row, and of an Events row.
 TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds", "penalised")
-ASYNC_NEEDS = (TIME_COLUMN, "Event", "Value")
+EVENT_NEEDS = (TIME_COLUMN, "Event", "Value")
 # A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an infinity, an
 # empty cell or text is a problem and the row's checks are skipped.
 TRIAL_NUMBERS = ("trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime",
@@ -318,14 +318,14 @@ def summarise(folder: Path, videos: bool = False) -> Summary:
 
 def _summarise(folder: Path) -> Summary:
     trials = trial_log.text_rows(folder)
-    events = _rows(folder, "BonsaiData/BonsaiData_Async_*.csv")
+    events = _rows(folder, "WorkflowData/WorkflowData_Events_*.csv")
     try:
         run = json.loads((folder / "manifest.json").read_text(encoding="utf-8-sig"))["run"]
         outcome = (run["outcome"] or "unknown") + (" (not final: the workflow never finished closing)" if run.get("final") is False else "")
     except (OSError, ValueError, KeyError, TypeError):
         outcome = "unknown"
-    missing = [f"BonsaiData_Trial has no {c} column" for c in TRIAL_NEEDS if trials and c not in trials[0]]
-    missing += [f"BonsaiData_Async has no {c} column" for c in ASYNC_NEEDS if events and c not in events[0]]
+    missing = [f"WorkflowData_Trials has no {c} column" for c in TRIAL_NEEDS if trials and c not in trials[0]]
+    missing += [f"WorkflowData_Events has no {c} column" for c in EVENT_NEEDS if events and c not in events[0]]
     if missing:
         return Summary(folder.name, outcome, len(trials), 0, float("nan"), problems=missing)
     correct = sum(r["outcome"] == "Correct" for r in trials)
@@ -339,11 +339,11 @@ def _summarise(folder: Path) -> Summary:
         try:
             s.delivered_ul += float(e["Value"] or 0)
         except (TypeError, ValueError):
-            s.problems.append(f"BonsaiData_Async: a RewardDelivered row's Value {e['Value']!r} is not a number")
+            s.problems.append(f"WorkflowData_Events: a RewardDelivered row's Value {e['Value']!r} is not a number")
         try:
             reward_times.append((_f(e, TIME_COLUMN), _requested(e.get("Detail", ""))))
         except (TypeError, ValueError):
-            s.problems.append(f"BonsaiData_Async: a RewardDelivered row's {TIME_COLUMN} {e[TIME_COLUMN]!r} is not a number")
+            s.problems.append(f"WorkflowData_Events: a RewardDelivered row's {TIME_COLUMN} {e[TIME_COLUMN]!r} is not a number")
     last: Optional[Dict[str, str]] = None  # the row before, when its numbers could be read
     for n, row in enumerate(trials):
         bad = _not_numbers(row)
@@ -415,11 +415,11 @@ def _summarise(folder: Path) -> Summary:
 def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Optional[Dict[str, str]]) -> None:
     """The trial after the last finished one, when StimulusState has rows for it: the run stopped in it. Its first
     stimulusActive row is the stimulus the last outcome's interval ran to."""
-    rows = _rows(folder, "BonsaiData/BonsaiData_StimulusState_*.csv")
+    rows = _rows(folder, "WorkflowData/WorkflowData_StimulusState_*.csv")
     if not rows or not trials:
         return
     if any(c not in rows[0] for c in ("harpTime", "trialNumber", "stimulusActive")):
-        s.problems.append("BonsaiData_StimulusState lacks harpTime, trialNumber or stimulusActive: the unfinished trial not looked for")
+        s.problems.append("WorkflowData_StimulusState lacks harpTime, trialNumber or stimulusActive: the unfinished trial not looked for")
         return
     try:
         cut = int(_f(trials[-1], "trialNumber")) + 1

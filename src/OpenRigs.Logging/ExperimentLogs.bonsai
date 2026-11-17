@@ -5,11 +5,11 @@
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:rig="clr-namespace:OpenRigs.Devices.Rigs;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>What every lab experiment logs, the same in every task: once RunSettings (SubjectId, SessionId) is published at Go, LogController makes the experiment folder under rig.yml's rootPath (RigConfigs) and publishes PathPrefix; LogAsync declares AsyncEvents and writes BonsaiData_Async (LogControlEvents adds the controller's events); once the folder exists, Settings_Rig (rig.yml as parsed) and Settings_Experiment (ExperimentSettings at Go) are written, the experiment's path is reported and the phase becomes Recording. The task logs its own trials and task file, and puts RecordHarpDevices and ExperimentManifest last. Needs RunSettings, RigConfigs (ReadLabRig) and ExperimentGo (ExperimentControl).</Description>
+  <Description>What every lab experiment logs, the same in every task: once ExperimentIds (SubjectId, SessionId) is published at Go, LogController makes the experiment folder under rig.yml's rootPath (RigConfigs) and publishes PathPrefix; LogEvents declares Events and writes WorkflowData_Events (LogControlEvents adds the controller's events); once the folder exists, Settings_Rig (rig.yml as parsed) and Settings_Experiment (ExperimentSettings at Go) are written, the experiment's path is reported and the phase becomes Recording. The task logs its own trials and task file, and puts RecordHarpDevices and ExperimentManifest last. Needs ExperimentIds, RigConfigs (ReadLabRig) and ExperimentGo (ExperimentControl).</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
-        <Name>RunSettings</Name>
+        <Name>ExperimentIds</Name>
       </Expression>
       <Expression xsi:type="PropertyMapping">
         <PropertyMappings>
@@ -39,12 +39,12 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
-        <Name>RunSettings</Name>
+        <Name>ExperimentIds</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:SubscribeWhen" />
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogAsync.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogEvents.bonsai" />
       <Expression xsi:type="SubscribeSubject">
         <Name>PathPrefix</Name>
       </Expression>

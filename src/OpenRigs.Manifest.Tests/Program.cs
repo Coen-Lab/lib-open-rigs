@@ -750,12 +750,12 @@ namespace OpenRigs.Manifest.Tests
                 var autoHarp = ExpectedPlan.Create("auto;harp", emptyYml, n => typeof(object));
                 Check("auto;harp writes each note once", autoHarp.Notes.Count(n => n.Contains("has no settings")) == 1 && autoHarp.Notes.Distinct().Count() == autoHarp.Notes.Count, string.Join(" | ", autoHarp.Notes));
                 // Version 4: path?Subject is required only while the bool subject Subject is true.
-                var conditional = ExpectedPlan.Create("Settings/Settings_Rig_;Settings/Settings_Laser_?Optogenetics;BonsaiData/BonsaiData_Laser_?Optogenetics", null, n => null);
+                var conditional = ExpectedPlan.Create("Settings/Settings_Rig_;Settings/Settings_Laser_?Optogenetics;WorkflowData/WorkflowData_Laser_?Optogenetics", null, n => null);
                 var laser = conditional.Entries[1];
                 Check("an entry with ?Subject keeps its path and names its condition", laser.Path == "Settings/Settings_Laser_" && laser.Condition == "Optogenetics" && conditional.Entries[0].Condition == null
                     && string.Join(",", conditional.Conditions) == "Optogenetics", laser.Path + " ? " + laser.Condition);
                 Check("... and is not required before its subject sends a value, saying so", !conditional.Required(laser) && conditional.Required(conditional.Entries[0])
-                    && conditional.ConditionNotes().SequenceEqual(new[] { "Condition Optogenetics has sent no value, so Settings/Settings_Laser_, BonsaiData/BonsaiData_Laser_ not required." }), string.Join(" | ", conditional.ConditionNotes()));
+                    && conditional.ConditionNotes().SequenceEqual(new[] { "Condition Optogenetics has sent no value, so Settings/Settings_Laser_, WorkflowData/WorkflowData_Laser_ not required." }), string.Join(" | ", conditional.ConditionNotes()));
                 conditional.SetCondition("Optogenetics", true);
                 Check("... is required while the subject's last value is true", conditional.Required(laser) && conditional.ConditionNotes().Count == 0, "not required");
                 conditional.SetCondition("Optogenetics", false);
@@ -764,7 +764,7 @@ namespace OpenRigs.Manifest.Tests
                 Check("... and not after the values are cleared for a new run", !conditional.Required(laser), "required");
                 conditional.Unconditional("Optogenetics", "is not a subject published before ExperimentManifest");
                 Check("a condition the workflow does not publish as bool makes its entries required always, with a note", conditional.Required(laser) && laser.Condition == null
-                    && conditional.Notes.Contains("Condition Optogenetics is not a subject published before ExperimentManifest, so Settings/Settings_Laser_, BonsaiData/BonsaiData_Laser_ are expected always."), string.Join(" | ", conditional.Notes));
+                    && conditional.Notes.Contains("Condition Optogenetics is not a subject published before ExperimentManifest, so Settings/Settings_Laser_, WorkflowData/WorkflowData_Laser_ are expected always."), string.Join(" | ", conditional.Notes));
                 var badConditions = ExpectedPlan.Create("a.csv?;?Optogenetics;auto?Optogenetics;Camera-*/?Optogenetics", null, n => null);
                 Check("a condition with no subject, no path, on auto or on a wildcard is noted, not expected", badConditions.Entries.Count == 0 && badConditions.Notes.Count == 4
                     && badConditions.Notes.All(n => n.EndsWith("then the name of a bool subject (Settings/Settings_Laser_?Optogenetics).")), string.Join(" | ", badConditions.Notes));

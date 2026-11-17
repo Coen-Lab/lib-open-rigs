@@ -32,15 +32,15 @@ TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "penalty": {"timeoutSec
 
 def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, columns=COLUMNS, task=TASK):
     folder = tmp_path / "ses-x_2026-11-14T01-00-00"
-    (folder / "BonsaiData").mkdir(parents=True)
+    (folder / "WorkflowData").mkdir(parents=True)
     if task is not None:
         (folder / "Settings").mkdir()
         (folder / "Settings" / "Settings_Task_2026-11-14T01-00-00.json").write_text(json.dumps({"taskParameters": task}))
-    with open(folder / "BonsaiData" / "BonsaiData_Trial_2026-11-14T01-00-00.csv", "w", newline="") as f:
+    with open(folder / "WorkflowData" / "WorkflowData_Trials_2026-11-14T01-00-00.csv", "w", newline="") as f:
         w = csv.DictWriter(f, columns, extrasaction="ignore")
         w.writeheader()
         w.writerows(trials)
-    with open(folder / "BonsaiData" / "BonsaiData_Async_2026-11-14T01-00-00.csv", "w", newline="") as f:
+    with open(folder / "WorkflowData" / "WorkflowData_Events_2026-11-14T01-00-00.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["harpTime", "Event", "Detail", "Value"])
         w.writerows([[r[0], "RewardDelivered", r[2] if len(r) > 2 else "left DO1", r[1]] for r in rewards])
@@ -81,7 +81,7 @@ def test_a_file_without_outcomeTime_is_one_problem_not_a_crash(tmp_path):
     # Files from before 14 Nov 2026 have no outcomeTime; they are restructured, not read as they are.
     trials = _chain(4)
     s = summarise(_experiment(tmp_path, trials, [], columns=[c for c in COLUMNS if c != "outcomeTime"]))
-    assert s.problems == ["BonsaiData_Trial has no outcomeTime column"]
+    assert s.problems == ["WorkflowData_Trials has no outcomeTime column"]
 
 
 def test_an_auto_rewarded_miss_is_a_rewarded_trial(tmp_path):
@@ -144,7 +144,7 @@ def test_an_infinite_number_or_a_reward_value_that_is_not_one_is_a_problem_not_a
     trials[0]["trialNumber"] = "inf"  # int(inf) raised OverflowError and stopped the command
     rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"] + [(5.0, "2,5")]
     s = summarise(_experiment(tmp_path, trials, rewards))  # float("2,5") raised ValueError and stopped it
-    assert s.problems == ["BonsaiData_Async: a RewardDelivered row's Value '2,5' is not a number",
+    assert s.problems == ["WorkflowData_Events: a RewardDelivered row's Value '2,5' is not a number",
                           "row 1: trialNumber 'inf' not a number, so the trial is not checked"]
     assert s.delivered_ul == 4.0
 
@@ -330,7 +330,7 @@ def test_videos_are_checked_when_asked(tmp_path):
 
 
 def _stimulus_state(folder, rows, columns=("harpTime", "trialNumber", "positionCm", "stimulusActive")):
-    with open(folder / "BonsaiData" / "BonsaiData_StimulusState_2026-11-14T01-00-00.csv", "w", newline="") as f:
+    with open(folder / "WorkflowData" / "WorkflowData_StimulusState_2026-11-14T01-00-00.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(columns)
         w.writerows(rows)
@@ -389,12 +389,12 @@ def test_the_c_sharp_helper_fills_the_shared_block_these_name():
 
 
 def test_summarise_reads_the_trial_log_as_open_rigs_trial_log_does(tmp_path):
-    # summarise had its own reader, whose BonsaiData_Trial*.csv also took BonsaiData_TrialState files and
+    # summarise had its own reader, whose WorkflowData_Trials*.csv also took WorkflowData_TrialsState files and
     # a last line still being written.
     trials = _chain(2)
     folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])
-    (folder / "BonsaiData" / "BonsaiData_TrialState_2026-11-14T01-00-00.csv").write_text("harpTime,state\n1,x\n")
-    with open(folder / "BonsaiData" / "BonsaiData_Trial_2026-11-14T01-00-00.csv", "a") as f:
+    (folder / "WorkflowData" / "WorkflowData_TrialsState_2026-11-14T01-00-00.csv").write_text("harpTime,state\n1,x\n")
+    with open(folder / "WorkflowData" / "WorkflowData_Trials_2026-11-14T01-00-00.csv", "a") as f:
         f.write("1,3,auditory")  # no newline: still being written
     s = summarise(folder)
     assert (s.trials, s.problems) == (2, [])

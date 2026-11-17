@@ -1,10 +1,10 @@
-"""An experiment's BonsaiData_Trial as one typed table, by the workflow's own trial columns.
+"""An experiment's WorkflowData_Trials as one typed table, by the workflow's own trial columns.
 
     from open_rigs import trial_log
     rows = trial_log.read(r"...\\sub-<mouse>\\ses-<id>_<DateTime>")
 
-LogTrial writes the log hourly (`BonsaiData\\BonsaiData_Trial_<hour>.csv`, split at the Harp clock's
-hour); this joins the files in name order, converts each column to its type (int, double, bool or string; an
+LogTrials writes one file for the experiment (`WorkflowData\\WorkflowData_Trials_<start>.csv`, start the
+experiment folder's); this reads it, converts each column to its type (int, double, bool or string; an
 empty cell is None, "NaN" a float NaN) and, with `decode`, replaces a coded column's number with its
 name (`values`, such as a task's trialType). Columns the workflow's file does not list are kept as
 written, as text. Nothing on disk is changed: recorded data is never rewritten.
@@ -24,7 +24,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from ruamel.yaml import YAML
 
-LOG = "BonsaiData_Trial"
+LOG = "WorkflowData_Trials"
 MANIFEST = "manifest.json"
 # Every version keeps `trial_columns` and `source.commit` as they were; any other is refused (records.md, rule 3).
 MANIFEST_VERSIONS = (1, 2, 3)
@@ -86,7 +86,7 @@ def _value(text: str, column: Optional[Dict[str, Any]], decode: bool) -> Any:
 
 
 def _text_rows(experiment: Union[str, Path]) -> Iterator[Tuple[Path, int, Dict[str, str]]]:
-    """Each row of the experiment's hourly files, BonsaiData/BonsaiData_Trial_<hour>.csv in name order, as written: its
+    """Each row of the experiment's WorkflowData/WorkflowData_Trials_<start>.csv (several in name order), as written: its
     file, line number and cells by column name. A file's last line without a newline (still being written) is left out."""
     for path in sorted((Path(experiment) / LOG.split("_", 1)[0]).glob(f"{LOG}_*.csv")):
         text = path.read_text(encoding="utf-8-sig")
@@ -98,13 +98,13 @@ def _text_rows(experiment: Union[str, Path]) -> Iterator[Tuple[Path, int, Dict[s
 
 
 def text_rows(experiment: Union[str, Path]) -> List[Dict[str, str]]:
-    """Every row of the experiment's BonsaiData_Trial as written, in file order, each cell its text: what `read` types,
+    """Every row of the experiment's WorkflowData_Trials as written, in file order, each cell its text: what `read` types,
     for a reader that checks the cells itself (open_rigs.rigs.trials' summarise)."""
     return [row for _, _, row in _text_rows(experiment)]
 
 
 def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, decode: bool = True) -> List[Dict[str, Any]]:
-    """Every row of the experiment's BonsaiData_Trial, in file order, as a dict by column name.
+    """Every row of the experiment's WorkflowData_Trials, in file order, as a dict by column name.
     A file's last line without a newline (still being written) is left out. Raises ValueError naming
     the file, row and column of a cell that is not its column's type. An experiment with no trial log
     is no rows, without looking for its columns."""

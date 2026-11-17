@@ -9,17 +9,17 @@ namespace OpenRigs.Logging
 {
     /// <summary>
     /// Represents one event of an experiment that does not belong to a trial, such as a manual reward,
-    /// a flush or a spout move, written as one row of BonsaiData_Async by LogAsync.
+    /// a flush or a spout move, written as one row of WorkflowData_Events by LogEvents.
     /// </summary>
-    public class AsyncEvent
+    public class EventRow
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="AsyncEvent"/> class.
+        /// Initializes a new instance of the <see cref="EventRow"/> class.
         /// </summary>
         /// <param name="eventName">What happened, for example RewardDelivered. Commas and line breaks are replaced, so the row stays one CSV row.</param>
         /// <param name="detail">Any text that qualifies the event, for example Manual. Commas and line breaks are replaced.</param>
         /// <param name="value">The number the event carries, for example microlitres or steps, or null if it carries none.</param>
-        public AsyncEvent(string eventName, string detail, double? value)
+        public EventRow(string eventName, string detail, double? value)
         {
             Event = Clean(eventName);
             Detail = Clean(detail);
@@ -69,14 +69,14 @@ namespace OpenRigs.Logging
     }
 
     /// <summary>
-    /// Represents an operator that makes an <see cref="AsyncEvent"/> from each element of the
-    /// sequence, for LogAsync to write into BonsaiData_Async.
+    /// Represents an operator that makes an <see cref="EventRow"/> from each element of the
+    /// sequence, for LogEvents to write into WorkflowData_Events.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Transform)]
     [XmlType(Namespace = "clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging")]
-    [Description("Makes an AsyncEvent from each element. A record with fields named Event, Detail or Value fills those (the properties fill any it lacks). Otherwise Event and Detail come from the properties, Value from the element when it is a number or a boolean (true is 1), and Detail from the element when it is text and Detail is empty. Stamp it with WithLatestTimestamp and send it to the AsyncEvents subject that LogAsync declares.")]
-    public class CreateAsyncEvent
+    [Description("Makes an EventRow from each element. A record with fields named Event, Detail or Value fills those (the properties fill any it lacks). Otherwise Event and Detail come from the properties, Value from the element when it is a number or a boolean (true is 1), and Detail from the element when it is text and Detail is empty. Stamp it with WithLatestTimestamp and send it to the Events subject that LogEvents declares.")]
+    public class CreateEvent
     {
         /// <summary>
         /// Gets or sets what happened, for example RewardDelivered or SpoutsIn.
@@ -92,18 +92,18 @@ namespace OpenRigs.Logging
         public string Detail { get; set; }
 
         /// <summary>
-        /// Makes an <see cref="AsyncEvent"/> from each element of the sequence.
+        /// Makes an <see cref="EventRow"/> from each element of the sequence.
         /// </summary>
         /// <typeparam name="TSource">The type of the elements of the sequence.</typeparam>
         /// <param name="source">The sequence of elements, each one event.</param>
         /// <returns>A sequence of events, one for each element.</returns>
-        public IObservable<AsyncEvent> Process<TSource>(IObservable<TSource> source)
+        public IObservable<EventRow> Process<TSource>(IObservable<TSource> source)
         {
             // A record with fields named Event, Detail or Value (an ExpressionTransform's
             // new(... as Event, ... as Detail, ... as Value)) fills those from each element.
-            var eventField = RecordField(typeof(TSource), nameof(AsyncEvent.Event));
-            var detailField = RecordField(typeof(TSource), nameof(AsyncEvent.Detail));
-            var valueField = RecordField(typeof(TSource), nameof(AsyncEvent.Value));
+            var eventField = RecordField(typeof(TSource), nameof(EventRow.Event));
+            var detailField = RecordField(typeof(TSource), nameof(EventRow.Detail));
+            var valueField = RecordField(typeof(TSource), nameof(EventRow.Value));
             var isRecord = eventField != null || detailField != null || valueField != null;
 
             return source.Select(element =>
@@ -128,7 +128,7 @@ namespace OpenRigs.Logging
                     value = ToNumber(element);
                 }
 
-                return new AsyncEvent(eventName, detail, value);
+                return new EventRow(eventName, detail, value);
             });
         }
 

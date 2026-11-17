@@ -8,7 +8,7 @@
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Every reward a task gives, the same in every task with reward valves, which come after it, one BehaviorBoard.RewardValve piece per valve: declares RewardRequests, a BehaviorSubject of (valve, microlitres) with the valve as rig.yml's wiring names it (left), which the task and each valve's manual drop multicast each reward into (a BehaviorSubject, so a per-trial graph that sends one and completes leaves it open; its readers subscribe at Start, so no reward is replayed to them); RewardValves, a ReplaySubject of the names the valve pieces announce, and stops the workflow on a reward for a valve no piece fires (RequireRewardValve); and RewardDelivered, each reward's plan from its valve, written as a RewardDelivered row of BonsaiData_Async (AsyncEvents; Value the microlitres delivered, Detail starting with the valve's name and line). Place it after the hardware and LogLabExperiment (it reads Timestamp and AsyncEvents), before the valves, the task that sends rewards and ExperimentRecords. A rig without reward valves does not include it.</Description>
+  <Description>Every reward a task gives, the same in every task with reward valves, which come after it, one BehaviorBoard.RewardValve piece per valve: declares RewardRequests, a BehaviorSubject of (valve, microlitres) with the valve as rig.yml's wiring names it (left), which the task and each valve's manual drop multicast each reward into (a BehaviorSubject, so a per-trial graph that sends one and completes leaves it open; its readers subscribe at Start, so no reward is replayed to them); RewardValves, a ReplaySubject of the names the valve pieces announce, and stops the workflow on a reward for a valve no piece fires (RequireRewardValve); and RewardDelivered, each reward's plan from its valve, written as a RewardDelivered row of WorkflowData_Events (Events; Value the microlitres delivered, Detail starting with the valve's name and line). Place it after the hardware and ExperimentLogs (it reads Timestamp and Events), before the valves, the task that sends rewards and ExperimentRecords. A rig without reward valves does not include it.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Tuple(sys:String,sys:Double)">
@@ -36,7 +36,7 @@
         <scr:Expression>new("RewardDelivered" as Event, RewardLine.Instance + " " + Line + " requested=" + RequestedUl.ToString() + " pulses=" + Pulses.ToString() + " pulseWidthMs=" + PulseWidthMs.ToString() + " pulseGapMs=" + PulseGapMs.ToString() + " clamped=" + Clamped.ToString() + " file=" + RewardLine.CalibrationPath as Detail, DeliveredUl as Value)</scr:Expression>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orl:CreateAsyncEvent">
+        <Combinator xsi:type="orl:CreateEvent">
           <orl:Event>RewardDelivered</orl:Event>
         </Combinator>
       </Expression>
@@ -44,7 +44,7 @@
         <Name>Timestamp</Name>
       </Expression>
       <Expression xsi:type="MulticastSubject">
-        <Name>AsyncEvents</Name>
+        <Name>Events</Name>
       </Expression>
     </Nodes>
     <Edges>

@@ -47,6 +47,19 @@ namespace OpenRigs.Devices.Zapit
             }
         }
 
+        /// <summary>
+        /// Gets the reply as an Events row's Detail (ZapitLogs: Event ZapitReply, Value the result):
+        /// the command, the laser state, the Zapit PC's datenum and, on an error reply, error.
+        /// </summary>
+        public string Detail
+        {
+            get
+            {
+                return string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "{0} laserOn={1} serverDatenum={2:R}{3}", Command, LaserOn, ServerDatenum, IsError ? " error" : string.Empty);
+            }
+        }
+
         /// <summary>Parses a 15-byte reply.</summary>
         public static ZapitReply Parse(byte[] buffer)
         {

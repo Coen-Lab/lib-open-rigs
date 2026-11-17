@@ -4,7 +4,7 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:sys="clr-namespace:System;assembly=mscorlib"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>What the device pieces read from an experiment, for a workflow that makes no experiment folder (a calibration, a preflight), in place of LaunchSettings and LogLabExperiment: PathPrefix, declared and never published, so no piece's log starts and nothing is written under rig.yml's rootPath; and SubjectId from Start, the property SubjectId: _no-experiment_, one name for every such workflow and no mouse's, so LickSpoutStage's in positions are rig.yml's lickSpoutDefaultPosition. Included once, with neither LogLabExperiment nor LaunchSettings, and the workflow declares neither subject itself (no_experiment_folder_problems).</Description>
+  <Description>What the device pieces read from an experiment, for a workflow that makes no experiment folder (a calibration, a preflight), in place of LaunchSettings and ExperimentLogs: PathPrefix, declared and never published, so no piece's log starts and nothing is written under rig.yml's rootPath; and SubjectId from Start, the property SubjectId: _no-experiment_, one name for every such workflow and no mouse's, so LickSpoutStage's in positions are rig.yml's lickSpoutDefaultPosition. Included once, with neither ExperimentLogs nor LaunchSettings, and the workflow declares neither subject itself (no_experiment_folder_problems).</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">

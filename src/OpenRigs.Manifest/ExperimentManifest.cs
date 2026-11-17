@@ -85,7 +85,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>Gets or sets the workflow's trial columns file, copied into the manifest at Start.</summary>
-        [Description("The workflow's trial columns file (schemas\\trial-columns.yml): what each BonsaiData_Trial column means, its type, and where they apply its values or codes and unit. Read once at Start and copied into the manifest as trial_columns, so the experiment carries the meaning of its trial log. A relative path is from the workflow's repository. Blank: the workflow logs no trials. A missing or unreadable file is noted, not an error.")]
+        [Description("The workflow's trial columns file (schemas\\trial-columns.yml): what each WorkflowData_Trials column means, its type, and where they apply its values or codes and unit. Read once at Start and copied into the manifest as trial_columns, so the experiment carries the meaning of its trial log. A relative path is from the workflow's repository. Blank: the workflow logs no trials. A missing or unreadable file is noted, not an error.")]
         public string TrialColumns
         {
             get { return Settings.TrialColumns; }

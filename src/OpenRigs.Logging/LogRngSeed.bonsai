@@ -4,14 +4,14 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The RngSeed event, the same in every task: the first input, the seed every draw of the experiment follows from (OpenRigs.Core RngSeed.Resolve: the task file's rngSeed, or one drawn at Go when it is null), as an AsyncEvent named RngSeed, stamped on the Harp clock (Timestamp), into AsyncEvents, once. Give it each trial's seed from its start; the Take(1) is after the multicast, so the shared AsyncEvents subject never completes. Needs Timestamp and AsyncEvents from the workflow.</Description>
+  <Description>The RngSeed event, the same in every task: the first input, the seed every draw of the experiment follows from (OpenRigs.Core RngSeed.Resolve: the task file's rngSeed, or one drawn at Go when it is null), as an EventRow named RngSeed, stamped on the Harp clock (Timestamp), into Events, once. Give it each trial's seed from its start; the Take(1) is after the multicast, so the shared Events subject never completes. Needs Timestamp and Events from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
         <Name>Source1</Name>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="orl:CreateAsyncEvent">
+        <Combinator xsi:type="orl:CreateEvent">
           <orl:Event>RngSeed</orl:Event>
         </Combinator>
       </Expression>
@@ -19,7 +19,7 @@
         <Name>Timestamp</Name>
       </Expression>
       <Expression xsi:type="MulticastSubject">
-        <Name>AsyncEvents</Name>
+        <Name>Events</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Take">

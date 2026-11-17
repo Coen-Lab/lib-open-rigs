@@ -181,7 +181,7 @@ namespace OpenRigs.LiveView
             if (plan.StreamsLoggedRows)
             {
                 workflow.Add(Group(LiveViewPlan.LoggedRowsStream,
-                    "Every row a log with PublishRows writes (OpenRigs.Logging's LogTrial and LogAsync), as it is written: its experiment, log name, row number, header and line, as the logs stream.",
+                    "Every row a log with PublishRows writes (OpenRigs.Logging's LogTrials and LogEvents), as it is written: its experiment, log name, row number, header and line, as the logs stream.",
                     Load("LoggedRows", new Dictionary<string, string> { { "Stream", LiveViewPlan.LoggedRowsStream } })));
             }
 

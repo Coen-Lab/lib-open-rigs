@@ -199,15 +199,15 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
         "  FAIL  ExperimentManifest expects '$($expected -join ', ')'; missing: $($missing -join ', '); extra: $($extra -join ', ')"; $failed++
         if ($planField) { foreach ($note in $planField.GetValue($recorder[0]).Notes) { "        its note: $note" } }
     }
-    # The trial row's columns, as LogTrial's writer names them, against schemas\trial-columns.yml.
+    # The trial row's columns, as LogTrials's writer names them, against schemas\trial-columns.yml.
     $rowType = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq 'Extensions' } | ForEach-Object { $_.GetType('TrialRow') } | Select-Object -First 1
     if ($rowType) {
         $columns = [OpenRigs.Logging.CsvWriter]::ColumnNames([Bonsai.Harp.Timestamped`1].MakeGenericType($rowType))
         $schema = @((Get-Content (Join-Path $Repo 'schemas\trial-columns.yml')) | Where-Object { $_ -match '^([A-Za-z]\w*):\s*$' } | ForEach-Object { $Matches[1] })
-        if (($columns -join ',') -eq ($schema -join ',')) { "  ok    BonsaiData_Trial's $($columns.Count) columns are schemas\trial-columns.yml's, in its order" }
-        else { "  FAIL  BonsaiData_Trial writes $($columns -join ','); schemas\trial-columns.yml lists $($schema -join ',')"; $failed++ }
+        if (($columns -join ',') -eq ($schema -join ',')) { "  ok    WorkflowData_Trials's $($columns.Count) columns are schemas\trial-columns.yml's, in its order" }
+        else { "  FAIL  WorkflowData_Trials writes $($columns -join ','); schemas\trial-columns.yml lists $($schema -join ',')"; $failed++ }
     } elseif ($script:plan.logs_trials) { "  FAIL  src\Extensions has no TrialRow, the trial log's row"; $failed++ }
-    else { "  ok    no trial log (the workflow includes no LogTrial)" }
+    else { "  ok    no trial log (the workflow includes no LogTrials)" }
     # config\main.layout's windows, on the nodes as the editor has them: Bonsai loads each group in topological
     # order, not file order, so a node fed from later in the file moves up and shifts the indices after it. A window
     # on the wrong node makes the editor offer to delete the layout, and --start waits. A visualizer type not in

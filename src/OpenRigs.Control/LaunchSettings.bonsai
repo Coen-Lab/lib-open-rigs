@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A launch's own settings, the same in every task: the mouse's lab ID from the launch property SubjectId as the AsyncSubject SubjectId (from Start: a mouse's spout positions and Zapit need it before Go), the task file's path from TaskPath as TaskFilePath, and at Go the Go event's SubjectId and SessionId as RunSettings (Item1, Item2), which LogLabExperiment makes the experiment folder from (ControlServer refuses a Go with either blank, naming it, so RunSettings always has both). After ExperimentControl, whose ExperimentGo it reads: the workflow maps its launch property SubjectId onto both ExperimentControl and this include, and keeps its own task file's path as this include's TaskPath, its value when run from the editor.</Description>
+  <Description>A launch's own settings, the same in every task: the mouse's lab ID from the launch property SubjectId as the AsyncSubject SubjectId (from Start: a mouse's spout positions and Zapit need it before Go), the task file's path from TaskPath as TaskPath, and at Go the Go event's SubjectId and SessionId as ExperimentIds (Item1, Item2), which ExperimentLogs makes the experiment folder from (ControlServer refuses a Go with either blank, naming it, so ExperimentIds always has both). After ExperimentControl, whose ExperimentGo it reads: the workflow maps its launch property SubjectId onto both ExperimentControl and this include, and keeps its own task file's path as this include's TaskPath, its value when run from the editor.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -36,7 +36,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
-        <Name>TaskFilePath</Name>
+        <Name>TaskPath</Name>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>ExperimentGo</Name>
@@ -59,7 +59,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
-        <Name>RunSettings</Name>
+        <Name>ExperimentIds</Name>
       </Expression>
     </Nodes>
     <Edges>

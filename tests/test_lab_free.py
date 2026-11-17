@@ -23,8 +23,8 @@ LAB_ONLY = re.compile(
 NAMED_THE_LAB_BEFORE_THE_RULE = {
     "README.md": 1,
     "build/Common.csproj.targets": 2,
-    "docs/bonsai-operators/OpenRigs.Logging/log-async.md": 1,
-    "docs/bonsai-operators/OpenRigs.Logging/log-trial.md": 3,
+    "docs/bonsai-operators/OpenRigs.Logging/log-events.md": 1,
+    "docs/bonsai-operators/OpenRigs.Logging/log-trials.md": 3,
     "fixtures/manifest/v3/completed.json": 10,
     "fixtures/manifest/v3/ended-early.json": 10,
     "fixtures/manifest/v3/no-controller.json": 9,
