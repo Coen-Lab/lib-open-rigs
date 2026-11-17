@@ -176,7 +176,8 @@ namespace OpenRigs.Trials
             if (!(t.ResponseWindowSeconds > 0)) problems.Add(string.Format("its response window is {0} s, not above 0 (infinity for no limit)", t.ResponseWindowSeconds));
             if (t.Laser && laser == null) problems.Add("it is a laser trial, but the rules give no LaserTiming");
             if (t.Laser && !(next is IZapitTrial)) problems.Add(string.Format("it is a laser trial, but its type {0} is not an IZapitTrial (its laser condition, laser on and power)", next.GetType().Name));
-            problems.AddRange(QuietWait.SettingsProblems(t.LickQuietSeconds, t.WheelQuietSeconds, t.WheelQuietCm));
+            problems.AddRange(QuietWait.LickProblems(t.LickQuietSeconds));
+            problems.AddRange(QuietWait.WheelProblems(t.WheelQuietSeconds, t.WheelQuietCm));
             if (!hasWheel && t.WheelQuietSeconds > 0) problems.Add(string.Format("it waits {0} s for the wheel to be quiet, but the loop has no wheel", t.WheelQuietSeconds));
             if (problems.Count > 0) throw new InvalidOperationException(string.Format("Trial {0} cannot be run: {1}.", next.TrialNumber, string.Join("; ", problems)));
         }

@@ -107,7 +107,7 @@ CORE_COLUMNS: List[Column] = [
 
 QUIET_WAIT_COLUMNS: List[Column] = [
     ("quietWaitSeconds", "double", "s",
-     "How long the stage's quiet waits (lickQuietSeconds, wheelQuietSeconds and wheelQuietCm; OpenRigs.Core QuietWait) "
+     "How long the quiet waits (lickQuietSeconds, wheelQuietSeconds and wheelQuietCm; OpenRigs.Core QuietWait) "
      "held this trial's start past the end of its interval less the lead; 0 with the waits off or a quiet mouse."),
 ]
 

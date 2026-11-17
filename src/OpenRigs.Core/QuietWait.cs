@@ -20,14 +20,24 @@ namespace OpenRigs.Core
         readonly double earliest, lickQuietSeconds, wheelQuietSeconds, wheelQuietCm;
 
         /// <summary>
-        /// What is wrong with a training stage's quiet waits, empty when nothing is: each a finite number from 0, the
-        /// seconds at most MaxQuietSeconds and the cm at most MaxWheelQuietCm, and the wheel's seconds and cm both above 0
-        /// (its wait) or both 0 (off). A task checks its stages with it when it loads them; the constructor refuses them.
+        /// What is wrong with the lick quiet wait, empty when nothing is: a finite number from 0 to MaxQuietSeconds. A task
+        /// checks it where its file holds it (a training stage or the task) when it loads the file, and WheelProblems
+        /// likewise; the constructor refuses both.
         /// </summary>
-        public static List<string> SettingsProblems(double lickQuietSeconds, double wheelQuietSeconds, double wheelQuietCm)
+        public static List<string> LickProblems(double lickQuietSeconds)
         {
             var problems = new List<string>();
             Check(problems, "lickQuietSeconds", lickQuietSeconds, MaxQuietSeconds, "s");
+            return problems;
+        }
+
+        /// <summary>
+        /// What is wrong with the wheel quiet wait, empty when nothing is: each a finite number from 0, the seconds at most
+        /// MaxQuietSeconds and the cm at most MaxWheelQuietCm, and both above 0 (its wait) or both 0 (off).
+        /// </summary>
+        public static List<string> WheelProblems(double wheelQuietSeconds, double wheelQuietCm)
+        {
+            var problems = new List<string>();
             Check(problems, "wheelQuietSeconds", wheelQuietSeconds, MaxQuietSeconds, "s");
             Check(problems, "wheelQuietCm", wheelQuietCm, MaxWheelQuietCm, "cm");
             if ((wheelQuietSeconds > 0) != (wheelQuietCm > 0))
@@ -56,7 +66,8 @@ namespace OpenRigs.Core
         /// <param name="lickHeld">Whether a spout is touched at the interval's start.</param>
         public QuietWait(double intervalStart, double earliest, double lickQuietSeconds, double wheelQuietSeconds, double wheelQuietCm, double wheelAtStart, bool lickHeld)
         {
-            var problems = SettingsProblems(lickQuietSeconds, wheelQuietSeconds, wheelQuietCm);
+            var problems = LickProblems(lickQuietSeconds);
+            problems.AddRange(WheelProblems(wheelQuietSeconds, wheelQuietCm));
             if (double.IsNaN(intervalStart) || double.IsInfinity(intervalStart)) problems.Add("the interval's start is " + intervalStart);
             if (double.IsNaN(earliest) || double.IsInfinity(earliest)) problems.Add("the earliest start is " + earliest);
             if (problems.Count > 0) throw new ArgumentException("QuietWait: " + string.Join("; ", problems) + ".");

@@ -6,7 +6,7 @@ namespace OpenRigs.Core
     /// The rules of the lab's task blocks in open_rigs.core.task (Iti, ResponseWindow, AutoReward), for a task to check its
     /// file with when it loads it: Bonsai reads the file without pydantic, so a hand-edited file reaches the task unchecked.
     /// Each returns what is wrong, empty when nothing is, named by the block's own keys; the task adds where they sit.
-    /// QuietWait.SettingsProblems is the QuietWait block's.
+    /// QuietWait.LickProblems and WheelProblems are the LickQuietWait and WheelQuietWait blocks'.
     /// </summary>
     public static class TaskBlocks
     {

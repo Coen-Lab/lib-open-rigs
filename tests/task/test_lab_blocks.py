@@ -12,40 +12,48 @@ from open_rigs.core.task import (
     Iti,
     Optogenetics,
     Penalty,
-    QuietWait,
+    LickQuietWait,
     ResponseWindow,
     RewardSize,
     RewardTone,
     StimulusSound,
+    WheelQuietWait,
 )
 
 OPTO = {"laserOnProbability": 0.5, "laserToStimulusSeconds": 0.1, "trialsBeforeLaser": 0}
 
 
-class Stage(QuietWait):
+class Stage(LickQuietWait):
     label: str
 
 
-def test_quiet_wait_keys_stay_on_the_stage():
-    stage = Stage.model_validate({"label": "a", "lickQuietSeconds": 1, "wheelQuietSeconds": 0.5, "wheelQuietCm": 2})
-    assert stage.model_dump(by_alias=True) == {"label": "a", "lickQuietSeconds": 1, "wheelQuietSeconds": 0.5, "wheelQuietCm": 2}
+class Structure(WheelQuietWait):
+    label: str
+
+
+def test_each_quiet_wait_keeps_its_keys_where_the_task_puts_it():
+    # A task puts each part on its stages if a stage changes it, else at task level, under the same keys.
+    stage = Stage.model_validate({"label": "a", "lickQuietSeconds": 1})
+    assert stage.model_dump(by_alias=True) == {"label": "a", "lickQuietSeconds": 1}
+    structure = Structure.model_validate({"label": "a", "wheelQuietSeconds": 0.5, "wheelQuietCm": 2})
+    assert structure.model_dump(by_alias=True) == {"label": "a", "wheelQuietSeconds": 0.5, "wheelQuietCm": 2}
 
 
 @pytest.mark.parametrize(("seconds", "cm"), [(1, 0), (0, 1)])
 def test_quiet_wait_refuses_half_a_wheel_wait(seconds, cm):
     with pytest.raises(ValidationError, match="must both be above 0"):
-        Stage(label="a", wheel_quiet_seconds=seconds, wheel_quiet_cm=cm)
+        Structure(label="a", wheel_quiet_seconds=seconds, wheel_quiet_cm=cm)
 
 
 # A wait of inf never reaches a trial's start and the run waits silently; a NaN lead passed check_lead_fits (every comparison false).
-@pytest.mark.parametrize("key", ["lickQuietSeconds", "wheelQuietSeconds"])
-def test_quiet_wait_refuses_an_endless_wait(key):
+@pytest.mark.parametrize(("block", "key"), [(Stage, "lickQuietSeconds"), (Structure, "wheelQuietSeconds")])
+def test_quiet_wait_refuses_an_endless_wait(block, key):
     with pytest.raises(ValidationError, match="finite number"):
-        Stage.model_validate({"label": "a", key: float("inf"), "wheelQuietCm": 1})
+        block.model_validate({"label": "a", key: float("inf"), "wheelQuietCm": 1})
 
 
 def test_a_task_s_own_field_on_a_lab_block_is_finite_too():
-    class TimedStage(QuietWait):
+    class TimedStage(LickQuietWait):
         response_window_seconds: float
 
     with pytest.raises(ValidationError, match="finite number"):

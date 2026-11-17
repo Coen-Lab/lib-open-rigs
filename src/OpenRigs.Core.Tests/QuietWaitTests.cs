@@ -47,12 +47,13 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void SettingsOutOfRangeOrAHalfSetWheelPairAreRefusedByName()
         {
-            CollectionAssert.AreEqual(new string[0], QuietWait.SettingsProblems(10, 10, 20));
-            CollectionAssert.AreEqual(new[] { "lickQuietSeconds is -1, not from 0 to 10 s" }, QuietWait.SettingsProblems(-1, 0, 0));
-            CollectionAssert.AreEqual(new[] { "wheelQuietCm is 25, not from 0 to 20 cm" }, QuietWait.SettingsProblems(0, 1, 25));
+            CollectionAssert.AreEqual(new string[0], QuietWait.LickProblems(10));
+            CollectionAssert.AreEqual(new string[0], QuietWait.WheelProblems(10, 20));
+            CollectionAssert.AreEqual(new[] { "lickQuietSeconds is -1, not from 0 to 10 s" }, QuietWait.LickProblems(-1));
+            CollectionAssert.AreEqual(new[] { "wheelQuietCm is 25, not from 0 to 20 cm" }, QuietWait.WheelProblems(1, 25));
             CollectionAssert.AreEqual(new[] { "wheelQuietSeconds 1 and wheelQuietCm 0 are both above 0 (the wheel's quiet wait) or both 0 (off), not one of each" },
-                QuietWait.SettingsProblems(0, 1, 0));
-            Assert.AreEqual(1, QuietWait.SettingsProblems(double.NaN, 0, 0).Count);
+                QuietWait.WheelProblems(1, 0));
+            Assert.AreEqual(1, QuietWait.LickProblems(double.NaN).Count);
             var error = Assert.ThrowsException<System.ArgumentException>(() => new QuietWait(0, double.PositiveInfinity, 11, 0, 0, double.NaN, false));
             StringAssert.Contains(error.Message, "lickQuietSeconds is 11");
             StringAssert.Contains(error.Message, "the earliest start is");

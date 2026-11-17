@@ -21,8 +21,9 @@ class Task(BaseSchema):
 
 
 # The lab's task blocks, one model each so every task names and checks them alike. A task's own
-# model takes QuietWait, Iti, ResponseWindow, AutoReward, RewardSize or Optogenetics by inheritance, which keeps
-# its keys where they are in the task file, and Penalty as its penalty field.
+# model takes LickQuietWait, WheelQuietWait, Iti, ResponseWindow, AutoReward, RewardSize or Optogenetics by inheritance,
+# which keeps its keys where they are in the task file, and Penalty as its penalty field. A setting sits on the training
+# stage rows only if some stage of the task changes it; otherwise it is a task-level setting, under the same name.
 
 
 class TaskBlock(BaseSchema):
@@ -32,8 +33,9 @@ class TaskBlock(BaseSchema):
     model_config = ConfigDict(allow_inf_nan=False)
 
 
-class QuietWait(TaskBlock):
-    """A training stage's quiet waits before a trial's start, counted from the interval's start (OpenRigs.Core QuietWait)."""
+class LickQuietWait(TaskBlock):
+    """The lick quiet wait before a trial's start, counted from the interval's start (OpenRigs.Core QuietWait). A task puts
+    it on its training stages if a stage changes it, else at task level; WheelQuietWait likewise."""
 
     lick_quiet_seconds: float = Field(
         default=0.0,
@@ -41,6 +43,11 @@ class QuietWait(TaskBlock):
         le=10,
         description="Quiet wait: a trial's start needs this long with every spout released, in seconds, counted from the interval's start and restarted by every touch and release; a held contact (a paw or chin on a spout) holds the trial's start until released, so licks for the last reward cannot carry into the next trial; 0: off; at most 10 s. It lengthens the interval only when the mouse licks late in it (quietWaitSeconds)",
     )
+
+
+class WheelQuietWait(TaskBlock):
+    """The wheel quiet wait before a trial's start, counted from the interval's start (OpenRigs.Core QuietWait)."""
+
     wheel_quiet_seconds: float = Field(
         default=0.0,
         ge=0,
@@ -63,7 +70,7 @@ class Iti(TaskBlock):
     and ends is the task's, said in its own description. No lab default: each task file gives both."""
 
     iti_min_seconds: float = Field(
-        ge=0, description="Lower bound of the inter-trial interval, drawn uniformly for every trial, in seconds; the stage's quiet waits can only lengthen it (quietWaitSeconds)"
+        ge=0, description="Lower bound of the inter-trial interval, drawn uniformly for every trial, in seconds; the quiet waits can only lengthen it (quietWaitSeconds)"
     )
     iti_max_seconds: float = Field(ge=0, description="Upper bound of the inter-trial interval, in seconds; at least itiMinSeconds")
 
@@ -146,7 +153,7 @@ class Optogenetics(TaskBlock):
         description="Probability that a trial after trialsBeforeLaser is a laser-on trial, shared equally by every condition in the conditions file; all other trials are laser-off trials, sent a condition with the laser off",
     )
     laser_to_stimulus_seconds: float = Field(
-        description="Signed, in seconds: the trigger (the ZapitTrigger line) comes this long before the stimulus; 0 with it; negative after it. The trial's start is the end of the interval less the lead, max(this, 0), once the stage's quiet waits hold, and the stimulus comes the lead after the trial's start in every experiment, optogenetics on or off, so timing never reveals Zapit; the trigger only with optogenetics. Zapit is armed during the interval and adds no time. Refused above itiMinSeconds - 0.2 s (Zapit's reply margin); each task adds its own limits",
+        description="Signed, in seconds: the trigger (the ZapitTrigger line) comes this long before the stimulus; 0 with it; negative after it. The trial's start is the end of the interval less the lead, max(this, 0), once the quiet waits hold, and the stimulus comes the lead after the trial's start in every experiment, optogenetics on or off, so timing never reveals Zapit; the trigger only with optogenetics. Zapit is armed during the interval and adds no time. Refused above itiMinSeconds - 0.2 s (Zapit's reply margin); each task adds its own limits",
     )
     trials_before_laser: int = Field(
         ge=0, description="Trials at the experiment's start with no laser-on trial among them (each still sends Zapit a condition, at 0 mW); laserOnProbability applies from the next trial"
