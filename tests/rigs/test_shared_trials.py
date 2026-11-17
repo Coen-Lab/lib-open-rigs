@@ -13,7 +13,7 @@ from open_rigs.rigs import trials as trials_module
 from open_rigs.rigs.trials import CORE_COLUMNS, OUTCOMES, shared_block_problems, shared_columns, summarise
 
 COLUMNS = ["harpTime", "trialNumber", "trialType", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds",
-           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds",
+           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySoundOn", "penaltyTimeoutSeconds",
            "penalised", "autoRewarded"]
 
 
@@ -23,7 +23,7 @@ def _trial(n, start, iti, response, outcome="Correct", timeout=0.0, quiet=0.0, r
     return {"harpTime": end, "trialNumber": n, "trialType": "auditory", "outcome": outcome, "itiStartTime": start,
             "itiSeconds": iti, "quietWaitSeconds": quiet, "trialStartTime": onset - 0.1, "stimulusOnsetTime": onset,
             "outcomeTime": end, "rewardOfferedUl": reward,
-            "rewarded": outcome == "Correct" or auto if rewarded is None else rewarded, "penaltySound": timeout > 0,
+            "rewarded": outcome == "Correct" or auto if rewarded is None else rewarded, "penaltySoundOn": timeout > 0,
             "penaltyTimeoutSeconds": timeout, "penalised": timeout > 0, "autoRewarded": auto}
 
 
@@ -179,7 +179,7 @@ def test_each_block_sits_in_its_place_in_the_core():
     assert [name for name, _, _, _ in shared_columns(())] == core
     both = [name for name, _, _, _ in shared_columns(BOTH)]
     assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-8:] == [
-        "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds", "penalised", "laserCondition",
+        "rewardOfferedUl", "rewarded", "penaltySoundOn", "penaltyTimeoutSeconds", "penalised", "laserCondition",
         "laserPowerMw", "laserTriggerTime"]
     assert len(both) == 18 and len(core) == 14
 
@@ -204,10 +204,10 @@ def test_a_change_to_the_shared_block_is_named():
         "itiSeconds's description is not the shared block's (open_rigs.rigs.trials)",
         "laserCondition is double, not int",
     ]
-    # penaltySound was each task's own words, and two tasks' differed.
+    # penaltySoundOn was each task's own words, and two tasks' differed.
     sound = _block()
-    sound["penaltySound"]["description"] = "True when the penalty sound played."
-    assert shared_block_problems(sound, BOTH) == ["penaltySound's description is not the shared block's (open_rigs.rigs.trials)"]
+    sound["penaltySoundOn"]["description"] = "True when the penalty sound played."
+    assert shared_block_problems(sound, BOTH) == ["penaltySoundOn's description is not the shared block's (open_rigs.rigs.trials)"]
     reordered = dict(reversed(list(_block().items())))
     assert shared_block_problems(reordered, BOTH)[0].startswith("the first 18 columns are")
 
@@ -217,27 +217,27 @@ def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):
     # all passed before; the penalty is held exactly to penalised.
     trials = _chain(4)
     trials[0]["trialStartTime"] -= 5
-    trials[1]["penaltySound"] = False  # penalised, the task's sound on
+    trials[1]["penaltySoundOn"] = False  # penalised, the task's sound on
     trials[2]["outcome"] = "Banana"
-    trials[2]["penaltySound"] = True  # not penalised
+    trials[2]["penaltySoundOn"] = True  # not penalised
     trials[3]["penaltyTimeoutSeconds"] = 3.0  # penalised, the task's timeout 4 s
     text = "\n".join(summarise(_experiment(tmp_path, trials, [])).problems)
     assert "trial 1: trial start (trialStartTime) -5.0000 s from its interval's end less the lead (0.1 s) plus quietWaitSeconds" in text
-    assert "trial 2: penaltySound False on a trial penalised, with the task's penalty.sound on" in text
+    assert "trial 2: penaltySoundOn False on a trial penalised, with the task's penalty.sound on" in text
     assert "trial 3: outcome 'Banana' is not one of Correct, Incorrect, NoResponse" in text
-    assert "trial 3: penaltySound True on a trial not penalised, with the task's penalty.sound on" in text
+    assert "trial 3: penaltySoundOn True on a trial not penalised, with the task's penalty.sound on" in text
     assert "trial 4: penaltyTimeoutSeconds 3 on a trial penalised, not 4" in text
 
 
 def test_a_timeout_on_an_unpenalised_trial_and_the_sound_off_are_named(tmp_path):
     trials = _chain(2)
     trials[0]["penaltyTimeoutSeconds"] = 0.5  # not penalised
-    trials[1]["penaltySound"] = True  # penalised, but the task's sound off
+    trials[1]["penaltySoundOn"] = True  # penalised, but the task's sound off
     task = {**TASK, "penalty": {"timeoutSeconds": 4.0, "sound": {"enabled": False}}}
     rewards = [(trials[0]["outcomeTime"], 2.0)]
     text = "\n".join(summarise(_experiment(tmp_path, trials, rewards, task=task)).problems)
     assert "trial 1: penaltyTimeoutSeconds 0.5 on a trial not penalised, not 0" in text
-    assert "trial 2: penaltySound True on a trial penalised, with the task's penalty.sound off" in text
+    assert "trial 2: penaltySoundOn True on a trial penalised, with the task's penalty.sound off" in text
 
 
 def test_a_reward_is_checked_both_ways_and_by_its_request(tmp_path):

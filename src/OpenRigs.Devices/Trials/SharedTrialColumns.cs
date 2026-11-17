@@ -14,7 +14,7 @@ namespace OpenRigs.Devices
     public static class SharedTrialColumns
     {
         /// <summary>The core columns this fills; every row has them (harpTime is the row's timestamp, and trialType and outcome the task's).</summary>
-        public static readonly string[] Core = { "trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds", "penalised" };
+        public static readonly string[] Core = { "trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySoundOn", "penaltyTimeoutSeconds", "penalised" };
 
         /// <summary>The quietWait block: filled when the row has it.</summary>
         public static readonly string[] QuietWait = { "quietWaitSeconds" };
@@ -25,7 +25,7 @@ namespace OpenRigs.Devices
         /// <summary>
         /// Fills <paramref name="row"/>'s shared block at the trial's outcome (times.Now): its number; the loop's times;
         /// rewardOfferedUl, the microlitres a reward on this trial gives, on every trial; rewarded, whether the outcome
-        /// delivers it (the same value the task's valve command is made from); penaltySound true only when the trial is
+        /// delivers it (the same value the task's valve command is made from); penaltySoundOn true only when the trial is
         /// penalised and the task's penalty sound is on; penaltyTimeoutSeconds the task's timeout when penalised, else 0;
         /// penalised itself; with the optogenetics block, the trial's laser condition, its power only if the
         /// laser was triggered (else 0 mW) and the trigger's time (NaN if none), or 0, 0 and NaN for a trial that is not an
@@ -47,7 +47,7 @@ namespace OpenRigs.Devices
                 { "outcomeTime", times.Now },
                 { "rewardOfferedUl", rewardOfferedUl },
                 { "rewarded", rewarded },
-                { "penaltySound", penalised && penaltySoundEnabled },
+                { "penaltySoundOn", penalised && penaltySoundEnabled },
                 { "penaltyTimeoutSeconds", penalised ? penaltyTimeoutSeconds : 0.0 },
                 { "penalised", penalised },
             };

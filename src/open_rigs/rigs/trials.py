@@ -18,7 +18,7 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
 - each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
   within 2 ms;
 - each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds, within 2 ms;
-- each penalised trial (penalised) had the penalty sound (penaltySound) exactly when the task's penalty.sound is enabled
+- each penalised trial (penalised) had the penalty sound (penaltySoundOn) exactly when the task's penalty.sound is enabled
   and the task's penalty.timeoutSeconds as its penaltyTimeoutSeconds; an unpenalised one neither;
 - each rewarded trial (rewarded) has a RewardDelivered row at its outcome requesting its rewardOfferedUl, and no
   RewardDelivered comes at the outcome of a trial not rewarded.
@@ -95,13 +95,13 @@ CORE_COLUMNS: List[Column] = [
     ("rewarded", "bool", None,
      "True when the trial's outcome delivered its reward (rewardOfferedUl, at outcomeTime): the value the workflow's "
      "reward command is made from. Which outcomes are rewarded is the task's (its note)."),
-    ("penaltySound", "bool", None, "True when the trial was penalised and the task's penalty sound is enabled."),
+    ("penaltySoundOn", "bool", None, "True when the trial was penalised and the task's penalty sound is enabled."),
     ("penaltyTimeoutSeconds", "double", "s",
      "The timeout after this trial: the task's penalty.timeoutSeconds when the trial was penalised, else 0. The next "
      "interval starts after it (itiStartTime)."),
     ("penalised", "bool", None,
      "True when the trial was penalised: the task's penalty timeout (penaltyTimeoutSeconds) and, with its penalty.sound "
-     "enabled, the penalty sound (penaltySound) followed its outcome. Which outcomes are penalised is the task's (its note)."),
+     "enabled, the penalty sound (penaltySoundOn) followed its outcome. Which outcomes are penalised is the task's (its note)."),
 ]
 
 QUIET_WAIT_COLUMNS: List[Column] = [
@@ -241,7 +241,7 @@ def _true(text: Any) -> bool:
 
 
 # The columns summarise reads: of a trial row, and of an Events row.
-TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySound", "penaltyTimeoutSeconds", "penalised")
+TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySoundOn", "penaltyTimeoutSeconds", "penalised")
 EVENT_NEEDS = (TIME_COLUMN, "Event", "Value")
 # A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an infinity, an
 # empty cell or text is a problem and the row's checks are skipped.
@@ -379,9 +379,9 @@ def _summarise(folder: Path) -> Summary:
             if not math.isnan(trigger) and abs(trigger - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: laser trigger {trigger - due:+.4f} s from laserToStimulusSeconds "
                                   f"({task.laser_to_stimulus:g} s) before the stimulus was due")
-            penalised, sounded, timeout = _true(row["penalised"]), _true(row["penaltySound"]), _f(row, "penaltyTimeoutSeconds")
+            penalised, sounded, timeout = _true(row["penalised"]), _true(row["penaltySoundOn"]), _f(row, "penaltyTimeoutSeconds")
             if sounded != (penalised and task.sound):
-                s.problems.append(f"trial {number}: penaltySound {sounded} on a trial {'penalised' if penalised else 'not penalised'}, "
+                s.problems.append(f"trial {number}: penaltySoundOn {sounded} on a trial {'penalised' if penalised else 'not penalised'}, "
                                   f"with the task's penalty.sound {'on' if task.sound else 'off'}")
             want = task.timeout_seconds if penalised else 0.0
             if abs(timeout - want) > 1e-9:

@@ -212,7 +212,7 @@ class PenaltySound(TaskBlock):
 
 
 class Penalty(TaskBlock):
-    """What a wrong or missed trial costs: a timeout, and the penalty sound with it (the trial log's penaltySound and
+    """What a wrong or missed trial costs: a timeout, and the penalty sound with it (the trial log's penaltySoundOn and
     penaltyTimeoutSeconds). Each task says which trials are penalised; timeoutSeconds has no lab default: each task file gives it."""
 
     timeout_seconds: float = Field(ge=0, description="Timeout after a penalised trial, in seconds; the next interval starts after it")

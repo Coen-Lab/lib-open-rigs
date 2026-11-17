@@ -47,7 +47,7 @@ namespace OpenRigs.Devices
             Row = Timestamped.Create(row, Get<double>(row, "outcomeTime"));
             Rewarded = Get<bool>(row, "rewarded");
             Reward = Rewarded ? Tuple.Create(valveInstance, Get<double>(row, "rewardOfferedUl")) : null;
-            PenaltySound = Get<bool>(row, "penaltySound");
+            PenaltySoundOn = Get<bool>(row, "penaltySoundOn");
             PenaltyTimeoutSeconds = Get<double>(row, "penaltyTimeoutSeconds");
         }
 
@@ -60,8 +60,8 @@ namespace OpenRigs.Devices
         /// <summary>Gets the reward request (valve, microlitres) for RewardRequests; null without a reward.</summary>
         public Tuple<string, double> Reward { get; private set; }
 
-        /// <summary>Gets whether the penalty sound plays (the row's penaltySound).</summary>
-        public bool PenaltySound { get; private set; }
+        /// <summary>Gets whether the penalty sound plays (the row's penaltySoundOn).</summary>
+        public bool PenaltySoundOn { get; private set; }
 
         /// <summary>Gets the timeout after the trial, in seconds (the row's penaltyTimeoutSeconds).</summary>
         public double PenaltyTimeoutSeconds { get; private set; }
