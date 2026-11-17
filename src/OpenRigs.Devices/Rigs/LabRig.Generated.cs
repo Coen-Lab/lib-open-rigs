@@ -40,7 +40,7 @@ namespace OpenRigs.Devices.Rigs
     
         private EqualisedSpeakerArray _speakerArray;
     
-        private StepperPositions _lickSpoutDefaultPosition;
+        private SpoutPositions _lickSpoutDefaultPosition;
     
         private ZapitServer _zapit;
     
@@ -245,14 +245,14 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The lick spout stage's in position, in steps, for a mouse with no positions file of its own.
+        /// The lick spout stage's in position, in steps, for a mouse with no row in LickSpoutPositions.csv beside rig.yml.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("lickSpoutDefaultPosition")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="lickSpoutDefaultPosition")]
-        [System.ComponentModel.DescriptionAttribute("The lick spout stage\'s in position, in steps, for a mouse with no positions file " +
-            "of its own.")]
-        public StepperPositions LickSpoutDefaultPosition
+        [System.ComponentModel.DescriptionAttribute("The lick spout stage\'s in position, in steps, for a mouse with no row in LickSpou" +
+            "tPositions.csv beside rig.yml.")]
+        public SpoutPositions LickSpoutDefaultPosition
         {
             get
             {
@@ -3390,14 +3390,13 @@ namespace OpenRigs.Devices.Rigs
 
 
     /// <summary>
-    /// Absolute target position for the 5-axis spout rig, expressed in task-relative axes.
+    /// The lick spout stage's five axes, in motor steps from each axis's home switch.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("Absolute target position for the 5-axis spout rig, expressed in task-relative axe" +
-        "s.")]
+    [System.ComponentModel.DescriptionAttribute("The lick spout stage\'s five axes, in motor steps from each axis\'s home switch.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
-    public partial class StepperPositions
+    public partial class SpoutPositions
     {
     
         private int _baseTransverse;
@@ -3410,11 +3409,11 @@ namespace OpenRigs.Devices.Rigs
     
         private int _elevationRight;
     
-        public StepperPositions()
+        public SpoutPositions()
         {
         }
     
-        protected StepperPositions(StepperPositions other)
+        protected SpoutPositions(SpoutPositions other)
         {
             _baseTransverse = other._baseTransverse;
             _radialLeft = other._radialLeft;
@@ -3424,12 +3423,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Base transverse axis absolute position (steps). Maps to motor 1 (StepperDriver a, motor 0)
+        /// Base transverse axis (StepperDriver-A Motor0), in steps.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("baseTransverse", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="baseTransverse")]
-        [System.ComponentModel.DescriptionAttribute("Base transverse axis absolute position (steps). Maps to motor 1 (StepperDriver a," +
-            " motor 0)")]
+        [System.ComponentModel.DescriptionAttribute("Base transverse axis (StepperDriver-A Motor0), in steps.")]
         public int BaseTransverse
         {
             get
@@ -3443,12 +3441,12 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (StepperDriver a, motor 1)
+        /// Left spout radial axis (StepperDriver-A Motor1), in steps; more is towards the mouse.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("radialLeft", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="radialLeft")]
-        [System.ComponentModel.DescriptionAttribute("Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (Stepp" +
-            "erDriver a, motor 1)")]
+        [System.ComponentModel.DescriptionAttribute("Left spout radial axis (StepperDriver-A Motor1), in steps; more is towards the mo" +
+            "use.")]
         public int RadialLeft
         {
             get
@@ -3462,12 +3460,12 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (StepperDriver a, motor 2)
+        /// Right spout radial axis (StepperDriver-A Motor2), in steps; more is towards the mouse.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("radialRight", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="radialRight")]
-        [System.ComponentModel.DescriptionAttribute("Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (Step" +
-            "perDriver a, motor 2)")]
+        [System.ComponentModel.DescriptionAttribute("Right spout radial axis (StepperDriver-A Motor2), in steps; more is towards the m" +
+            "ouse.")]
         public int RadialRight
         {
             get
@@ -3481,12 +3479,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriver b, motor 0)
+        /// Left spout elevation axis (StepperDriver-B Motor0), in steps.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("elevationLeft", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="elevationLeft")]
-        [System.ComponentModel.DescriptionAttribute("Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriv" +
-            "er b, motor 0)")]
+        [System.ComponentModel.DescriptionAttribute("Left spout elevation axis (StepperDriver-B Motor0), in steps.")]
         public int ElevationLeft
         {
             get
@@ -3500,12 +3497,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDriver b, motor 1)
+        /// Right spout elevation axis (StepperDriver-B Motor1), in steps.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("elevationRight", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="elevationRight")]
-        [System.ComponentModel.DescriptionAttribute("Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDri" +
-            "ver b, motor 1)")]
+        [System.ComponentModel.DescriptionAttribute("Right spout elevation axis (StepperDriver-B Motor1), in steps.")]
         public int ElevationRight
         {
             get
@@ -3518,14 +3514,14 @@ namespace OpenRigs.Devices.Rigs
             }
         }
     
-        public System.IObservable<StepperPositions> Generate()
+        public System.IObservable<SpoutPositions> Generate()
         {
-            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new StepperPositions(this)));
+            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new SpoutPositions(this)));
         }
     
-        public System.IObservable<StepperPositions> Generate<TSource>(System.IObservable<TSource> source)
+        public System.IObservable<SpoutPositions> Generate<TSource>(System.IObservable<TSource> source)
         {
-            return System.Reactive.Linq.Observable.Select(source, _ => new StepperPositions(this));
+            return System.Reactive.Linq.Observable.Select(source, _ => new SpoutPositions(this));
         }
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
@@ -4692,9 +4688,9 @@ namespace OpenRigs.Devices.Rigs
             return Process<SpinnakerCamera>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<StepperPositions> source)
+        public System.IObservable<string> Process(System.IObservable<SpoutPositions> source)
         {
-            return Process<StepperPositions>(source);
+            return Process<SpoutPositions>(source);
         }
 
         public System.IObservable<string> Process(System.IObservable<StepperWiring> source)
@@ -4756,7 +4752,7 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Speaker>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SphericalPosition>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpinnakerCamera>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<StepperPositions>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpoutPositions>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<StepperWiring>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<VideoEncoder>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<WiredLine>))]
@@ -5023,9 +5019,9 @@ namespace OpenRigs.Devices.Rigs
             return Process<SpinnakerCamera>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<StepperPositions> source)
+        public System.IObservable<string> Process(System.IObservable<SpoutPositions> source)
         {
-            return Process<StepperPositions>(source);
+            return Process<SpoutPositions>(source);
         }
 
         public System.IObservable<string> Process(System.IObservable<StepperWiring> source)
@@ -5087,7 +5083,7 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Speaker>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SphericalPosition>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpinnakerCamera>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<StepperPositions>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpoutPositions>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<StepperWiring>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<VideoEncoder>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<WiredLine>))]

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -15,19 +16,19 @@ namespace OpenRigs.Devices
         /// <summary>The axes in file and rig.yml order.</summary>
         public static readonly string[] AxisNames = { "baseTransverse", "radialLeft", "radialRight", "elevationLeft", "elevationRight" };
 
-        /// <summary>Gets or sets the base's transverse axis (StepperDriver-A motor 0).</summary>
+        /// <summary>Gets or sets the base's transverse axis (StepperDriver-A Motor0).</summary>
         public int BaseTransverse { get; set; }
 
-        /// <summary>Gets or sets the left spout's radial axis (StepperDriver-A motor 1).</summary>
+        /// <summary>Gets or sets the left spout's radial axis (StepperDriver-A Motor1).</summary>
         public int RadialLeft { get; set; }
 
-        /// <summary>Gets or sets the right spout's radial axis (StepperDriver-A motor 2).</summary>
+        /// <summary>Gets or sets the right spout's radial axis (StepperDriver-A Motor2).</summary>
         public int RadialRight { get; set; }
 
-        /// <summary>Gets or sets the left spout's elevation axis (StepperDriver-B motor 0).</summary>
+        /// <summary>Gets or sets the left spout's elevation axis (StepperDriver-B Motor0).</summary>
         public int ElevationLeft { get; set; }
 
-        /// <summary>Gets or sets the right spout's elevation axis (StepperDriver-B motor 1).</summary>
+        /// <summary>Gets or sets the right spout's elevation axis (StepperDriver-B Motor1).</summary>
         public int ElevationRight { get; set; }
 
         /// <summary>The axes in <see cref="AxisNames"/> order.</summary>
@@ -62,26 +63,62 @@ namespace OpenRigs.Devices
             };
         }
 
-        /// <summary>Reads a positions file: one line, the five axes comma separated in <see cref="AxisNames"/> order.</summary>
-        public static SpoutPositions Load(string path)
+        /// <summary>The positions list's header: the mouse, then the axes in <see cref="AxisNames"/> order.</summary>
+        public static readonly string Header = "mouse," + string.Join(",", AxisNames);
+
+        /// <summary>
+        /// The mouse's row of a rig's positions list (LickSpoutPositions.csv beside rig.yml); null when the list
+        /// does not exist or has no row for the mouse. Throws, naming the list, when it is malformed.
+        /// </summary>
+        public static SpoutPositions Load(string path, string mouse)
         {
-            var lines = File.ReadAllLines(path).Where(line => line.Trim().Length > 0).ToArray();
-            var parts = lines.Length == 1 ? lines[0].Split(',') : new string[0];
-            int value;
-            if (parts.Length != 5 || !parts.All(part => int.TryParse(part.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value)))
-            {
-                throw new InvalidDataException(string.Format(
-                    "The spout positions file {0} must be one line of five whole numbers, {1}, comma separated.",
-                    path, string.Join(", ", AxisNames)));
-            }
-            return FromArray(parts.Select(part => int.Parse(part.Trim(), CultureInfo.InvariantCulture)).ToArray());
+            if (!File.Exists(path)) return null;
+            int[] found;
+            return Rows(path).TryGetValue(mouse, out found) ? FromArray(found) : null;
         }
 
-        /// <summary>Writes a positions file, making its folder if needed.</summary>
-        public void Save(string path)
+        /// <summary>
+        /// Writes these positions as the mouse's row of a rig's positions list, replacing its old row and keeping the
+        /// others: the whole list goes to a temporary file beside it, which then takes the list's place, so a list
+        /// is never half written. Makes the list, with its header, if there is none.
+        /// </summary>
+        public void Save(string path, string mouse)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
-            File.WriteAllText(path, string.Join(",", ToArray().Select(v => v.ToString(CultureInfo.InvariantCulture))) + Environment.NewLine);
+            if (string.IsNullOrWhiteSpace(mouse) || mouse.IndexOfAny(new[] { ',', '\r', '\n' }) >= 0)
+                throw new ArgumentException("A spout positions row needs a mouse name without commas or line breaks, not '" + mouse + "'.");
+            var rows = File.Exists(path) ? Rows(path) : new Dictionary<string, int[]>(StringComparer.Ordinal);
+            rows[mouse] = ToArray();
+            var lines = new List<string> { Header };
+            lines.AddRange(rows.OrderBy(row => row.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(row => row.Key + "," + string.Join(",", row.Value.Select(v => v.ToString(CultureInfo.InvariantCulture)))));
+            var full = Path.GetFullPath(path);
+            Directory.CreateDirectory(Path.GetDirectoryName(full));
+            var temporary = full + ".tmp";
+            File.WriteAllText(temporary, string.Join(Environment.NewLine, lines) + Environment.NewLine);
+            if (File.Exists(full)) File.Replace(temporary, full, null);
+            else File.Move(temporary, full);
+        }
+
+        static Dictionary<string, int[]> Rows(string path)
+        {
+            var lines = File.ReadAllLines(path).Where(line => line.Trim().Length > 0).ToArray();
+            if (lines.Length == 0 || lines[0].Trim() != Header) throw Malformed(path, "its first line must be " + Header);
+            var rows = new Dictionary<string, int[]>(StringComparer.Ordinal);
+            foreach (var line in lines.Skip(1))
+            {
+                var parts = line.Split(',').Select(part => part.Trim()).ToArray();
+                int value;
+                if (parts.Length != 6 || parts[0].Length == 0 || !parts.Skip(1).All(part => int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out value)))
+                    throw Malformed(path, "each row must be a mouse and five whole numbers, not '" + line + "'");
+                if (rows.ContainsKey(parts[0])) throw Malformed(path, parts[0] + " has more than one row");
+                rows[parts[0]] = parts.Skip(1).Select(part => int.Parse(part, CultureInfo.InvariantCulture)).ToArray();
+            }
+            return rows;
+        }
+
+        static InvalidDataException Malformed(string path, string why)
+        {
+            return new InvalidDataException(string.Format("The spout positions list {0} is malformed: {1}.", path, why));
         }
 
         /// <summary>Reads rig.yml's <c>lickSpoutDefaultPosition</c>; throws naming the file and what is missing.</summary>
@@ -93,7 +130,7 @@ namespace OpenRigs.Devices
             YamlNode node = null;
             if (root == null || !root.Children.TryGetValue(new YamlScalarNode("lickSpoutDefaultPosition"), out node) || !(node is YamlMappingNode))
             {
-                throw new InvalidDataException(rigFile + " has no lickSpoutDefaultPosition, the in position of a mouse with no positions file.");
+                throw new InvalidDataException(rigFile + " has no lickSpoutDefaultPosition, the in position of a mouse with no row in LickSpoutPositions.csv.");
             }
             var entries = (YamlMappingNode)node;
             return FromArray(AxisNames.Select(axis =>

@@ -13,9 +13,9 @@ namespace OpenRigs.Devices
     /// <summary>The lick spout stage's two Harp StepperDriver boards.</summary>
     public enum LickSpoutDriver
     {
-        /// <summary>StepperDriver-A: motor 0 base transverse, 1 left radial, 2 right radial.</summary>
+        /// <summary>StepperDriver-A: Motor0 base transverse, Motor1 left radial, Motor2 right radial.</summary>
         A,
-        /// <summary>StepperDriver-B: motor 0 left elevation, 1 right elevation.</summary>
+        /// <summary>StepperDriver-B: Motor0 left elevation, Motor1 right elevation.</summary>
         B
     }
 
@@ -195,7 +195,7 @@ namespace OpenRigs.Devices
                 return Observable.Return(LickSpoutDrivers.ReadSwitches()).Concat(stepOff).Concat(driveHome);
             });
             return homing.Timeout(timeout, Observable.Defer(() => Observable.Throw<HarpMessage>(new TimeoutException(string.Format(
-                "StepperDriver-{0} motor {1} was not homed within {2} s: check its home switch and cable.", driver, motor, timeout.TotalSeconds)))), scheduler);
+                "StepperDriver-{0} Motor{1} was not homed within {2} s: check its home switch and cable.", driver, motor, timeout.TotalSeconds)))), scheduler);
         }
     }
 }

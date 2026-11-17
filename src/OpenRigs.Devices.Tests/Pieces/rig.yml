@@ -151,7 +151,7 @@ zapit:
   port: 1488
   hardwareTriggered: false  # true once the ZapitTrigger line is cabled to the Zapit DAQ trigger input
 
-# The stage's in position, in steps, for a mouse with no positions file of its own
+# The stage's in position, in steps, for a mouse with no row in LickSpoutPositions.csv beside this file
 lickSpoutDefaultPosition:
   baseTransverse: 0
   radialLeft: 0

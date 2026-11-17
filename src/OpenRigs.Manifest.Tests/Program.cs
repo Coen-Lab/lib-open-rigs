@@ -282,7 +282,7 @@ namespace OpenRigs.Manifest.Tests
             var topKeys = string.Join(",", records["completed"].Select(p => p.Key));
             var fileKeys = string.Join(",", ((JsonObject)((List<object>)records["completed"].First(p => p.Key == "files").Value)[0]).Select(p => p.Key));
             Check("version 4 has no status, completed or ingest, and a file no sha256 or expected", Field(completed, "version") == "4"
-                && topKeys == "version,created,ingest_script,writer,rig,session,source,launch,control,config_files,trial_columns,run,expected,notes,files"
+                && topKeys == "version,created,ingest_script,writer,rig,session,source,launch,control,config_files,spout_positions,trial_columns,run,expected,notes,files"
                 && fileKeys == "path,size,mtime,closed", topKeys + " | " + fileKeys);
             Check("control.launch_id is the LaunchId the controller passed", Field(completed, "control.launch_id") == "rig-AM006-004B1-20261112T101500Z", Field(completed, "control.launch_id"));
             Check("... and null when none was passed", ManifestWriter.ControlSection(null, "a", "b", null, null, null, null).First(p => p.Key == "launch_id").Value == null, "not null");
@@ -413,15 +413,23 @@ namespace OpenRigs.Manifest.Tests
                 Check("{SubjectId} names the subject's own file", mine.Count == 1 && ((string)mine[0][0].Value).EndsWith(@"Spouts\M7.csv") && mine[0][1].Key == "sha256", string.Join(" | ", mine.Select(f => string.Join(",", f.Select(p => p.Key + "=" + p.Value)))));
                 var nobody = ManifestWriter.ConfigFiles(@"Spouts\{SubjectId}.csv", root, null);
                 Check("... and with no SubjectId on the command line it is missing, saying why", nobody.Count == 1 && nobody[0].Any(p => p.Key == "missing") && ((string)nobody[0].First(p => p.Key == "why").Value).Contains("SubjectId"), "found");
-                // {RigFiles}: rig.yml and every file it names, relative ones from its folder; the spout positions when the stage is there.
+                // {RigFiles}: rig.yml and every file it names, relative ones from its folder.
                 var tokenRig = Path.Combine(root, "RIG", "rig.yml");
                 Directory.CreateDirectory(Path.GetDirectoryName(tokenRig));
                 File.WriteAllText(tokenRig, "behaviorBoard:\n  main:\n    pulseController:\n      outputs:\n        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }\n" +
                     "projectionCalibration:\n  meshMapPath: calibration/MeshMap.csv\nspeakerArray:\n  device: { deviceName: Speakers (XMOS xCORE-200 MC (UAC2.0)) }\n" +
                     "  speakers:\n    left: { channel: 0, filter: calibration/speaker-left.json }\n  backgroundNoise: ../shared/sounds/background_noise.wav\nlickSpoutDefaultPosition: { baseTransverse: 0 }\n");
                 var rigFiles = ManifestWriter.RigFiles(tokenRig);
-                var wantFiles = new[] { tokenRig, Path.Combine(root, @"RIG\calibration\valve-DO1.json"), Path.Combine(root, @"RIG\calibration\MeshMap.csv"), Path.Combine(root, @"RIG\calibration\speaker-left.json"), Path.Combine(root, @"shared\sounds\background_noise.wav"), Path.Combine(root, @"RIG\calibration\LickSpoutPositions\{SubjectId}.csv") };
-                Check("{RigFiles} is rig.yml, every path it names and the spout positions", rigFiles.SequenceEqual(wantFiles), string.Join(" | ", rigFiles));
+                var wantFiles = new[] { tokenRig, Path.Combine(root, @"RIG\calibration\valve-DO1.json"), Path.Combine(root, @"RIG\calibration\MeshMap.csv"), Path.Combine(root, @"RIG\calibration\speaker-left.json"), Path.Combine(root, @"shared\sounds\background_noise.wav") };
+                Check("{RigFiles} is rig.yml and every path it names", rigFiles.SequenceEqual(wantFiles), string.Join(" | ", rigFiles));
+                // spout_positions: the mouse's row of LickSpoutPositions.csv beside rig.yml, else rig.yml's default, as numbers.
+                Func<JsonObject, string> spouts = section => section == null ? "null" : string.Join(",", section.Select(p => p.Key + "=" + p.Value));
+                var noRow = spouts(ManifestWriter.SpoutPositionsSection(tokenRig, "M7"));
+                Check("spout_positions without a list is rig.yml's default", noRow == "mouse=M7,from=lickSpoutDefaultPosition,baseTransverse=0,radialLeft=,radialRight=,elevationLeft=,elevationRight=", noRow);
+                File.WriteAllText(Path.Combine(root, "RIG", "LickSpoutPositions.csv"), "mouse,baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight\nM6,9,9,9,9,9\nM7,1,2,3,4,5\n");
+                var row = spouts(ManifestWriter.SpoutPositionsSection(tokenRig, "M7"));
+                Check("... and with the mouse's row, its five numbers", row == "mouse=M7,from=LickSpoutPositions.csv,baseTransverse=1,radialLeft=2,radialRight=3,elevationLeft=4,elevationRight=5", row);
+                Check("... and null on a rig without a stage", ManifestWriter.SpoutPositionsSection(cfgPath, "M7") == null, "a section");
                 Check("... and an unreadable rig.yml alone", ManifestWriter.RigFiles(Path.Combine(root, "none.yml")).Count == 1, "more");
                 // A missing file's note names the file looked for, environment variables and {SubjectId} filled in, not the entry as typed.
                 Environment.SetEnvironmentVariable("OPENRIGS_TEST_MACHINE", "TEST-RIG-2");

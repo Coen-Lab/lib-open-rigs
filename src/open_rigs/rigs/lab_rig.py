@@ -22,7 +22,7 @@ from open_rigs.components.video import SpinnakerCamera, VideoEncoder
 from open_rigs.components.wiring import BoardWiring
 from open_rigs.components.zapit import ZapitServer
 from open_rigs.core.rig import Rig
-from open_rigs.devices import CalibratedPulse, HarpTimestampGeneratorGen3, LicketySplit, StepperPositions
+from open_rigs.devices import CalibratedPulse, HarpTimestampGeneratorGen3, LicketySplit, SpoutPositions
 from open_rigs.devices.behavior_board import PulseOutputs
 
 REWARD_VALVE_DEVICE = "RewardValve"
@@ -72,8 +72,8 @@ class LabRig(Rig):
         default=None, description="Mesh-map and gamma-LUT files for the projector's display, each relative to rig.yml's folder."
     )
     speaker_array: Optional[EqualisedSpeakerArray] = Field(default=None, description="Speaker array and audio output device.")
-    lick_spout_default_position: Optional[StepperPositions] = Field(
-        default=None, description="The lick spout stage's in position, in steps, for a mouse with no positions file of its own."
+    lick_spout_default_position: Optional[SpoutPositions] = Field(
+        default=None, description="The lick spout stage's in position, in steps, for a mouse with no row in LickSpoutPositions.csv beside rig.yml."
     )
     zapit: Optional[ZapitServer] = Field(
         default=None, description="Zapit optogenetics server endpoint; contacted only when the task enables optogenetics."

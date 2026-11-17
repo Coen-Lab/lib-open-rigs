@@ -13,7 +13,7 @@ stepperDriver:
 lickSpoutDefaultPosition: { baseTransverse: 0, radialLeft: 0, radialRight: 0, elevationLeft: 0, elevationRight: 0 }
 ```
 
-A mouse's own positions are `calibration\LickSpoutPositions\<SubjectId>.csv` beside `rig.yml`, one line: `baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight`. The operator saves them with `SaveSpoutPositions`; a mouse without a file gets `lickSpoutDefaultPosition`.
+The rig's spout positions are one list, `LickSpoutPositions.csv` beside `rig.yml`: a header, `mouse,baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight`, then one row per mouse. The operator saves the mouse's row with `SaveSpoutPositions`, through a temporary file that then takes the list's place, so the other rows are kept and the list is never half written; a mouse without a row gets `lickSpoutDefaultPosition`. The positions the stage starts from and each save are rows of the experiment's events (`SpoutPositionsLoaded`, `SpoutPositionsDefault`, `SpoutPositionsSaved`; `Detail` the mouse and each axis's steps), and the manifest records the starting five numbers (`spout_positions`).
 
 ---
 
@@ -25,4 +25,4 @@ A mouse's own positions are `calibration\LickSpoutPositions\<SubjectId>.csv` bes
 
 Opens `StepperDriver-A` and `StepperDriver-B` behind their `.Data` and `.Commands` subjects and logs both once the experiment folder exists and the Harp clock is set. Sets both drivers up and homes all five motors together, each within 60 s; once done it publishes `LickSpoutStage.Homed`, announces `SpoutsHomed` into `ReadyStages` and moves the spouts in. It then moves for the controller's spout commands (`SpoutsHome`, `SpoutsIn`, `SpoutsOut`, `SpoutsDefault` (the in position reset to `lickSpoutDefaultPosition`, kept for the mouse only by `SaveSpoutPositions`), `SaveSpoutPositions`, `LeftUp`, `LeftDown`, `RightUp`, `RightDown`, `LeftIn`, `LeftOut`, `RightIn`, `RightOut`, `BaseLeft`, `BaseRight`, each declared by the piece itself, `DeclareControls`, never by the workflow), a nudge by the experiment parameter `SpoutStepSize`, which the piece declares too and the stage takes live as the controller sets it (150 steps until then, shown on the controller one second after Start), and for `LickSpoutCommand` values a task sends to `LickSpoutStage.Commands`. Each target is published on `LickSpoutStage.Target`. Stops the workflow at Start, naming the entries `rig.yml` has, if it lacks `a` or `b`.
 
-The setup, homing, moves and positions file are C# in OpenRigs.Devices (`SetUpLickSpoutDriver`, `HomeLickSpoutMotor`, `MoveLickSpoutDriver`, `ToLickSpoutCommand`, `SpoutPositions`, `LickSpoutStage`), each with tests.
+The setup, homing, moves and positions list are C# in OpenRigs.Devices (`SetUpLickSpoutDriver`, `HomeLickSpoutMotor`, `MoveLickSpoutDriver`, `ToLickSpoutCommand`, `SpoutPositions`, `LickSpoutStage`), each with tests.

@@ -24,6 +24,7 @@ namespace OpenRigs.Manifest
         public JsonObject Launch;
         public List<object> ConfigFiles = new List<object>();
         public JsonObject TrialColumns;
+        public JsonObject SpoutPositions;
         public List<object> Notes = new List<object>();
     }
 
@@ -81,6 +82,7 @@ namespace OpenRigs.Manifest
                     if (missing.Key != null) snapshot.Notes.Add(MissingNote(file, configured, subject));
                 }
             }
+            if (!string.IsNullOrWhiteSpace(configRoot)) snapshot.SpoutPositions = SpoutPositionsSection(RigDevices.PathFor(configRoot), subject);
             string trialNote;
             snapshot.TrialColumns = Manifest.TrialColumns.Read(trialColumns, root ?? workflowFolder, out trialNote);
             if (trialNote != null) snapshot.Notes.Add(trialNote);
@@ -112,9 +114,8 @@ namespace OpenRigs.Manifest
         /// <summary>
         /// The ConfigFiles entry that stands for this machine's rig.yml (under ExperimentManifest's ConfigRoot) and every
         /// file it names: each scalar in it that is a path (holding / or \ and ending in an
-        /// extension), relative ones from rig.yml's folder, such as valve calibrations, speaker filters, the mesh map
-        /// and the gamma table; and, on a rig with a lick spout stage (lickSpoutDefaultPosition), the mouse's spout
-        /// positions, calibration\LickSpoutPositions\{SubjectId}.csv.
+        /// extension), relative ones from rig.yml's folder, such as valve calibrations, speaker filters, the projector
+        /// mesh and the gamma table. The mouse's spout positions are recorded as numbers, in spout_positions.
         /// </summary>
         public const string RigFilesToken = "{RigFiles}";
 
@@ -164,9 +165,59 @@ namespace OpenRigs.Manifest
                     if (!files.Contains(full, StringComparer.OrdinalIgnoreCase)) files.Add(full);
                 }
             }
-            if (root.Children.Keys.OfType<YamlDotNet.RepresentationModel.YamlScalarNode>().Any(k => k.Value == "lickSpoutDefaultPosition"))
-                files.Add(Path.Combine(folder, "calibration", "LickSpoutPositions", SubjectToken + ".csv"));
             return files;
+        }
+
+        /// <summary>The rig's spout positions list, beside rig.yml: a header, then one row per mouse.</summary>
+        public const string SpoutPositionsFile = "LickSpoutPositions.csv";
+
+        /// <summary>The axes of a spout position, in the list's and rig.yml's order (OpenRigs.Devices SpoutPositions).</summary>
+        public static readonly string[] SpoutAxes = { "baseTransverse", "radialLeft", "radialRight", "elevationLeft", "elevationRight" };
+
+        /// <summary>
+        /// spout_positions: on a rig with a lick spout stage (rig.yml's lickSpoutDefaultPosition), the in positions the
+        /// mouse starts from, as OpenRigs.Devices LickSpoutStage reads them: its row of LickSpoutPositions.csv beside
+        /// rig.yml, else rig.yml's default; <c>from</c> says which. Null on a rig without a stage or when rig.yml cannot
+        /// be read; a list that cannot be read is <c>{from, error}</c>.
+        /// </summary>
+        public static JsonObject SpoutPositionsSection(string rigYml, string subject)
+        {
+            YamlDotNet.RepresentationModel.YamlMappingNode defaults;
+            try
+            {
+                var yaml = new YamlDotNet.RepresentationModel.YamlStream();
+                using (var reader = new StreamReader(rigYml)) yaml.Load(reader);
+                var root = yaml.Documents.Count > 0 ? yaml.Documents[0].RootNode as YamlDotNet.RepresentationModel.YamlMappingNode : null;
+                YamlDotNet.RepresentationModel.YamlNode node = null;
+                if (root == null || !root.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode("lickSpoutDefaultPosition"), out node)) return null;
+                defaults = node as YamlDotNet.RepresentationModel.YamlMappingNode;
+            }
+            catch (Exception) { return null; }
+            var section = new JsonObject();
+            section.Add("mouse", subject);
+            var list = Path.Combine(Path.GetDirectoryName(rigYml), SpoutPositionsFile);
+            string[] row = null;
+            try
+            {
+                if (File.Exists(list) && !string.IsNullOrEmpty(subject))
+                    row = File.ReadAllLines(list).Skip(1).Select(line => line.Split(',').Select(part => part.Trim()).ToArray())
+                        .FirstOrDefault(parts => parts.Length == SpoutAxes.Length + 1 && parts[0] == subject);
+            }
+            catch (Exception e)
+            {
+                section.Add("from", SpoutPositionsFile);
+                section.Add("error", e.Message);
+                return section;
+            }
+            section.Add("from", row != null ? SpoutPositionsFile : "lickSpoutDefaultPosition");
+            for (var i = 0; i < SpoutAxes.Length; i++)
+            {
+                YamlDotNet.RepresentationModel.YamlNode value = null;
+                var text = row != null ? row[i + 1] : defaults != null && defaults.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode(SpoutAxes[i]), out value) ? ((value as YamlDotNet.RepresentationModel.YamlScalarNode) ?? new YamlDotNet.RepresentationModel.YamlScalarNode("")).Value : null;
+                long steps;
+                section.Add(SpoutAxes[i], long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out steps) ? (object)steps : null);
+            }
+            return section;
         }
 
         /// <summary>The first of ConfigFiles named rig.yml, its path resolved as at Start; null if none is.</summary>
@@ -179,8 +230,7 @@ namespace OpenRigs.Manifest
             return ResolvePath(configured, Git.FindRoot(folder) ?? folder);
         }
 
-        /// <summary>The part of a ConfigFiles entry that is the subject, from the launch's --property:SubjectId
-        /// (the mouse's spout positions, calibration\LickSpoutPositions\{SubjectId}.csv, 0.1.1-coen.6).</summary>
+        /// <summary>The part of a ConfigFiles entry that is the subject, from the launch's --property:SubjectId.</summary>
         public const string SubjectToken = "{SubjectId}";
 
         public static string LaunchProperty(JsonObject launch, string name)
@@ -296,6 +346,7 @@ namespace OpenRigs.Manifest
             doc.Add("launch", start.Launch);
             doc.Add("control", control);
             doc.Add("config_files", start.ConfigFiles);
+            doc.Add("spout_positions", start.SpoutPositions);
             doc.Add("trial_columns", start.TrialColumns);
             doc.Add("run", run);
             doc.Add("expected", expected);

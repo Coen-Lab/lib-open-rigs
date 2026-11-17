@@ -11,7 +11,7 @@ from open_rigs.devices.behavior_board import (
 from open_rigs.devices.serial import SerialDevice
 from open_rigs.devices.serial_balance import SerialBalance
 from open_rigs.devices.lickety_split import LicketySplit
-from open_rigs.devices.lick_spout_stage import StepperPositions
+from open_rigs.devices.lick_spout_stage import SpoutPositions
 from open_rigs.devices.harp import (
     HarpDevice,
     HarpClockSynchronizer,
@@ -31,7 +31,7 @@ __all__ = [
     "PulseController",
     "RunningWheel",
     "BehaviorBoard",
-    "StepperPositions",
+    "SpoutPositions",
     "SerialDevice",
     "SerialBalance",
     "LicketySplit",

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
@@ -6,8 +6,9 @@
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:ctl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The lick spout stage. PiecesSubscribeTests sets ConfigRoot; PathPrefix, ControlEvents and SubjectId (ExperimentControl's) never come, so nothing is logged.</Description>
+  <Description>The lick spout stage. PiecesSubscribeTests sets ConfigRoot; PathPrefix, ControlEvents, SubjectId (ExperimentControl's) and Timestamp never come, so nothing is logged.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
@@ -25,6 +26,12 @@
       </Expression>
       <Expression xsi:type="rx:AsyncSubject" TypeArguments="sys:String">
         <rx:Name>SubjectId</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Double">
+        <rx:Name>Timestamp</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:ReplaySubject" TypeArguments="harp:Timestamped(orl:EventRow)">
+        <rx:Name>Events</rx:Name>
       </Expression>
     </Nodes>
     <Edges>

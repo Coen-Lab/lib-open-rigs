@@ -2,6 +2,7 @@ using Bonsai;
 using System;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Reactive.Linq;
 
 namespace OpenRigs.Devices
@@ -21,7 +22,7 @@ namespace OpenRigs.Devices
         LeftOnly,
         /// <summary>The right spout in, the left drawn back and down.</summary>
         RightOnly,
-        /// <summary>Writes the mouse's in positions to its file.</summary>
+        /// <summary>Writes the mouse's in positions as its row of the rig's LickSpoutPositions.csv.</summary>
         SaveSpoutPositions,
         /// <summary>Left elevation up one step size.</summary>
         LeftUp,
@@ -46,14 +47,15 @@ namespace OpenRigs.Devices
     }
 
     /// <summary>
-    /// The lick spout stage's state: the mouse's in positions, loaded once from its file (or rig.yml's
-    /// lickSpoutDefaultPosition when it has none), and the placement last asked for. Each placement
-    /// command outputs the stage's new target; each nudge changes the in positions and outputs the
-    /// current placement's target again; SpoutsDefault sets the in positions back to rig.yml's default
-    /// and places the spouts in; SaveSpoutPositions writes the file and outputs nothing.
+    /// The lick spout stage's state: the mouse's in positions, loaded once from its row of the rig's
+    /// LickSpoutPositions.csv (or rig.yml's lickSpoutDefaultPosition when it has none), and the placement
+    /// last asked for. Each placement command outputs the stage's new target; each nudge changes the in
+    /// positions and outputs the current placement's target again; SpoutsDefault sets the in positions back
+    /// to rig.yml's default and places the spouts in; SaveSpoutPositions writes the mouse's row and outputs
+    /// the positions saved. The first output is the positions the stage started from.
     /// </summary>
     [Combinator]
-    [Description("Turns lick spout stage commands into the stage's targets, in steps: loads the mouse's in positions from PositionsFile (rig.yml's lickSpoutDefaultPosition if there is none), nudges them by StepSize, resets them to rig.yml's default (SpoutsDefault), saves them, and places the spouts home, in, out, left only or right only.")]
+    [Description("Turns lick spout stage commands into the stage's targets, in steps: loads the mouse's in positions from its row of PositionsFile (rig.yml's lickSpoutDefaultPosition if it has none), nudges them by StepSize, resets them to rig.yml's default (SpoutsDefault), saves them as its row, and places the spouts home, in, out, left only or right only.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class LickSpoutStage
     {
@@ -61,9 +63,16 @@ namespace OpenRigs.Devices
         [Description("The path of rig.yml, whose lickSpoutDefaultPosition is the in position of a mouse with no positions file.")]
         public string RigFile { get; set; }
 
-        /// <summary>Gets or sets this mouse's positions file.</summary>
-        [Description("This mouse's positions file: one line, baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight.")]
+        /// <summary>Gets or sets the rig's spout positions list.</summary>
+        [Description("The rig's spout positions list, LickSpoutPositions.csv beside rig.yml: a header, mouse,baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight, then one row per mouse.")]
         public string PositionsFile { get; set; }
+
+        /// <summary>Gets or sets the mouse whose row the stage reads and saves.</summary>
+        [Description("The mouse whose row of PositionsFile the stage reads and saves. NoMouse, a workflow's with no experiment, has no row: the stage starts from rig.yml's default and saves nothing.")]
+        public string SubjectId { get; set; }
+
+        /// <summary>The subject of a workflow that makes no experiment (OpenRigs.Logging NoExperimentFolder), no mouse's.</summary>
+        public const string NoMouse = "_no-experiment_";
 
         /// <summary>Gets or sets the steps each nudge moves, read at each nudge.</summary>
         [Description("Motor steps each nudge moves, read at each nudge.")]
@@ -73,22 +82,32 @@ namespace OpenRigs.Devices
         [Description("How far a spout is drawn back and down when out, in steps on both its axes.")]
         public int RetractSteps { get; set; } = 1500;
 
-        /// <summary>Turns each command into the stage's target, if it moves the stage.</summary>
-        public IObservable<SpoutPositions> Process(IObservable<LickSpoutCommand> source)
+        /// <summary>The positions the stage started from, then each command's step: a new target, or the positions saved.</summary>
+        public IObservable<LickSpoutStep> Process(IObservable<LickSpoutCommand> source)
         {
             return Observable.Defer(() =>
             {
-                var state = Start(RigFile, PositionsFile);
-                return source.Select(command => state.Apply(command, StepSize, RetractSteps)).Where(target => target != null);
+                var state = Start(RigFile, PositionsFile, SubjectId);
+                var started = new LickSpoutStep { Event = state.StartedFrom, Positions = state.In, SubjectId = SubjectId };
+                return Observable.Return(started).Concat(
+                    source.Select(command => state.Step(command, StepSize, RetractSteps)).Where(step => step != null));
             });
         }
 
-        /// <summary>The stage's state at start: the file's positions, or rig.yml's defaults.</summary>
-        public static StageState Start(string rigFile, string positionsFile)
+        /// <summary>The stage's state at start: the mouse's row, or rig.yml's defaults.</summary>
+        public static StageState Start(string rigFile, string positionsFile, string subjectId)
         {
             if (string.IsNullOrEmpty(positionsFile)) throw new InvalidOperationException("LickSpoutStage has no PositionsFile.");
-            var positions = File.Exists(positionsFile) ? SpoutPositions.Load(positionsFile) : SpoutPositions.FromRigFile(rigFile);
-            return new StageState { In = positions, RigFile = rigFile, PositionsFile = positionsFile, Placement = LickSpoutCommand.SpoutsHome };
+            var row = subjectId == NoMouse ? null : SpoutPositions.Load(positionsFile, subjectId);
+            return new StageState
+            {
+                In = row ?? SpoutPositions.FromRigFile(rigFile),
+                StartedFrom = row != null ? LickSpoutStep.FromList : LickSpoutStep.FromDefault,
+                RigFile = rigFile,
+                PositionsFile = positionsFile,
+                SubjectId = subjectId,
+                Placement = LickSpoutCommand.SpoutsHome
+            };
         }
 
         /// <summary>The stage's in positions and its current placement.</summary>
@@ -97,8 +116,14 @@ namespace OpenRigs.Devices
             /// <summary>Gets or sets the mouse's in positions.</summary>
             public SpoutPositions In { get; set; }
 
-            /// <summary>Gets or sets the positions file.</summary>
+            /// <summary>Gets or sets the rig's positions list.</summary>
             public string PositionsFile { get; set; }
+
+            /// <summary>Gets or sets the mouse whose row is read and saved.</summary>
+            public string SubjectId { get; set; }
+
+            /// <summary>Gets or sets where the in positions came from at start, <see cref="LickSpoutStep.FromList"/> or <see cref="LickSpoutStep.FromDefault"/>.</summary>
+            public string StartedFrom { get; set; }
 
             /// <summary>Gets or sets the path of rig.yml, whose lickSpoutDefaultPosition SpoutsDefault resets to.</summary>
             public string RigFile { get; set; }
@@ -106,7 +131,20 @@ namespace OpenRigs.Devices
             /// <summary>Gets or sets the placement last asked for.</summary>
             public LickSpoutCommand Placement { get; set; }
 
-            /// <summary>Applies one command; the new target, or null when the stage does not move.</summary>
+            /// <summary>Applies one command: a step with the new target, a step with the positions saved, or null.</summary>
+            public LickSpoutStep Step(LickSpoutCommand command, int stepSize, int retractSteps)
+            {
+                if (command == LickSpoutCommand.SaveSpoutPositions)
+                {
+                    if (SubjectId == NoMouse) return null;
+                    In.Save(PositionsFile, SubjectId);
+                    return new LickSpoutStep { Event = LickSpoutStep.Saved, Positions = In, SubjectId = SubjectId };
+                }
+                var target = Apply(command, stepSize, retractSteps);
+                return target == null ? null : new LickSpoutStep { Target = target };
+            }
+
+            /// <summary>Applies one command other than a save; the new target, or null when the stage does not move.</summary>
             public SpoutPositions Apply(LickSpoutCommand command, int stepSize, int retractSteps)
             {
                 var values = In.ToArray();
@@ -123,9 +161,6 @@ namespace OpenRigs.Devices
                         In = SpoutPositions.FromRigFile(RigFile);
                         Placement = LickSpoutCommand.SpoutsIn;
                         return Target(retractSteps);
-                    case LickSpoutCommand.SaveSpoutPositions:
-                        In.Save(PositionsFile);
-                        return null;
                     case LickSpoutCommand.LeftUp: values[3] += stepSize; break;
                     case LickSpoutCommand.LeftDown: values[3] -= stepSize; break;
                     case LickSpoutCommand.RightUp: values[4] += stepSize; break;
@@ -152,6 +187,42 @@ namespace OpenRigs.Devices
                     case LickSpoutCommand.LeftOnly: return In.Retract(false, true, retractSteps);
                     default: return In.Retract(true, false, retractSteps);
                 }
+            }
+        }
+    }
+
+    /// <summary>One output of <see cref="LickSpoutStage"/>: a target to move to, or the mouse's in positions with what happened to them.</summary>
+    public class LickSpoutStep
+    {
+        /// <summary>The event of the positions the stage started from, the mouse's row.</summary>
+        public const string FromList = "SpoutPositionsLoaded";
+
+        /// <summary>The event of the positions the stage started from, rig.yml's lickSpoutDefaultPosition (the mouse has no row).</summary>
+        public const string FromDefault = "SpoutPositionsDefault";
+
+        /// <summary>The event of the positions SaveSpoutPositions wrote as the mouse's row.</summary>
+        public const string Saved = "SpoutPositionsSaved";
+
+        /// <summary>Gets or sets the stage's new target, or null when the step is an event.</summary>
+        public SpoutPositions Target { get; set; }
+
+        /// <summary>Gets or sets the event, or null when the step is a move.</summary>
+        public string Event { get; set; }
+
+        /// <summary>Gets or sets the mouse's in positions the event is about.</summary>
+        public SpoutPositions Positions { get; set; }
+
+        /// <summary>Gets or sets the mouse.</summary>
+        public string SubjectId { get; set; }
+
+        /// <summary>The event's detail for the experiment's events log: the mouse and each axis's steps.</summary>
+        public string Detail
+        {
+            get
+            {
+                if (Positions == null) return null;
+                var values = Positions.ToArray();
+                return SubjectId + " " + string.Join(" ", SpoutPositions.AxisNames.Select((axis, i) => axis + "=" + values[i].ToString(System.Globalization.CultureInfo.InvariantCulture)));
             }
         }
     }

@@ -56,7 +56,7 @@ NAMED_THE_LAB_BEFORE_THE_RULE = {
     "src/OpenRigs.Manifest/ExpectedFiles.cs": 1,
     "src/OpenRigs.Manifest/FORMAT.md": 3,
     "src/OpenRigs.Manifest/ManifestRecorder.cs": 3,
-    "src/OpenRigs.Manifest/ManifestWriter.cs": 4,
+    "src/OpenRigs.Manifest/ManifestWriter.cs": 3,
     "src/OpenRigs.Manifest/OpenRigs.Manifest.csproj": 1,
     "src/OpenRigs.Manifest/README.md": 8,
     "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj": 1,

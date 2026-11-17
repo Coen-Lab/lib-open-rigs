@@ -45,6 +45,7 @@
       "why": "Could not find file 'D:\\RigConfigs\\RIG-PC1\\rig.yml'."
     }
   ],
+  "spout_positions": null,
   "trial_columns": null,
   "run": {
     "outcome": "completed",

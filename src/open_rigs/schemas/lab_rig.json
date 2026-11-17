@@ -839,14 +839,14 @@
         "lickSpoutDefaultPosition": {
           "anyOf": [
             {
-              "$ref": "#/$defs/StepperPositions"
+              "$ref": "#/$defs/SpoutPositions"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "The lick spout stage's in position, in steps, for a mouse with no positions file of its own.",
+          "description": "The lick spout stage's in position, in steps, for a mouse with no row in LickSpoutPositions.csv beside rig.yml.",
           "title": "LickSpoutDefaultPosition"
         },
         "zapit": {
@@ -1302,31 +1302,31 @@
       "title": "SpinnakerCamera",
       "type": "object"
     },
-    "StepperPositions": {
-      "description": "Absolute target position for the 5-axis spout rig, expressed in task-relative axes.",
+    "SpoutPositions": {
+      "description": "The lick spout stage's five axes, in motor steps from each axis's home switch.",
       "properties": {
         "baseTransverse": {
-          "description": "Base transverse axis absolute position (steps). Maps to motor 1 (StepperDriver a, motor 0)",
+          "description": "Base transverse axis (StepperDriver-A Motor0), in steps.",
           "title": "BaseTransverse",
           "type": "integer"
         },
         "radialLeft": {
-          "description": "Left spout radial axis (in/out) absolute position (steps). Maps to motor 2 (StepperDriver a, motor 1)",
+          "description": "Left spout radial axis (StepperDriver-A Motor1), in steps; more is towards the mouse.",
           "title": "RadialLeft",
           "type": "integer"
         },
         "radialRight": {
-          "description": "Right spout radial axis (in/out) absolute position (steps). Maps to motor 3 (StepperDriver a, motor 2)",
+          "description": "Right spout radial axis (StepperDriver-A Motor2), in steps; more is towards the mouse.",
           "title": "RadialRight",
           "type": "integer"
         },
         "elevationLeft": {
-          "description": "Left spout elevation axis absolute position (steps). Maps to motor 4 (StepperDriver b, motor 0)",
+          "description": "Left spout elevation axis (StepperDriver-B Motor0), in steps.",
           "title": "ElevationLeft",
           "type": "integer"
         },
         "elevationRight": {
-          "description": "Right spout elevation axis absolute position (steps). Maps to motor 5 (StepperDriver b, motor 1)",
+          "description": "Right spout elevation axis (StepperDriver-B Motor1), in steps.",
           "title": "ElevationRight",
           "type": "integer"
         }
@@ -1338,7 +1338,7 @@
         "elevationLeft",
         "elevationRight"
       ],
-      "title": "StepperPositions",
+      "title": "SpoutPositions",
       "type": "object"
     },
     "StepperWiring": {
