@@ -51,7 +51,7 @@ def test_wiring_by_channel_name():
     board = {
         "portName": "COM6",
         "usbSerial": "BG01WA0E",
-        "pulseController": {"outputs": {"DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DO1.json"},
+        "pulseController": {"outputs": {"DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/RewardValve-Left.json"},
                                          "DO2": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0},
                                          "DO3": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0}}},
         "wiring": {

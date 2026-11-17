@@ -160,7 +160,7 @@ class LabRig(Rig):
                 if output is None or not isinstance(output.root, CalibratedPulse):
                     raise ValueError(
                         f"behaviorBoard {name}: RewardValve {alias} needs a CalibratedPulse in pulseController.outputs {WHERE}. "
-                        f"Add it, as in `{alias}: {{ discriminatorType: CalibratedPulse, artefact: calibration/valve-{alias}.json }}`."
+                        f"Add it, as in `{alias}: {{ discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-{_title(valves[alias].name)}.json }}`."
                     )
             # A pulse-enabled line ends itself after its PulseDOx width; the Zapit line (and any masking light on it)
             # is held from the trigger until the workflow clears it.

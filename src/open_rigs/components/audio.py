@@ -27,7 +27,7 @@ class Speaker(BaseSchema):
     channel: data_types.Int = Field(ge=0, description="Mixer output channel driving this speaker.")
     filter: ArtefactPath | None = Field(
         default=None,
-        examples=["calibration/speaker-left.json"],
+        examples=["calibration/Speaker-Left.json"],
         description="Path of this speaker's SpeakerFilter artefact, relative to rig.yml's folder. Every speaker plays equalised, so a speaker without one stops the workflow at Start (OpenRigs.Audio LoadSpeakers).",
     )
 

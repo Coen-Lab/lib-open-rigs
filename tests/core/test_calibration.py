@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from open_rigs.core.calibration import CalibrationCurve, CalibrationPoint, LinearFit
 
-FIXTURE = Path(__file__).parents[2] / "fixtures" / "calibration" / "valve-DO1.json"
+FIXTURE = Path(__file__).parents[2] / "fixtures" / "calibration" / "RewardValve-Left.json"
 
 PROVENANCE = dict(
     calibrated_at=datetime(2026, 9, 26, 10, 30, tzinfo=timezone.utc),

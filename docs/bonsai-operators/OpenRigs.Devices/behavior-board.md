@@ -33,8 +33,8 @@ behaviorBoard:
     pulseController:
       outputPulseEnable: "DO1, DO2"
       outputs:
-        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
-        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
+        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }
+        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }
         DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
     wiring:
       DO0: { device: CameraTrigger, targets: [Camera-Face] }

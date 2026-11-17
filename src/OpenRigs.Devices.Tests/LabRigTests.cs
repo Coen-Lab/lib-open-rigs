@@ -53,7 +53,7 @@ namespace OpenRigs.Devices.Tests
         {
             var rig = Deserialize(Template()
                 .Replace("      DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }",
-                         "      DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }\n        DOPort0: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DOPort0.json }")
+                         "      DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }\n        DOPort0: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Centre.json }")
                 .Replace("      DO2: { device: RewardValve, name: right }",
                          "      DO2: { device: RewardValve, name: right }\n      DOPort0: { device: RewardValve, name: centre }"));
             var main = rig.BehaviorBoard["main"];

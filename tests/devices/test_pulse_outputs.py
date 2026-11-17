@@ -25,8 +25,8 @@ def calibrated(artefact: str) -> PulseOutput:
 
 def outputs() -> PulseOutputs:
     return PulseOutputs(
-        DO1=calibrated("calibration/valve-DO1.json"),
-        DO2=calibrated("calibration/valve-DO2.json"),
+        DO1=calibrated("calibration/RewardValve-Left.json"),
+        DO2=calibrated("calibration/RewardValve-Right.json"),
         DO3=fixed(5),
     )
 
@@ -49,7 +49,7 @@ def test_source_is_chosen_by_discriminator_in_yaml(tmp_path):
         "portName: COM3\n"
         "pulseController:\n"
         "  outputs:\n"
-        "    DO1: {discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json}\n"
+        "    DO1: {discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json}\n"
         "    DO2: {discriminatorType: FixedPulse, pulseWidthMs: 30}\n"
         "    DO3: {discriminatorType: FixedPulse, pulseWidthMs: 5}\n",
         encoding="utf-8",

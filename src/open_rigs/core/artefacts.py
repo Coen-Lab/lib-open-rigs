@@ -37,7 +37,7 @@ def _relative(value: str) -> str:
 
 
 ArtefactPath = Annotated[str, _MARKER, AfterValidator(_relative), Field(json_schema_extra={SCHEMA_TAG: True})]
-"""A file path relative to the rig configuration directory, such as `calibration/valve-DO1.json`; a full path is
+"""A file path relative to the rig configuration directory, such as `calibration/RewardValve-Left.json`; a full path is
 refused, here and at Start.
 
 It stays a plain string in generated code; rig workflows resolve it with OpenRigs.Core's

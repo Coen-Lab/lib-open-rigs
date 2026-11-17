@@ -457,7 +457,7 @@
         "artefact": {
           "description": "Relative path of the CalibrationCurve that converts the requested quantity to a pulse width: a file in this machine's calibration folder holding the measured points and their linear fit.",
           "examples": [
-            "calibration/valve-DO1.json"
+            "calibration/RewardValve-Left.json"
           ],
           "title": "Artefact",
           "type": "string",
@@ -1206,7 +1206,7 @@
           "default": null,
           "description": "Path of this speaker's SpeakerFilter artefact, relative to rig.yml's folder. Every speaker plays equalised, so a speaker without one stops the workflow at Start (OpenRigs.Audio LoadSpeakers).",
           "examples": [
-            "calibration/speaker-left.json"
+            "calibration/Speaker-Left.json"
           ],
           "title": "Filter"
         }

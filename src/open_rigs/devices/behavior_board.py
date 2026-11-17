@@ -52,7 +52,7 @@ class CalibratedPulse(DiscriminatorTypeMixin, BaseSchema):
     """A pulsed output whose width comes from a calibration curve's linear fit at run time, such as a reward valve."""
 
     artefact: ArtefactPath = Field(
-        examples=["calibration/valve-DO1.json"],
+        examples=["calibration/RewardValve-Left.json"],
         description=(
             "Relative path of the CalibrationCurve that converts the requested quantity to a pulse width: "
             "a file in this machine's calibration folder holding the measured points and their linear fit."

@@ -71,7 +71,7 @@ def composed_rig() -> ComposedRig:
                 "portName": "COM3",
                 "pulseController": {
                     "outputs": {
-                        "DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DO1.json"},
+                        "DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/RewardValve-Left.json"},
                         "DO2": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0},
                         "DO3": {"discriminatorType": "FixedPulse", "pulseWidthMs": 20},
                     }
@@ -80,7 +80,7 @@ def composed_rig() -> ComposedRig:
             "speakerArray": {
                 "device": {"deviceName": "Speakers"},
                 "speakers": {
-                    "left": {"position": {"azimuth": -90, "elevation": 15}, "channel": 0, "filter": "calibration/speaker-left.json"},
+                    "left": {"position": {"azimuth": -90, "elevation": 15}, "channel": 0, "filter": "calibration/Speaker-Left.json"},
                     "right": {"position": {"azimuth": 90, "elevation": 15}, "channel": 1},
                 },
             },
@@ -90,8 +90,8 @@ def composed_rig() -> ComposedRig:
 
 def test_composed_rig_lists_each_device_reference():
     assert rig_artefacts(composed_rig()) == {
-        "behaviorBoard.pulseController.outputs.DO1.artefact": "calibration/valve-DO1.json",
-        "speakerArray.speakers.left.filter": "calibration/speaker-left.json",
+        "behaviorBoard.pulseController.outputs.DO1.artefact": "calibration/RewardValve-Left.json",
+        "speakerArray.speakers.left.filter": "calibration/Speaker-Left.json",
     }
 
 

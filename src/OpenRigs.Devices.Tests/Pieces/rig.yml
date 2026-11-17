@@ -31,9 +31,9 @@ behaviorBoard:
       # reward's pulses at the gap it was calibrated at. The ZapitTrigger line is held high, never pulsed.
       outputs:
         DO1: {discriminatorType: CalibratedPulse, artefact: 
-            calibration/valve-DO1.json}
+            calibration/RewardValve-Left.json}
         DO2: {discriminatorType: CalibratedPulse, artefact: 
-            calibration/valve-DO2.json}
+            calibration/RewardValve-Right.json}
         DO3: {discriminatorType: FixedPulse, pulseWidthMs: 0}
     # What each line drives (lab rig model, open_rigs.rigs.lab_rig): each RewardValve by its name
     # (name: left is the piece RewardValve-Left), one ZapitTrigger and the Photodiode on the screen's sync square.
@@ -135,15 +135,15 @@ speakerArray:
     left:
       position: {azimuth: -90, elevation: 15}
       channel: 0
-      filter: calibration/speaker-left.json
+      filter: calibration/Speaker-Left.json
     right:
       position: {azimuth: 90, elevation: 15}
       channel: 1
-      filter: calibration/speaker-right.json
+      filter: calibration/Speaker-Right.json
     centre:
       position: {azimuth: 0, elevation: 15}
       channel: 2
-      filter: calibration/speaker-centre.json
+      filter: calibration/Speaker-Centre.json
 
 # Zapit optogenetics server (tcpServer section of the Zapit settings file). Contacted only when the
 # task sets optogenetics.enabled: true. The trigger is the board's ZapitTrigger line in wiring.

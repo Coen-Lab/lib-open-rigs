@@ -27,7 +27,7 @@ class EqualisedSpeakerArray(SpeakerArray):
             raise ValueError(
                 f"speakerArray: speaker {', '.join(missing)} has no filter, and every speaker is played equalised "
                 "(lab rig model, open_rigs.rigs.lab_rig). "
-                f"Give each its SpeakerFilter artefact, as in `filter: calibration/speaker-{missing[0]}.json`."
+                f"Give each its SpeakerFilter artefact, as in `filter: calibration/Speaker-{missing[0][:1].upper() + missing[0][1:]}.json`."
             )
         return self
 

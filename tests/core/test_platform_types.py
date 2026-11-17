@@ -48,10 +48,10 @@ def test_generator_leaves_the_models_bound_for_everyone_else():
 
 
 def test_calibrated_pulse_names_only_its_artefact():
-    pulse = CalibratedPulse.model_validate({"artefact": "calibration/valve-DO1.json"})
+    pulse = CalibratedPulse.model_validate({"artefact": "calibration/RewardValve-Left.json"})
     assert pulse.model_dump(by_alias=True, mode="json") == {
         "discriminatorType": "CalibratedPulse",
-        "artefact": "calibration/valve-DO1.json",
+        "artefact": "calibration/RewardValve-Left.json",
     }
 
 

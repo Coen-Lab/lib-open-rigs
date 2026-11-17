@@ -17,14 +17,14 @@ namespace OpenRigs.Audio.Tests
             taps = taps ?? new[] { 0.25, 0.5, 0.25 };
             foreach (var name in new[] { "left", "right", "centre" })
             {
-                File.WriteAllText(Path.Combine(folder, "calibration", "speaker-" + name + ".json"),
+                File.WriteAllText(Path.Combine(folder, "calibration", "Speaker-" + char.ToUpperInvariant(name[0]) + name.Substring(1) + ".json"),
                     "{\"calibratedAt\": \"2026-11-14T00:00:00Z\", \"calibratedBy\": \"test\", \"machineName\": \"" + machine + "\", \"sampleRate\": 48000, \"taps\": [" +
                     string.Join(", ", taps.Select(t => t.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]}");
             }
             speakers = speakers ??
-                "    left:\n      position: {azimuth: -90.0, elevation: 15.0, radius: 1.0}\n      channel: 0\n      filter: calibration/speaker-left.json\n" +
-                "    right:\n      position: {azimuth: 90.0, elevation: 15.0, radius: 1.0}\n      channel: 1\n      filter: calibration/speaker-right.json\n" +
-                "    centre:\n      position: {azimuth: 0.0, elevation: 15.0, radius: 1.0}\n      channel: 2\n      filter: calibration/speaker-centre.json\n";
+                "    left:\n      position: {azimuth: -90.0, elevation: 15.0, radius: 1.0}\n      channel: 0\n      filter: calibration/Speaker-Left.json\n" +
+                "    right:\n      position: {azimuth: 90.0, elevation: 15.0, radius: 1.0}\n      channel: 1\n      filter: calibration/Speaker-Right.json\n" +
+                "    centre:\n      position: {azimuth: 0.0, elevation: 15.0, radius: 1.0}\n      channel: 2\n      filter: calibration/Speaker-Centre.json\n";
             var path = Path.Combine(folder, "rig.yml");
             File.WriteAllText(path, "speakerArray:\n  device:\n    sampleRate: 48000\n    channelCount: 32\n  speakers:\n" + speakers + extra);
             return path;
@@ -88,7 +88,7 @@ namespace OpenRigs.Audio.Tests
         public void AFullPathFilterOrBackgroundNoiseIsRefusedNamingItsKey()
         {
             var rig = Rig();
-            var full = Path.Combine(Path.GetDirectoryName(rig), "calibration", "speaker-left.json");
+            var full = Path.Combine(Path.GetDirectoryName(rig), "calibration", "Speaker-Left.json");
             var filter = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(
                 "    left:\n      channel: 0\n      filter: " + full + "\n"), "TEST-RIG"));
             StringAssert.Contains(filter.Message, "rig.yml's speakerArray.speakers.left.filter is a full path, " + full);
@@ -222,7 +222,7 @@ namespace OpenRigs.Audio.Tests
             var missing = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(), "ANOTHER-RIG"));
             StringAssert.Contains(missing.Message, "was measured on 'TEST-RIG', not on this machine (ANOTHER-RIG)");
             var unfiltered = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(
-                "    left:\n      channel: 0\n      filter: calibration/speaker-left.json\n    right:\n      channel: 1\n"), "TEST-RIG"));
+                "    left:\n      channel: 0\n      filter: calibration/Speaker-Left.json\n    right:\n      channel: 1\n"), "TEST-RIG"));
             StringAssert.Contains(unfiltered.Message, "speaker 'right' has no filter");
         }
 
@@ -230,8 +230,8 @@ namespace OpenRigs.Audio.Tests
         public void EveryChannelProblemIsNamed()
         {
             const string twoSpeakers =
-                "    left:\n      channel: 0\n      filter: calibration/speaker-left.json\n" +
-                "    right:\n      channel: 1\n      filter: calibration/speaker-right.json\n";
+                "    left:\n      channel: 0\n      filter: calibration/Speaker-Left.json\n" +
+                "    right:\n      channel: 1\n      filter: calibration/Speaker-Right.json\n";
             // speakers.md's old example: speakers on 0 and 1, the penalty sound on 2, where it would play unequalised.
             var unheard = Assert.ThrowsException<InvalidOperationException>(() => SpeakerSet.Load(Rig(twoSpeakers), "TEST-RIG"));
             StringAssert.Contains(unheard.Message, "penaltySoundChannel 2 has no speaker on it, and the penalty sound is never played unequalised: set it to a speaker's channel (left 0, right 1)");

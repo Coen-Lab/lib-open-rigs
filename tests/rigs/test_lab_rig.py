@@ -14,8 +14,8 @@ RIG = {
     "behaviorBoard": {"main": {
         **HARP,
         "pulseController": {"outputPulseEnable": "DO1, DO2", "outputs": {
-            "DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DO1.json"},
-            "DO2": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DO2.json"},
+            "DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/RewardValve-Left.json"},
+            "DO2": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/RewardValve-Right.json"},
             "DO3": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0},
         }},
         "wiring": {
@@ -32,7 +32,7 @@ RIG = {
     "projector": {"meshPath": "calibration/Projector-Mesh.csv", "gammaPath": "calibration/Projector-Gamma.bmp"},
     "speakerArray": {
         "device": {"deviceName": "Speakers"},
-        "speakers": {"centre": {"position": {"azimuth": 0, "elevation": 15}, "channel": 2, "filter": "calibration/speaker-centre.json"}},
+        "speakers": {"centre": {"position": {"azimuth": 0, "elevation": 15}, "channel": 2, "filter": "calibration/Speaker-Centre.json"}},
         "penaltySoundChannel": 2,
     },
     "lickSpoutDefaultPosition": STAGE,
@@ -89,8 +89,8 @@ def test_projector_files_are_relative_to_rig_yml(key, path):
 
 
 @pytest.mark.parametrize("edit", [
-    lambda rig: rig["behaviorBoard"]["main"]["pulseController"]["outputs"]["DO1"].update(artefact="C:\\RigConfigs\\RIG\\calibration\\valve-DO1.json"),
-    lambda rig: rig["speakerArray"]["speakers"]["centre"].update(filter="/calibration/speaker-centre.json"),
+    lambda rig: rig["behaviorBoard"]["main"]["pulseController"]["outputs"]["DO1"].update(artefact="C:\\RigConfigs\\RIG\\calibration\\RewardValve-Left.json"),
+    lambda rig: rig["speakerArray"]["speakers"]["centre"].update(filter="/calibration/Speaker-Centre.json"),
     lambda rig: rig["speakerArray"].update(backgroundNoise="D:/shared/sounds/background_noise.wav"),
 ])
 def test_every_rig_file_is_relative_to_rig_yml(edit):
@@ -165,7 +165,7 @@ def test_three_valves_on_any_pulsed_line():
     rig = copy.deepcopy(RIG)
     main = rig["behaviorBoard"]["main"]
     main["wiring"]["DOPort0"] = {"device": "RewardValve", "name": "centre"}
-    main["pulseController"]["outputs"]["DOPort0"] = {"discriminatorType": "CalibratedPulse", "artefact": "calibration/valve-DOPort0.json"}
+    main["pulseController"]["outputs"]["DOPort0"] = {"discriminatorType": "CalibratedPulse", "artefact": "calibration/RewardValve-Centre.json"}
     main["pulseController"]["outputPulseEnable"] = "DO1, DO2, DOPort0"
     valves = LabRig.model_validate(rig).reward_valves()
     assert valves == {"RewardValve-Left": ("BehaviorBoard-Main", "DO1"), "RewardValve-Right": ("BehaviorBoard-Main", "DO2"),
@@ -236,7 +236,7 @@ def test_one_zapit_trigger_per_rig():
          "`DO3: { device: ZapitTrigger }`"),
         ({"DO1": {"device": "RewardValve", "name": "left"}, "DO3": {"device": "RewardValve", "name": "right"},
           "DO2": {"device": "ZapitTrigger"}}, "RewardValve DO3 needs a CalibratedPulse",
-         "`DO3: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO3.json }`"),
+         "`DO3: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }`"),
     ],
 )
 def test_wiring_refused(wiring, message, example):
@@ -271,7 +271,7 @@ def test_penalty_sound_channel_required():
 def test_every_speaker_needs_a_filter():
     rig = copy.deepcopy(RIG)
     rig["speakerArray"]["speakers"]["left"] = {"position": {"azimuth": -90, "elevation": 15}, "channel": 0}
-    with pytest.raises(ValidationError, match=r"speaker left has no filter.*calibration/speaker-left.json"):
+    with pytest.raises(ValidationError, match=r"speaker left has no filter.*calibration/Speaker-Left.json"):
         LabRig.model_validate(rig)
 
 
@@ -280,8 +280,8 @@ def test_speaker_channels_are_refused_as_the_workflow_refuses_them_at_start():
     rig = copy.deepcopy(RIG)
     array = rig["speakerArray"]
     array["device"]["channelCount"] = 4
-    array["speakers"]["left"] = {"position": {"azimuth": -90, "elevation": 15}, "channel": 2, "filter": "calibration/speaker-left.json"}
-    array["speakers"]["right"] = {"position": {"azimuth": 90, "elevation": 15}, "channel": 4, "filter": "calibration/speaker-right.json"}
+    array["speakers"]["left"] = {"position": {"azimuth": -90, "elevation": 15}, "channel": 2, "filter": "calibration/Speaker-Left.json"}
+    array["speakers"]["right"] = {"position": {"azimuth": 90, "elevation": 15}, "channel": 4, "filter": "calibration/Speaker-Right.json"}
     array["syncChannel"] = 4
     array["penaltySoundChannel"] = 3
     with pytest.raises(ValidationError) as refused:

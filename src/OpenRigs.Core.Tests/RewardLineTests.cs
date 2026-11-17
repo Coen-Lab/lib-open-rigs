@@ -23,7 +23,7 @@ namespace OpenRigs.Core.Tests
             "      DO3: {device: RewardValve, name: middle}\n" +
             "    pulseController:\n" +
             "      outputs:\n" +
-            "        DO1: {discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json}\n" +
+            "        DO1: {discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json}\n" +
             "        DO2: {discriminatorType: FixedPulse, pulseWidthMs: 30}\n" +
             "        DO3: {discriminatorType: CalibratedPulse}\n";
 
@@ -35,7 +35,7 @@ namespace OpenRigs.Core.Tests
             {
                 var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
                 while (!File.Exists(Path.Combine(directory.FullName, "OpenRigs.sln"))) directory = directory.Parent;
-                return File.ReadAllText(Path.Combine(directory.FullName, "fixtures", "calibration", "valve-DO1.json"));
+                return File.ReadAllText(Path.Combine(directory.FullName, "fixtures", "calibration", "RewardValve-Left.json"));
             }
         }
 
@@ -55,7 +55,7 @@ namespace OpenRigs.Core.Tests
         string Write(string rig, string calibration)
         {
             File.WriteAllText(Path.Combine(folder, "rig.yml"), rig);
-            if (calibration != null) File.WriteAllText(Path.Combine(folder, "calibration", "valve-DO1.json"), calibration);
+            if (calibration != null) File.WriteAllText(Path.Combine(folder, "calibration", "RewardValve-Left.json"), calibration);
             return Path.Combine(folder, "rig.yml");
         }
 
@@ -94,8 +94,8 @@ namespace OpenRigs.Core.Tests
         [TestMethod]
         public void AFullPathArtefactIsRefusedNamingItsKey()
         {
-            var full = Path.Combine(folder, "calibration", "valve-DO1.json");
-            var message = Refusal(Rig.Replace("artefact: calibration/valve-DO1.json", "artefact: '" + full + "'"), Fixture);
+            var full = Path.Combine(folder, "calibration", "RewardValve-Left.json");
+            var message = Refusal(Rig.Replace("artefact: calibration/RewardValve-Left.json", "artefact: '" + full + "'"), Fixture);
             StringAssert.Contains(message, "rig.yml's behaviorBoard.main.pulseController.outputs.DO1.artefact is a full path, " + full);
         }
 
@@ -145,7 +145,7 @@ namespace OpenRigs.Core.Tests
             Assert.AreEqual("left", line.Instance);
             Assert.AreEqual(100, line.PulseGapMs);
             Assert.AreEqual(Fixture, line.CalibrationJson);
-            Assert.AreEqual(Path.Combine(folder, "calibration", "valve-DO1.json"), line.CalibrationPath);
+            Assert.AreEqual(Path.Combine(folder, "calibration", "RewardValve-Left.json"), line.CalibrationPath);
         }
 
         [TestMethod]
@@ -327,7 +327,7 @@ namespace OpenRigs.Core.Tests
             var rig = "behaviorBoard:\n  main:\n    portName: COM3\n  second:\n    portName: COM4\n    wiring:\n" +
                 "      DOPort0: {device: RewardValve, name: centre}\n" +
                 "    pulseController:\n      outputs:\n" +
-                "        DOPort0: {discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json}\n";
+                "        DOPort0: {discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json}\n";
             var line = Load(rig, Fixture, "RewardValve-Centre", "BehaviorBoard-Second");
             Assert.AreEqual("DOPort0", line.Line);
             Assert.AreEqual("BehaviorBoard-Second", line.Board);

@@ -75,7 +75,7 @@ namespace OpenRigs.Core
         public string Board { get; set; }
 
         /// <summary>Gets or sets the folder the output entry's artefact path is relative to.</summary>
-        [Description("The folder the line's artefact path (such as calibration/valve-DO1.json) is relative to. Empty: rig.yml's folder.")]
+        [Description("The folder the line's artefact path (such as calibration/RewardValve-Left.json) is relative to. Empty: rig.yml's folder.")]
         [Editor("Bonsai.Design.FolderNameEditor, Bonsai.Design", DesignTypes.UITypeEditor)]
         public string CalibrationDirectory { get; set; }
 

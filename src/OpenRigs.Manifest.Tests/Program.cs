@@ -416,11 +416,11 @@ namespace OpenRigs.Manifest.Tests
                 // {RigFiles}: rig.yml and every file it names, relative ones from its folder.
                 var tokenRig = Path.Combine(root, "RIG", "rig.yml");
                 Directory.CreateDirectory(Path.GetDirectoryName(tokenRig));
-                File.WriteAllText(tokenRig, "behaviorBoard:\n  main:\n    pulseController:\n      outputs:\n        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }\n" +
+                File.WriteAllText(tokenRig, "behaviorBoard:\n  main:\n    pulseController:\n      outputs:\n        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }\n" +
                     "projector:\n  meshPath: calibration/Projector-Mesh.csv\nspeakerArray:\n  device: { deviceName: Speakers (XMOS xCORE-200 MC (UAC2.0)) }\n" +
-                    "  speakers:\n    left: { channel: 0, filter: calibration/speaker-left.json }\n  backgroundNoise: ../shared/sounds/background_noise.wav\nlickSpoutDefaultPosition: { baseTransverse: 0 }\n");
+                    "  speakers:\n    left: { channel: 0, filter: calibration/Speaker-Left.json }\n  backgroundNoise: ../shared/sounds/background_noise.wav\nlickSpoutDefaultPosition: { baseTransverse: 0 }\n");
                 var rigFiles = ManifestWriter.RigFiles(tokenRig);
-                var wantFiles = new[] { tokenRig, Path.Combine(root, @"RIG\calibration\valve-DO1.json"), Path.Combine(root, @"RIG\calibration\Projector-Mesh.csv"), Path.Combine(root, @"RIG\calibration\speaker-left.json"), Path.Combine(root, @"shared\sounds\background_noise.wav") };
+                var wantFiles = new[] { tokenRig, Path.Combine(root, @"RIG\calibration\RewardValve-Left.json"), Path.Combine(root, @"RIG\calibration\Projector-Mesh.csv"), Path.Combine(root, @"RIG\calibration\Speaker-Left.json"), Path.Combine(root, @"shared\sounds\background_noise.wav") };
                 Check("{RigFiles} is rig.yml and every path it names", rigFiles.SequenceEqual(wantFiles), string.Join(" | ", rigFiles));
                 // spout_positions: the mouse's row of LickSpoutPositions.csv beside rig.yml, else rig.yml's default, as numbers.
                 Func<JsonObject, string> spouts = section => section == null ? "null" : string.Join(",", section.Select(p => p.Key + "=" + p.Value));

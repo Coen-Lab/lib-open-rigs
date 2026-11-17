@@ -66,7 +66,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ARewardValveWithoutItsCalibrationStops()
         {
-            var errors = RunValves(null, rig => rig.Replace("calibration/valve-DO2.json", "calibration/missing.json"));
+            var errors = RunValves(null, rig => rig.Replace("calibration/RewardValve-Right.json", "calibration/missing.json"));
             StringAssert.Contains(string.Join(" || ", errors), "RewardValve-Right (DO2 on BehaviorBoard-Main) has no valve calibration");
         }
 
@@ -209,8 +209,8 @@ namespace OpenRigs.Devices.Tests
             File.WriteAllText(Path.Combine(root, Environment.MachineName, "rig.yml"), editRig == null ? rig : editRig(rig));
             // Each valve's calibration, measured on this machine, so a RewardValve piece loads its line (LoadRewardLine).
             Directory.CreateDirectory(Path.Combine(root, Environment.MachineName, "calibration"));
-            var curve = File.ReadAllText(Path.Combine(Solution, "fixtures", "calibration", "valve-DO1.json")).Replace("RIG-NAME", Environment.MachineName);
-            foreach (var line in new[] { "DO1", "DO2" }) File.WriteAllText(Path.Combine(root, Environment.MachineName, "calibration", "valve-" + line + ".json"), curve);
+            var curve = File.ReadAllText(Path.Combine(Solution, "fixtures", "calibration", "RewardValve-Left.json")).Replace("RIG-NAME", Environment.MachineName);
+            foreach (var name in new[] { "Left", "Right" }) File.WriteAllText(Path.Combine(root, Environment.MachineName, "calibration", "RewardValve-" + name + ".json"), curve);
             var xml = File.ReadAllText(Path.Combine(Folder, file)).Replace("CONFIG_ROOT", SecurityElement.Escape(root));
             if (edit != null) xml = edit(xml);
             WorkflowBuilder builder;

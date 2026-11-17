@@ -4,7 +4,7 @@ A rig turns a quantity the task asks for, such as a reward volume, into somethin
 
 ## What the platform provides
 
-- **Artefact types** in `OpenRigs.Core.Calibration`, generated once from the pydantic models in `open_rigs.core.calibration`. `CalibrationCurve` holds the measured `(x, y)` points with the axis names and units, provenance (`calibratedAt`, `calibratedBy`, `machineName`, `notes`), the `pulseGapMs` the samples were fired at, and the `linearFit` made from the points (`slope`, `intercept`, and the range `minX` to `maxX` it is valid for). A file without `pulseGapMs` or `linearFit` is refused. `fixtures/calibration/valve-DO1.json` is an example and the contract a fit writes against.
+- **Artefact types** in `OpenRigs.Core.Calibration`, generated once from the pydantic models in `open_rigs.core.calibration`. `CalibrationCurve` holds the measured `(x, y)` points with the axis names and units, provenance (`calibratedAt`, `calibratedBy`, `machineName`, `notes`), the `pulseGapMs` the samples were fired at, and the `linearFit` made from the points (`slope`, `intercept`, and the range `minX` to `maxX` it is valid for). A file without `pulseGapMs` or `linearFit` is refused. `fixtures/calibration/RewardValve-Left.json` is an example and the contract a fit writes against.
 - **Fits are made in Python** when the curve is written, never in Bonsai: a workflow fires pulses and weighs, the fit is tested code outside it.
 - **Pulse and weighing operators** in `OpenRigs.Core`: `FirePulses` fires a train of `(line, pulseWidthMs)` requests for a board's `<Board>.TriggerCalibratedPulse` (`PulseOutputs`), timed on the Harp clock with `pulseGapMs` off-to-on between pulses, and completes once the last pulse has closed; `WeighStable` takes a weight once that step is over and the balance has settled. `WriteCalibrationArtefact` files an artefact made in Bonsai; a tool that fits in Python writes the same file itself.
 - **Settings types** `DispenseProcedure` and `SerialBalance`, committed by the experiment repository as one `DispenseCalibration` YAML.
@@ -19,16 +19,16 @@ Artefacts belong to the machine they were measured on. They sit under the machin
 <ConfigRoot>\<MACHINE-NAME>\
   rig.yml
   calibration\
-    valve-DO1.json
-    valve-DO2.json
+    RewardValve-Left.json
+    RewardValve-Right.json
     Projector-Mesh.csv, Projector-Gamma.bmp   projector's meshPath and gammaPath
-    speaker-left.json           a speaker's filter
-    history\
-      valve-DO1_2026-10-05T143012Z.json
+    Speaker-Left.json           a speaker's filter
+    _backups\
+      RewardValve-Left_2026-10-05T14-30-12_calibrated.json
     runs\<kind>\<run>\          one run's raw files (weights, pulses), as the run left them
 ```
 
-Each calibration replaces the file the rig reads and keeps a dated copy in `history\`; the raw files a run measured stay in its own folder under `runs\`. `rig.yml` names every file relative to its own folder, as `calibration/valve-DO1.json`: the valves' artefacts, the projector's files, the speakers' filters and the background noise alike. A full path is refused, by the rig model (`ArtefactPath`) and at Start (`ResolveRigFile`, `LoadRewardLine`, `LoadSpeakers`). See the rig configuration page for `ResolveRigConfigDirectory` and `ResolveRigFile`.
+Each calibration replaces the file the rig reads and keeps a copy in `_backups\`, named `<stem>_<YYYY-MM-DDTHH-MM-SS>_<why><ext>` in UTC; the raw files a run measured stay in its own folder under `runs\`. `rig.yml` names every file relative to its own folder, as `calibration/RewardValve-Left.json`: the valves' artefacts, the projector's files, the speakers' filters and the background noise alike. A full path is refused, by the rig model (`ArtefactPath`) and at Start (`ResolveRigFile`, `LoadRewardLine`, `LoadSpeakers`). See the rig configuration page for `ResolveRigConfigDirectory` and `ResolveRigFile`.
 
 ## Running a dispense calibration
 
@@ -45,7 +45,7 @@ behaviorBoard:
       DO1: { device: RewardValve, name: left }
     pulseController:
       outputs:
-        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
+        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }
         DO2: { discriminatorType: FixedPulse, pulseWidthMs: 40 }
         DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
 ```

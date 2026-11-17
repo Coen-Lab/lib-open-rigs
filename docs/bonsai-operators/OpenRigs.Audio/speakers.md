@@ -19,11 +19,11 @@ speakerArray:
     left:
       position: {azimuth: -90.0, elevation: 15.0, radius: 1.0}
       channel: 0
-      filter: calibration/speaker-left.json   # relative to rig.yml's folder
+      filter: calibration/Speaker-Left.json   # relative to rig.yml's folder
     right:
       position: {azimuth: 90.0, elevation: 15.0, radius: 1.0}
       channel: 1
-      filter: calibration/speaker-right.json
+      filter: calibration/Speaker-Right.json
   syncChannel: 31          # the sync copy's channel, needed by SyncCopy
   syncGain: 0.2            # the sync copy's level (0.2 when left out)
   penaltySoundChannel: 1     # the penalty sound's speaker: a speaker's channel

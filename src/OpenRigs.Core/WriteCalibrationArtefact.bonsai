@@ -4,14 +4,14 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Writes a serialized calibration artefact into a rig configuration directory: calibration\&lt;FileName&gt;.json, which the rig configuration points at and which is replaced on every run, plus a dated copy in calibration\history\. Input is a Tuple of the JSON text and the directory, for example SerializeToJson combined with the folder holding rig.yml. Output is a message naming the file written and the rig.yml line to paste. WriteAllText reads its Path when it subscribes. The input is therefore held in a scoped AsyncSubject and each sink gets its path through its own subscription and property mapping, declared before the sink's text. The literal Path on each sink is only a placeholder.</Description>
+  <Description>Writes a serialized calibration artefact into a rig configuration directory: calibration\&lt;FileName&gt;.json, which the rig configuration points at and which is replaced on every run, plus a copy in calibration\_backups\, &lt;FileName&gt;_&lt;UTC time&gt;_calibrated.json. Input is a Tuple of the JSON text and the directory, for example SerializeToJson combined with the folder holding rig.yml. Output is a message naming the file written and the rig.yml line to paste. WriteAllText reads its Path when it subscribes. The input is therefore held in a scoped AsyncSubject and each sink gets its path through its own subscription and property mapping, declared before the sink's text. The literal Path on each sink is only a placeholder.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
         <Name>Source1</Name>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="FileName" Description="The artefact's file name without extension, such as valve-DO1. The rig configuration refers to it as calibration/&lt;FileName&gt;.json." />
+        <Property Name="FileName" Description="The artefact's file name without extension, such as RewardValve-Left. The rig configuration refers to it as calibration/&lt;FileName&gt;.json." />
       </Expression>
       <Expression xsi:type="rx:SelectMany">
         <Name>WriteArtefact</Name>
@@ -79,7 +79,7 @@
               <Combinator xsi:type="rx:Timestamp" />
             </Expression>
             <Expression xsi:type="Format">
-              <Format>{0}\calibration\history\{1}_{2:yyyy-MM-ddTHHmmssZ}.json</Format>
+              <Format>{0}\calibration\_backups\{1}_{2:yyyy-MM-ddTHH-mm-ss}_calibrated.json</Format>
               <Selector>Value.Item1.Item2,Value.Item2,Timestamp.UtcDateTime</Selector>
             </Expression>
             <Expression xsi:type="PropertyMapping">
@@ -95,7 +95,7 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="io:WriteAllText">
-                <io:Path>calibration-history.json</io:Path>
+                <io:Path>calibration-backup.json</io:Path>
                 <io:Append>false</io:Append>
               </Combinator>
             </Expression>
@@ -111,7 +111,7 @@
               <Combinator xsi:type="rx:Zip" />
             </Expression>
             <Expression xsi:type="Format">
-              <Format>Calibration written to {0}\calibration\{1}.json (copy in history). Point the rig configuration at it with: artefact: calibration/{1}.json</Format>
+              <Format>Calibration written to {0}\calibration\{1}.json (copy in _backups). Point the rig configuration at it with: artefact: calibration/{1}.json</Format>
               <Selector>Item1.Item2,Item2</Selector>
             </Expression>
             <Expression xsi:type="Combinator">
