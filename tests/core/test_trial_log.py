@@ -113,3 +113,12 @@ def test_refuses_a_manifest_of_no_known_version(tmp_path, version, name):
     with pytest.raises(ValueError) as raised:
         trial_log.columns(tmp_path, repo=tmp_path)
     assert "no trial columns" not in str(raised.value)
+
+
+def test_only_chunk_names_are_read(tmp_path):
+    # A converted experiment keeps other files beside its chunks; a fixture's _x for a time is not one either.
+    manifest(tmp_path, trial_columns={"columns": COLUMNS})
+    write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv", "trialNumber\n1\n")
+    write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00_old.csv", "trialNumber\n7\n")
+    write(tmp_path / "WorkflowData", "WorkflowData_Trials_x.csv", "trialNumber\n8\n")
+    assert trial_log.read(tmp_path) == [{"trialNumber": 1}]

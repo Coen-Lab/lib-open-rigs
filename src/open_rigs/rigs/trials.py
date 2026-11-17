@@ -7,9 +7,10 @@ The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses,
 laserTriggerTime) after penalised. trialType and outcome are in the core by name, type and place, each described by its
 task. A task's own columns follow the block.
 
-summarise reads one experiment's WorkflowData/WorkflowData_Trials_*.csv, WorkflowData/WorkflowData_Events_*.csv (each
-RewardDelivered row, Value the microlitres delivered and Detail the microlitres requested=), Settings/Settings_Task_*.json
-(the lead and the penalty) and manifest.json (how the run ended), and checks the rows against each other and the task:
+summarise reads one experiment's WorkflowData/WorkflowData_Trials_<time>.csv, WorkflowData/WorkflowData_Events_<time>.csv (each
+RewardDelivered row, Value the microlitres delivered and Detail the microlitres requested=), Settings/Settings_Task_<time>.json
+(the lead and the penalty) and manifest.json (how the run ended), and checks the rows against each other and the task. It reads only files named <Name>_<time><suffix>
+(open_rigs.chunks); any other file named like one it reads is a NOTE, not read:
 
 - trial numbers run 1, 2, 3 ... with none missing, and each outcome is Correct, Incorrect, NoResponse or Probe;
 - each trial's start (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
@@ -56,7 +57,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from open_rigs import trial_log
+from open_rigs import chunks, trial_log
 from open_rigs.rigs import video_frames
 
 # (name, type, unit or None, description or None: None where each task describes it)
@@ -218,9 +219,27 @@ class Summary:
     unfinished: Optional[int] = None  # the number of a trial the run stopped in (StimulusState rows, no Trial row), or None
 
 
-def _rows(folder: Path, pattern: str) -> List[Dict[str, str]]:
+# The chunked files summarise reads, as (folder, name, suffix): each <name>_<time><suffix> (open_rigs.chunks).
+TRIALS_FILES = ("WorkflowData", trial_log.LOG, ".csv")
+EVENTS_FILES = ("WorkflowData", "WorkflowData_Events", ".csv")
+STIMULUS_FILES = ("WorkflowData", "WorkflowData_StimulusState", ".csv")
+TASK_FILES = ("Settings", "Settings_Task", ".json")
+
+
+def _chunks(folder: Path, files: Tuple[str, str, str]) -> List[Path]:
+    return chunks.files(folder / files[0], files[1], files[2])[0]
+
+
+def skipped(folder: Path) -> List[str]:
+    """A note for each file summarise does not read though it is named like one it does: not <Name>_<time><suffix>."""
+    return [f"{p.relative_to(folder).as_posix()}: not read, not named {name}_<time>{suffix}"
+            for sub, name, suffix in (TRIALS_FILES, EVENTS_FILES, STIMULUS_FILES, TASK_FILES)
+            for p in chunks.files(folder / sub, name, suffix)[1]]
+
+
+def _rows(folder: Path, files: Tuple[str, str, str]) -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
-    for log in sorted(folder.glob(pattern)):
+    for log in _chunks(folder, files):
         with open(log, newline="", encoding="utf-8-sig") as f:
             for row in csv.DictReader(f):
                 rows.append(row)
@@ -293,8 +312,8 @@ class _Task:
 
 
 def _task(folder: Path) -> Optional[_Task]:
-    """The experiment's task file values the checks need (Settings/Settings_Task_*.json), or None."""
-    for path in sorted(folder.glob("Settings/Settings_Task_*.json")):
+    """The experiment's task file values the checks need (Settings/Settings_Task_<time>.json), or None."""
+    for path in _chunks(folder, TASK_FILES):
         try:
             p = json.loads(path.read_text(encoding="utf-8-sig"))["taskParameters"]
             return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), float(p["penalty"]["timeoutSeconds"]),
@@ -308,17 +327,18 @@ def summarise(folder: Path, videos: bool = False) -> Summary:
     """One experiment's summary and failed checks, from its files alone; with videos, each camera video against its CSV."""
     folder = Path(folder)
     s = _summarise(folder)
+    s.notes += skipped(folder)
     if videos:
         checks = video_frames.check_videos(folder)
         s.videos = [video_frames.describe(check).strip() for check in checks]
         s.problems += [p for check in checks for p in check.problems]
-        s.notes += [n for check in checks for n in check.notes]
+        s.notes += [n for check in checks for n in check.notes] + video_frames.skipped(folder)
     return s
 
 
 def _summarise(folder: Path) -> Summary:
     trials = trial_log.text_rows(folder)
-    events = _rows(folder, "WorkflowData/WorkflowData_Events_*.csv")
+    events = _rows(folder, EVENTS_FILES)
     try:
         run = json.loads((folder / "manifest.json").read_text(encoding="utf-8-sig"))["run"]
         outcome = (run["outcome"] or "unknown") + (" (not final: the workflow never finished closing)" if run.get("final") is False else "")
@@ -415,7 +435,7 @@ def _summarise(folder: Path) -> Summary:
 def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Optional[Dict[str, str]]) -> None:
     """The trial after the last finished one, when StimulusState has rows for it: the run stopped in it. Its first
     stimulusActive row is the stimulus the last outcome's interval ran to."""
-    rows = _rows(folder, "WorkflowData/WorkflowData_StimulusState_*.csv")
+    rows = _rows(folder, STIMULUS_FILES)
     if not rows or not trials:
         return
     if any(c not in rows[0] for c in ("harpTime", "trialNumber", "stimulusActive")):

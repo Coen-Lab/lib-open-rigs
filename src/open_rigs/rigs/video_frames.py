@@ -1,6 +1,6 @@
 """Whether each camera video holds every frame its CSV lists: one experiment's videos checked from their files.
 
-A camera logs <Device>/<Device>_<DateTime>.mkv (OpenRigs.Logging's LogVideoFfmpeg) or .avi (LogVideo), each with a .csv
+A camera logs <Device>/<Device>_<time>.mkv (OpenRigs.Logging's LogVideoFfmpeg) or .avi (LogVideo), each with a .csv
 beside it holding one row per frame. A video can hold fewer frames than its CSV lists when the writer did not finish
 (LogVideo's last AVI at a Stop that came with frames still queued), and a reader that trusts the file's index sees fewer
 still, so the frames are counted from the file itself:
@@ -12,7 +12,8 @@ still, so the frames are counted from the file itself:
 
 Each video is checked for: a CSV beside it; as many frames as CSV rows; no .error.txt beside it (FfmpegVideoWriter
 leaves one saying what went wrong: frames dropped, ffmpeg failed or killed). Each camera's CSVs, in order, are checked
-for frameId steps other than 1 (frames the camera or the writer lost); a CSV without a frame id column is a note. `check-videos <experiment folder> ...` prints
+for frameId steps other than 1 (frames the camera or the writer lost); a CSV without a frame id column is a note. Only
+videos named <Device>_<time><suffix> are read (open_rigs.chunks); any other video file is a note, not checked. `check-videos <experiment folder> ...` prints
 each video, each note and each problem, exiting 1 when there is a problem.
 
 A killed run is the one exception to "as many frames as CSV rows". FfmpegVideoWriter flushes each CSV row just after
@@ -37,6 +38,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
+
+from open_rigs import chunks
 
 VIDEO_SUFFIXES = (".mkv", ".avi", ".mp4")
 # The frame counter's column: FfmpegVideoWriter's, LogVideo's (Bonsai member paths), then old behaviour-box CSVs'.
@@ -115,14 +118,15 @@ def _rows(path: Path) -> List[dict]:
 
 
 def check_videos(folder: Path, ffprobe: Optional[str] = None, killed: Optional[bool] = None) -> List[VideoCheck]:
-    """Every camera video in an experiment folder (<Device>/<Device>_*.mkv or .avi), each with its problems and notes.
+    """Every camera video in an experiment folder (<Device>/<Device>_<time>.mkv, .avi or .mp4), each with its problems
+    and notes. Any other video file is skipped (skipped names them).
     killed: whether the run was killed; None reads it from the folder's manifest.json."""
     folder = Path(folder)
     ffprobe = ffprobe or shutil.which("ffprobe")
     killed = run_killed(folder) if killed is None else killed
     checks: List[VideoCheck] = []
     for device in sorted(p for p in folder.iterdir() if p.is_dir()):
-        videos = sorted(p for p in device.iterdir() if p.suffix.lower() in VIDEO_SUFFIXES and p.is_file())
+        videos = sorted(p for suffix in VIDEO_SUFFIXES for p in chunks.files(device, device.name, suffix)[0])
         last_id: Optional[int] = None
         for video in videos:
             name = f"{device.name}/{video.name}"
@@ -183,6 +187,17 @@ def check_videos(folder: Path, ffprobe: Optional[str] = None, killed: Optional[b
     return checks
 
 
+def skipped(folder: Path) -> List[str]:
+    """A note for each video file in a device folder that check_videos does not read: not <Device>_<time><suffix>,
+    such as a converted experiment's _crf35 copy."""
+    notes = []
+    for device in sorted(p for p in Path(folder).iterdir() if p.is_dir()):
+        read = {p for suffix in VIDEO_SUFFIXES for p in chunks.files(device, device.name, suffix)[0]}
+        notes += [f"{device.name}/{p.name}: not checked, not named {device.name}_<time>{p.suffix}"
+                  for p in sorted(device.iterdir()) if p.is_file() and p.suffix in VIDEO_SUFFIXES and p not in read]
+    return notes
+
+
 def describe(check: VideoCheck) -> str:
     frames = "not counted" if check.frames is None else f"{check.frames} frames"
     rows = "no CSV" if check.rows is None else f"CSV {check.rows} rows"
@@ -197,6 +212,8 @@ def main() -> None:
     for folder in args.folders:
         checks = check_videos(folder)
         print(f"{folder.name}: {len(checks)} videos")
+        for note in skipped(folder):
+            print(f"  NOTE {note}")
         for check in checks:
             print(describe(check))
             for note in check.notes:

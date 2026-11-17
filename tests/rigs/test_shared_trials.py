@@ -404,3 +404,14 @@ def test_the_csharp_outcomes_are_outcomes():
     source = (Path(__file__).parents[2] / "src/OpenRigs.Trials/TrialOutcome.cs").read_text(encoding="utf-8")
     constants = re.findall(r'public const string (\w+) = "(\w+)";', source)
     assert constants == [(o, o) for o in OUTCOMES]
+
+
+def test_summarise_reads_only_chunk_names_and_notes_the_rest(tmp_path):
+    trials = _chain(2)
+    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])
+    (folder / "WorkflowData" / "WorkflowData_Trials_2026-11-14T01-00-00_copy.csv").write_text("harpTime\nnot a number\n")
+    (folder / "Settings" / "Settings_Task_x.json").write_text("{}")
+    s = summarise(folder)
+    assert (s.trials, s.problems) == (2, [])
+    assert s.notes == ["WorkflowData/WorkflowData_Trials_2026-11-14T01-00-00_copy.csv: not read, not named WorkflowData_Trials_<time>.csv",
+                       "Settings/Settings_Task_x.json: not read, not named Settings_Task_<time>.json"]

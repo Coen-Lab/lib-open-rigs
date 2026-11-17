@@ -238,3 +238,19 @@ def test_a_csv_without_a_frame_id_column_is_a_note(tmp_path):
     assert check.problems == [] and check.notes == [
         "Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00.avi: Camera-Pupil_2026-11-14T10-00-00.csv has no frame id column "
         "(frameId, ChunkData.FrameID, Value.ChunkData.FrameID, FrameID), so frames lost by the camera are not checked"]
+
+
+def test_only_chunk_names_are_checked_and_the_rest_noted(tmp_path, capsys, monkeypatch):
+    # A converted experiment keeps its video's crf copies beside it: not checked, each a note.
+    _camera(tmp_path, "2026-11-14T10-00-00", _avi(3), rows=3)
+    _camera(tmp_path, "2026-11-14T10-00-00_crf35", _avi(1))
+    _camera(tmp_path, "x", _avi(1))
+    assert [c.video.name for c in check_videos(tmp_path)] == ["Camera-Pupil_2026-11-14T10-00-00.avi"]
+    notes = ["Camera-Pupil/Camera-Pupil_2026-11-14T10-00-00_crf35.avi: not checked, not named Camera-Pupil_<time>.avi",
+             "Camera-Pupil/Camera-Pupil_x.avi: not checked, not named Camera-Pupil_<time>.avi"]
+    assert video_frames.skipped(tmp_path) == notes
+    monkeypatch.setattr(sys, "argv", ["check-videos", str(tmp_path)])
+    with pytest.raises(SystemExit) as exit:
+        video_frames.main()
+    out = capsys.readouterr().out
+    assert exit.value.code == 0 and all(f"NOTE {n}" in out for n in notes)

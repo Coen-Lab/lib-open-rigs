@@ -24,6 +24,8 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from ruamel.yaml import YAML
 
+from open_rigs import chunks
+
 LOG = "WorkflowData_Trials"
 MANIFEST = "manifest.json"
 # Every version keeps `trial_columns` and `source.commit` as they were; any other is refused (records.md, rule 3).
@@ -87,8 +89,9 @@ def _value(text: str, column: Optional[Dict[str, Any]], decode: bool) -> Any:
 
 def _text_rows(experiment: Union[str, Path]) -> Iterator[Tuple[Path, int, Dict[str, str]]]:
     """Each row of the experiment's WorkflowData/WorkflowData_Trials_<start>.csv (several in name order), as written: its
-    file, line number and cells by column name. A file's last line without a newline (still being written) is left out."""
-    for path in sorted((Path(experiment) / LOG.split("_", 1)[0]).glob(f"{LOG}_*.csv")):
+    file, line number and cells by column name. A file's last line without a newline (still being written) is left out.
+    Only chunk names are read (open_rigs.chunks); any other file is skipped."""
+    for path in chunks.files(Path(experiment) / LOG.split("_", 1)[0], LOG, ".csv")[0]:
         text = path.read_text(encoding="utf-8-sig")
         if not text.endswith("\n"):
             text = text[: text.rfind("\n") + 1]
