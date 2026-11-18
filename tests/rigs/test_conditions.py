@@ -120,7 +120,7 @@ def test_pick_lists_are_every_array_but_a_whole_one():
 
 
 def test_combinations_change_the_first_cell_fastest_and_zip_pairs():
-    base = {"c": [1, 2], "a": "x", "p": [5, 6], "q": [7, 8]}
+    base = {"c": [1, 2], "a": "x", "p": 0, "q": 0}
     got = condition_combinations(base, {"a": ["u", "v"], "p": [5, 6], "q": [7, 8]}, [["p", "q"]], ["c"])
     # cells in order: the pair, then a, then c; the pair's pick changes fastest.
     assert [(g["p"], g["q"], g["a"], g["c"]) for g in got][:5] == [(5, 7, "u", [1]), (6, 8, "u", [1]), (5, 7, "v", [1]), (6, 8, "v", [1]), (5, 7, "u", [2])]
