@@ -13,6 +13,7 @@ Both are JSON Schema subschemas checked against a flat object keyed by dotted pa
 
 import json
 from functools import cache
+from collections.abc import Sequence
 from typing import Any
 
 from jsonschema import Draft202012Validator
@@ -73,7 +74,7 @@ def unused_paths(rules: list[dict], values: dict) -> set[str]:
     return {path for rule, _ in _applying(rules, values) for path in rule.get("unused", [])}
 
 
-def derive_trial_type(trial_types: list[dict], task: dict, values: dict[str, Any], pairs: list[list[str]] = ()) -> str:
+def derive_trial_type(trial_types: list[dict], task: dict, values: dict[str, Any], pairs: Sequence[Sequence[str]] = ()) -> str:
     """A condition's trialType by x-trial-types: task the task's values (by alias, as JSON), values the condition's set by
     dotted path, pairs its pairs."""
     flat = {path: value if isinstance(value, list) else [value] for path, value in {**flatten(task), **values}.items()}
@@ -141,7 +142,7 @@ def _options(base: dict, values: dict, path: str, list_fields) -> list:
     return value if isinstance(value, list) and not isinstance(_get(base, path), list) else [value]
 
 
-def condition_combinations(base: dict, values: dict, pairs: list[list[str]] = (), list_fields=()) -> list[dict[str, Any]]:
+def condition_combinations(base: dict, values: dict, pairs: Sequence[Sequence[str]] = (), list_fields=()) -> list[dict[str, Any]]:
     """Every combination of a condition, each a dict of dotted path to value: base the task's values (by alias, as JSON),
     values the condition's set, pairs its pairs, list_fields the task's pick_lists. Each pairs group's lists are zipped
     (equal lengths), then every other list cell of the set and every list field one pick, as a product with the first
