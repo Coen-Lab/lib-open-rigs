@@ -126,38 +126,3 @@ def pick_lists(schema: dict) -> list[str]:
 
     walk(schema, "")
     return sorted(paths)
-
-
-def _get(data: dict, dotted: str) -> Any:
-    for part in dotted.split("."):
-        data = data[part]
-    return data
-
-
-def _options(base: dict, values: dict, path: str, list_fields) -> list:
-    # A cell's picks: a list field's entries, each a one-entry list; a scalar field's list, else its one value (an x-whole list is one value).
-    value = values[path] if path in values else _get(base, path)
-    if path in list_fields:
-        return [[entry] for entry in value] if isinstance(value, list) else [value]
-    return value if isinstance(value, list) and not isinstance(_get(base, path), list) else [value]
-
-
-def condition_combinations(base: dict, values: dict, pairs: Sequence[Sequence[str]] = (), list_fields=()) -> list[dict[str, Any]]:
-    """Every combination of a condition, each a dict of dotted path to value: base the task's values (by alias, as JSON),
-    values the condition's set, pairs its pairs, list_fields the task's pick_lists. Each pairs group's lists are zipped
-    (equal lengths), then every other list cell of the set and every list field one pick, as a product with the first
-    cell's pick changing fastest: the index the trialCombination column logs (a task's own draw must use the same order)."""
-    paired = [path for group in pairs for path in group]
-    cells: list[tuple[tuple[str, ...], list[tuple]]] = []
-    for group in pairs:
-        lists = [_options(base, values, path, list_fields) for path in group]
-        if len({len(options) for options in lists}) > 1:
-            raise ValueError(f"pairs {group} have lists of lengths {', '.join(str(len(options)) for options in lists)}; paired lists must be equally long")
-        cells.append((tuple(group), list(zip(*lists))))
-    cells += [((path,), [(option,) for option in _options(base, values, path, list_fields)]) for path in sorted({*values, *list_fields} - {*paired})]
-    combos: list[dict[str, Any]] = [{}]
-    for paths, options in cells:
-        if not options:
-            raise ValueError(f"{', '.join(paths)} is an empty list")
-        combos = [{**combo, **dict(zip(paths, option))} for option in options for combo in combos]
-    return combos

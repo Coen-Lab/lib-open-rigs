@@ -3,6 +3,7 @@ trial columns its manifest carries, or the workflow repository's file."""
 
 import json
 import math
+import re
 import subprocess
 from pathlib import Path
 
@@ -124,47 +125,92 @@ def test_only_chunk_names_are_read(tmp_path):
     assert trial_log.read(tmp_path) == [{"trialNumber": 1}]
 
 
-# A task with two conditions: "a" sets contrasts [0.5, 1] (2 combinations) and a reward 3, "b" one combination.
-TASK = {"taskParameters": {"reward": {"size": 2}, "contrasts": [0.1, 0.2], "mode": "x", "trialConditions": [
-    {"trialType": "a", "weight": 1, "set": {"reward.size": 3}, "pairs": []},
-    {"trialType": "b", "weight": 1, "set": {}, "pairs": []}]}}
-COMBO_COLUMNS = {"trialCondition": {"type": "int"}, "trialCombination": {"type": "int"}}
+# A run with a combinations table. The manifest carries every scalar as text, as the writer copies it ("0"); the task
+# file's NaN is text, the table's bare. contrasts and reward.sizeUl vary; stim.azimuth is constant, a one-entry list.
+TABLE_COLUMNS = {
+    "trialCondition": {"type": "int"}, "trialCombinationId": {"type": "int"}, "trialType": {"type": "string"},
+    "target": {"type": "string"}, "visualContrast": {"type": "double", "copyOf": "contrasts"},
+    "visualAzimuthDeg": {"type": "double", "copyOf": "stim.azimuth", "nanWhen": {"column": "visualContrast", "equals": "0"}},
+    "rewardUl": {"type": "double", "copyOf": "reward.sizeUl"}, "delay": {"type": "double", "copyOf": "delaySeconds"},
+}
+TABLE_TASK = {"taskParameters": {"contrasts": [0, 1], "target": "left", "stim": {"azimuth": [-60]}, "reward": {"sizeUl": 3},
+                                 "delaySeconds": "NaN", "trialConditions": [{"trialType": "visual"}, {"trialType": "auditory"}]}}
+TABLE = {"rows": [
+    {"trialCombinationId": 0, "trialCondition": 0, "trialType": "visual", "conditionWeight": 1, "values": {"contrasts": 0, "reward.sizeUl": 3, "target": "left"}},
+    {"trialCombinationId": 1, "trialCondition": 0, "trialType": "visual", "conditionWeight": 1, "values": {"contrasts": 1, "reward.sizeUl": float("nan"), "target": "left"}},
+    {"trialCombinationId": 2, "trialCondition": 1, "trialType": "auditory", "conditionWeight": 1, "values": {"contrasts": 0, "reward.sizeUl": 2, "target": "right"}},
+]}
+TABLE_LOG = [  # target is resolved, not a copy: the third trial's centre stays as recorded
+    {"trialCondition": "0", "trialCombinationId": "0", "trialType": "visual", "target": "left", "visualContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "3", "delay": "NaN"},
+    {"trialCondition": "0", "trialCombinationId": "1", "trialType": "visual", "target": "left", "visualContrast": "1", "visualAzimuthDeg": "-60", "rewardUl": "NaN", "delay": "NaN"},
+    {"trialCondition": "1", "trialCombinationId": "2", "trialType": "auditory", "target": "centre", "visualContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "2", "delay": "NaN"},
+]
 
 
-def combo_run(tmp_path, rows, task=TASK):
-    manifest(tmp_path, trial_columns={"columns": COMBO_COLUMNS})
-    if task is not None:
-        write(tmp_path / "Settings", "Settings_Task_2026-11-05T10-00-00.json", json.dumps(task))
-    write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv",
-          "trialCondition,trialCombination\n" + "".join(f"{c},{k}\n" for c, k in rows))
-    return tmp_path
+def table_run(folder, log=TABLE_LOG, table=TABLE, tables=1):
+    manifest(folder, trial_columns={"columns": TABLE_COLUMNS})
+    write(folder / "Settings", "Settings_Task_2026-11-05T10-00-00.json", json.dumps(TABLE_TASK))
+    for n in range(tables):
+        write(folder / "Settings", f"Settings_Combinations_2026-11-05T10-00-0{n}.json", json.dumps(table))
+    names = list(log[0])
+    write(folder / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv",
+          ",".join(names) + "\n" + "".join(",".join(row[n] for n in names) + "\n" for row in log))
+    return folder
 
 
-def test_a_combination_decodes_into_columns_of_the_fields_that_varied(tmp_path):
-    rows = trial_log.read(combo_run(tmp_path, [(0, 0), (0, 1), (1, 1)]), list_fields=["contrasts"])
-    # reward.size differs between the conditions and contrasts within them; mode is the same on every trial.
-    assert [(r["reward.size"], r["contrasts"]) for r in rows] == [(3, [0.1]), (3, [0.2]), (2, [0.2])]
-    assert "mode" not in rows[0]
+def test_a_combination_s_values_join_as_task_columns_and_never_overwrite(tmp_path):
+    rows = trial_log.read(table_run(tmp_path))
+    assert [(r["task.contrasts"], r["task.target"], r["target"]) for r in rows] == [(0, "left", "left"), (1, "left", "left"), (0, "right", "centre")]
+    assert math.isnan(rows[1]["task.reward.sizeUl"]) and "task.stim.azimuth" not in rows[0]  # constant: in Settings_Task alone
+    clash = [{**row, "task.target": "x"} for row in TABLE_LOG]
+    with pytest.raises(ValueError, match="recorded column task.target"):
+        trial_log.read(table_run(tmp_path / "clash", log=clash))
 
 
-def test_an_index_out_of_range_a_missing_task_file_or_list_fields_fail(tmp_path):
-    with pytest.raises(ValueError, match="trialCombination 2 is out of range"):
-        trial_log.read(combo_run(tmp_path / "a", [(0, 2)]), list_fields=["contrasts"])
-    with pytest.raises(ValueError, match="trialCondition 5"):
-        trial_log.read(combo_run(tmp_path / "b", [(5, 0)]), list_fields=[])
-    with pytest.raises(ValueError, match="0 task files"):
-        trial_log.read(combo_run(tmp_path / "c", [(0, 0)], task=None), list_fields=[])
-    with pytest.raises(ValueError, match="give repo"):
-        trial_log.read(combo_run(tmp_path / "d", [(0, 0)]))
+def test_an_id_needs_exactly_one_table_and_the_old_index_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="0 files Settings/Settings_Combinations"):
+        trial_log.read(table_run(tmp_path / "none", tables=0))
+    with pytest.raises(ValueError, match="2 files Settings/Settings_Combinations"):
+        trial_log.read(table_run(tmp_path / "two", tables=2))
+    with pytest.raises(ValueError, match="trialCombinationId 7 is not a row"):
+        trial_log.read(table_run(tmp_path / "out", log=[{**TABLE_LOG[0], "trialCombinationId": "7"}]))
+    old = [{"trialCondition": "0", "trialCombination": "0"}]
+    with pytest.raises(ValueError, match="trialCombination, logged before the combinations table"):
+        trial_log.read(table_run(tmp_path / "old", log=old, tables=0))
 
 
-def test_the_list_fields_come_from_the_repo_s_task_schema(tmp_path):
-    # read(folder, repo) decodes alone. The params node is the one with x-max-combinations; an x-whole
-    # array is never a pick. No commit in the manifest: the clone's schema as it is now.
-    params = {"x-max-combinations": 1024, "properties": {"contrasts": {"type": "array"},
-                                                          "trialConditions": {"type": "array", "x-whole": True}}}
-    repo = tmp_path / "repo"
-    write(repo / "src" / "DataSchemas", "x_task.json", json.dumps({"$defs": {"Params": params}, "$ref": "#/$defs/Params"}))
-    run = combo_run(tmp_path / "run", [(0, 0), (0, 1), (1, 1)])
-    assert trial_log.list_fields_of(run, repo) == ["contrasts"]
-    assert [r["contrasts"] for r in trial_log.read(run, repo)] == [[0.1], [0.2], [0.2]]
+def test_a_log_with_neither_reads_as_written_without_a_table(tmp_path):
+    log = [{k: v for k, v in row.items() if k != "trialCombinationId"} for row in TABLE_LOG]
+    rows = trial_log.read(table_run(tmp_path, log=log, tables=0))
+    assert rows[2]["target"] == "centre" and not any(name.startswith("task.") for name in rows[0])
+    trial_log.check(tmp_path)
+
+
+@pytest.mark.parametrize("trial, column, value, words", [
+    (2, "trialCondition", "0", "trial 3: trialCondition 0, its combination 2's is 1"),
+    (2, "trialType", "visual", "trial 3: trialType 'visual'"),
+    (1, "visualContrast", "0.5", "trial 2: visualContrast 0.5, its combination 1's contrasts is 1"),  # the row's value
+    (1, "visualAzimuthDeg", "60", "trial 2: visualAzimuthDeg 60.0, its combination 1's stim.azimuth is -60"),  # Settings_Task's, unwrapped
+    (0, "visualAzimuthDeg", "-60", "trial 1: visualAzimuthDeg -60.0, not NaN where visualContrast is 0"),  # nanWhen
+    (0, "rewardUl", "NaN", "trial 1: rewardUl nan, its combination 0's reward.sizeUl is 3"),
+    (1, "rewardUl", "3", "trial 2: rewardUl 3.0"),  # the table's bare NaN
+    (0, "delay", "1", "trial 1: delay 1.0, its combination 0's delaySeconds is 'NaN'"),  # Settings_Task's text NaN
+])
+def test_check_catches_a_planted_mismatch(tmp_path, trial, column, value, words):
+    trial_log.check(table_run(tmp_path / "clean"))
+    log = [dict(row) for row in TABLE_LOG]
+    log[trial][column] = value
+    run = table_run(tmp_path / "planted", log=log)
+    for call in (trial_log.check, trial_log.read):
+        with pytest.raises(ValueError, match=re.escape(words)):
+            call(run)
+
+
+def test_copy_of_comes_from_the_manifest_only(tmp_path):
+    # Without copyOf in the manifest's columns, only trialCondition and trialType are held to the table.
+    run = table_run(tmp_path, log=[{**TABLE_LOG[1], "visualContrast": "0.5"}])
+    manifest(run, trial_columns={"columns": {k: {"type": v["type"]} for k, v in TABLE_COLUMNS.items()}})
+    assert trial_log.read(run)[0]["visualContrast"] == 0.5
+    with pytest.raises(ValueError, match="copyOf nowhere, a path in neither"):
+        manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "visualContrast": {"type": "double", "copyOf": "nowhere"}}})
+        trial_log.check(run)
