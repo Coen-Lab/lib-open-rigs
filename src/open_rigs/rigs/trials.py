@@ -25,10 +25,11 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
   RewardDelivered comes at the outcome of a trial not rewarded.
 
 These checks run on finished trials, the rows of WorkflowData_Trials. A run stopped mid-trial has no row for that trial, but
-a task that logs WorkflowData/WorkflowData_StimulusState_*.csv (harpTime, trialNumber, auditoryOn, visualOn) shows it: rows
-for the trial after the last finished one are an unfinished trial, reported in the summary (never a problem), and the first
-of them with auditoryOn or visualOn True is its stimulus onset, which gives the last outcome's interval to the next stimulus. A task
-without that log has no unfinished trial.
+a task that logs WorkflowData/WorkflowData_StimulusState_*.csv (harpTime, trialNumber, and auditoryOn and visualOn, or
+auditoryAmplitude and visualContrast, whichever it has) shows it: rows for the trial after the last finished one are an
+unfinished trial, reported in the summary (never a problem), and the first of them with a stimulus on (auditoryOn or
+visualOn True, auditoryAmplitude or visualContrast above 0) is its stimulus onset, which gives the last outcome's interval
+to the next stimulus. A task without that log has no unfinished trial.
 
 A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
 Performance and the response rate are performance()'s, which says what each counts.
@@ -432,14 +433,27 @@ def _summarise(folder: Path) -> Summary:
     return s
 
 
+# StimulusState's stimulus columns, each with when its value says the stimulus is on: the old flags, or navigation's
+# amplitude and contrast.
+STIMULUS_ON_COLUMNS = {
+    "auditoryOn": _true,
+    "visualOn": _true,
+    "auditoryAmplitude": lambda v: float(v) > 0,
+    "visualContrast": lambda v: float(v) > 0,
+}
+
+
 def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Optional[Dict[str, str]]) -> None:
     """The trial after the last finished one, when StimulusState has rows for it: the run stopped in it. Its first
-    row with auditoryOn or visualOn is the stimulus the last outcome's interval ran to."""
+    row with a stimulus on (auditoryOn or visualOn True, auditoryAmplitude or visualContrast above 0, whichever columns
+    the log has) is the stimulus the last outcome's interval ran to."""
     rows = _rows(folder, STIMULUS_FILES)
     if not rows or not trials:
         return
-    if any(c not in rows[0] for c in ("harpTime", "trialNumber", "auditoryOn", "visualOn")):
-        s.problems.append("WorkflowData_StimulusState lacks harpTime, trialNumber, auditoryOn or visualOn: the unfinished trial not looked for")
+    onsets = [c for c in STIMULUS_ON_COLUMNS if c in rows[0]]
+    if any(c not in rows[0] for c in ("harpTime", "trialNumber")) or not onsets:
+        s.problems.append("WorkflowData_StimulusState lacks harpTime, trialNumber, or a stimulus column (auditoryOn, visualOn, "
+                          "auditoryAmplitude, visualContrast): the unfinished trial not looked for")
         return
     try:
         cut = int(_f(trials[-1], "trialNumber")) + 1
@@ -459,7 +473,7 @@ def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Op
         return
     for r in mine:
         try:
-            if _true(r["auditoryOn"]) or _true(r["visualOn"]):
+            if any(STIMULUS_ON_COLUMNS[c](r[c]) for c in onsets):
                 s.interval_seconds.append(_f(r, TIME_COLUMN) - _f(last, "outcomeTime"))
                 return
         except (TypeError, ValueError):
