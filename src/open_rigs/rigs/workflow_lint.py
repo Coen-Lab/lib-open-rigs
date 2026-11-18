@@ -51,7 +51,6 @@ PLAY_PENALTY_SOUND = "OpenRigs.Audio:PlayPenaltySound.bonsai"
 SET_ZAPIT_TRIGGER_LINE = "OpenRigs.Devices:SetZapitTriggerLine.bonsai"
 LOG_RNG_SEED = "OpenRigs.Logging:LogRngSeed.bonsai"
 TASK_LOGS = "OpenRigs.Logging:TaskLogs.bonsai"
-TRAINING_STAGE = "OpenRigs.Control:TrainingStage.bonsai"
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
 DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
@@ -1082,27 +1081,6 @@ def output_ends_logs_problems(root: ET.Element) -> list[str]:
             problems += [f"{n.findtext(W + 'Name') or kind(n)} logs beside a WorkflowOutput fed by a one-shot LogDataSchema, "
                          "which ends it when the write completes" for i, n in enumerate(nodes)
                          if i not in feed and any("Log" in (e.get("Path") or "") for e in n.iter(W + "Expression"))]
-    return problems
-
-
-def training_stage_problems(wf: Workflow) -> list[str]:
-    """The training stage is OpenRigs.Control's TrainingStage, included once after ExperimentControl, which declares
-    the parameter TrainingStage; the workflow reads the parameter, declares the subject and reports the metric nowhere
-    itself."""
-    count = wf.text.count(f'Path="{TRAINING_STAGE}"')
-    if count != 1:
-        return [f"the workflow includes TrainingStage {count} times, not once"]
-    problems = [] if re.search(r"<Parameter>\s*<Name>TrainingStage</Name>", wf.text) else [
-        "ExperimentControl does not declare the parameter TrainingStage, which TrainingStage reads"]
-    if _order(wf.root, _declares("TrainingStage")) is not None:
-        problems.append("the workflow declares TrainingStage itself (TrainingStage does)")
-    names = {c.findtext(CONTROL + "Name") or "" for c in wf.root.iter(W + "Combinator")
-             if (c.get(XSI) or "").split(":")[-1] in ("ParameterValue", "ReportMetric")}
-    problems += [f"the workflow handles {name} itself (TrainingStage does)" for name in sorted(names & {"TrainingStage", "trainingStage"})]
-    at = _order(wf.root, lambda n: n.get("Path") == TRAINING_STAGE)
-    control = _order(wf.root, lambda n: n.get("Path") == EXPERIMENT_CONTROL)
-    if control is None or at is None or control > at:
-        problems.append("TrainingStage comes before ExperimentControl")
     return problems
 
 

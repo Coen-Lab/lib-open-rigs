@@ -564,21 +564,6 @@ def test_no_include_ends_its_logs_when_a_one_shot_write_completes():
         for name in ("TrialLogs", "IncludeWorkflow")]
 
 
-def test_the_training_stage_is_the_lab_s_include_after_experiment_control(tmp_path):
-    control = include(lint.EXPERIMENT_CONTROL, "<Parameters><Parameter><Name>TrainingStage</Name></Parameter></Parameters>")
-    assert lint.training_stage_problems(workflow(tmp_path, control + include(lint.TRAINING_STAGE))) == []
-    # A task's own chain, refused.
-    own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:ParameterValue" ' + CONTROL + '><orcl:Name>TrainingStage</orcl:Name></Combinator></Expression>'
-           '<Expression xsi:type="rx:AsyncSubject"><Name>TrainingStage</Name></Expression>'
-           '<Expression xsi:type="Combinator"><Combinator xsi:type="orcl:ReportMetric" ' + CONTROL + '><orcl:Name>trainingStage</orcl:Name></Combinator></Expression>')
-    assert lint.training_stage_problems(workflow(tmp_path / "b", control + own)) == ["the workflow includes TrainingStage 0 times, not once"]
-    assert lint.training_stage_problems(workflow(tmp_path / "c", control + own + include(lint.TRAINING_STAGE))) == [
-        "the workflow declares TrainingStage itself (TrainingStage does)",
-        "the workflow handles TrainingStage itself (TrainingStage does)", "the workflow handles trainingStage itself (TrainingStage does)"]
-    assert lint.training_stage_problems(workflow(tmp_path / "d", include(lint.TRAINING_STAGE) + include(lint.EXPERIMENT_CONTROL))) == [
-        "ExperimentControl does not declare the parameter TrainingStage, which TrainingStage reads", "TrainingStage comes before ExperimentControl"]
-
-
 def test_the_penalty_sound_is_the_lab_s_include(tmp_path):
     assert rules.play_penalty_sound_problems(lint.ET.fromstring(block_text(lint.PLAY_PENALTY_SOUND).encode("utf-8"))) == []
     assert lint.penalty_sound_problems(workflow(tmp_path, include(lint.PLAY_PENALTY_SOUND))) == []
@@ -695,7 +680,7 @@ def test_a_task_without_its_pieces_copies_passes_and_one_with_them_does_not(tmp_
         z.writestr("lib/net472/OpenRigs.Devices.dll", dll + b"\x00")
     monkeypatch.setattr(lint, "LIB_SRC", tmp_path / "nowhere")
     pieces = include(lint.READ_LAB_RIG) + include(lint.DEVICES + "DomeHardware.bonsai") + VALVES
-    task = "<Parameters><Parameter><Name>TrainingStage</Name></Parameter></Parameters>"
+    task = "<Parameters><Parameter><Name>Speed</Name></Parameter></Parameters>"
     without = workflow(tmp_path, pieces + include(lint.EXPERIMENT_CONTROL, task))
     assert lint.undeclared_commands(without) == [] and lint.declared_twice(without) == [] and lint.spout_step_size_problems(without) == []
     assert {(who, name) for who, kind, name in lint.control_declarations(without) if kind == "command"} >= {("LickSpoutStage", "SpoutsHome"), ("RewardValve-Right", "RewardValve-Right.Reward")}

@@ -264,10 +264,7 @@ if ($Step -eq 'Checks') {
         try {
             $d = (New-Object YamlDotNet.Serialization.DeserializerBuilder).Build()
             $c = $d.Deserialize((New-Object IO.StringReader ([IO.File]::ReadAllText($file.FullName))), $taskType)
-            # A task with training stages needs a row; a task with none has no such property.
-            $stages = $c.TaskParameters.PSObject.Properties['TrainingStages']
             if ($null -eq $c.TaskParameters) { "  FAIL  config\$($file.Name) has no taskParameters"; $failed++ }
-            elseif ($stages -and $stages.Value.Count -eq 0) { "  FAIL  config\$($file.Name) has no trainingStages"; $failed++ }
             else { "  ok    config\$($file.Name) reads as the workflow reads it at Go" }
         } catch { $x = $_.Exception; while ($x.InnerException) { $x = $x.InnerException }; "  FAIL  config\$($file.Name): $($x.Message)"; $failed++ }
     }
