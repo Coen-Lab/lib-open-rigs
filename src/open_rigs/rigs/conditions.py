@@ -6,15 +6,23 @@ Both are JSON Schema subschemas checked against a flat object keyed by dotted pa
         matching S leaves the unused paths unread.
     x-trial-types: ordered [{"trialType": name, "if": S, "mirrored": [a, b]}], the last with no "if"
         on a condition's values, every value a list; the first entry that matches names it. "mirrored": a and b share
-        a pairs group and b's list is a's negated.
+        a pairs group and b's list is a's negated (a non-number, such as "all", is never mirrored).
+    x-required-conditions: [{"if": S, "some": T, "message": m}]
+        S on the task's resolved values: when it matches, some combination of a condition with weight > 0 must match T, else m.
 """
 
+import json
+from functools import cache
 from typing import Any
 
 from jsonschema import Draft202012Validator
 
 RULE_KEYS = {"if", "then", "unused", "message", "description"}
 TRIAL_TYPE_KEYS = {"trialType", "if", "mirrored"}
+REQUIRED_KEYS = {"if", "some", "message"}
+# The most combinations one condition may expand into (a task schema's x-max-combinations, which its C# and the launcher
+# read). At 1024 a task's C# check and build at Go took 2.5 s and pydantic's 0.4 s (desk PC, 18 Nov 2026).
+MAX_COMBINATIONS = 1024
 
 
 def flatten(data: dict, prefix: str = "") -> dict[str, Any]:
@@ -28,16 +36,22 @@ def flatten(data: dict, prefix: str = "") -> dict[str, Any]:
     return flat
 
 
-def _matches(schema: dict, flat: dict) -> bool:
+@cache
+def _validator(text: str) -> Draft202012Validator:
+    schema = json.loads(text)
     Draft202012Validator.check_schema(schema)
-    return Draft202012Validator(schema).is_valid(flat)
+    return Draft202012Validator(schema)
 
 
-def _if_matches(entry: dict, flat: dict, kind: str) -> bool:
-    """Whether the entry's if matches; refused when it names a path not in the values, which would pass vacuously."""
-    if missing := [path for path in [*entry["if"].get("properties", {}), *entry["if"].get("required", [])] if path not in flat]:
+def _matches(schema: dict, flat: dict) -> bool:
+    return _validator(json.dumps(schema, sort_keys=True)).is_valid(flat)
+
+
+def _if_matches(entry: dict, flat: dict, kind: str, key: str = "if") -> bool:
+    """Whether the entry's if (or key) matches; refused when it names a path not in the values, which would pass vacuously."""
+    if missing := [path for path in [*entry[key].get("properties", {}), *entry[key].get("required", [])] if path not in flat]:
         raise ValueError(f"{kind} entry {entry} names {', '.join(dict.fromkeys(missing))}, not in the values")
-    return _matches(entry["if"], flat)
+    return _matches(entry[key], flat)
 
 
 def _applying(rules: list[dict], values: dict):
@@ -71,7 +85,43 @@ def derive_trial_type(trial_types: list[dict], task: dict, values: dict[str, Any
             continue
         if "mirrored" in entry:
             a, b = entry["mirrored"]
-            if not any(a in group and b in group for group in pairs) or [-pick for pick in flat[a]] != flat[b]:
+            numbers = all(isinstance(pick, (int, float)) and not isinstance(pick, bool) for pick in flat[a])
+            if not any(a in group and b in group for group in pairs) or not numbers or [-pick for pick in flat[a]] != flat[b]:
                 continue
         return entry["trialType"]
     raise ValueError(f"no x-trial-types entry matches the condition {values} with pairs {pairs}")
+
+
+def required_problems(required: list[dict], task: dict, combinations: list[dict]) -> list[str]:
+    """The messages of the x-required-conditions the task's values (by alias, as JSON) match but no combination (each one
+    combination's values, by alias, as JSON) of a condition with weight > 0 does."""
+    flat, combos = flatten(task), [flatten(combo) for combo in combinations]
+    problems = []
+    for entry in required:
+        if set(entry) != REQUIRED_KEYS:
+            raise ValueError(f"x-required-conditions entry {entry} is malformed: needs exactly {', '.join(sorted(REQUIRED_KEYS))}")
+        if _if_matches(entry, flat, "x-required-conditions") and not any(_if_matches(entry, combo, "x-required-conditions", "some") for combo in combos):
+            problems.append(entry["message"])
+    return problems
+
+
+def pick_lists(schema: dict) -> list[str]:
+    """The list fields of a task parameters' JSON schema (with its $defs) one entry of which each trial draws: every array
+    but an x-whole one, by dotted path, sorted. Each expands into a condition's combinations, one entry each."""
+    defs, paths = schema.get("$defs", {}), []
+
+    def walk(node: dict, prefix: str) -> None:
+        for key, prop in node.get("properties", {}).items():
+            for option in [prop, *prop.get("anyOf", []), *prop.get("allOf", [])]:
+                kind = option.get("type")
+                if prop.get("x-whole"):
+                    break
+                if kind == "array" or isinstance(kind, list) and "array" in kind:
+                    paths.append(prefix + key)
+                    break
+                if "$ref" in option:
+                    walk(defs[option["$ref"].rsplit("/", 1)[1]], f"{prefix}{key}.")
+                    break
+
+    walk(schema, "")
+    return sorted(paths)

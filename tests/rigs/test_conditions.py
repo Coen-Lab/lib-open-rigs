@@ -1,6 +1,6 @@
 import pytest
 
-from open_rigs.rigs.conditions import derive_trial_type, flatten, rule_problems, unused_paths
+from open_rigs.rigs.conditions import derive_trial_type, flatten, pick_lists, required_problems, rule_problems, unused_paths
 
 V, A = "visual.azimuths", "sound.azimuths"
 SOME_ABOVE_0 = {"contains": {"exclusiveMinimum": 0}}
@@ -32,6 +32,7 @@ def test_flatten_keys_leaves_by_dotted_path():
     ({}, [[V, A]], "coherent"),
     ({A: [60, -60]}, [[V, A]], "conflict"),
     ({A: [60, -60]}, [], "coherent"),
+    ({V: [60, "all"], A: [-60, "all"]}, [[V, A]], "coherent"),  # a non-number is never mirrored
     ({A: [0, "all"]}, [], "visual"),
     ({A: [0, 60]}, [], "coherent"),
     ({"sound.amplitude": [0, 0.5]}, [], "coherent"),
@@ -83,3 +84,36 @@ def test_an_if_naming_a_path_not_in_the_values_fails_loudly():
     entry = {"trialType": "x", "if": {"properties": {"contrast": SOME_ABOVE_0}}}
     with pytest.raises(ValueError, match="x-trial-types entry .* names contrast, not in the values"):
         derive_trial_type([entry, {"trialType": "y"}], BASE, {})
+
+
+GO_NO_GO = [{"if": {"properties": {"taskType": {"const": "goNoGo"}}, "required": ["taskType"]},
+             "some": {"properties": {"target": {"const": "go"}}, "required": ["target"]}, "message": "needs a go condition"}]
+
+
+@pytest.mark.parametrize("task_type, targets, problems", [
+    ("goNoGo", ["noGo", "go"], []),
+    ("goNoGo", ["noGo"], ["needs a go condition"]),
+    ("goNoGo", [], ["needs a go condition"]),
+    ("other", ["noGo"], []),
+])
+def test_required_problems_need_some_combination_matching(task_type, targets, problems):
+    task = {**BASE, "taskType": task_type}
+    assert required_problems(GO_NO_GO, task, [{**task, "target": target} for target in targets]) == problems
+
+
+@pytest.mark.parametrize("entry, words", [
+    ({**GO_NO_GO[0], "description": "d"}, "malformed"),
+    ({"if": {}, "message": "m"}, "malformed"),
+    ({**GO_NO_GO[0], "some": {"required": ["targt"]}}, "names targt, not in the values"),
+])
+def test_a_malformed_x_required_conditions_entry_fails_loudly(entry, words):
+    task = {**BASE, "taskType": "goNoGo"}
+    with pytest.raises(ValueError, match=words):
+        required_problems([entry], task, [task])
+
+
+def test_pick_lists_are_every_array_but_a_whole_one():
+    schema = {"properties": {"contrasts": {"type": "array"}, "trialConditions": {"type": "array", "x-whole": True}, "seed": {"type": "number"},
+                             "sound": {"$ref": "#/$defs/Sound"}, "maybe": {"anyOf": [{"type": "array"}, {"type": "null"}]}},
+              "$defs": {"Sound": {"properties": {"azimuths": {"type": ["array", "null"]}, "stimuli": {"type": "array", "x-whole": True}}}}}
+    assert pick_lists(schema) == ["contrasts", "maybe", "sound.azimuths"]
