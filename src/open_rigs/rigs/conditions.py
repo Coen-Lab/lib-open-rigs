@@ -145,7 +145,7 @@ def condition_combinations(base: dict, values: dict, pairs: list[list[str]] = ()
     """Every combination of a condition, each a dict of dotted path to value: base the task's values (by alias, as JSON),
     values the condition's set, pairs its pairs, list_fields the task's pick_lists. Each pairs group's lists are zipped
     (equal lengths), then every other list cell of the set and every list field one pick, as a product with the first
-    cell's pick changing fastest: the index the trialCombination column logs (the domes' draw uses the same order)."""
+    cell's pick changing fastest: the index the trialCombination column logs (a task's own draw must use the same order)."""
     paired = [path for group in pairs for path in group]
     cells: list[tuple[tuple[str, ...], list[tuple]]] = []
     for group in pairs:

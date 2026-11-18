@@ -159,7 +159,7 @@ def test_an_index_out_of_range_a_missing_task_file_or_list_fields_fail(tmp_path)
 
 
 def test_the_list_fields_come_from_the_repo_s_task_schema(tmp_path):
-    # Pip, 18 Nov 2026: read(folder, repo) decodes alone. The params node is the one with x-max-combinations; an x-whole
+    # read(folder, repo) decodes alone. The params node is the one with x-max-combinations; an x-whole
     # array is never a pick. No commit in the manifest: the clone's schema as it is now.
     params = {"x-max-combinations": 1024, "properties": {"contrasts": {"type": "array"},
                                                           "trialConditions": {"type": "array", "x-whole": True}}}
