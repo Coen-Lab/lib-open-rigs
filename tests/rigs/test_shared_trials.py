@@ -350,7 +350,7 @@ def test_a_run_stopped_mid_trial_reports_the_unfinished_trial_and_its_interval(t
 
 
 def test_navigations_amplitude_and_contrast_give_the_onset(tmp_path):
-    # coen-dome-navigation logs auditoryAmplitude and visualContrast in place of auditoryOn and visualOn: above 0 is on.
+    # A task may log auditoryAmplitude and visualContrast in place of auditoryOn and visualOn: above 0 is on.
     trials = _chain(1)
     end = trials[0]["outcomeTime"]
     folder = _experiment(tmp_path, trials, [(end, 2.0)], outcome="stopped")
