@@ -1,6 +1,6 @@
 import pytest
 
-from open_rigs.rigs.conditions import derive_trial_type, flatten, rule_problems
+from open_rigs.rigs.conditions import derive_trial_type, flatten, rule_problems, unused_paths
 
 V, A = "visual.azimuths", "sound.azimuths"
 SOME_ABOVE_0 = {"contains": {"exclusiveMinimum": 0}}
@@ -59,6 +59,11 @@ def test_a_malformed_or_unmatched_x_trial_types_fails_loudly(trial_types, words)
 ])
 def test_rule_problems_are_the_broken_rules_messages(values, problems):
     assert rule_problems(RULES, values) == problems
+
+
+def test_unused_paths_are_the_applying_rules():
+    assert unused_paths(RULES, {**BASE, "contrasts": [0]}) == {V}
+    assert unused_paths(RULES, BASE) == set()
 
 
 @pytest.mark.parametrize("rule", [

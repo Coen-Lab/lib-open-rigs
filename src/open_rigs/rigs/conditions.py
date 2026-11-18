@@ -2,7 +2,8 @@
 
 Both are JSON Schema subschemas checked against a flat object keyed by dotted path:
     x-rules: [{"if": S, "then": T, "message": m} | {"if": S, "unused": [paths], "message": m}, optional "description"]
-        on one combination's values (a scalar cell one pick, a list field a list): matching S must match T, else m.
+        on one combination's values (a scalar cell one pick, a list field a list): matching S must match T, else m;
+        matching S leaves the unused paths unread.
     x-trial-types: ordered [{"trialType": name, "if": S, "mirrored": [a, b]}], the last with no "if"
         on a condition's values, every value a list; the first entry that matches names it. "mirrored": a and b share
         a pairs group and b's list is a's negated.
@@ -32,16 +33,23 @@ def _matches(schema: dict, flat: dict) -> bool:
     return Draft202012Validator(schema).is_valid(flat)
 
 
-def rule_problems(rules: list[dict], values: dict) -> list[str]:
-    """The messages of the x-rules one combination's values (by alias, as JSON) break."""
+def _applying(rules: list[dict], values: dict):
     flat = flatten(values)
-    problems = []
     for rule in rules:
         if set(rule) - RULE_KEYS or not {"if", "message"} <= set(rule) or ("then" in rule) == ("unused" in rule):
             raise ValueError(f"x-rules entry {rule} is malformed: needs if, message and one of then or unused, and only {', '.join(sorted(RULE_KEYS))}")
-        if "then" in rule and _matches(rule["if"], flat) and not _matches(rule["then"], flat):
-            problems.append(rule["message"])
-    return problems
+        if _matches(rule["if"], flat):
+            yield rule, flat
+
+
+def rule_problems(rules: list[dict], values: dict) -> list[str]:
+    """The messages of the x-rules one combination's values (by alias, as JSON) break."""
+    return [rule["message"] for rule, flat in _applying(rules, values) if "then" in rule and not _matches(rule["then"], flat)]
+
+
+def unused_paths(rules: list[dict], values: dict) -> set[str]:
+    """The paths x-rules say one combination's values (by alias, as JSON) leave unread."""
+    return {path for rule, _ in _applying(rules, values) for path in rule.get("unused", [])}
 
 
 def derive_trial_type(trial_types: list[dict], task: dict, values: dict[str, Any], pairs: list[list[str]] = ()) -> str:
