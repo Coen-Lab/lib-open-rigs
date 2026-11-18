@@ -154,5 +154,17 @@ def test_an_index_out_of_range_a_missing_task_file_or_list_fields_fail(tmp_path)
         trial_log.read(combo_run(tmp_path / "b", [(5, 0)]), list_fields=[])
     with pytest.raises(ValueError, match="0 task files"):
         trial_log.read(combo_run(tmp_path / "c", [(0, 0)], task=None), list_fields=[])
-    with pytest.raises(ValueError, match="give list_fields"):
+    with pytest.raises(ValueError, match="give repo"):
         trial_log.read(combo_run(tmp_path / "d", [(0, 0)]))
+
+
+def test_the_list_fields_come_from_the_repo_s_task_schema(tmp_path):
+    # Pip, 18 Nov 2026: read(folder, repo) decodes alone. The params node is the one with x-max-combinations; an x-whole
+    # array is never a pick. No commit in the manifest: the clone's schema as it is now.
+    params = {"x-max-combinations": 1024, "properties": {"contrasts": {"type": "array"},
+                                                          "trialConditions": {"type": "array", "x-whole": True}}}
+    repo = tmp_path / "repo"
+    write(repo / "src" / "DataSchemas", "x_task.json", json.dumps({"$defs": {"Params": params}, "$ref": "#/$defs/Params"}))
+    run = combo_run(tmp_path / "run", [(0, 0), (0, 1), (1, 1)])
+    assert trial_log.list_fields_of(run, repo) == ["contrasts"]
+    assert [r["contrasts"] for r in trial_log.read(run, repo)] == [[0.1], [0.2], [0.2]]

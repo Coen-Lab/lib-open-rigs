@@ -33,6 +33,7 @@ MANIFEST = "manifest.json"
 MANIFEST_VERSIONS = (1, 2, 3, 4)  # 4 is what OpenRigs.Manifest writes (ManifestWriter.Version)
 REPO_FILE = "schemas/trial-columns.yml"
 TASK_FILE = ("Settings", "Settings_Task", ".json")  # written beside the trial log at Go
+SCHEMA_DIR = "src/DataSchemas"  # a task repo's generated schemas, its task schema *_task.json
 
 
 def _parse(text: str) -> Dict[str, Dict[str, Any]]:
@@ -108,6 +109,33 @@ def text_rows(experiment: Union[str, Path]) -> List[Dict[str, str]]:
     return [row for _, _, row in _text_rows(experiment)]
 
 
+def _git(repo: Path, *args: str) -> Optional[str]:
+    shown = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
+    return shown.stdout if shown.returncode == 0 else None
+
+
+def list_fields_of(experiment: Union[str, Path], repo: Union[str, Path]) -> List[str]:
+    """The task's list fields (conditions.pick_lists) from the repo's task schema, SCHEMA_DIR/*_task.json, at the run's
+    commit (its manifest's source.commit), else as the clone has it now. Raises ValueError when the repo has none."""
+    repo, manifest_path = Path(repo), Path(experiment) / MANIFEST
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig")) if manifest_path.is_file() else {}
+    commit = (manifest.get("source") or {}).get("commit")
+    names = _git(repo, "ls-tree", "--name-only", f"{commit}:{SCHEMA_DIR}") if commit else None
+    name = next((n for n in (names or "").split() if n.endswith("_task.json")), None)
+    text = _git(repo, "show", f"{commit}:{SCHEMA_DIR}/{name}") if name else None
+    if text is None:
+        found = sorted((repo / SCHEMA_DIR).glob("*_task.json"))
+        if len(found) != 1:
+            raise ValueError(f"{repo}: {len(found)} task schemas in {SCHEMA_DIR}, need exactly one for the task's list fields")
+        text = found[0].read_text(encoding="utf-8")
+    schema = json.loads(text)
+    defs = schema.get("$defs", {})
+    params = next((d for d in defs.values() if isinstance(d, dict) and "x-max-combinations" in d), None)
+    if params is None:
+        raise ValueError(f"{repo}: its task schema has no x-max-combinations, so no task parameters to find list fields in")
+    return conditions.pick_lists({**params, "$defs": defs})
+
+
 def _task(experiment: Path) -> Dict[str, Any]:
     found = chunks.files(experiment / TASK_FILE[0], TASK_FILE[1], TASK_FILE[2])[0]
     if len(found) != 1:
@@ -147,8 +175,8 @@ def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, deco
 
     A log with a trialCombination column also gets one column per task field that varied across its rows, named by the
     field's dotted path, decoded from the run's task file (Settings/Settings_Task_<time>.json) with trialCondition. The task's
-    pick_lists (`list_fields`, its list fields, which the task file does not say) are required then; () for none. Raises
-    ValueError for a missing task file, a missing list_fields or an index out of range."""
+    list fields, which the task file does not say, come from `repo`'s task schema (list_fields_of) unless `list_fields`
+    gives them. Raises ValueError for a missing task file, neither repo nor list_fields, or an index out of range."""
     found = list(_text_rows(experiment))
     if not found:
         return []
@@ -164,6 +192,8 @@ def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, deco
         rows.append(row)
     if any("trialCombination" in row for row in rows):
         if list_fields is None:
-            raise ValueError(f"{experiment}: the log has trialCombination; give list_fields, the task schema's open_rigs.rigs.conditions.pick_lists")
+            if repo is None:
+                raise ValueError(f"{experiment}: the log has trialCombination; give repo, a clone of the task's repository, to decode it")
+            list_fields = list_fields_of(experiment, repo)
         _combination_columns(Path(experiment), rows, list_fields)
     return rows
