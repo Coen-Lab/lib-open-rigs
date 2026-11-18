@@ -9,6 +9,7 @@ description = "Environment to generate and extend shared and reuseable schemas a
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "jsonschema>=4.26.0",
     "pydantic>=2.12.3",
     "pydantic-yaml>=1.6.0",
     "swc-aeon>=0.2.0",

@@ -1,53 +1,62 @@
-"""A task's condition labels as data: the schema's x-labels, evaluated here once for every task that has them.
+"""A task schema's x-rules and x-trial-types, evaluated here once for every task that has them.
 
-x-labels is an ordered list; a condition takes the first entry whose every test holds, and no entry matching is an error.
-Each test reads a path's value as the condition has it (its set, else the task's), a list of picks:
-    {"label": L}                          always (a last catch-all)
-    "when": path, "is": value             every pick is the value (x-rules' when/is)
-    "anyAbove": {path: v, ...}            some pick is above v
-    "anyNotIn": {path: [values], ...}     some pick is none of the values
-    "mirrored": [a, b]                    a and b share a pairs group and b's list is a's negated
+Both are JSON Schema subschemas checked against a flat object keyed by dotted path:
+    x-rules: [{"if": S, "then": T, "message": m} | {"if": S, "unused": [paths], "message": m}, optional "description"]
+        on one combination's values (a scalar cell one pick, a list field a list): matching S must match T, else m.
+    x-trial-types: ordered [{"trialType": name, "if": S, "mirrored": [a, b]}], the last with no "if"
+        on a condition's values, every value a list; the first entry that matches names it. "mirrored": a and b share
+        a pairs group and b's list is a's negated.
 """
 
 from typing import Any
 
-TESTS = {"label", "when", "is", "anyAbove", "anyNotIn", "mirrored"}
+from jsonschema import Draft202012Validator
+
+RULE_KEYS = {"if", "then", "unused", "message", "description"}
+TRIAL_TYPE_KEYS = {"trialType", "if", "mirrored"}
 
 
-def _get(data: dict, dotted: str) -> Any:
-    for part in dotted.split("."):
-        data = data[part]
-    return data
+def flatten(data: dict, prefix: str = "") -> dict[str, Any]:
+    """Every leaf of a task's values (by alias, as JSON) by dotted path; a list is a leaf."""
+    flat = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            flat.update(flatten(value, f"{prefix}{key}."))
+        else:
+            flat[prefix + key] = value
+    return flat
 
 
-def _matches(entry: dict, picks, pairs: list[list[str]]) -> bool:
-    if "when" in entry:
-        found = picks(entry["when"])
-        if not found or any(pick != entry["is"] for pick in found):
-            return False
-    if not all(any(pick > above for pick in picks(path)) for path, above in entry.get("anyAbove", {}).items()):
-        return False
-    if not all(any(pick not in values for pick in picks(path)) for path, values in entry.get("anyNotIn", {}).items()):
-        return False
-    if "mirrored" in entry:
-        a, b = entry["mirrored"]
-        if not any(a in group and b in group for group in pairs) or [-pick for pick in picks(a)] != picks(b):
-            return False
-    return True
+def _matches(schema: dict, flat: dict) -> bool:
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema).is_valid(flat)
 
 
-def derive_label(labels: list[dict], base: dict, values: dict[str, Any], pairs: list[list[str]] = ()) -> str:
-    """A condition's label by x-labels: base the task's values (by alias, as JSON), values the condition's set by dotted
-    path, pairs its pairs."""
+def rule_problems(rules: list[dict], values: dict) -> list[str]:
+    """The messages of the x-rules one combination's values (by alias, as JSON) break."""
+    flat = flatten(values)
+    problems = []
+    for rule in rules:
+        if set(rule) - RULE_KEYS or not {"if", "message"} <= set(rule) or ("then" in rule) == ("unused" in rule):
+            raise ValueError(f"x-rules entry {rule} is malformed: needs if, message and one of then or unused, and only {', '.join(sorted(RULE_KEYS))}")
+        if "then" in rule and _matches(rule["if"], flat) and not _matches(rule["then"], flat):
+            problems.append(rule["message"])
+    return problems
 
-    def picks(path: str) -> list:
-        found = values[path] if path in values else _get(base, path)
-        return found if isinstance(found, list) else [found]
 
-    for entry in labels:
-        unknown = set(entry) - TESTS
-        if unknown or "label" not in entry or ("when" in entry) != ("is" in entry):
-            raise ValueError(f"x-labels entry {entry} is malformed: needs label, when and is together, and only {', '.join(sorted(TESTS))}")
-        if _matches(entry, picks, pairs):
-            return entry["label"]
-    raise ValueError(f"no x-labels entry matches the condition {values} with pairs {pairs}")
+def derive_trial_type(trial_types: list[dict], task: dict, values: dict[str, Any], pairs: list[list[str]] = ()) -> str:
+    """A condition's trialType by x-trial-types: task the task's values (by alias, as JSON), values the condition's set by
+    dotted path, pairs its pairs."""
+    flat = {path: value if isinstance(value, list) else [value] for path, value in {**flatten(task), **values}.items()}
+    for i, entry in enumerate(trial_types):
+        last = i == len(trial_types) - 1
+        if set(entry) - TRIAL_TYPE_KEYS or "trialType" not in entry or ("if" in entry) == last:
+            raise ValueError(f"x-trial-types entry {entry} is malformed: needs trialType, if on every entry but the last, and only {', '.join(sorted(TRIAL_TYPE_KEYS))}")
+        if "if" in entry and not _matches(entry["if"], flat):
+            continue
+        if "mirrored" in entry:
+            a, b = entry["mirrored"]
+            if not any(a in group and b in group for group in pairs) or [-pick for pick in flat[a]] != flat[b]:
+                continue
+        return entry["trialType"]
+    raise ValueError(f"no x-trial-types entry matches the condition {values} with pairs {pairs}")
