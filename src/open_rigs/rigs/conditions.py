@@ -33,12 +33,19 @@ def _matches(schema: dict, flat: dict) -> bool:
     return Draft202012Validator(schema).is_valid(flat)
 
 
+def _if_matches(entry: dict, flat: dict, kind: str) -> bool:
+    """Whether the entry's if matches; refused when it names a path not in the values, which would pass vacuously."""
+    if missing := [path for path in [*entry["if"].get("properties", {}), *entry["if"].get("required", [])] if path not in flat]:
+        raise ValueError(f"{kind} entry {entry} names {', '.join(dict.fromkeys(missing))}, not in the values")
+    return _matches(entry["if"], flat)
+
+
 def _applying(rules: list[dict], values: dict):
     flat = flatten(values)
     for rule in rules:
         if set(rule) - RULE_KEYS or not {"if", "message"} <= set(rule) or ("then" in rule) == ("unused" in rule):
             raise ValueError(f"x-rules entry {rule} is malformed: needs if, message and one of then or unused, and only {', '.join(sorted(RULE_KEYS))}")
-        if _matches(rule["if"], flat):
+        if _if_matches(rule, flat, "x-rules"):
             yield rule, flat
 
 
@@ -60,7 +67,7 @@ def derive_trial_type(trial_types: list[dict], task: dict, values: dict[str, Any
         last = i == len(trial_types) - 1
         if set(entry) - TRIAL_TYPE_KEYS or "trialType" not in entry or ("if" in entry) == last:
             raise ValueError(f"x-trial-types entry {entry} is malformed: needs trialType, if on every entry but the last, and only {', '.join(sorted(TRIAL_TYPE_KEYS))}")
-        if "if" in entry and not _matches(entry["if"], flat):
+        if "if" in entry and not _if_matches(entry, flat, "x-trial-types"):
             continue
         if "mirrored" in entry:
             a, b = entry["mirrored"]

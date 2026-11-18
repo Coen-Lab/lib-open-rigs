@@ -74,3 +74,12 @@ def test_unused_paths_are_the_applying_rules():
 def test_a_malformed_x_rule_fails_loudly(rule):
     with pytest.raises(ValueError, match="malformed"):
         rule_problems([rule], BASE)
+
+
+def test_an_if_naming_a_path_not_in_the_values_fails_loudly():
+    rule = {"if": {"properties": {"targt": {"const": "side"}}}, "unused": [V], "message": "m"}
+    with pytest.raises(ValueError, match="x-rules entry .* names targt, not in the values"):
+        unused_paths([rule], BASE)
+    entry = {"trialType": "x", "if": {"properties": {"contrast": SOME_ABOVE_0}}}
+    with pytest.raises(ValueError, match="x-trial-types entry .* names contrast, not in the values"):
+        derive_trial_type([entry, {"trialType": "y"}], BASE, {})
