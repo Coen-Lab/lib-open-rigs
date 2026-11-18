@@ -122,3 +122,37 @@ def test_only_chunk_names_are_read(tmp_path):
     write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00_old.csv", "trialNumber\n7\n")
     write(tmp_path / "WorkflowData", "WorkflowData_Trials_x.csv", "trialNumber\n8\n")
     assert trial_log.read(tmp_path) == [{"trialNumber": 1}]
+
+
+# A task with two conditions: "a" sets contrasts [0.5, 1] (2 combinations) and a reward 3, "b" one combination.
+TASK = {"taskParameters": {"reward": {"size": 2}, "contrasts": [0.1, 0.2], "mode": "x", "trialConditions": [
+    {"trialType": "a", "weight": 1, "set": {"reward.size": 3}, "pairs": []},
+    {"trialType": "b", "weight": 1, "set": {}, "pairs": []}]}}
+COMBO_COLUMNS = {"trialCondition": {"type": "int"}, "trialCombination": {"type": "int"}}
+
+
+def combo_run(tmp_path, rows, task=TASK):
+    manifest(tmp_path, trial_columns={"columns": COMBO_COLUMNS})
+    if task is not None:
+        write(tmp_path / "Settings", "Settings_Task_2026-11-05T10-00-00.json", json.dumps(task))
+    write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv",
+          "trialCondition,trialCombination\n" + "".join(f"{c},{k}\n" for c, k in rows))
+    return tmp_path
+
+
+def test_a_combination_decodes_into_columns_of_the_fields_that_varied(tmp_path):
+    rows = trial_log.read(combo_run(tmp_path, [(0, 0), (0, 1), (1, 1)]), list_fields=["contrasts"])
+    # reward.size differs between the conditions and contrasts within them; mode is the same on every trial.
+    assert [(r["reward.size"], r["contrasts"]) for r in rows] == [(3, [0.1]), (3, [0.2]), (2, [0.2])]
+    assert "mode" not in rows[0]
+
+
+def test_an_index_out_of_range_a_missing_task_file_or_list_fields_fail(tmp_path):
+    with pytest.raises(ValueError, match="trialCombination 2 is out of range"):
+        trial_log.read(combo_run(tmp_path / "a", [(0, 2)]), list_fields=["contrasts"])
+    with pytest.raises(ValueError, match="trialCondition 5"):
+        trial_log.read(combo_run(tmp_path / "b", [(5, 0)]), list_fields=[])
+    with pytest.raises(ValueError, match="0 task files"):
+        trial_log.read(combo_run(tmp_path / "c", [(0, 0)], task=None), list_fields=[])
+    with pytest.raises(ValueError, match="give list_fields"):
+        trial_log.read(combo_run(tmp_path / "d", [(0, 0)]))

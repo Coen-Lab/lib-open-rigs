@@ -20,17 +20,19 @@ import csv
 import json
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 
 from ruamel.yaml import YAML
 
 from open_rigs import chunks
+from open_rigs.rigs import conditions
 
 LOG = "WorkflowData_Trials"
 MANIFEST = "manifest.json"
 # Every version keeps `trial_columns` and `source.commit` as they were; any other is refused (records.md, rule 3).
 MANIFEST_VERSIONS = (1, 2, 3, 4)  # 4 is what OpenRigs.Manifest writes (ManifestWriter.Version)
 REPO_FILE = "schemas/trial-columns.yml"
+TASK_FILE = ("Settings", "Settings_Task", ".json")  # written beside the trial log at Go
 
 
 def _parse(text: str) -> Dict[str, Dict[str, Any]]:
@@ -106,11 +108,47 @@ def text_rows(experiment: Union[str, Path]) -> List[Dict[str, str]]:
     return [row for _, _, row in _text_rows(experiment)]
 
 
-def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, decode: bool = True) -> List[Dict[str, Any]]:
+def _task(experiment: Path) -> Dict[str, Any]:
+    found = chunks.files(experiment / TASK_FILE[0], TASK_FILE[1], TASK_FILE[2])[0]
+    if len(found) != 1:
+        raise ValueError(f"{experiment}: {len(found)} task files in {TASK_FILE[0]} (Settings_Task_<time>.json), need exactly one to decode trialCombination")
+    return json.loads(found[0].read_text(encoding="utf-8-sig"))["taskParameters"]
+
+
+def _combination_columns(experiment: Path, rows: List[Dict[str, Any]], list_fields: Iterable[str]) -> None:
+    """Adds to each row the resolved value of every field that varies across the run's drawn combinations, by dotted path.
+    trialCondition indexes the task file's trialConditions and trialCombination that condition's combinations."""
+    task = _task(experiment)
+    base, flat = task, conditions.flatten(task)
+    built: Dict[int, List[Dict[str, Any]]] = {}
+
+    def resolved(index: Any, combination: Any, line: int) -> Dict[str, Any]:
+        if not isinstance(index, int) or not 0 <= index < len(task["trialConditions"]):
+            raise ValueError(f"trial {line}: trialCondition {index!r} is not one of the task file's {len(task['trialConditions'])} trialConditions")
+        if index not in built:
+            c = task["trialConditions"][index]
+            built[index] = conditions.condition_combinations(base, c.get("set") or {}, c.get("pairs") or [], list_fields)
+        if not isinstance(combination, int) or not 0 <= combination < len(built[index]):
+            raise ValueError(f"trial {line}: trialCombination {combination!r} is out of range, condition {index} has {len(built[index])} combinations")
+        return {**flat, **built[index][combination]}
+
+    values = [resolved(row.get("trialCondition"), row.get("trialCombination"), n) for n, row in enumerate(rows, 1)]
+    varied = [path for path in flat if len({json.dumps(v[path]) for v in values}) > 1]
+    for row, value in zip(rows, values):
+        row.update({path: value[path] for path in varied})
+
+
+def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, decode: bool = True,
+         list_fields: Optional[Iterable[str]] = None) -> List[Dict[str, Any]]:
     """Every row of the experiment's WorkflowData_Trials, in file order, as a dict by column name.
     A file's last line without a newline (still being written) is left out. Raises ValueError naming
     the file, row and column of a cell that is not its column's type. An experiment with no trial log
-    is no rows, without looking for its columns."""
+    is no rows, without looking for its columns.
+
+    A log with a trialCombination column also gets one column per task field that varied across its rows, named by the
+    field's dotted path, decoded from the run's task file (Settings/Settings_Task_<time>.json) with trialCondition. The task's
+    pick_lists (`list_fields`, its list fields, which the task file does not say) are required then; () for none. Raises
+    ValueError for a missing task file, a missing list_fields or an index out of range."""
     found = list(_text_rows(experiment))
     if not found:
         return []
@@ -124,4 +162,8 @@ def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, deco
             except ValueError as error:
                 raise ValueError(f"{path.name} line {number}, {name}: {error}") from None
         rows.append(row)
+    if any("trialCombination" in row for row in rows):
+        if list_fields is None:
+            raise ValueError(f"{experiment}: the log has trialCombination; give list_fields, the task schema's open_rigs.rigs.conditions.pick_lists")
+        _combination_columns(Path(experiment), rows, list_fields)
     return rows
