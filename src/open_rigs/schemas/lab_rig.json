@@ -920,20 +920,34 @@
           ]
         },
         "channel0TriggerThreshold": {
-          "default": 0,
-          "description": "ADC threshold above which Channel 0 triggers a lick",
-          "maximum": 65535,
-          "minimum": 0,
-          "title": "Channel0TriggerThreshold",
-          "type": "integer"
+          "anyOf": [
+            {
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ADC threshold (0-255) above which Channel 0 triggers a lick, written to the board at start; left out, the board keeps its own.",
+          "title": "Channel0TriggerThreshold"
         },
         "channel0UntriggerThreshold": {
-          "default": 0,
-          "description": "ADC threshold below which Channel 0 untriggers a lick",
-          "maximum": 65535,
-          "minimum": 0,
-          "title": "Channel0UntriggerThreshold",
-          "type": "integer"
+          "anyOf": [
+            {
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ADC threshold (0-255) below which Channel 0 untriggers a lick, written to the board at start; left out, the board keeps its own.",
+          "title": "Channel0UntriggerThreshold"
         }
       },
       "required": [

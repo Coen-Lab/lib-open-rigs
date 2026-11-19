@@ -2146,14 +2146,12 @@ namespace OpenRigs.Devices.Rigs
     
         private string _usbSerial;
     
-        private int _channel0TriggerThreshold;
+        private int? _channel0TriggerThreshold;
     
-        private int _channel0UntriggerThreshold;
+        private int? _channel0UntriggerThreshold;
     
         public LicketySplit()
         {
-            _channel0TriggerThreshold = 0;
-            _channel0UntriggerThreshold = 0;
         }
     
         protected LicketySplit(LicketySplit other)
@@ -2202,12 +2200,13 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// ADC threshold above which Channel 0 triggers a lick
+        /// ADC threshold (0-255) above which Channel 0 triggers a lick, written to the board at start; left out, the board keeps its own.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("channel0TriggerThreshold")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="channel0TriggerThreshold")]
-        [System.ComponentModel.DescriptionAttribute("ADC threshold above which Channel 0 triggers a lick")]
-        public int Channel0TriggerThreshold
+        [System.ComponentModel.DescriptionAttribute("ADC threshold (0-255) above which Channel 0 triggers a lick, written to the board" +
+            " at start; left out, the board keeps its own.")]
+        public int? Channel0TriggerThreshold
         {
             get
             {
@@ -2220,12 +2219,13 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// ADC threshold below which Channel 0 untriggers a lick
+        /// ADC threshold (0-255) below which Channel 0 untriggers a lick, written to the board at start; left out, the board keeps its own.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("channel0UntriggerThreshold")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="channel0UntriggerThreshold")]
-        [System.ComponentModel.DescriptionAttribute("ADC threshold below which Channel 0 untriggers a lick")]
-        public int Channel0UntriggerThreshold
+        [System.ComponentModel.DescriptionAttribute("ADC threshold (0-255) below which Channel 0 untriggers a lick, written to the boa" +
+            "rd at start; left out, the board keeps its own.")]
+        public int? Channel0UntriggerThreshold
         {
             get
             {

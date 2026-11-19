@@ -68,17 +68,16 @@ stepperDriver:
     portName: COM4
     usbSerial: CHANGE-ME
 
+# Leave channel0TriggerThreshold and channel0UntriggerThreshold out to keep the board's own thresholds. Set them
+# only from a measurement (a reading at rest and one during a touch): the trigger between them, the untrigger below
+# the trigger. 0 hangs the board.
 licketySplit:
   left:
     portName: COM5
     usbSerial: CHANGE-ME            # a Pico's flash id, such as E664C856C360B937
-    channel0TriggerThreshold: 0     # ADC counts above which a lick registers
-    channel0UntriggerThreshold: 0   # ADC counts below which the lick ends
   right:
     portName: COM6
     usbSerial: CHANGE-ME
-    channel0TriggerThreshold: 0
-    channel0UntriggerThreshold: 0
 
 # The cameras, each on the board trigger whose wiring line names it in targets (DO0 above).
 camera:

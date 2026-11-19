@@ -119,6 +119,9 @@ class LabRig(Rig):
 
     @model_validator(mode="after")
     def _wired_lines(self):
+        for name, split in self.lickety_split.items():
+            if problem := split.threshold_problem():
+                raise ValueError(f"licketySplit {name}: {problem}")
         zapit_boards, valve_names = [], Counter()
         for name, board in self.behavior_board.items():
             lines = {alias: getattr(board.wiring, field) for field, alias in _ALIASES.items()} if board.wiring else {}
