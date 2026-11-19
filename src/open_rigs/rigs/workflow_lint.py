@@ -809,7 +809,7 @@ def live_view_problems(wf: Workflow) -> list[str]:
     edge into it builds it before them, so it streams nothing (a task shipped that way)."""
     nodes, edges = _top(wf)
     live = [i for i, n in enumerate(nodes) if kind(n).endswith(":StreamDevices")]
-    if len(live) != 1 or len(list(e for e in wf.root.iter(W + "Expression") if kind(e).endswith(":StreamDevices"))) != 1:
+    if len(live) != 1 or len([e for e in wf.root.iter(W + "Expression") if kind(e).endswith(":StreamDevices")]) != 1:
         return ["the workflow does not have one StreamDevices, at its top level"]
     problems = [] if live[0] == len(nodes) - 1 else ["StreamDevices is not the last top-level node"]
     return problems + (["StreamDevices has an edge into or out of it"] if any(live[0] in e[:2] for e in edges) else [])
@@ -1075,7 +1075,7 @@ def task_logs_problems(wf: Workflow) -> list[str]:
     for nodes, edges in _scopes(wf.root):
         for i, n in enumerate(nodes):
             if n.get("Path") in (TASK_LOGS, CONDITIONED_TASK_LOGS) and not any(kind(nodes[a]).endswith(":SerializeToJson") for a, b, _ in edges if b == i):
-                problems.append(f"{n.get('Path').split(':')[1].removesuffix('.bonsai')} is not given the task file as JSON (the task's SerializeToJson)")
+                problems.append(f"{str(n.get('Path')).split(':')[1].removesuffix('.bonsai')} is not given the task file as JSON (the task's SerializeToJson)")
     return problems
 
 

@@ -3,15 +3,14 @@
 import xml.etree.ElementTree as ET
 
 from open_rigs.core.task import BACKGROUND_LEVEL_DBFS
-
 from open_rigs.rigs.workflow_lint import (
     AUDIO,
     RX,
     SCRIPT,
     SPEAKER_MIXER_SOUNDS,
-    W,
     XSI,
     ZAPIT_INCLUDE,
+    W,
     _name,  # pyright: ignore[reportPrivateUsage]
     _named,  # pyright: ignore[reportPrivateUsage]
     child,
@@ -20,6 +19,7 @@ from open_rigs.rigs.workflow_lint import (
     scope,
     upstream,
 )
+
 
 def _value(n: ET.Element) -> str:
     return child(n, W + "Combinator").findtext(W + "Value") or ""
@@ -125,7 +125,7 @@ def background_noise_include_problems(root: ET.Element) -> list[str]:
     buffers = [n for n in up if kind(n) == "aud:SpeakerBuffer"]
     if len(buffers) != 1 or child(buffers[0], W + "Combinator").findtext(AUDIO + "Equalise") != "false":
         problems.append("the noise is not one SpeakerBuffer, unequalised")
-    elif float(child(buffers[0], W + "Combinator").findtext(AUDIO + "LevelDbfs")) != BACKGROUND_LEVEL_DBFS:
+    elif float(child(buffers[0], W + "Combinator").findtext(AUDIO + "LevelDbfs") or "nan") != BACKGROUND_LEVEL_DBFS:
         problems.append(f"the noise's level is not the lab's {BACKGROUND_LEVEL_DBFS:g} dBFS")
     if subjects & {"TaskConfig", "LaunchTaskConfig"}:
         problems.append("the noise reads the task file, which has no background setting")

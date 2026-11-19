@@ -14,10 +14,18 @@ import math
 import subprocess
 from functools import cache
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal, cast
 
 import pydantic
-from pydantic import ConfigDict, Field, ValidationError, ValidationInfo, WithJsonSchema, field_validator, model_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    ValidationError,
+    ValidationInfo,
+    WithJsonSchema,
+    field_validator,
+    model_validator,
+)
 
 from open_rigs.core.base import Double, String
 from open_rigs.core.task import STIMULUS_LEVEL_DBFS, SoundLevelDbfs, TaskBlock, level_dbfs
@@ -192,7 +200,7 @@ class ConditionedTask(TaskBlock):
     @classmethod
     def list_fields(cls) -> tuple[str, ...]:
         """The list fields one entry of which each trial draws (open_rigs.rigs.conditions.pick_lists)."""
-        return _list_fields(cls)
+        return _list_fields(cast(type, cls))
 
     @classmethod
     def between_trials(cls, tasks: list[dict]) -> None:
@@ -377,7 +385,10 @@ def task_schema_cs(session_fields, list_fields, trial_types) -> str:
     )
 
 
-def regenerate(logic: type, parameters: type, schema_file: Path, extensions_root: Path = Path("./src/Extensions/")) -> None:
+EXTENSIONS_ROOT = Path("./src/Extensions/")
+
+
+def regenerate(logic: type, parameters: type, schema_file: Path, extensions_root: Path = EXTENSIONS_ROOT) -> None:
     """A conditioned task's regenerate-schemas: TaskSchema.Generated.cs, the task logic's JSON schema and its Bonsai.Sgen C#."""
     schema_file.parent.mkdir(parents=True, exist_ok=True)
     (extensions_root / "TaskSchema.Generated.cs").write_text(task_schema_cs(parameters.SESSION_FIELDS, parameters.list_fields(), parameters.TRIAL_TYPES), encoding="utf-8")

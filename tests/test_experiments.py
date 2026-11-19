@@ -30,8 +30,10 @@ def test_an_experiment_s_stage_conditions_and_weights_come_from_its_task_file(tm
     task = {"curriculum": {"code": "S03A"}, "trialConditions": [{"weight": 2}, {"weight": 1, "set": {"a": 1}}, {"weight": 3}]}
     s = experiment(tmp_path, "AB001", "ses-001_20261101T090000", "r", task, ("visual", "auditory", "visual"))
     assert experiments.curriculum_stage(s) == {"code": "S03A"}
-    assert experiments.trial_conditions(s)[1] == {"trialType": "auditory", "weight": 1, "set": {"a": 1}}
-    assert experiments.trial_conditions(s)[0]["set"] == {} and experiments.trial_conditions(s)[1]["set"] == {"a": 1}
+    conditions = experiments.trial_conditions(s)
+    assert conditions is not None
+    assert conditions[1] == {"trialType": "auditory", "weight": 1, "set": {"a": 1}}
+    assert conditions[0]["set"] == {} and conditions[1]["set"] == {"a": 1}
     assert experiments.trial_weights(s) == {"visual": 5, "auditory": 1}
     bare = experiment(tmp_path, "AB001", "ses-002_20261102T090000", "r")
     assert experiments.curriculum_stage(bare) is None and experiments.trial_weights(bare) is None
