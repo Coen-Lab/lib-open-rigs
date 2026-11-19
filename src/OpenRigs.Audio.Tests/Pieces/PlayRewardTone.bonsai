@@ -10,7 +10,7 @@
     <Nodes>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="test:ToneRulesSource">
-          <test:LoudestRewardToneLevelDbfs>-20</test:LoudestRewardToneLevelDbfs>
+          <test:MaxRewardToneLevelDbfs>-20</test:MaxRewardToneLevelDbfs>
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">

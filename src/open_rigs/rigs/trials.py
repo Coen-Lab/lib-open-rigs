@@ -238,7 +238,7 @@ def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
 @dataclass
 class Summary:
     folder: str
-    outcome: str  # the manifest's run outcome (completed, stopped, ...), "not final" when it never closed; or unknown
+    run_outcome: str  # the manifest's run outcome (completed, stopped, ...), "not final" when it never closed; or unknown
     trials: int
     correct: int
     performance: float  # performance()'s first: correct / (correct + incorrect), two-spout and go/no-go trials; NaN with none
@@ -373,15 +373,15 @@ def _summarise(folder: Path) -> Summary:
     events = _rows(folder, EVENTS_FILES)
     try:
         run = json.loads((folder / "manifest.json").read_text(encoding="utf-8-sig"))["run"]
-        outcome = (run["outcome"] or "unknown") + (" (not final: the workflow never finished closing)" if run.get("final") is False else "")
+        run_outcome = (run["outcome"] or "unknown") + (" (not final: the workflow never finished closing)" if run.get("final") is False else "")
     except (OSError, ValueError, KeyError, TypeError):
-        outcome = "unknown"
+        run_outcome = "unknown"
     missing = [f"WorkflowData_Trials has no {c} column" for c in TRIAL_NEEDS if trials and c not in trials[0]]
     missing += [f"WorkflowData_Events has no {c} column" for c in EVENT_NEEDS if events and c not in events[0]]
     if missing:
-        return Summary(folder.name, outcome, len(trials), 0, float("nan"), problems=missing)
+        return Summary(folder.name, run_outcome, len(trials), 0, float("nan"), problems=missing)
     correct = sum(r["outcome"] == "correct" for r in trials)
-    s = Summary(folder.name, outcome, len(trials), correct, *performance(trials))
+    s = Summary(folder.name, run_outcome, len(trials), correct, *performance(trials))
     task = _task(folder)
     if trials and task is None:
         s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the timeout not checked")
@@ -513,7 +513,7 @@ def describe(s: Summary) -> str:
         return "none" if math.isnan(x) else f"{x:.0%}"
 
     cut = f", and trial {s.unfinished} unfinished at the stop" if s.unfinished is not None else ""
-    lines = [f"{s.folder}: {s.outcome}, {s.trials} trials, {s.correct} correct{cut}",
+    lines = [f"{s.folder}: {s.run_outcome}, {s.trials} trials, {s.correct} correct{cut}",
              f"  performance {percent(s.performance)} (correct / (correct + incorrect), two-spout and go/no-go trials),"
              f" responded {percent(s.responded)}",
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",

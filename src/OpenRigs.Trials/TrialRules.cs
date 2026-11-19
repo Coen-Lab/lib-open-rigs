@@ -23,7 +23,7 @@ namespace OpenRigs.Trials
         Cue,
         /// <summary>The trial ended, its outcome in Outcome.</summary>
         Outcome,
-        /// <summary>The laser has run its longest (LaserTiming.LaserMaxSeconds from the trigger) with no outcome yet: stop it.</summary>
+        /// <summary>The laser has run to its cap (LaserTiming.LaserCapSeconds from the trigger) with no outcome yet: stop it.</summary>
         LaserCap,
         /// <summary>The trigger line falls.</summary>
         TriggerOff
@@ -61,19 +61,19 @@ namespace OpenRigs.Trials
         public double RampDownSeconds { get; private set; }
 
         /// <summary>Gets how long after the trigger LaserCap comes with no outcome yet, in seconds (AtOutcome); infinity for none.</summary>
-        public double LaserMaxSeconds { get; private set; }
+        public double LaserCapSeconds { get; private set; }
 
-        /// <summary>The laser on until the outcome, stopped by LaserCap laserMaxSeconds after the trigger; the line held triggerHoldSeconds past the outcome (the conditions file's longest ramp-down, ZapitConditions.Check).</summary>
-        public static LaserTiming UntilOutcome(bool hardwareTriggered, double triggerHoldSeconds, double laserMaxSeconds)
+        /// <summary>The laser on until the outcome, stopped by LaserCap laserCapSeconds after the trigger; the line held triggerHoldSeconds past the outcome (the conditions file's MaxRampDownSeconds, ZapitConditions.Check).</summary>
+        public static LaserTiming UntilOutcome(bool hardwareTriggered, double triggerHoldSeconds, double laserCapSeconds)
         {
             Check("triggerHoldSeconds", triggerHoldSeconds, false);
-            if (!(laserMaxSeconds > 0)) throw new ArgumentException(string.Format("LaserTiming: laserMaxSeconds is {0}; it must be above 0 (infinity for no cap).", laserMaxSeconds));
+            if (!(laserCapSeconds > 0)) throw new ArgumentException(string.Format("LaserTiming: laserCapSeconds is {0}; it must be above 0 (infinity for no cap).", laserCapSeconds));
             return new LaserTiming
             {
                 HardwareTriggered = hardwareTriggered,
                 End = LaserEnd.AtOutcome,
                 TriggerHoldSeconds = triggerHoldSeconds,
-                LaserMaxSeconds = laserMaxSeconds,
+                LaserCapSeconds = laserCapSeconds,
             };
         }
 
@@ -86,7 +86,7 @@ namespace OpenRigs.Trials
                 HardwareTriggered = hardwareTriggered,
                 End = LaserEnd.AfterDuration,
                 RampDownSeconds = rampDownSeconds,
-                LaserMaxSeconds = double.PositiveInfinity,
+                LaserCapSeconds = double.PositiveInfinity,
             };
         }
 

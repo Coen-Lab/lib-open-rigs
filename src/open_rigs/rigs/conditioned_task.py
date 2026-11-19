@@ -1,6 +1,6 @@
 """A task whose trials are drawn from weighted trial conditions, once for every such task.
 
-A task's parameters model takes `ConditionedTask` beside its lab blocks and states its own RULES, TRIAL_TYPES, REQUIRED and
+A task's parameters model takes `ConditionedTask` beside its lab blocks and states its own RULES, TRIAL_TYPES, REQUIRED_CONDITIONS and
 SESSION_FIELDS (COMMON_SESSION_FIELDS and its own) as class attributes; the mixin then validates its trial conditions as the
 C# draw (OpenRigs.Trials TrialConditions) builds them, every combination checked as a task, and calls the task's
 `between_trials` hook on the weighted combinations. `schema_extra` gives the model_config's x- keys the experiment launcher reads.
@@ -20,7 +20,7 @@ import pydantic
 from pydantic import ConfigDict, Field, ValidationError, ValidationInfo, WithJsonSchema, field_validator, model_validator
 
 from open_rigs.core.base import Double, String
-from open_rigs.core.task import MAX_REWARD_UL, STIMULUS_LEVEL_DBFS, SoundLevelDbfs, TaskBlock, level_dbfs
+from open_rigs.core.task import STIMULUS_LEVEL_DBFS, SoundLevelDbfs, TaskBlock, level_dbfs
 from open_rigs.rigs import conditions
 
 ALL_SPEAKERS = "all"  # an auditoryStimulus.initialAzimuthsDeg item: every rig.yml speaker plays (OpenRigs.Audio SoundAzimuths.AllSpeakers)
@@ -59,10 +59,10 @@ ABOVE_0 = {"contains": {"exclusiveMinimum": 0}}
 SOUNDING = {"contains": {"type": "number"}}  # a level list holding a number: a sound plays (mute is the only text)
 
 
-def schema_extra(session_fields: dict, rules, trial_types, required=()) -> dict:
+def schema_extra(session_fields: dict, rules, trial_types, required_conditions=()) -> dict:
     """A conditioned task's model_config json_schema_extra: x-session-fields, x-rules, x-trial-types, x-required-conditions, x-max-combinations."""
     return {"x-session-fields": list(session_fields), "x-rules": list(rules), "x-trial-types": list(trial_types),
-            "x-required-conditions": list(required), "x-max-combinations": conditions.MAX_COMBINATIONS}
+            "x-required-conditions": list(required_conditions), "x-max-combinations": conditions.MAX_COMBINATIONS}
 
 
 def get_path(data: dict, dotted: str) -> Any:
@@ -174,16 +174,6 @@ class AuditoryStimulus(TaskBlock):
         return value
 
 
-class Reward(TaskBlock):
-    """Reward delivery: the reward size and the large-reward trials."""
-
-    size_ul: Double = Field(
-        gt=0, le=MAX_REWARD_UL, description=f"Reward size, in microlitres, planned into valve pulses from the valve's calibration; at most {MAX_REWARD_UL}, the most one reward may ask for"
-    )
-    large_multiplier: Double = Field(default=2.0, gt=1, description="Reward size multiplier on large-reward trials, above 1")
-    large_probability: Double = Field(default=0.0, ge=0, le=1, description="Probability that a trial is a large-reward trial; 0: none (the only off)")
-
-
 @cache
 def _list_fields(model: type) -> tuple[str, ...]:
     return tuple(conditions.pick_lists(model.model_json_schema(by_alias=True)))
@@ -191,13 +181,13 @@ def _list_fields(model: type) -> tuple[str, ...]:
 
 class ConditionedTask(TaskBlock):
     """A mixin block for a task parameters model with trialConditions (never on Task; its fields are the task's): validates the conditions as the C# draw
-    builds them. The model gives RULES, TRIAL_TYPES, REQUIRED and SESSION_FIELDS; between_trials is its hook for the timing
+    builds them. The model gives RULES, TRIAL_TYPES, REQUIRED_CONDITIONS and SESSION_FIELDS; between_trials is its hook for the timing
     rules between a trial and the next."""
 
     SESSION_FIELDS: ClassVar[dict[str, str]] = COMMON_SESSION_FIELDS
     RULES: ClassVar[tuple] = ()
     TRIAL_TYPES: ClassVar[tuple] = ()
-    REQUIRED: ClassVar[tuple] = ()
+    REQUIRED_CONDITIONS: ClassVar[tuple] = ()
 
     @classmethod
     def list_fields(cls) -> tuple[str, ...]:
@@ -256,7 +246,7 @@ class ConditionedTask(TaskBlock):
             if key not in built:
                 built[key] = self._combinations(base, condition, where)
             drawn += built[key] * (condition.weight > 0)
-        if problems := conditions.required_problems(list(self.REQUIRED), base, drawn):
+        if problems := conditions.required_problems(list(self.REQUIRED_CONDITIONS), base, drawn):
             raise ValueError("; ".join(f"{problem} (x-required-conditions)" for problem in problems))
         self.between_trials(drawn)
         return self

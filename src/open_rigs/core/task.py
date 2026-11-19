@@ -5,6 +5,7 @@ from pydantic import ConfigDict, Field, WithJsonSchema, model_validator
 from swc.aeon.schema import BaseSchema
 
 from open_rigs.components.zapit import ZAPIT_REPLY_MARGIN_SECONDS
+from open_rigs.core.base import Double
 
 # The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, a RewardValve piece's MaxRewardUl).
 MAX_REWARD_UL = 20
@@ -21,8 +22,8 @@ class Task(BaseSchema):
 
 
 # The lab's task blocks, one model each so every task names and checks them alike. A task's own
-# model takes LickQuietWait, WheelQuietWait, Iti, ResponseWindow, AutoReward, RewardSize or Optogenetics by inheritance,
-# which keeps its keys where they are in the task file, and Penalty as its penalty field. A setting sits on the training
+# model takes LickQuietWait, WheelQuietWait, Iti, ResponseWindow, AutoReward or Optogenetics by inheritance,
+# which keeps its keys where they are in the task file, and Penalty and Reward as its penalty and reward fields. A setting sits on the training
 # stage rows only if some stage of the task changes it; otherwise it is a task-level setting, under the same name.
 
 
@@ -82,7 +83,7 @@ class ResponseWindow(TaskBlock):
     response_window_seconds: float | None = Field(
         default=None,
         gt=0,
-        description="The response window, in seconds from when a lick first counts (the task says when); with no response by its end the trial is NoResponse. Null or left out: no limit (a task may refuse it)",
+        description="The response window, in seconds from when a lick first counts (the task says when); with no response by its end the trial is noResponse. Null or left out: no limit (a task may refuse it)",
     )
 
 
@@ -94,14 +95,14 @@ class AutoReward(TaskBlock):
     )
 
 
-class RewardSize(TaskBlock):
-    """The reward's size, planned into valve pulses from the valve's calibration."""
+class Reward(TaskBlock):
+    """Reward delivery: the reward size and the large-reward trials."""
 
-    reward_size_ul: float = Field(
-        gt=0,
-        le=MAX_REWARD_UL,
-        description=f"Reward size, in microlitres, planned into valve pulses from the valve's calibration; at most {MAX_REWARD_UL}, the most one reward may ask for",
+    size_ul: Double = Field(
+        gt=0, le=MAX_REWARD_UL, description=f"Reward size, in microlitres, planned into valve pulses from the valve's calibration; at most {MAX_REWARD_UL}, the most one reward may ask for"
     )
+    large_multiplier: Double = Field(default=2.0, gt=1, description="Reward size multiplier on large-reward trials, above 1")
+    large_probability: Double = Field(default=0.0, ge=0, le=1, description="Probability that a trial is a large-reward trial; 0: none (the only off)")
 
 
 class Optogenetics(TaskBlock):
@@ -178,7 +179,7 @@ class Optogenetics(TaskBlock):
         busy at the next trial's trigger, less its reply margin (OpenRigs.Trials TrialLoop stops there naming the last laser: the
         same rule). Off unless enabled. response_delay_seconds is the soonest an outcome follows the stimulus; the next trigger
         comes at the soonest iti_min_seconds - laser_to_stimulus_seconds after an outcome. A laser until the outcome holds the
-        line for the conditions file's longest ramp-down (ZapitConditions.Check), read at connect, so the workflow checks it."""
+        line for the conditions file's MaxRampDownSeconds (ZapitConditions.Check), read at connect, so the workflow checks it."""
         if not self.enabled:
             return
         margin = ZAPIT_REPLY_MARGIN_SECONDS
@@ -216,7 +217,7 @@ def level_dbfs(default: float, sound: str):
         default=default,
         description=f"{sound}'s level in dBFS RMS: the RMS of the sound over its samples outside silent stretches (runs of exactly-zero samples "
         f"at least 1 ms long), as the task gives it, before the speaker's equalisation, against full scale (a full-scale sine is -3); "
-        f"{MUTE}: no sound. The lab's default {default:g}. The workflow stops at Go if any peak at the loudest level a trial can draw would reach "
+        f"{MUTE}: no sound. The lab's default {default:g}. The workflow stops at Go if any peak at the highest level a trial can draw would reach "
         f"{PEAK_LIMIT_DBFS:g} dBFS after equalisation. Sounds overlapping on a speaker share its headroom: each buffer's peak is checked, not their mix",
     )
 

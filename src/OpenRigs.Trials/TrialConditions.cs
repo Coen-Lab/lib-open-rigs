@@ -57,7 +57,7 @@ namespace OpenRigs.Trials
     }
 
     /// <summary>One of the task's trialConditions as built at Go (TrialConditions.Build).</summary>
-    public class TrialConditionDraw<TTask>
+    public class BuiltTrialCondition<TTask>
     {
         /// <summary>The condition's trialType, its trials', derived from its values (TrialTypes.Derive).</summary>
         public string TrialType;
@@ -80,31 +80,31 @@ namespace OpenRigs.Trials
         public int Id;
     }
 
-    /// <summary>The loudest level a sound plays at in a task's weighted conditions, and where (a condition and its picks): what
+    /// <summary>The highest level a sound plays at in a task's weighted conditions, and where (a condition and its picks): what
     /// a sound's buffer is peak-checked at, at Go, so no trial's level can clip.</summary>
-    public class LoudestSound
+    public class MaxSoundLevel
     {
         /// <summary>The level in dBFS RMS; NaN when every combination is mute.</summary>
         public double LevelDbfs;
         /// <summary>The condition that draws it, for a message.</summary>
         public string Where;
 
-        /// <summary>The loudest of the weighted conditions' combinations, by the task's level (a number or mute, SoundLevels.Parse).</summary>
-        public static LoudestSound Of<TTask>(IEnumerable<TrialConditionDraw<TTask>> conditions, Func<TTask, object> levelDbfs)
+        /// <summary>The highest level of the weighted conditions' combinations, by the task's level (a number or mute, SoundLevels.Parse).</summary>
+        public static MaxSoundLevel Of<TTask>(IEnumerable<BuiltTrialCondition<TTask>> conditions, Func<TTask, object> levelDbfs)
         {
-            var loudest = new LoudestSound { LevelDbfs = double.NaN, Where = "no condition" };
+            var max = new MaxSoundLevel { LevelDbfs = double.NaN, Where = "no condition" };
             foreach (var condition in conditions.Where(c => c.Weight > 0))
             {
                 foreach (var combination in condition.Combinations)
                 {
                     var value = SoundLevels.Parse(levelDbfs(combination.Task));
-                    if (value > loudest.LevelDbfs || (double.IsNaN(loudest.LevelDbfs) && !double.IsNaN(value)))
+                    if (value > max.LevelDbfs || (double.IsNaN(max.LevelDbfs) && !double.IsNaN(value)))
                     {
-                        loudest = new LoudestSound { LevelDbfs = value, Where = condition.Where + (combination.Picks.Length == 0 ? "" : " with " + combination.Picks) };
+                        max = new MaxSoundLevel { LevelDbfs = value, Where = condition.Where + (combination.Picks.Length == 0 ? "" : " with " + combination.Picks) };
                     }
                 }
             }
-            return loudest;
+            return max;
         }
     }
 
@@ -123,7 +123,7 @@ namespace OpenRigs.Trials
         /// condition no x-trial-types entry names, a session field, a path that is not a task field, an optogenetics path with optogenetics off, a missing
         /// weight, a YAML merge key, a set that is not a map or a key that is not a path, a bad pairs group. Adds a problem for
         /// each condition that cannot be built, and returns null then.</summary>
-        public static List<TrialConditionDraw<TTask>> Build<TTask>(string taskText, IConditionedTask task, Func<string, TTask> read, ConditionsSchema schema, List<string> problems)
+        public static List<BuiltTrialCondition<TTask>> Build<TTask>(string taskText, IConditionedTask task, Func<string, TTask> read, ConditionsSchema schema, List<string> problems)
         {
             var typed = task.Conditions ?? new List<ITrialCondition>();
             if (typed.Count == 0) { problems.Add("trialConditions needs a condition"); return null; }
@@ -145,7 +145,7 @@ namespace OpenRigs.Trials
             stripped.Save(writer, false);
             var baseText = writer.ToString();
             var leaves = TaskYaml.Flatten(task, new string[0]);
-            var built = new List<TrialConditionDraw<TTask>>();
+            var built = new List<BuiltTrialCondition<TTask>>();
             int id = 0;
             for (int i = 0; i < typed.Count; i++)
             {
@@ -214,7 +214,7 @@ namespace OpenRigs.Trials
                 var count = cells.Aggregate(1L, (n, cell) => n * cell.Value.Count);
                 if (count > schema.MaxCombinations) problems.Add(string.Format("{0} expands into {1} combinations, more than {2} (x-max-combinations)", where, count, schema.MaxCombinations));
                 if (problems.Count > before) continue;
-                var draw = new TrialConditionDraw<TTask> { TrialType = trialType, Weight = c.Weight, Where = where, Combinations = new List<TrialConditionCombination<TTask>>() };
+                var condition = new BuiltTrialCondition<TTask> { TrialType = trialType, Weight = c.Weight, Where = where, Combinations = new List<TrialConditionCombination<TTask>>() };
                 for (int n = 0; n < count; n++)
                 {
                     var stream = TaskYaml.Load(baseText);
@@ -235,7 +235,7 @@ namespace OpenRigs.Trials
                     stream.Save(writer, false);
                     try
                     {
-                        draw.Combinations.Add(new TrialConditionCombination<TTask> { Task = read(writer.ToString()), Picks = string.Join(", ", named), Id = id++ });
+                        condition.Combinations.Add(new TrialConditionCombination<TTask> { Task = read(writer.ToString()), Picks = string.Join(", ", named), Id = id++ });
                     }
                     catch (YamlDotNet.Core.YamlException e)
                     {
@@ -243,7 +243,7 @@ namespace OpenRigs.Trials
                         break;
                     }
                 }
-                built.Add(draw);
+                built.Add(condition);
             }
             if (problems.Count == 0 && built.Sum(c => (long)c.Weight) <= 0) problems.Add("trialConditions needs a condition with a weight above 0");
             return problems.Count == 0 ? built : null;
@@ -254,7 +254,7 @@ namespace OpenRigs.Trials
         /// SerializeToJson serialises Settings_Task and flattened to dotted paths, a one-entry list unwrapped only at a list
         /// field (an x-whole list stays a list); a path is in values when it differs between rows or from the task's own, so a
         /// set every condition shares is kept; session fields are left out. NaN is written as JSON NaN.</summary>
-        public static string CombinationsJson<TTask>(TTask task, IList<TrialConditionDraw<TTask>> conditions, ConditionsSchema schema)
+        public static string CombinationsJson<TTask>(TTask task, IList<BuiltTrialCondition<TTask>> conditions, ConditionsSchema schema)
         {
             var own = TaskYaml.Flatten(task, schema.ListFields);
             var all = conditions.SelectMany(c => c.Combinations.Select(m => TaskYaml.Flatten(m.Task, schema.ListFields))).ToList();

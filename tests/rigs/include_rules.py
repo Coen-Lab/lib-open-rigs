@@ -135,10 +135,10 @@ def background_noise_include_problems(root: ET.Element) -> list[str]:
 
 
 def play_penalty_sound_problems(root: ET.Element) -> list[str]:
-    """PlayPenaltySound makes the PenaltySoundBuffer once the rules' loudest penalty level is in (TrialRules'
-    LoudestPenaltyLevelDbfs, Zip with Speakers, InputMapping LevelDbfs from Item1), never at the default level from the
+    """PlayPenaltySound makes the PenaltySoundBuffer once the rules' max penalty level is in (TrialRules'
+    MaxPenaltyLevelDbfs, Zip with Speakers, InputMapping LevelDbfs from Item1), never at the default level from the
     speakers alone, and sends it into PenaltySounds at each input's level (SoundAtLevel, its BufferLevelDbfs mapped from
-    the same loudest level). `root` is OpenRigs.Audio's PlayPenaltySound.bonsai."""
+    the same max level). `root` is OpenRigs.Audio's PlayPenaltySound.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     buffers = [i for i, n in enumerate(nodes) if kind(n) == "aud:PenaltySoundBuffer"]
     if len(buffers) != 1:
@@ -150,9 +150,9 @@ def play_penalty_sound_problems(root: ET.Element) -> list[str]:
     zips = [a for a, b, _ in edges if b == mapping[0]]
     inputs = [nodes[a] for a in upstream(edges, zips[0])] if zips and kind(nodes[zips[0]]) == "rx:Zip" else []
     problems = []
-    if not any(n.findtext(W + "Selector") == "LoudestPenaltyLevelDbfs" for n in inputs) or \
+    if not any(n.findtext(W + "Selector") == "MaxPenaltyLevelDbfs" for n in inputs) or \
             not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "TrialRules" for n in inputs):
-        problems.append("the penalty sound is not laid out at TrialRules' LoudestPenaltyLevelDbfs")
+        problems.append("the penalty sound is not laid out at TrialRules' MaxPenaltyLevelDbfs")
     if not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "Speakers" for n in inputs):
         problems.append("the penalty sound is not made from Speakers")
     sends = [i for i, n in enumerate(nodes) if n.get(XSI) == "MulticastSubject" and _name(n) == "PenaltySounds"]
@@ -160,6 +160,6 @@ def play_penalty_sound_problems(root: ET.Element) -> list[str]:
     if "WorkflowInput" not in {nodes[a].get(XSI) for a in up}:
         problems.append("PlayPenaltySound does not send the buffer into PenaltySounds on each input")
     scale = [a for a in up if kind(nodes[a]) == "aud:SoundAtLevel"]
-    if len(scale) != 1 or not any(n.findtext(W + "Selector") == "LoudestPenaltyLevelDbfs" for n in (nodes[a] for a in upstream(edges, scale[0]))):
-        problems.append("PlayPenaltySound does not play each input at its level from the buffer's (SoundAtLevel, BufferLevelDbfs from LoudestPenaltyLevelDbfs)")
+    if len(scale) != 1 or not any(n.findtext(W + "Selector") == "MaxPenaltyLevelDbfs" for n in (nodes[a] for a in upstream(edges, scale[0]))):
+        problems.append("PlayPenaltySound does not play each input at its level from the buffer's (SoundAtLevel, BufferLevelDbfs from MaxPenaltyLevelDbfs)")
     return problems

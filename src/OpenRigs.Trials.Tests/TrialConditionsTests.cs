@@ -57,7 +57,7 @@ namespace OpenRigs.Trials.Tests
             return "taskParameters:\n  rngSeed: 3\n  contrasts: [0.5, 1]\n  delaySeconds: 0\n  optogenetics:\n    enabled: false\n    power: 1\n  trialConditions:\n" + conditions;
         }
 
-        static List<TrialConditionDraw<Params>> Build(string text, List<string> problems)
+        static List<BuiltTrialCondition<Params>> Build(string text, List<string> problems)
         {
             var task = TaskYaml.Read<Logic>(text).TaskParameters;
             return TrialConditions.Build(text, task, t => TaskYaml.Read<Logic>(t).TaskParameters, Schema, problems);
@@ -172,15 +172,15 @@ namespace OpenRigs.Trials.Tests
         }
 
         [TestMethod]
-        public void TheLoudestIsTheWeightedCombinationsLargest()
+        public void TheMaxIsTheWeightedCombinationsHighest()
         {
             var problems = new List<string>();
             var built = Build(Text("  - {weight: 1, set: {delaySeconds: [1, 3]}}\n  - {weight: 0, set: {delaySeconds: 9}}\n"), problems);
-            var loudest = LoudestSound.Of(built, t => t.DelaySeconds);
-            Assert.AreEqual(3, loudest.LevelDbfs);
-            Assert.AreEqual("trialConditions[0] (visual) with contrasts [0.5], delaySeconds 3", loudest.Where);
-            Assert.AreEqual(1, LoudestSound.Of(built, t => t.DelaySeconds < 2 ? (object)t.DelaySeconds : SoundLevels.Mute).LevelDbfs);   // mute plays nothing
-            Assert.IsTrue(double.IsNaN(LoudestSound.Of(built, t => SoundLevels.Mute).LevelDbfs));
+            var max = MaxSoundLevel.Of(built, t => t.DelaySeconds);
+            Assert.AreEqual(3, max.LevelDbfs);
+            Assert.AreEqual("trialConditions[0] (visual) with contrasts [0.5], delaySeconds 3", max.Where);
+            Assert.AreEqual(1, MaxSoundLevel.Of(built, t => t.DelaySeconds < 2 ? (object)t.DelaySeconds : SoundLevels.Mute).LevelDbfs);   // mute plays nothing
+            Assert.IsTrue(double.IsNaN(MaxSoundLevel.Of(built, t => SoundLevels.Mute).LevelDbfs));
         }
 
         [TestMethod]

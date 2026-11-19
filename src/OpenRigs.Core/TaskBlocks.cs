@@ -41,7 +41,7 @@ namespace OpenRigs.Core
             return problems;
         }
 
-        /// <summary>A reward block's size (open_rigs.rigs.conditioned_task Reward): sizeUl above 0 and at most maxRewardUl (LoadRewardLine.DefaultMaxRewardUl).</summary>
+        /// <summary>A task's reward size (open_rigs.core.task Reward, the task file's reward.sizeUl): sizeUl above 0 and at most maxRewardUl (LoadRewardLine.DefaultMaxRewardUl).</summary>
         public static List<string> RewardSizeProblems(double sizeUl, double maxRewardUl)
         {
             var problems = new List<string>();

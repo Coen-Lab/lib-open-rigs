@@ -49,20 +49,20 @@ namespace OpenRigs.Trials.Tests
         public LaserTiming Laser { get; set; }
     }
 
-    /// <summary>A task's trial rules as PlayPenaltySound reads them: the loudest penalty level any trial draws.</summary>
+    /// <summary>A task's trial rules as PlayPenaltySound reads them: the highest penalty level any trial draws (MaxPenaltyLevelDbfs).</summary>
     public class PieceSoundRules
     {
-        public double LoudestPenaltyLevelDbfs { get; set; }
+        public double MaxPenaltyLevelDbfs { get; set; }
     }
 
-    /// <summary>The rules at Go: the loudest penalty level -30 dBFS.</summary>
+    /// <summary>The rules at Go: MaxPenaltyLevelDbfs -30 dBFS.</summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
     public class PieceSoundRulesSource
     {
         public IObservable<PieceSoundRules> Process()
         {
-            return Observable.Return(new PieceSoundRules { LoudestPenaltyLevelDbfs = -30 });
+            return Observable.Return(new PieceSoundRules { MaxPenaltyLevelDbfs = -30 });
         }
     }
 
@@ -100,7 +100,7 @@ namespace OpenRigs.Trials.Tests
 
     /// <summary>
     /// The rules at 0.1 s, then trial 1's Arm (0.3 s), Trigger (0.4 s), Outcome (OutcomeAt s, none when 0) and TriggerOff
-    /// (0.9 s), as TrialEvents. Stop: Duration (LaserTiming.ForDuration, 0.5 s), UntilOutcome (LaserMaxSeconds cap), or None.
+    /// (0.9 s), as TrialEvents. Stop: Duration (LaserTiming.ForDuration, 0.5 s), UntilOutcome (LaserCapSeconds cap), or None.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
@@ -108,14 +108,14 @@ namespace OpenRigs.Trials.Tests
     {
         public string Stop { get; set; }
         public bool HardwareTriggered { get; set; }
-        public double LaserMaxSeconds { get; set; }
+        public double LaserCapSeconds { get; set; }
 
         public IObservable<PieceRules> Process()
         {
             return Observable.Defer(() =>
             {
                 var laser = Stop == "Duration" ? LaserTiming.ForDuration(HardwareTriggered, 0.5)
-                    : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(HardwareTriggered, 0, LaserMaxSeconds) : null;
+                    : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(HardwareTriggered, 0, LaserCapSeconds) : null;
                 return Observable.Timer(TimeSpan.FromSeconds(0.1)).Select(_ => new PieceRules { Laser = laser });
             });
         }
@@ -244,10 +244,10 @@ namespace OpenRigs.Trials.Tests
             Assert.IsTrue(outputs.IndexOf("penalty 4") > outputs.IndexOf("row 2"), "The penalty sound played before trial 2: " + string.Join(", ", outputs));
         }
 
-        static List<string> RunZapit(string stop, bool hardwareTriggered, double laserMaxSeconds, double outcomeAt)
+        static List<string> RunZapit(string stop, bool hardwareTriggered, double laserCapSeconds, double outcomeAt)
         {
             return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop == "Duration" ? "true" : "false").Replace("STOP", stop).Replace("HARDWARE", hardwareTriggered ? "true" : "false")
-                .Replace("LASER_MAX", laserMaxSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("LASER_CAP", laserCapSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("OUTCOME_AT", outcomeAt.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         }
 
@@ -268,7 +268,7 @@ namespace OpenRigs.Trials.Tests
                 RunZapit("UntilOutcome", false, 10, 0.6));
         }
 
-        // No outcome and no LaserCap: LaserBackstop stops it laserMaxSeconds after the trigger on the computer's clock.
+        // No outcome and no LaserCap: LaserBackstop stops it LaserCapSeconds after the trigger on the computer's clock.
         [TestMethod]
         public void ZapitTrialsUntilOutcomeWithNoOutcomeStopsAtTheBackstop()
         {

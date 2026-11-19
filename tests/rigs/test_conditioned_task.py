@@ -6,7 +6,7 @@ import pytest
 import yaml
 from pydantic import Field, ValidationError
 
-from open_rigs.core.task import Optogenetics, TaskParameters
+from open_rigs.core.task import Optogenetics, Reward, TaskParameters
 from open_rigs.rigs import conditioned_task as ct
 
 
@@ -24,14 +24,14 @@ class Params(TaskParameters, ct.ConditionedTask):
     SESSION_FIELDS = {**ct.COMMON_SESSION_FIELDS, "taskType": "fixed"}
     RULES = ({"if": ct.if_({"contrasts": {"items": {"const": 0}}}), "unused": ["azimuthsDeg"], "message": "no grating"},)
     TRIAL_TYPES = ({"trialType": "visual", "if": ct.if_({"contrasts": ct.ABOVE_0})}, {"trialType": "neutral"})
-    REQUIRED = ({"if": ct.if_({"taskType": {"const": "go"}}), "some": ct.if_({"contrasts": {"contains": {"const": 1}}}), "message": "go needs contrast 1"},)
+    REQUIRED_CONDITIONS = ({"if": ct.if_({"taskType": {"const": "go"}}), "some": ct.if_({"contrasts": {"contains": {"const": 1}}}), "message": "go needs contrast 1"},)
 
     curriculum: ct.Curriculum | None = None
     trial_conditions: list[TrialCondition] = Field(min_length=1, json_schema_extra={"x-whole": True})
     contrasts: list[float] = [1.0]
     azimuths_deg: list[float] = [-60.0, 60.0]
     auditory_stimulus: ct.AuditoryStimulus = ct.AuditoryStimulus()
-    reward: ct.Reward = ct.Reward(size_ul=2)
+    reward: Reward = Reward(size_ul=2)
     optogenetics: Opto = Opto()
     task_type: str = "go"
     delay_seconds: float = 0.0
@@ -114,7 +114,7 @@ def test_block_order_problems():
     assert ct.block_order_problems(Params) == ["contrasts comes before optogenetics: a task's own fields follow the lab's blocks"]
 
     class Disordered(TaskParameters):
-        reward: ct.Reward
+        reward: Reward
         curriculum: ct.Curriculum | None = None
 
     assert ct.block_order_problems(Disordered) == [
@@ -122,7 +122,7 @@ def test_block_order_problems():
 
     class Ordered(TaskParameters):
         curriculum: ct.Curriculum | None = None
-        reward: ct.Reward
+        reward: Reward
         own_field: int = 0
 
     assert ct.block_order_problems(Ordered) == []

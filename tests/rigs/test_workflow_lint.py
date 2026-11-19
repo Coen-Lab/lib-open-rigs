@@ -608,10 +608,10 @@ def test_the_penalty_sound_is_the_lab_s_include(tmp_path):
     text = block_text(lint.PLAY_PENALTY_SOUND)
     unscaled = text.replace('xsi:type="aud:SoundAtLevel"', 'xsi:type="aud:SpeakerBuffer"')
     assert rules.play_penalty_sound_problems(lint.ET.fromstring(unscaled.encode("utf-8"))) == [
-        "PlayPenaltySound does not play each input at its level from the buffer's (SoundAtLevel, BufferLevelDbfs from LoudestPenaltyLevelDbfs)"]
+        "PlayPenaltySound does not play each input at its level from the buffer's (SoundAtLevel, BufferLevelDbfs from MaxPenaltyLevelDbfs)"]
     at_go = text.replace("<Name>TrialRules</Name>", "<Name>TaskConfig</Name>")
     assert rules.play_penalty_sound_problems(lint.ET.fromstring(at_go.encode("utf-8"))) == [
-        "the penalty sound is not laid out at TrialRules' LoudestPenaltyLevelDbfs"]
+        "the penalty sound is not laid out at TrialRules' MaxPenaltyLevelDbfs"]
     # A task's own chain, refused.
     own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="aud:PenaltySoundBuffer" xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio" /></Expression>'
            '<Expression xsi:type="MulticastSubject"><Name>PenaltySounds</Name></Expression>')

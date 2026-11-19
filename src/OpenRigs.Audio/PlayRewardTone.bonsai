@@ -5,14 +5,14 @@
                  xmlns:dsp="clr-namespace:Bonsai.Dsp;assembly=Bonsai.Dsp"
                  xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A task's reward tone, in PlayPenaltySound's shape: the tone (RewardToneFile, the task's own mono 32-bit float file, read at Start) laid out once the trials' rules are made at Go on every rig.yml speaker, each copy equalised for its speaker, at the loudest reward tone level any trial draws (TrialRules' LoudestRewardToneLevelDbfs), into the AsyncSubject RewardToneBuffer (SpeakerBuffer stops the workflow if a copy would peak at -1 dBFS); each input, a rewarded trial's rewardTone.levelDbfs (NaN when mute: nothing plays), then plays it at that level (SoundAtLevel), sent into SpeakerMixer's RewardToneSounds. Needs TrialRules (with LoudestRewardToneLevelDbfs) and Speakers from the workflow.</Description>
+  <Description>A task's reward tone, in PlayPenaltySound's shape: the tone (RewardToneFile, the task's own mono 32-bit float file, read at Start) laid out once the trials' rules are made at Go on every rig.yml speaker, each copy equalised for its speaker, at the highest reward tone level any trial draws (TrialRules' MaxRewardToneLevelDbfs), into the AsyncSubject RewardToneBuffer (SpeakerBuffer stops the workflow if a copy would peak at -1 dBFS); each input, a rewarded trial's rewardTone.levelDbfs (NaN when mute: nothing plays), then plays it at that level (SoundAtLevel), sent into SpeakerMixer's RewardToneSounds. Needs TrialRules (with MaxRewardToneLevelDbfs) and Speakers from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
         <Name>TrialRules</Name>
       </Expression>
       <Expression xsi:type="MemberSelector">
-        <Selector>LoudestRewardToneLevelDbfs</Selector>
+        <Selector>MaxRewardToneLevelDbfs</Selector>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>Speakers</Name>
@@ -85,7 +85,7 @@
         <Name>TrialRules</Name>
       </Expression>
       <Expression xsi:type="MemberSelector">
-        <Selector>LoudestRewardToneLevelDbfs</Selector>
+        <Selector>MaxRewardToneLevelDbfs</Selector>
       </Expression>
     </Nodes>
     <Edges>

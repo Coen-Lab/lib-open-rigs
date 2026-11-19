@@ -312,7 +312,7 @@ namespace OpenRigs.Logging.Tests
                 }
                 using (var second = new StreamWriter(LogFile("Wheel_Rows", "2026-11-05T09-00-00")))
                 {
-                    LoggedRows.WriteRow(second, "3,NoResponse", "harpTime,response", true, true);
+                    LoggedRows.WriteRow(second, "3,noResponse", "harpTime,response", true, true);
                 }
                 // A log with PublishRows off is written and not published.
                 using (var quiet = new StreamWriter(LogFile("WorkflowData_Other", "2026-11-05T08-00-00")))
@@ -326,7 +326,7 @@ namespace OpenRigs.Logging.Tests
             CollectionAssert.AreEqual(new[] { "Wheel_Rows", "Wheel_Rows", "WorkflowData_Events", "Wheel_Rows" }, rows.Select(r => r.Log).ToArray());
             // The hourly log's rows go on from 0 to 2 across its two files; the events log counts its own.
             CollectionAssert.AreEqual(new long[] { 0, 1, 0, 2 }, rows.Select(r => r.Row).ToArray());
-            Assert.AreEqual("3,NoResponse", rows[3].Line);
+            Assert.AreEqual("3,noResponse", rows[3].Line);
             Assert.AreEqual("harpTime,Event,Detail,Value", rows[2].Header);
         }
 

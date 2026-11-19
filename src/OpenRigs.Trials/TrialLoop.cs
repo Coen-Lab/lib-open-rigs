@@ -259,7 +259,7 @@ namespace OpenRigs.Trials
             }
             else
             {
-                capAt = now + laser.LaserMaxSeconds;
+                capAt = now + laser.LaserCapSeconds;
             }
         }
 

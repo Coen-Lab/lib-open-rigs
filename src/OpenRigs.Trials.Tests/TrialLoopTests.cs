@@ -33,7 +33,7 @@ namespace OpenRigs.Trials.Tests
         public Func<StubTrial, TrialTimes, ICollection<string>, StubOutcome> OnTick = (t, x, u) => null;
         public Func<StubTrial, int, TrialTimes, ICollection<string>, StubOutcome> OnLick = (t, s, x, u) => Outcome("Lick" + s, 0, x);
         public Func<StubTrial, double, TrialTimes, ICollection<string>, StubOutcome> OnWheel = (t, cm, x, u) => null;
-        public Func<StubTrial, TrialTimes, StubOutcome> OnResponseEnd = (t, x) => Outcome("NoResponse", 0, x);
+        public Func<StubTrial, TrialTimes, StubOutcome> OnResponseEnd = (t, x) => Outcome("noResponse", 0, x);
         public bool LaserOn = true;
         public readonly List<StubOutcome> Previous = new List<StubOutcome>();
         public readonly List<double> StartWheels = new List<double>();
@@ -134,7 +134,7 @@ namespace OpenRigs.Trials.Tests
             var stimulus = rig.RunTo(TrialEventKind.Stimulus);
             Assert.AreEqual(102.002, stimulus.Seconds, 1e-9, "the first tick at or after the interval after its start");
             var outcome = rig.RunTo(TrialEventKind.Outcome);
-            Assert.AreEqual("NoResponse", outcome.Outcome.Choice);
+            Assert.AreEqual("noResponse", outcome.Outcome.Choice);
             Assert.AreEqual(103.502, outcome.Seconds, 1e-9, "the window closes stimulusTime + 1.5 s, on the tick at or after it");
             var times = outcome.Outcome.Times;
             Assert.AreEqual(100.001, times.ItiStartTime, 1e-9);
@@ -291,7 +291,7 @@ namespace OpenRigs.Trials.Tests
             rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
             var trigger = rig.RunTo(TrialEventKind.Trigger);
             var cap = rig.RunTo(TrialEventKind.LaserCap);
-            Assert.AreEqual(trigger.Seconds + 12.5, cap.Seconds, 1e-9, "the laser's longest run, on the Harp clock");
+            Assert.AreEqual(trigger.Seconds + 12.5, cap.Seconds, 1e-9, "the laser's cap, on the Harp clock");
             rig.Lick(0);
             var outcome = rig.Of(TrialEventKind.Outcome).Single();
             Assert.AreEqual(1, rig.Of(TrialEventKind.LaserCap).Count(), "one cap");
@@ -700,7 +700,7 @@ namespace OpenRigs.Trials.Tests
             public StubOutcome Tick(PlainTrial trial, TrialTimes times, ICollection<string> updates) { return null; }
             public StubOutcome Lick(PlainTrial trial, int spout, TrialTimes times, ICollection<string> updates) { return null; }
             public StubOutcome Wheel(PlainTrial trial, double cm, TrialTimes times, ICollection<string> updates) { return null; }
-            public StubOutcome ResponseEnd(PlainTrial trial, TrialTimes times) { return StubRules.Outcome("NoResponse", 0, times); }
+            public StubOutcome ResponseEnd(PlainTrial trial, TrialTimes times) { return StubRules.Outcome("noResponse", 0, times); }
         }
 
         [TestMethod]

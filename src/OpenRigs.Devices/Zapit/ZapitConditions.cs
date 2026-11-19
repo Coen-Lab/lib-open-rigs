@@ -9,12 +9,19 @@ namespace OpenRigs.Devices.Zapit
     /// <summary>What <see cref="ZapitConditions.Check"/> reads from a conditions file that passes.</summary>
     public sealed class ZapitConditionsFile
     {
-        /// <summary>Gets the number of conditions, 1 to N.</summary>
-        public int Count { get; internal set; }
+        /// <summary>A conditions file's count and max ramp-down, as Check reads them (or a test's stand-in for a file).</summary>
+        public ZapitConditionsFile(int count, double maxRampDownSeconds)
+        {
+            Count = count;
+            MaxRampDownSeconds = maxRampDownSeconds;
+        }
 
-        /// <summary>Gets the longest offRampDownDuration_ms of any condition, in seconds: the masking tail every trial's laser
+        /// <summary>Gets the number of conditions, 1 to N.</summary>
+        public int Count { get; private set; }
+
+        /// <summary>Gets the highest offRampDownDuration_ms of any condition, in seconds: the masking tail every trial's laser
         /// ends with, so a laser held until the outcome holds its trigger line this long past it (LaserTiming.UntilOutcome).</summary>
-        public double LongestRampDownSeconds { get; internal set; }
+        public double MaxRampDownSeconds { get; private set; }
     }
 
     /// <summary>
@@ -36,7 +43,7 @@ namespace OpenRigs.Devices.Zapit
         static readonly Regex ModulationFrequency = new Regex(@"stimModulationFreqHz\s*:\s*([0-9.eE+-]+)", RegexOptions.CultureInvariant);
 
         /// <summary>
-        /// The number of conditions in the file and its longest ramp-down, after checking they are numbered 1 to N and
+        /// The number of conditions in the file and its max ramp-down, after checking they are numbered 1 to N and
         /// each ramps down over <see cref="MinimumRampDownSeconds"/> to <see cref="MaximumRampDownSeconds"/> and over
         /// more than one stimulus cycle. Throws, naming the file and every problem, otherwise.
         /// </summary>
@@ -65,14 +72,14 @@ namespace OpenRigs.Devices.Zapit
                         path, string.Join(", ", numbers), numbers.Count));
                 }
             }
-            return new ZapitConditionsFile { Count = numbers.Count, LongestRampDownSeconds = CheckRampDowns(path, text) };
+            return new ZapitConditionsFile(numbers.Count, CheckRampDowns(path, text));
         }
 
         // MATLAB Zapit ramps down in whole cycles, and a ramp of one cycle or less writes zeros without stopping
         // the DAQ, so a hardware-triggered rig's next stimulus would start when armed, not at its trigger.
         static double CheckRampDowns(string path, string text)
         {
-            var longestMs = 0.0;
+            var maxMs = 0.0;
             var blocks = new Dictionary<string, string>();
             var keys = TopLevelKey.Matches(text);
             for (var i = 0; i < keys.Count; i++)
@@ -99,7 +106,7 @@ namespace OpenRigs.Devices.Zapit
                     continue;
                 }
                 var rampMs = double.Parse(ramp.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture);
-                longestMs = Math.Max(longestMs, rampMs);
+                maxMs = Math.Max(maxMs, rampMs);
                 if (rampMs < MinimumRampDownSeconds * 1000)
                     problems.Add(string.Format(CultureInfo.InvariantCulture, "{0} ramps down over {1} ms, less than {2} ms", pair.Key, rampMs, MinimumRampDownSeconds * 1000));
                 else if (rampMs > MaximumRampDownSeconds * 1000)
@@ -113,7 +120,7 @@ namespace OpenRigs.Devices.Zapit
                     "The Zapit conditions file '{0}': {1}. Each condition needs offRampDownDuration_ms of {2} to {3} ms and longer than one stimulus cycle.",
                     path, string.Join("; ", problems), MinimumRampDownSeconds * 1000, MaximumRampDownSeconds * 1000));
             }
-            return longestMs / 1000;
+            return maxMs / 1000;
         }
 
         static string Read(string path)

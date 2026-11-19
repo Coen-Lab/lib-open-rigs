@@ -39,7 +39,7 @@ def test_the_file_reads_typed_with_codes(tmp_path):
     write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-14-17.csv",
           "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,singleSpoutOffered,extra\n"
           "12.5,1,2,correct,10.1,11.0,True,x\n"
-          "3600.2,2,4,NoResponse,3598.0,NaN,False,y\n"
+          "3600.2,2,4,noResponse,3598.0,NaN,False,y\n"
           "3610.0,3,0,Inco")
     rows = trial_log.read(tmp_path)
     assert len(rows) == 2

@@ -29,13 +29,13 @@ namespace OpenRigs.Trials.Tests
         public void ACombinationDrawnAwayFromItsShareIsNamed()
         {
             // Weights 3 and 1, the first with two combinations: shares 3/8, 3/8 and 1/4.
-            var built = new List<TrialConditionDraw<string>>
+            var built = new List<BuiltTrialCondition<string>>
             {
-                new TrialConditionDraw<string> { Weight = 3, Where = "trialConditions[0]", Combinations = new List<TrialConditionCombination<string>>
+                new BuiltTrialCondition<string> { Weight = 3, Where = "trialConditions[0]", Combinations = new List<TrialConditionCombination<string>>
                 {
                     new TrialConditionCombination<string> { Id = 0, Picks = "a" }, new TrialConditionCombination<string> { Id = 1, Picks = "b" },
                 } },
-                new TrialConditionDraw<string> { Weight = 1, Where = "trialConditions[1]", Combinations = new List<TrialConditionCombination<string>>
+                new BuiltTrialCondition<string> { Weight = 1, Where = "trialConditions[1]", Combinations = new List<TrialConditionCombination<string>>
                 {
                     new TrialConditionCombination<string> { Id = 2, Picks = "" },
                 } },

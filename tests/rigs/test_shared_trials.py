@@ -62,7 +62,7 @@ def test_a_consistent_experiment_has_no_problems(tmp_path):
     trials = _chain(4)
     rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     s = summarise(_experiment(tmp_path, trials, rewards))
-    assert (s.outcome, s.trials, s.correct, s.performance, s.responded) == ("completed", 4, 2, 0.5, 1.0)
+    assert (s.run_outcome, s.trials, s.correct, s.performance, s.responded) == ("completed", 4, 2, 0.5, 1.0)
     assert s.problems == []
     assert s.response_seconds == [3.0] * 4
     assert [round(x, 6) for x in s.interval_seconds] == [2.5, 6.5, 2.5]
@@ -153,12 +153,12 @@ def test_no_trials_and_no_manifest(tmp_path):
     folder = _experiment(tmp_path, [], [])
     (folder / "manifest.json").unlink()
     s = summarise(folder)
-    assert (s.outcome, s.trials) == ("unknown", 0) and math.isnan(s.performance) and s.problems == []
+    assert (s.run_outcome, s.trials) == ("unknown", 0) and math.isnan(s.performance) and s.problems == []
 
 
 def test_a_run_that_never_closed_says_so(tmp_path):
     s = summarise(_experiment(tmp_path, _chain(1), [], outcome="stopped", final=False))
-    assert s.outcome == "stopped (not final: the workflow never finished closing)"
+    assert s.run_outcome == "stopped (not final: the workflow never finished closing)"
 
 
 BOTH = ("optogenetics", "quietWait")

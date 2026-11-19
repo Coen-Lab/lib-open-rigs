@@ -13,7 +13,7 @@ from open_rigs.core.task import (
     Penalty,
     LickQuietWait,
     ResponseWindow,
-    RewardSize,
+    Reward,
     RewardTone,
     WheelQuietWait,
 )
@@ -58,21 +58,22 @@ def test_a_task_s_own_field_on_a_lab_block_is_finite_too():
         TimedStage.model_validate({"responseWindowSeconds": float("inf")})
 
 
-class Row(Iti, ResponseWindow, AutoReward, RewardSize):
+class Row(Iti, ResponseWindow, AutoReward):
     label: str
+    reward: Reward
 
 
-ROW = {"label": "a", "itiMinSeconds": 2, "itiMaxSeconds": 3, "autoRewardProbability": 0.5, "rewardSizeUl": 3}
+ROW = {"label": "a", "itiMinSeconds": 2, "itiMaxSeconds": 3, "autoRewardProbability": 0.5, "reward": {"sizeUl": 3}}
 
 
 def test_trial_blocks_keep_their_keys_where_the_task_puts_them():
-    assert Row.model_validate(ROW).model_dump(by_alias=True) == {**ROW, "responseWindowSeconds": None}
+    assert Row.model_validate(ROW).model_dump(by_alias=True) == {**ROW, "responseWindowSeconds": None, "reward": {"sizeUl": 3, "largeMultiplier": 2.0, "largeProbability": 0.0}}
 
 
 def test_trial_blocks_have_no_lab_default_but_the_window():
     with pytest.raises(ValidationError) as error:
         Row.model_validate({"label": "a"})
-    assert {e["loc"][0] for e in error.value.errors()} == {"itiMinSeconds", "itiMaxSeconds", "autoRewardProbability", "rewardSizeUl"}
+    assert {e["loc"][0] for e in error.value.errors()} == {"itiMinSeconds", "itiMaxSeconds", "autoRewardProbability", "reward"}
 
 
 @pytest.mark.parametrize(
@@ -81,7 +82,7 @@ def test_trial_blocks_have_no_lab_default_but_the_window():
         ({"itiMaxSeconds": 1}, "iti_max_seconds must be >= iti_min_seconds"),
         ({"responseWindowSeconds": 0}, "greater than 0"),
         ({"autoRewardProbability": 1.5}, "less than or equal to 1"),
-        ({"rewardSizeUl": MAX_REWARD_UL + 1}, f"less than or equal to {MAX_REWARD_UL}"),
+        ({"reward": {"sizeUl": MAX_REWARD_UL + 1}}, f"less than or equal to {MAX_REWARD_UL}"),
         ({"itiMinSeconds": float("nan")}, "finite number"),
     ],
 )

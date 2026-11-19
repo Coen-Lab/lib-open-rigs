@@ -11,22 +11,22 @@ using OpenRigs.Tests;
 
 namespace OpenRigs.Audio.Tests
 {
-    /// <summary>A task's trial rules as PlayRewardTone reads them: the loudest reward tone level any trial draws.</summary>
+    /// <summary>A task's trial rules as PlayRewardTone reads them: the highest reward tone level any trial draws (MaxRewardToneLevelDbfs).</summary>
     public class ToneRules
     {
-        public double LoudestRewardToneLevelDbfs { get; set; }
+        public double MaxRewardToneLevelDbfs { get; set; }
     }
 
-    /// <summary>The rules at Go, the loudest reward tone at LoudestRewardToneLevelDbfs.</summary>
+    /// <summary>The rules at Go, the highest reward tone level at MaxRewardToneLevelDbfs.</summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
     public class ToneRulesSource
     {
-        public double LoudestRewardToneLevelDbfs { get; set; }
+        public double MaxRewardToneLevelDbfs { get; set; }
 
         public IObservable<ToneRules> Process()
         {
-            return Observable.Defer(() => Observable.Return(new ToneRules { LoudestRewardToneLevelDbfs = LoudestRewardToneLevelDbfs }));
+            return Observable.Defer(() => Observable.Return(new ToneRules { MaxRewardToneLevelDbfs = MaxRewardToneLevelDbfs }));
         }
     }
 
@@ -83,7 +83,7 @@ namespace OpenRigs.Audio.Tests
     {
         static readonly string Folder = Path.Combine(Path.GetDirectoryName(typeof(PlayRewardToneTests).Assembly.Location), "Pieces");
 
-        // The tone is laid out on both speakers of a four-channel mixer at the loudest level, -20 dBFS; each rewarded trial
+        // The tone is laid out on both speakers of a four-channel mixer at MaxRewardToneLevelDbfs, -20 dBFS; each rewarded trial
         // plays it at its own level, a mute trial not at all.
         [TestMethod]
         public void EachInputPlaysTheToneOnEverySpeakerAtItsTrialsLevel()

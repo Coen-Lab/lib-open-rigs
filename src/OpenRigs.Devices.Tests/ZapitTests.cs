@@ -168,11 +168,11 @@ namespace OpenRigs.Devices.Tests
         }
 
         [TestMethod]
-        public void CheckReturnsTheCountAndTheLongestRampDown()
+        public void CheckReturnsTheCountAndTheMaxRampDown()
         {
             var file = ZapitConditions.Check(WriteConditions("stimLocations01:\n  offRampDownDuration_ms: 250\nstimLocations02:\n  offRampDownDuration_ms: 400\n"));
             Assert.AreEqual(2, file.Count);
-            Assert.AreEqual(0.4, file.LongestRampDownSeconds, 1e-12);
+            Assert.AreEqual(0.4, file.MaxRampDownSeconds, 1e-12);
         }
 
         [TestMethod]

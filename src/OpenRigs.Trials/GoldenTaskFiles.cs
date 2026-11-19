@@ -39,7 +39,7 @@ namespace OpenRigs.Trials
         /// trialCombinationId) is more than 4.5 standard errors from its condition's weight over the sum of weights over its
         /// number of combinations, named with <paramref name="name"/> (the file's): none when every share holds.
         /// </summary>
-        public static List<string> ShareProblems<TTask>(string name, IList<TrialConditionDraw<TTask>> built, IDictionary<int, int> counts, int draws)
+        public static List<string> ShareProblems<TTask>(string name, IList<BuiltTrialCondition<TTask>> built, IDictionary<int, int> counts, int draws)
         {
             var problems = new List<string>();
             double total = built.Sum(c => c.Weight);
