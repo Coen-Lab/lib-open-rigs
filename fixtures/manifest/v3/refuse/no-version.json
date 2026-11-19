@@ -1,6 +1,6 @@
 {
   "created": "2026-11-12T10:45:04Z",
-  "ingest_script": "coen-behaviour-box",
+  "ingest_script": "coen-bbox-wheel",
   "writer": {
     "package": "OpenRigs.Manifest",
     "version": "0.1.1-coen-lab.13"
@@ -18,8 +18,8 @@
   },
   "source": {
     "workflow": "src\\main.bonsai",
-    "repo": "https://github.com/ucl-open/coen-behaviour-box.git",
-    "root": "C:\\Github\\Coen-Lab\\coen-behaviour-box",
+    "repo": "https://github.com/ucl-open/coen-bbox-wheel.git",
+    "root": "C:\\Github\\Coen-Lab\\coen-bbox-wheel",
     "branch": "main",
     "commit": "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
     "dirty": false,
@@ -29,7 +29,7 @@
   },
   "launch": {
     "arguments": [
-      "C:\\Github\\Coen-Lab\\coen-behaviour-box\\src\\main.bonsai",
+      "C:\\Github\\Coen-Lab\\coen-bbox-wheel\\src\\main.bonsai",
       "--no-editor",
       "--property:SubjectId=AM006",
       "--property:SessionId=004B1",

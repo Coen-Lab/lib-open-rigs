@@ -19,8 +19,8 @@
   },
   "source": {
     "workflow": "src\\main.bonsai",
-    "repo": "https://github.com/ucl-open/coen-behaviour-box.git",
-    "root": "C:\\Github\\Coen-Lab\\coen-behaviour-box",
+    "repo": "https://github.com/ucl-open/coen-bbox-wheel.git",
+    "root": "C:\\Github\\Coen-Lab\\coen-bbox-wheel",
     "branch": "main",
     "commit": "9b77733c1d0e8f6a4b2c9d7e5f3a1b8c6d4e2f0a",
     "dirty": true,
@@ -32,7 +32,7 @@
   },
   "launch": {
     "arguments": [
-      "C:\\Github\\Coen-Lab\\coen-behaviour-box\\src\\main.bonsai",
+      "C:\\Github\\Coen-Lab\\coen-bbox-wheel\\src\\main.bonsai",
       "--start"
     ],
     "properties": {}
