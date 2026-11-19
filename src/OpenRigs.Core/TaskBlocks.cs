@@ -41,6 +41,51 @@ namespace OpenRigs.Core
             return problems;
         }
 
+        /// <summary>The RewardSize block: rewardSizeUl above 0 and at most maxRewardUl (LoadRewardLine.DefaultMaxRewardUl).</summary>
+        public static List<string> RewardSizeProblems(double rewardSizeUl, double maxRewardUl)
+        {
+            var problems = new List<string>();
+            if (!(rewardSizeUl > 0 && rewardSizeUl <= maxRewardUl)) problems.Add(string.Format("rewardSizeUl must be above 0 and at most {0} ul", maxRewardUl));
+            return problems;
+        }
+
+        /// <summary>The large-reward fields of a reward block (open_rigs.rigs.conditioned_task Reward): with largeRewardProbability
+        /// above 0 and largeRewardMultiplier above 1, a large reward at most maxRewardUl, the most one reward may ask for.</summary>
+        public static List<string> LargeRewardProblems(double rewardSizeUl, double largeRewardMultiplier, double largeRewardProbability, double maxRewardUl)
+        {
+            var problems = new List<string>();
+            if (!(largeRewardProbability >= 0 && largeRewardProbability <= 1)) problems.Add("largeRewardProbability must be in [0, 1]");
+            if (largeRewardProbability > 0 && largeRewardMultiplier > 1 && rewardSizeUl * largeRewardMultiplier > maxRewardUl + 1e-9)
+            {
+                problems.Add(string.Format("rewardSizeUl ({0} ul) x largeRewardMultiplier ({1}) is {2} ul, more than {3} ul, the most one reward may ask for", rewardSizeUl, largeRewardMultiplier, rewardSizeUl * largeRewardMultiplier, maxRewardUl));
+            }
+            return problems;
+        }
+
+        /// <summary>The Optogenetics block's laserOnProbability, from 0 to 1.</summary>
+        public static List<string> LaserOnProbabilityProblems(double laserOnProbability)
+        {
+            var problems = new List<string>();
+            if (!(laserOnProbability >= 0 && laserOnProbability <= 1)) problems.Add("laserOnProbability must be in [0, 1]");
+            return problems;
+        }
+
+        /// <summary>A stimulus: the contrasts each finite, 0 or more, at least one; the sound's amplitude finite, 0 or more.</summary>
+        public static List<string> StimulusProblems(IList<double> contrasts, double amplitude)
+        {
+            var problems = new List<string>();
+            var any = false;
+            var bad = false;
+            foreach (var c in contrasts ?? new List<double>())
+            {
+                any = true;
+                if (!(c >= 0) || double.IsInfinity(c)) bad = true;
+            }
+            if (!any || bad) problems.Add("contrasts must each be a finite number, 0 or more, at least one");
+            if (!(amplitude >= 0) || double.IsInfinity(amplitude)) problems.Add("auditoryStimulus.amplitude must be a finite number, 0 or more");
+            return problems;
+        }
+
         static void AtLeastZero(List<string> problems, string name, double value)
         {
             if (!(value >= 0) || double.IsInfinity(value)) problems.Add(string.Format("{0} is {1}, not a finite number, 0 or more", name, value));

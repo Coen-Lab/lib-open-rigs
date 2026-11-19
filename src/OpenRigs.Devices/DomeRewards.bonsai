@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A dome's rewards: Rewards and the two spouts' RewardValve pieces, RewardValve-Left and RewardValve-Right on BehaviorBoard-Main (every dome has the same valves and names in rig.yml). Apart from DomeHardware because the domes' preflight (coen-qc-preflight-rig) includes DomeHardware with no experiment and no valve calibrations; a dome task includes it after DomeHardware and ExperimentLogs (Rewards reads Timestamp and Events), before the task that sends rewards and ExperimentRecords.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:Rewards.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RewardValve.bonsai">
+        <Name>RewardValve-Left</Name>
+        <Board>BehaviorBoard-Main</Board>
+        <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RewardValve.bonsai">
+        <Name>RewardValve-Right</Name>
+        <Board>BehaviorBoard-Main</Board>
+        <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>
+      </Expression>
+    </Nodes>
+    <Edges />
+  </Workflow>
+</WorkflowBuilder>

@@ -17,6 +17,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path, PurePath, PureWindowsPath
 
 from open_rigs.rigs.lab_rig import PREFLIGHT_DEVICE_KINDS
@@ -267,10 +268,12 @@ def _scopes(root: ET.Element):
         yield nodes_and_edges(workflow)
 
 
-def wall_clock_waits(wf: Workflow, group: str = "TaskLogic") -> list[str]:
+def wall_clock_waits(wf: Workflow, group: str = "TaskLogic", allowed: Iterable[str] = ()) -> list[str]:
     """Every wall-clock wait in `group` (a task waits on the Harp clock, Core HarpDelay on Timestamp), as
-    "<name or type> (<type>)"."""
-    found = [f"{e.findtext(W + 'Name') or kind(e)} ({kind(e)})" for e in wf.named(group).iter(W + "Expression") if kind(e) in WALL_CLOCK]
+    "<name or type> (<type>)", but those inside a named group listed in `allowed` (a backstop that must not stall
+    with the board, such as a laser's)."""
+    skipped = {id(e) for name in allowed for e in wf.named(name).iter(W + "Expression")}
+    found = [f"{e.findtext(W + 'Name') or kind(e)} ({kind(e)})" for e in wf.named(group).iter(W + "Expression") if kind(e) in WALL_CLOCK and id(e) not in skipped]
     if "TimeOfDay" in ET.tostring(wf.named(group), encoding="unicode"):
         found.append("TimeOfDay")
     return found

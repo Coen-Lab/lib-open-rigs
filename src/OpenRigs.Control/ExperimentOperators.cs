@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using System.Reactive.Linq;
 using Bonsai;
 
@@ -198,6 +200,53 @@ namespace OpenRigs.Control
         {
             var name = Name ?? "";
             return source.Do(value => ControlState.Require("ReportMetric").SetMetric(name, Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""));
+        }
+    }
+
+    /// <summary>
+    /// Reports the current trial's shared facts as metrics, each under its member's name (the trial log's column), in one
+    /// order for every task: a task reports its own after it with ReportMetric. Passes the trial through.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Sink)]
+    [Description("Reports each named field or property of the trial as a metric under its name (default trialNumber, trialType, rewardOfferedUl, laserCondition), passing the trial through.")]
+    public class ReportTrialMetrics
+    {
+        /// <summary>The members every trial-condition task reports, in order.</summary>
+        public const string SharedMembers = "trialNumber,trialType,rewardOfferedUl,laserCondition";
+
+        /// <summary>Gets or sets the members to report, comma-separated, in order.</summary>
+        [Description("The trial's fields or properties to report, comma-separated, in order; each metric is named as its member.")]
+        public string Members { get; set; } = SharedMembers;
+
+        /// <summary>Each named member of the trial and its value as reported (invariant culture); throws naming a member the trial lacks.</summary>
+        public static List<KeyValuePair<string, string>> Values(object trial, string members)
+        {
+            var values = new List<KeyValuePair<string, string>>();
+            var type = trial.GetType();
+            foreach (var name in (members ?? "").Split(',').Select(m => m.Trim()).Where(m => m.Length > 0))
+            {
+                var field = type.GetField(name, BindingFlags.Public | BindingFlags.Instance);
+                var property = field == null ? type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance) : null;
+                if (field == null && property == null) throw new InvalidOperationException(string.Format("ReportTrialMetrics: the trial {0} has no member {1}.", type.Name, name));
+                var value = field != null ? field.GetValue(trial) : property!.GetValue(trial, null);
+                values.Add(new KeyValuePair<string, string>(name, Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""));
+            }
+            return values;
+        }
+
+        /// <summary>Reports each trial's members as metrics, passing the trial through.</summary>
+        /// <typeparam name="T">The trial's type.</typeparam>
+        /// <param name="source">The trials.</param>
+        /// <returns>The same trials.</returns>
+        public IObservable<T> Process<T>(IObservable<T> source)
+        {
+            var members = Members;
+            return source.Do(trial =>
+            {
+                var state = ControlState.Require("ReportTrialMetrics");
+                foreach (var pair in Values(trial!, members)) state.SetMetric(pair.Key, pair.Value);
+            });
         }
     }
 }

@@ -399,6 +399,18 @@ def test_a_lab_type_is_found_under_the_prefix_a_bonsai_save_gives_it(tmp_path):
     assert lint.harp_delays_off_the_clock(lint.Workflow(tmp_path)) == (1, ["HarpDelay"])
 
 
+def test_a_wall_clock_wait_in_an_allowed_group_is_left_out(tmp_path):
+    timer = '<Expression xsi:type="Combinator"><Combinator xsi:type="rx:Timer" /></Expression>'
+    backstop = f'<Expression xsi:type="GroupWorkflow"><Name>Backstop</Name><Workflow><Nodes>{timer}</Nodes><Edges /></Workflow></Expression>'
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.bonsai").write_text(
+        HEAD + f'<Expression xsi:type="GroupWorkflow"><Name>TaskLogic</Name><Workflow><Nodes>{timer}{backstop}</Nodes><Edges /></Workflow></Expression>'
+        "</Nodes><Edges /></Workflow></WorkflowBuilder>", encoding="utf-8")
+    wf = lint.Workflow(tmp_path)
+    assert lint.wall_clock_waits(wf) == ["rx:Timer (rx:Timer)", "rx:Timer (rx:Timer)"]
+    assert lint.wall_clock_waits(wf, allowed=["Backstop"]) == ["rx:Timer (rx:Timer)"]
+
+
 def test_a_command_the_workflow_handles_and_does_not_declare_is_found(tmp_path):
     on = '<Expression xsi:type="Combinator"><Combinator xsi:type="c:OnCommand"><c:Name>{}</c:Name></Combinator></Expression>'
     wf = workflow(tmp_path, '<Expression xsi:type="GroupWorkflow" xmlns:c="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control">'

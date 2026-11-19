@@ -1,0 +1,86 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:ctl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>DomeRewards: Rewards and a RewardValve piece per valve in Pieces\rig.yml (left, right) with no board: a 1 kHz Timestamp, and BehaviorBoard-Main.TriggerCalibratedPulse declared here, each pulse sent into it stopping the workflow as "fired line width". At SEND_AFTER a reward of 2 ul is asked of VALVE. PiecesSubscribeTests writes the valves' calibrations and sets ConfigRoot; PathPrefix never comes, so nothing is logged.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>CONFIG_ROOT</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:String">
+        <rx:Name>PathPrefix</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="ctl:ControlEvent">
+        <rx:Name>ControlEvents</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:ReplaySubject" TypeArguments="harp:Timestamped(orl:EventRow)">
+        <rx:Name>Events</rx:Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Timer">
+          <rx:DueTime>PT0S</rx:DueTime>
+          <rx:Period>PT0.001S</rx:Period>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>Convert.ToDouble(it) / 1000.0</scr:Expression>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Tuple(sys:String,sys:Int32)">
+        <rx:Name>BehaviorBoard-Main.TriggerCalibratedPulse</rx:Name>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:DomeRewards.bonsai" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main.TriggerCalibratedPulse</Name>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>"fired " + Item1 + " " + Item2.ToString()</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:ThrowError" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Timer">
+          <rx:DueTime>SEND_AFTER</rx:DueTime>
+          <rx:Period>PT0S</rx:Period>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="StringProperty">
+          <Value>VALVE</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="DoubleProperty">
+          <Value>2</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>RewardRequests</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="15" Label="Source1" />
+      <Edge From="14" To="15" Label="Source2" />
+      <Edge From="15" To="16" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

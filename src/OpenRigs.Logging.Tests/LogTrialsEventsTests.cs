@@ -124,6 +124,26 @@ namespace OpenRigs.Logging.Tests
         }
     }
     /// <summary>
+    /// ConditionedTaskLogs: TaskLogs' logs and Settings_Combinations from TrialRules' CombinationsJson, once.
+    /// </summary>
+    [TestClass]
+    public class ConditionedTaskLogsTests : LoggingTestBase
+    {
+        protected override string WorkflowFileName => "ConditionedTaskLogsTest.bonsai";
+
+        [TestMethod]
+        public void ConditionedTaskLogs_WritesSettingsCombinationsBesideTaskLogs()
+        {
+            var result = RunWorkflow(new Dictionary<string, string> { { "Count", "10" } });
+            Assert.AreEqual(1, FindLogFiles("Settings_Task_*.json", result).Length, result.Describe());
+            var combinations = FindLogFiles("Settings_Combinations_*.json", result);
+            Assert.AreEqual(1, combinations.Length, result.Describe());
+            Assert.AreEqual("[0]", System.Text.RegularExpressions.Regex.Replace(System.IO.File.ReadAllText(combinations[0]), @"\s", ""), result.Describe());
+            ReadCsvLog(GetSingleLogFile("WorkflowData_Trials_*.csv", result), new[] { "harpTime", "Trial" }, 10, result);
+        }
+    }
+
+    /// <summary>
     /// CreateEvent and EventRow without Bonsai: what each kind of element becomes.
     /// </summary>
     [TestClass]

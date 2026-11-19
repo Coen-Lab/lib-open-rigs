@@ -15,6 +15,8 @@ using OpenRigs.Control;
 // dotnet run --project src\OpenRigs.Control.Tests
 namespace OpenRigs.Control.Tests
 {
+    public class MetricTrial { public int trialNumber = 7; public string trialType = "visual"; public double rewardOfferedUl = 2.5; public int laserCondition { get { return 0; } } }
+
     static class Program
     {
         // Not 5561, so a rig agent's workflow running on this machine is left alone.
@@ -152,9 +154,13 @@ namespace OpenRigs.Control.Tests
                 Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
                 try { new ReportMetric { Name = "water_ml" }.Process(Observable.Return(0.25)).Wait(); }
                 finally { Thread.CurrentThread.CurrentCulture = culture; }
+                new ReportTrialMetrics().Process(Observable.Return(new MetricTrial())).Wait();
+                var trialMissing = Catch(() => ReportTrialMetrics.Values(new MetricTrial(), "trialNumber,nope"));
+                Check("ReportTrialMetrics refuses a member the trial lacks, naming it", trialMissing != null && trialMissing.Message.Contains("has no member nope"), trialMissing == null ? "no error" : trialMissing.Message);
                 var status = Ask(socket, new { cmd = "status" });
                 Check("status reports the phase, which only moves forward", (string)status["phase"] == "Recording", (string)status["phase"]);
                 Check("a metric is reported in the invariant culture, whatever the rig's", (string)status["metrics"]["water_ml"] == "0.25", status["metrics"]?.ToString());
+                Check("ReportTrialMetrics reports the shared trial members under their names", (string)status["metrics"]["trialNumber"] == "7" && (string)status["metrics"]["trialType"] == "visual" && (string)status["metrics"]["rewardOfferedUl"] == "2.5" && (string)status["metrics"]["laserCondition"] == "0", status["metrics"]?.ToString());
                 // A second frame left unread made the reply throw, which ended the experiment.
                 socket.SendMoreFrame("{\"cmd\": \"status\"}").SendFrame("{\"cmd\": \"status\"}");
                 string twoFrames;

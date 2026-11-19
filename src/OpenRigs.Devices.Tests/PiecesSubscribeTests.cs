@@ -41,9 +41,9 @@ namespace OpenRigs.Devices.Tests
         // Rewards and both RewardValve pieces with no board: each loads its line and calibration and runs; a reward
         // asked of a valve fires its calibrated pulse into its board's TriggerCalibratedPulse (2 ul is 38 ms on the
         // fixture's curve); one asked of a valve no piece fires, or a valve with no calibration, stops the workflow.
-        static List<string> RunValves(string valve, Func<string, string> editRig = null)
+        static List<string> RunValves(string valve, Func<string, string> editRig = null, string file = "RewardValves.bonsai")
         {
-            return Run("RewardValves.bonsai", editRig, edit: xml => xml.Replace("VALVE", valve)
+            return Run(file, editRig, edit: xml => xml.Replace("VALVE", valve)
                 .Replace("SEND_AFTER", valve == null ? "PT1H" : "PT0.5S"));
         }
 
@@ -55,6 +55,15 @@ namespace OpenRigs.Devices.Tests
         {
             StringAssert.StartsWith(string.Join(" || ", RunValves("left")), "InvalidOperationException: fired DO1 38");
             StringAssert.StartsWith(string.Join(" || ", RunValves("Right")), "InvalidOperationException: fired DO2 38");
+        }
+
+        // DomeRewards: the same three pieces in one include, as a two-spout task has them.
+        [TestMethod]
+        public void DomeRewardsLoadsBothValvesAndFiresEach()
+        {
+            Assert.AreEqual("", string.Join(" || ", RunValves(null, file: "DomeRewards.bonsai")));
+            StringAssert.StartsWith(string.Join(" || ", RunValves("left", file: "DomeRewards.bonsai")), "InvalidOperationException: fired DO1 38");
+            StringAssert.StartsWith(string.Join(" || ", RunValves("right", file: "DomeRewards.bonsai")), "InvalidOperationException: fired DO2 38");
         }
 
         [TestMethod]
