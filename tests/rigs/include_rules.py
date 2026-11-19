@@ -62,8 +62,17 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
     def inputs(i: int) -> list[tuple[str, str, str]]:
         return sorted((label, nodes[a].get(XSI) or "", _name(nodes[a])) for a, b, label in edges if b == i)
 
+    def appends(node: ET.Element, fed_by: str) -> bool:
+        if kind(node) == "mix:AppendBuffer":
+            return True
+        if node.get(XSI) != "rx:SelectMany":  # StimulusSounds: each buffer appended to the StimulusSource of the moment
+            return False
+        inner, inner_edges = nodes_and_edges(child(node, W + "Workflow"))
+        return any(kind(inner[b]) == "mix:AppendBuffer" and label == "Source1" and inner[a].get(XSI) == "WorkflowInput"
+                   for a, b, label in inner_edges) and fed_by == "MixerStimulusSounds"
+
     def read_by_append_buffer(subject: str) -> bool:
-        return any(kind(nodes[b]) == "mix:AppendBuffer" and label == "Source1" and nodes[a].get(XSI) == "SubscribeSubject"
+        return any(appends(nodes[b], subject) and label == "Source1" and nodes[a].get(XSI) == "SubscribeSubject"
                    and _name(nodes[a]) == subject for a, b, label in edges)
 
     def checked(i: int, sound: str) -> bool:

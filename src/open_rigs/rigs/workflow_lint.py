@@ -137,7 +137,7 @@ LIB_SRC = Path(__file__).parents[2]
 BLOCK_SUBJECTS = {
     ZAPIT_INCLUDE: {"ZapitCommands": "rx:BehaviorSubject", "ZapitReplies": "rx:PublishSubject"},
     REWARDS: {"RewardRequests": "rx:BehaviorSubject", "RewardValves": "rx:ReplaySubject", "RewardDelivered": "rx:BehaviorSubject"},
-    SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in SPEAKER_MIXER_SOUNDS},
+    SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in (*SPEAKER_MIXER_SOUNDS, "StopStimulusSounds")},
     READY_GATE: {"ReadyStages": "rx:ReplaySubject", "HarpClockSet": "rx:AsyncSubject", "Ready": "rx:AsyncSubject"},
     LICK_SPOUT_STAGE: {"LickSpoutStage.Commands": "rx:BehaviorSubject","LickSpoutStage.Homed": "rx:BehaviorSubject",
                        "StepperDriver-A.Commands": "rx:BehaviorSubject", "StepperDriver-B.Commands": "rx:BehaviorSubject"},
