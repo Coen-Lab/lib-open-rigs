@@ -41,20 +41,33 @@ namespace OpenRigs.Devices.Tests
         // Rewards and both RewardValve pieces with no board: each loads its line and calibration and runs; a reward
         // asked of a valve fires its calibrated pulse into its board's TriggerCalibratedPulse (2 ul is 38 ms on the
         // fixture's curve); one asked of a valve no piece fires, or a valve with no calibration, stops the workflow.
-        static List<string> RunValves(string valve, Func<string, string> editRig = null)
+        // echo: the board answers the pulse's writes 10 ms later on its Data, as a live board does; without, as at a stop
+        // that ended the board's path, nothing answers.
+        static List<string> RunValves(string valve, Func<string, string> editRig = null, bool echo = true)
         {
             return Run("RewardValves.bonsai", editRig, edit: xml => xml.Replace("VALVE", valve)
-                .Replace("SEND_AFTER", valve == null ? "PT1H" : "PT0.5S"));
+                .Replace("SEND_AFTER", valve == null ? "PT1H" : "PT0.5S")
+                .Replace("ECHO_INTO", echo ? "BehaviorBoard-Main.Data" : "Silent.Data"));
         }
 
         [TestMethod]
         public void RewardValvesLoadTheirLines() { Assert.AreEqual("", string.Join(" || ", RunValves(null))); }
 
+        // The pulse goes out, and RewardDelivered comes once the board has answered the write that opens the valve.
         [TestMethod]
-        public void ARewardFiresItsValvesCalibratedPulse()
+        public void ARewardFiresItsValvesCalibratedPulseAndIsDeliveredOnTheBoardsAnswer()
         {
-            StringAssert.StartsWith(string.Join(" || ", RunValves("left")), "InvalidOperationException: fired DO1 38");
-            StringAssert.StartsWith(string.Join(" || ", RunValves("Right")), "InvalidOperationException: fired DO2 38");
+            StringAssert.StartsWith(string.Join(" || ", RunValves("left")), "InvalidOperationException: delivered DO1 2");
+            StringAssert.StartsWith(string.Join(" || ", RunValves("Right")), "InvalidOperationException: delivered DO2 2");
+        }
+
+        // F12: a stop at the outcome let the valve plan the reward while the board's path was
+        // gone, and the plan alone was RewardDelivered, so the row said rewarded with no valve write. With no answer from
+        // the board the pulse is sent and no RewardDelivered comes.
+        [TestMethod]
+        public void ARewardTheBoardNeverAnswersIsNotDelivered()
+        {
+            StringAssert.StartsWith(string.Join(" || ", RunValves("left", echo: false)), "InvalidOperationException: fired DO1 38");
         }
 
         [TestMethod]

@@ -23,6 +23,7 @@ def include(path: str, inner: str = "") -> str:
 def valve(instance: str, board: str = "BehaviorBoard-Main") -> str:
     """A RewardValve piece, as a task includes one per valve after Rewards."""
     return include(lint.REWARD_VALVE, f"<Name>RewardValve-{instance}</Name><Board>{board}</Board>"
+                   f"<BoardDataSubjectName>{board}.Data</BoardDataSubjectName>"
                    f"<BoardTriggerCalibratedPulseSubjectName>{board}.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>")
 
 
@@ -991,9 +992,9 @@ def test_rewards_checks_each_request_against_the_valves_and_logs_each_delivery()
 def test_a_reward_valve_is_a_piece_named_by_its_valve_on_its_board(tmp_path):
     wf = workflow(tmp_path, MIXED + include(lint.REWARDS) + VALVES)
     assert lint.hardware_problems(wf) == [] and lint.reward_problems(wf) == []
-    wrong = (include(lint.REWARD_VALVE, "<Name>Valve-Left</Name><Board>BehaviorBoard-Main</Board>"
+    wrong = (include(lint.REWARD_VALVE, "<Name>Valve-Left</Name><Board>BehaviorBoard-Main</Board><BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>"
                      "<BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>")
-             + include(lint.REWARD_VALVE, "<Name>RewardValve-Right</Name><Board>BehaviorBoard-Second</Board>"
+             + include(lint.REWARD_VALVE, "<Name>RewardValve-Right</Name><Board>BehaviorBoard-Second</Board><BoardDataSubjectName>BehaviorBoard-Second.Data</BoardDataSubjectName>"
                        "<BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>"))
     assert lint.hardware_problems(workflow(tmp_path / "b", MIXED + include(lint.REWARDS) + wrong)) == [
         "RewardValve Valve-Left is not named RewardValve-<Instance>",

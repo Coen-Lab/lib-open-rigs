@@ -1,4 +1,5 @@
 using Bonsai;
+using Bonsai.Harp;
 using OpenRigs.Core;
 using System;
 using System.Collections.Generic;
@@ -72,6 +73,53 @@ namespace OpenRigs.Devices
                     return request;
                 });
                 return announced.Merge(checkedRequests);
+            });
+        }
+    }
+
+    /// <summary>
+    /// Each reward plan once its board has answered the write that opens its valve: the board's Write reply to OutputSet
+    /// with the plan's line set, for the first of the plan's pulses. The plan alone is not a delivery: a stop at the
+    /// outcome can leave the valve's chain planning while the board's path is already gone (F12), and then no answer
+    /// comes and neither does the plan. Plans are answered in order; a plan of no pulses opens nothing and never comes.
+    /// The board answers over its serial link, after the plan has reached this operator.
+    /// </summary>
+    [Combinator]
+    [Description("Each reward plan (RewardDelivered's), passed on when its board's messages (second input, Board.Data) carry the Write reply to OutputSet with its line set: the valve opened. A plan the board never answers, as at a stop, never comes.")]
+    [WorkflowElementCategory(ElementCategory.Combinator)]
+    public class RewardsFired
+    {
+        /// <summary>The plans of <paramref name="source"/>, each as the board answers its first pulse.</summary>
+        public IObservable<RewardPlan> Process(IObservable<RewardPlan> source, IObservable<HarpMessage> board)
+        {
+            return Observable.Create<RewardPlan>(observer =>
+            {
+                var gate = new object();
+                var waiting = new Queue<RewardPlan>();
+                var answered = 0;  // the head plan's pulses the board has answered
+                var sourceDone = false;
+                Action completeWhenIdle = () => { if (sourceDone && waiting.Count == 0) observer.OnCompleted(); };
+                var answers = board.Subscribe(message =>
+                {
+                    lock (gate)
+                    {
+                        if (waiting.Count == 0 || message.Address != PulseLines.OutputSet || message.MessageType != MessageType.Write || message.Error) return;
+                        var plan = waiting.Peek();
+                        if ((message.GetPayloadUInt16() & PulseLines.Mask(plan.Line)) == 0) return;
+                        if (answered++ == 0) observer.OnNext(plan);
+                        if (answered >= plan.Pulses)
+                        {
+                            waiting.Dequeue();
+                            answered = 0;
+                            completeWhenIdle();
+                        }
+                    }
+                }, error => { lock (gate) observer.OnError(error); });
+                var plans = source.Subscribe(plan =>
+                {
+                    lock (gate) if (plan != null && plan.Pulses > 0) waiting.Enqueue(plan);
+                }, error => { lock (gate) observer.OnError(error); }, () => { lock (gate) { sourceDone = true; completeWhenIdle(); } });
+                return new System.Reactive.Disposables.CompositeDisposable(plans, answers);
             });
         }
     }

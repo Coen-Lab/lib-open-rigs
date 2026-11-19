@@ -81,7 +81,7 @@ PIECES = {
     CLOCK_FROM_BOARD: ("Board", "Board.Commands", "Board.Data"),
     BOARD: ("Name", "Name.Commands", "Name.Data"),
     PULSE_OUTPUTS: ("Board", "Board.Commands", "Board.Data", "Board.TriggerCalibratedPulse"),
-    REWARD_VALVE: ("Name", "Board", "Board.TriggerCalibratedPulse"),
+    REWARD_VALVE: ("Name", "Board", "Board.Data", "Board.TriggerCalibratedPulse"),
     DEVICES + "ZapitTriggerLine.bonsai": ("Board",),
     RUNNING_WHEEL: ("Board", "Board.Commands", "Board.Data"),
     LICKETY_SPLIT: ("Name", "Name.Commands", "Name.Data"),

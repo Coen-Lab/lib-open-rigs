@@ -6,10 +6,11 @@
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:ctl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Rewards and a RewardValve piece per valve in Pieces\rig.yml (left, right) with no board: a 1 kHz Timestamp, and BehaviorBoard-Main.TriggerCalibratedPulse declared here, each pulse sent into it stopping the workflow as "fired line width". At SEND_AFTER a reward of 2 ul is asked of VALVE. PiecesSubscribeTests writes the valves' calibrations and sets ConfigRoot; PathPrefix never comes, so nothing is logged.</Description>
+  <Description>Rewards and a RewardValve piece per valve in Pieces\rig.yml (left, right) with no board: a 1 kHz Timestamp, and BehaviorBoard-Main.TriggerCalibratedPulse declared here, each pulse sent into it stopping the workflow 0.3 s later as "fired line width"; its writes are echoed 10 ms later into ECHO_INTO (BehaviorBoard-Main.Data, as a board answers, or Silent.Data, as at a stop that ended the board), and a RewardDelivered stops the workflow as "delivered line microlitres". At SEND_AFTER a reward of 2 ul is asked of VALVE. PiecesSubscribeTests writes the valves' calibrations and sets ConfigRoot; PathPrefix never comes, so nothing is logged.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
@@ -39,15 +40,20 @@
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Tuple(sys:String,sys:Int32)">
         <rx:Name>BehaviorBoard-Main.TriggerCalibratedPulse</rx:Name>
       </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>BehaviorBoard-Main.Data</rx:Name>
+      </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:Rewards.bonsai" />
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RewardValve.bonsai">
         <Name>RewardValve-Left</Name>
         <Board>BehaviorBoard-Main</Board>
+        <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:RewardValve.bonsai">
         <Name>RewardValve-Right</Name>
         <Board>BehaviorBoard-Main</Board>
+        <BoardDataSubjectName>BehaviorBoard-Main.Data</BoardDataSubjectName>
         <BoardTriggerCalibratedPulseSubjectName>BehaviorBoard-Main.TriggerCalibratedPulse</BoardTriggerCalibratedPulseSubjectName>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
@@ -55,6 +61,11 @@
       </Expression>
       <Expression xsi:type="scr:ExpressionTransform">
         <scr:Expression>"fired " + Item1 + " " + Item2.ToString()</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Delay">
+          <rx:DueTime>PT0.3S</rx:DueTime>
+        </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="core:ThrowError" />
@@ -81,16 +92,48 @@
       <Expression xsi:type="MulticastSubject">
         <Name>RewardRequests</Name>
       </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>Silent.Data</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main.TriggerCalibratedPulse</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:CalibratedPulseWrites" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Delay">
+          <rx:DueTime>PT0.01S</rx:DueTime>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ECHO_INTO</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardDelivered</Name>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>"delivered " + Line + " " + RequestedUl.ToString()</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:ThrowError" />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="4" To="5" Label="Source1" />
       <Edge From="5" To="6" Label="Source1" />
-      <Edge From="11" To="12" Label="Source1" />
       <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
       <Edge From="14" To="15" Label="Source1" />
-      <Edge From="15" To="17" Label="Source1" />
-      <Edge From="16" To="17" Label="Source2" />
-      <Edge From="17" To="18" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="17" To="19" Label="Source1" />
+      <Edge From="18" To="19" Label="Source2" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="22" To="23" Label="Source1" />
+      <Edge From="23" To="24" Label="Source1" />
+      <Edge From="24" To="25" Label="Source1" />
+      <Edge From="26" To="27" Label="Source1" />
+      <Edge From="27" To="28" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

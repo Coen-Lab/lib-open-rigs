@@ -238,6 +238,15 @@ def test_a_timeout_on_an_unpenalised_trial_is_named(tmp_path):
     assert len(text.splitlines()) == 2  # and the next interval, timed from that timeout; a mute penalty asks nothing of the log
 
 
+def test_a_reward_answered_by_the_board_after_the_outcome_is_at_it(tmp_path):
+    # RewardDelivered is the board's answer to the valve's write, 2 to 26 ms after the outcome on a rig (F12)
+    trials = _chain(2)
+    rewards = [(t["outcomeTime"] + 0.026, 2.0, "left DO1 requested=2 pulses=3") for t in trials if t["outcome"] == "correct"]
+    assert summarise(_experiment(tmp_path, trials, rewards)).problems == []
+    late = [(t + 0.2, *rest) for t, *rest in rewards]
+    assert any("no RewardDelivered at its outcome" in p for p in summarise(_experiment(tmp_path / "late", trials, late)).problems)
+
+
 def test_a_reward_is_checked_both_ways_and_by_its_request(tmp_path):
     # rewarded is the value the reward command came from: a rewarded trial has its RewardDelivered at its outcome,
     # requesting rewardOfferedUl; a trial not rewarded has none there.

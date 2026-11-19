@@ -41,9 +41,13 @@ namespace OpenRigs.Trials.Tests
     {
         public bool Present { get; set; }
 
+        /// <summary>When the board answers the valve's write after the request, as RewardDelivered comes on a rig.</summary>
+        public int AnswerAfterMs { get; set; }
+
         public IObservable<OpenRigs.Core.RewardPlan> Process(IObservable<Tuple<string, double>> source)
         {
-            return source.Where(_ => Present).Select(r => new OpenRigs.Core.RewardPlan { RewardLine = new OpenRigs.Core.RewardLine { Instance = r.Item1 }, RequestedUl = r.Item2 });
+            return source.Where(_ => Present).SelectMany(r => Observable.Return(new OpenRigs.Core.RewardPlan { RewardLine = new OpenRigs.Core.RewardLine { Instance = r.Item1 }, RequestedUl = r.Item2 })
+                .Delay(TimeSpan.FromMilliseconds(AnswerAfterMs)));
         }
     }
 
@@ -245,31 +249,44 @@ namespace OpenRigs.Trials.Tests
             return result.Item1;
         }
 
-        static List<string> RunEffects(bool valve)
+        static List<string> RunEffects(bool valve, int answerAfterMs = 10)
         {
             var rig = Rig();
-            var outputs = Run("TrialOutcomeEffects.bonsai", 2, xml => xml.Replace("RIG_FILE", SecurityElement.Escape(rig)).Replace("VALVE_PRESENT", valve ? "true" : "false"));
+            var outputs = Run("TrialOutcomeEffects.bonsai", 2, xml => xml.Replace("RIG_FILE", SecurityElement.Escape(rig)).Replace("VALVE_PRESENT", valve ? "true" : "false")
+                .Replace("ANSWER_MS", answerAfterMs.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             Directory.Delete(Path.GetDirectoryName(rig), true);
             return outputs;
         }
 
-        // Trial 1's reward goes into RewardRequests before its row goes into TrialRow, rewarded since the valve planned it;
-        // trial 2's penalty sound into PenaltySounds (the mixer's four channels); every outcome is passed on.
+        // Trial 1's reward goes into RewardRequests before its row goes into TrialRow; the row waits for the valve's
+        // RewardDelivered, the board's answer 10 ms later, and is rewarded; trial 2's penalty sound into PenaltySounds (the
+        // mixer's four channels); every outcome is passed on.
         [TestMethod]
         public void TrialOutcomeEffectsSendsTheRewardThenTheRowAndThePenaltySoundAndPassesTheOutcomeOn()
         {
             var outputs = RunEffects(true);
             CollectionAssert.AreEquivalent(new[] { "reward Left 2.5", "row 1 rewarded", "out 1", "row 2", "penalty 4", "out 2", "row 3", "out 3" }, outputs, string.Join(", ", outputs));
             Assert.IsTrue(outputs.IndexOf("reward Left 2.5") < outputs.IndexOf("row 1 rewarded"), "The row went before the reward: " + string.Join(", ", outputs));
+            Assert.IsTrue(outputs.IndexOf("row 1 rewarded") < outputs.IndexOf("row 2"), "The rows went out of order: " + string.Join(", ", outputs));
             Assert.IsTrue(outputs.IndexOf("penalty 4") > outputs.IndexOf("row 2"), "The penalty sound played before trial 2: " + string.Join(", ", outputs));
         }
 
-        // F12: a rewarded outcome whose valve planned nothing (the stop ended the valve's path) logs rewarded false.
+        // F12: a rewarded outcome no valve planned logs rewarded false.
         [TestMethod]
         public void TrialOutcomeEffectsLogsARewardNoValvePlannedAsNotRewarded()
         {
             var outputs = RunEffects(false);
             CollectionAssert.AreEquivalent(new[] { "reward Left 2.5", "row 1", "out 1", "row 2", "penalty 4", "out 2", "row 3", "out 3" }, outputs, string.Join(", ", outputs));
+        }
+
+        // F12: the valve planned the reward but the board never answered (a stop at the outcome) before the next outcome:
+        // the row goes out then, not rewarded.
+        [TestMethod]
+        public void TrialOutcomeEffectsLogsARewardTheBoardNeverAnsweredAsNotRewarded()
+        {
+            var outputs = RunEffects(true, 60000);
+            CollectionAssert.AreEquivalent(new[] { "reward Left 2.5", "row 1", "out 1", "row 2", "penalty 4", "out 2", "row 3", "out 3" }, outputs, string.Join(", ", outputs));
+            Assert.IsTrue(outputs.IndexOf("row 1") < outputs.IndexOf("row 2"), "The rows went out of order: " + string.Join(", ", outputs));
         }
 
         static List<string> RunZapit(string stop, bool hardwareTriggered, double laserCapSeconds, double outcomeAt)

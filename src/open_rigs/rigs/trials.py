@@ -21,8 +21,9 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
   within 2 ms;
 - each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds, within 2 ms;
 - each penalised trial (penalised) had the task's penalty.timeoutSeconds as its penaltyTimeoutSeconds, an unpenalised one 0;
-- each rewarded trial (rewarded) has a RewardDelivered row at its outcome requesting its rewardOfferedUl, and no
-  RewardDelivered comes at the outcome of a trial not rewarded.
+- each rewarded trial (rewarded) has a RewardDelivered row at its outcome (from 2 ms before it to REWARD_ANSWER_S after:
+  the row is the board's answer to the valve's write) requesting its rewardOfferedUl, and no RewardDelivered comes at the
+  outcome of a trial not rewarded.
 
 These checks run on finished trials, the rows of WorkflowData_Trials. A run stopped mid-trial has no row for that trial, but
 a task that logs WorkflowData/WorkflowData_StimulusState_*.csv (harpTime, trialNumber, and auditoryLevelDbfs,
@@ -95,9 +96,10 @@ CORE_COLUMNS: List[Column] = [
      "for it (the task file's reward size, or a larger reward where the task has one); 0 on a trial that offers none. "
      "rewarded says whether it was given; what was delivered is RewardDelivered in WorkflowData_Events."),
     ("rewarded", "bool", None,
-     "True when the valve planned the trial's reward (rewardOfferedUl; its RewardDelivered row in WorkflowData_Events, "
-     "at outcomeTime); false on an outcome that earned it when the stop came first. Which outcomes are rewarded is the "
-     "task's (its note)."),
+     "True when the board answered the write that opened the valve for the trial's reward (rewardOfferedUl; its "
+     "RewardDelivered row in WorkflowData_Events, a few ms after outcomeTime); false on an outcome that earned it when the "
+     "board had not answered by the next outcome. A stop before the board answered leaves the trial with no row. Which "
+     "outcomes are rewarded is the task's (its note)."),
     ("penaltyTimeoutSeconds", "double", "s",
      "The timeout after this trial: the task's penalty.timeoutSeconds when the trial was penalised, else 0. The next "
      "interval starts after it (itiStartTime)."),
@@ -170,6 +172,7 @@ BLOCKS: Dict[str, Tuple[str, List[Column]]] = {
 
 TIME_COLUMN = "harpTime"
 TOLERANCE_S = 0.002  # Harp-clock waits land within a tick or two of 1 ms
+REWARD_ANSWER_S = 0.1  # a RewardDelivered row is the board's answer to the valve's write: 2 to 26 ms after the outcome on a rig
 
 
 def shared_columns(blocks: Iterable[str]) -> List[Column]:
@@ -490,7 +493,7 @@ def _summarise(folder: Path) -> Summary:
             if shown:
                 s.interval_seconds.append(onset - _f(last, "outcomeTime"))
         last = row
-        at_outcome = [r for t, r in reward_times if abs(t - end) <= TOLERANCE_S]
+        at_outcome = [r for t, r in reward_times if end - TOLERANCE_S <= t <= end + REWARD_ANSWER_S]
         offered = _f(row, "rewardOfferedUl")
         if _rewarded(row):
             s.requested_ul += offered
