@@ -215,8 +215,8 @@ GO_NO_GO = ("go", "noGo", "noReward")  # a go/no-go task's targets: one spout by
 
 
 def _auto(r: Dict[str, Any]) -> bool:
-    """Whether the auto-reward answered a trial row, with no response of the mouse's own: outcome auto, or in a log from
-    before that outcome, autoReward and rewarded with no choice made (choice noResponse) or, with no choice column, correct."""
+    """Whether the auto-reward answered a trial row: outcome auto, or in a log from before that outcome, autoReward and
+    rewarded with no choice made (choice noResponse) or, with no choice column, correct."""
     if r.get("outcome") == "auto":
         return True
     if not (_true(r.get("autoReward", False)) and _true(r.get("rewarded", False))):
@@ -231,19 +231,21 @@ def _responded(r: Dict[str, Any]) -> bool:
     return str(r.get("outcome") or "noResponse") != "noResponse"
 
 
-def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
+def performance(rows: Iterable[Dict[str, Any]], licks: Optional[Dict[int, bool]] = None) -> Tuple[float, float]:
     """Performance and the response rate of trial rows (text or typed cells), each NaN with no trial to count.
 
     Performance is correct / (correct + incorrect) over the trials not offered a single spout as a guide (singleSpoutOffered
     False, as where the task does not record it) and every go/no-go trial (target go or noGo; one spout by design), a go
     trial with no lick (noResponse) counted incorrect. The response rate is the share of trials the mouse responded to: in
-    a go/no-go task (a target go, noGo or noReward) the go trials, else the trials not probe, in either leaving out the
-    trials the auto-reward answered (outcome auto, or in an older log autoReward and rewarded with no choice made, or
-    correct with no choice column: a trial the drift carried into the reward zone), of those the ones responded to: where
-    the row has a choice, any choice but noResponse (a withheld noGo is none; an auto-reward trial where the mouse chose a
-    side is one); with no choice column, an outcome not noResponse. A probe (no right answer) and an auto trial count in
-    neither, though rewarded and penalised say what they got."""
+    a go/no-go task (a target go, noGo or noReward) the go trials, else the trials not probe, of those the ones responded to:
+    where the row has a choice, any choice but noResponse (a withheld noGo is none; an auto-reward trial where the mouse
+    chose a side is one); with no choice column, an outcome not noResponse. A trial the auto-reward answered (outcome auto,
+    or in an older log autoReward and rewarded with no choice made, or correct with no choice column: a trial the drift
+    carried into the reward zone) is responded to when the mouse licked in it, between its stimulus onset and its end
+    (licks, by trialNumber), and not when it did not; where its licks are unknown it is left out. A probe (no right
+    answer) counts in neither, though rewarded and penalised say what it got."""
     rows = list(rows)
+    licks = licks or {}
     go_no_go = any(str(r.get("target")) in GO_NO_GO for r in rows)
     correct = counted = 0
     for r in rows:
@@ -252,9 +254,27 @@ def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
         if (not _true(r.get("singleSpoutOffered", False)) or target in ("go", "noGo")) and (outcome in ("correct", "incorrect") or go_miss):
             counted += 1
             correct += outcome == "correct"
-    asked = [r for r in rows if (str(r.get("target")) == "go" if go_no_go else r["outcome"] != "probe") and not _auto(r)]
-    answered = sum(map(_responded, asked))
-    return (correct / counted if counted else float("nan"), answered / len(asked) if asked else float("nan"))
+    answered = asked = 0
+    for r in rows:
+        if not (str(r.get("target")) == "go" if go_no_go else r["outcome"] != "probe"):
+            continue
+        if _auto(r):
+            number = _trial_number(r)
+            licked = licks.get(number) if number is not None else None
+            if licked is None:
+                continue  # licks unknown: left out
+            answered += bool(licked)
+        else:
+            answered += _responded(r)
+        asked += 1
+    return (correct / counted if counted else float("nan"), answered / asked if asked else float("nan"))
+
+
+def _trial_number(r: Dict[str, Any]) -> Optional[int]:
+    try:
+        return int(float(str(r.get("trialNumber"))))
+    except (TypeError, ValueError):
+        return None
 
 
 @dataclass
@@ -406,6 +426,7 @@ def _summarise(folder: Path) -> Summary:
     if missing:
         return Summary(folder.name, run_outcome, len(trials), 0, float("nan"), problems=missing)
     correct = sum(r["outcome"] == "correct" for r in trials)
+    # It reads no lick data (licks are in the lick detectors' logs), so an auto trial's licks are unknown: left out.
     s = Summary(folder.name, run_outcome, len(trials), correct, *performance(trials))
     task = _task(folder)
     if trials and task is None:

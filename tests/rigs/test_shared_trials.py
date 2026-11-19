@@ -333,6 +333,21 @@ def test_outcome_auto_is_left_out_of_the_response_rate_and_performance():
     assert trials_module.performance(gng)[1] == 1.0
 
 
+def test_an_auto_trial_is_responded_when_the_mouse_licked_and_left_out_when_its_licks_are_unknown():
+    rows = [{"trialNumber": "1", "outcome": "auto", "autoReward": "True", "rewarded": "True"},
+            {"trialNumber": "2", "outcome": "auto", "autoReward": "True", "rewarded": "True"},
+            {"trialNumber": "3", "outcome": "correct", "autoReward": "True", "rewarded": "True"},  # old log: auto
+            {"trialNumber": "4", "outcome": "noResponse"}]
+    assert trials_module.performance(rows)[1] == 0.0  # licks unknown: the three auto trials left out
+    assert trials_module.performance(rows, {1: True, 2: False})[1] == 1 / 3  # 1 licked, 2 did not, 3 unknown
+    assert trials_module.performance(rows, {1: True, 2: True, 3: True})[1] == 3 / 4
+    # go/no-go: an auto go trial with a lick counts; a noGo trial is never asked
+    gng = [{"trialNumber": 1, "target": "go", "outcome": "auto", "choice": "noResponse", "autoReward": True, "rewarded": True},
+           {"trialNumber": 2, "target": "noGo", "outcome": "correct", "choice": "noResponse"}]
+    assert trials_module.performance(gng, {1: True, 2: True})[1] == 1.0
+    assert trials_module.performance(gng, {1: False})[1] == 0.0
+
+
 def test_with_a_choice_column_the_response_is_the_choice():
     def rate(*rows):
         return trials_module.performance(list(rows))[1]
