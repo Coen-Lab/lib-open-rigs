@@ -58,15 +58,28 @@ timestampGeneratorGen3:
     usbSerial: CHANGE-ME
     timerFrequency: Timer1000Hz
 
-# The lick spout stage's two Harp StepperDriver boards (OpenRigs.Devices LickSpoutStage): board a drives the base
-# transverse, left radial and right radial axes, board b the left and right elevations.
+# The lick spout stage's two Harp StepperDriver boards (OpenRigs.Devices LickSpoutStage). Its five axes are the motors
+# wired BaseTransverse, Radial and Elevation (with their side), each homed on the input of the same number. maxSteps
+# is how far a motor may go from home: the board moves it no further. A spare motor may drive anything else.
 stepperDriver:
   a:
     portName: COM3
     usbSerial: CHANGE-ME
+    wiring:
+      Motor0: { device: BaseTransverse }
+      Motor1: { device: Radial, side: left }
+      Motor2: { device: Radial, side: right }
+      Input0: { device: BaseTransverseHome }
+      Input1: { device: RadialHome, side: left }
+      Input2: { device: RadialHome, side: right }
   b:
     portName: COM4
     usbSerial: CHANGE-ME
+    wiring:
+      Motor0: { device: Elevation, side: left }
+      Motor1: { device: Elevation, side: right }
+      Input0: { device: ElevationHome, side: left }
+      Input1: { device: ElevationHome, side: right }
 
 # Leave channel0TriggerThreshold and channel0UntriggerThreshold out to keep the board's own thresholds. Set them
 # only from a measurement (a reading at rest and one during a touch): the trigger between them, the untrigger below

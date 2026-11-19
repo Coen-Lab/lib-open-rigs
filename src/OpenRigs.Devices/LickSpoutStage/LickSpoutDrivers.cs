@@ -10,56 +10,68 @@ using System.Reactive.Linq;
 
 namespace OpenRigs.Devices
 {
-    /// <summary>The lick spout stage's two Harp StepperDriver boards.</summary>
+    /// <summary>The lick spout stage's two Harp StepperDriver boards, rig.yml's stepperDriver entries a and b; which axis each motor drives is their wiring (<see cref="LickSpoutWiring"/>).</summary>
     public enum LickSpoutDriver
     {
-        /// <summary>StepperDriver-A: Motor0 base transverse, Motor1 left radial, Motor2 right radial.</summary>
+        /// <summary>StepperDriver-A, rig.yml's stepperDriver entry a.</summary>
         A,
-        /// <summary>StepperDriver-B: Motor0 left elevation, Motor1 right elevation.</summary>
+        /// <summary>StepperDriver-B, rig.yml's stepperDriver entry b.</summary>
         B
     }
 
-    /// <summary>The stage's fixed wiring and the messages that set up and move its drivers.</summary>
+    /// <summary>The messages that set up and move the stage's drivers, by their wiring.</summary>
     public static class LickSpoutDrivers
     {
-        /// <summary>The motors each driver uses.</summary>
-        public static int MotorCount(LickSpoutDriver driver)
+        /// <summary>
+        /// The setup a driver needs once it is open: interlock open, its axes' motors, their encoders
+        /// (Motor0-2 have one; Motor3 none) and their home switches enabled, 0.5 A, 1/8 steps, and each
+        /// motor's limit cleared until it is homed (the driver keeps a limit while powered, and a limit
+        /// from a run before would stop the homing).
+        /// </summary>
+        public static IList<HarpMessage> Setup(LickSpoutDriver driver, LickSpoutWiring wiring)
         {
-            return driver == LickSpoutDriver.A ? 3 : 2;
-        }
-
-        /// <summary>The setup each driver needs once it is open: interlock open, motors and their home switches enabled, 0.5 A, 1/8 steps.</summary>
-        public static IList<HarpMessage> Setup(LickSpoutDriver driver)
-        {
-            var motors = MotorCount(driver);
-            var all = string.Join(", ", Enumerable.Range(0, motors).Select(m => "{0}" + m));
+            var motors = wiring.On(driver).Select(pair => pair.Value.Motor).OrderBy(m => m).ToList();
+            var all = string.Join(", ", motors.Select(m => "{0}" + m));
+            var encoders = string.Join(", ", motors.Where(m => m < 3).Select(m => "Encoder" + m));
             var messages = new List<HarpMessage>
             {
                 Named("InterlockEnabled", "Open"),
-                Named("EnableDriver", string.Format(all, "Motor")),
-                Named("EnableEncoders", string.Format(all, "Encoder")),
-                Named("ResetEncoders", string.Format(all, "Encoder")),
+                Named("EnableDriver", string.Format(all, "Motor"))
+            };
+            if (encoders.Length > 0)
+            {
+                messages.Add(Named("EnableEncoders", encoders));
+                messages.Add(Named("ResetEncoders", encoders));
+            }
+            messages.AddRange(new[]
+            {
                 Named("EncoderMode", "Position"),
                 Named("EncoderSamplingRate", "Rate100Hz"),
                 Named("AccumulatedStepsSamplingRate", "Rate100Hz"),
                 Named("EnableDigitalInputs", string.Format(all, "Input"))
-            };
-            for (var motor = 0; motor < motors; motor++)
+            });
+            foreach (var motor in motors)
             {
                 messages.Add(Motor(motor, typeof(Motor0MaximumRunCurrent), 0.5f));
                 messages.Add(Named("Motor" + motor + "MicrostepResolution", "Microstep8"));
                 messages.Add(Motor(motor, typeof(Motor0StepInterval), 280));
                 messages.Add(Named("Input" + motor + "OpMode", "StopMotor" + motor + "OnFalling"));
+                messages.Add(Motor(motor, typeof(Motor0MaxPosition), 0));
             }
             return messages;
         }
 
-        /// <summary>The absolute moves that take one driver's motors to <paramref name="target"/>.</summary>
-        public static IList<HarpMessage> Move(LickSpoutDriver driver, SpoutPositions target)
+        /// <summary>The absolute moves that take one driver's axes to <paramref name="target"/>.</summary>
+        public static IList<HarpMessage> Move(LickSpoutDriver driver, LickSpoutWiring wiring, SpoutPositions target)
         {
             var steps = target.ToArray();
-            var mine = driver == LickSpoutDriver.A ? steps.Take(3) : steps.Skip(3);
-            return mine.Select((value, motor) => Motor(motor, typeof(Motor0MoveAbsolute), value)).ToList();
+            return wiring.On(driver).Select(pair => Motor(pair.Value.Motor, typeof(Motor0MoveAbsolute), steps[pair.Key])).ToList();
+        }
+
+        /// <summary>Sets one motor's limit: the driver moves it no further than <paramref name="maxSteps"/> from home.</summary>
+        public static HarpMessage SetMaxSteps(int motor, int maxSteps)
+        {
+            return Motor(motor, typeof(Motor0MaxPosition), maxSteps);
         }
 
         /// <summary>A relative move of one motor.</summary>
@@ -111,7 +123,7 @@ namespace OpenRigs.Devices
     /// Sets up one lick spout driver once it is open: outputs the setup messages for its commands and completes.
     /// </summary>
     [Combinator]
-    [Description("Outputs one lick spout driver's setup messages for its commands when the first input arrives, then completes.")]
+    [Description("Outputs one lick spout driver's setup messages for its commands when the first input arrives, then completes. Its motors are the ones RigFile's wiring gives the stage's axes.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class SetUpLickSpoutDriver
     {
@@ -119,16 +131,20 @@ namespace OpenRigs.Devices
         [Description("The driver to set up.")]
         public LickSpoutDriver Driver { get; set; }
 
+        /// <summary>Gets or sets the path of rig.yml, whose stepperDriver wiring names each axis's motor.</summary>
+        [Description("The path of rig.yml, whose stepperDriver wiring names each axis's motor.")]
+        public string RigFile { get; set; }
+
         /// <summary>Outputs the setup when the first input arrives.</summary>
         public IObservable<HarpMessage> Process<TSource>(IObservable<TSource> source)
         {
-            return source.Take(1).SelectMany(_ => LickSpoutDrivers.Setup(Driver));
+            return source.Take(1).SelectMany(_ => LickSpoutDrivers.Setup(Driver, LickSpoutWiring.FromRigFile(RigFile)));
         }
     }
 
     /// <summary>Turns each stage target into the absolute moves of one driver's motors.</summary>
     [Combinator]
-    [Description("Turns each stage target into one driver's absolute moves.")]
+    [Description("Turns each stage target into one driver's absolute moves, for the axes RigFile's wiring puts on it.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class MoveLickSpoutDriver
     {
@@ -136,50 +152,65 @@ namespace OpenRigs.Devices
         [Description("The driver whose motors to move.")]
         public LickSpoutDriver Driver { get; set; }
 
+        /// <summary>Gets or sets the path of rig.yml, whose stepperDriver wiring names each axis's motor.</summary>
+        [Description("The path of rig.yml, whose stepperDriver wiring names each axis's motor.")]
+        public string RigFile { get; set; }
+
         /// <summary>Outputs the moves for each target.</summary>
         public IObservable<HarpMessage> Process(IObservable<SpoutPositions> source)
         {
-            return source.SelectMany(target => LickSpoutDrivers.Move(Driver, target));
+            return Observable.Defer(() =>
+            {
+                var wiring = LickSpoutWiring.FromRigFile(RigFile);
+                return source.SelectMany(target => LickSpoutDrivers.Move(Driver, wiring, target));
+            });
         }
     }
 
     /// <summary>
-    /// Homes one motor of a lick spout driver. The input is the driver's events; the output is the
-    /// commands to send it. It reads the motor's home switch; if the motor is on it, steps away 1000
-    /// at a time until it is off; then drives towards it (the driver stops the motor as the switch
-    /// closes), sets the step count to 0 and completes. Stops the workflow if this takes longer
-    /// than <see cref="TimeoutSeconds"/>.
+    /// Homes the motors of a lick spout driver that RigFile's wiring gives the stage's axes, all at
+    /// once. The input is the driver's events; the output is the commands to send it. For each motor
+    /// it reads the home switch; if the motor is on it, steps away 1000 at a time until it is off;
+    /// then drives towards it (the driver stops the motor as the switch closes), sets the step count
+    /// to 0 and, where the wiring gives the motor a maxSteps, sets the driver's limit for it.
+    /// Completes once every motor is homed; stops the workflow if one takes longer than
+    /// <see cref="TimeoutSeconds"/>.
     /// </summary>
     [Combinator]
-    [Description("Homes one motor: the input is its driver's events, the output the commands to send it. Steps off the home switch if on it, drives back until the switch stops it, sets the step count to 0 and completes. Stops the workflow if it takes longer than TimeoutSeconds.")]
+    [Description("Homes the driver's axis motors at once: the input is its events, the output the commands to send it. Each steps off its home switch if on it, drives back until the switch stops it, sets its step count to 0 and its limit to its wiring's maxSteps, if any. Completes once all are homed; stops the workflow if one takes longer than TimeoutSeconds.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
-    public class HomeLickSpoutMotor
+    public class HomeLickSpoutDriver
     {
         const int StepOff = 1000;
         const int DriveHome = -100000;
         static readonly TimeSpan StepOffInterval = TimeSpan.FromSeconds(0.3);
         static readonly TimeSpan SettleTime = TimeSpan.FromSeconds(0.2);
 
-        /// <summary>Gets or sets the driver, for the error message.</summary>
-        [Description("The driver, for the error message.")]
+        /// <summary>Gets or sets the driver.</summary>
+        [Description("The driver whose axis motors to home.")]
         public LickSpoutDriver Driver { get; set; }
 
-        /// <summary>Gets or sets the motor, 0 to 2.</summary>
-        [Description("The motor to home, 0 to 2.")]
-        public int Motor { get; set; }
+        /// <summary>Gets or sets the path of rig.yml, whose stepperDriver wiring names each axis's motor and its limit.</summary>
+        [Description("The path of rig.yml, whose stepperDriver wiring names each axis's motor and its limit.")]
+        public string RigFile { get; set; }
 
         /// <summary>Gets or sets how long homing may take, in seconds.</summary>
         [Description("How long homing may take, in seconds.")]
         public double TimeoutSeconds { get; set; } = 60;
 
-        /// <summary>Homes the motor.</summary>
+        /// <summary>Homes the motors.</summary>
         public IObservable<HarpMessage> Process(IObservable<HarpMessage> source)
         {
-            return Home(source, Driver, Motor, TimeSpan.FromSeconds(TimeoutSeconds), DefaultScheduler.Instance);
+            return Observable.Defer(() =>
+            {
+                var motors = LickSpoutWiring.FromRigFile(RigFile).On(Driver).Select(pair => pair.Value).ToList();
+                var timeout = TimeSpan.FromSeconds(TimeoutSeconds);
+                return source.Publish(events => motors.Select(m => Home(events, Driver, m.Motor, m.MaxSteps, timeout, DefaultScheduler.Instance)).Merge());
+            });
         }
 
-        /// <summary>Homes <paramref name="motor"/> from its driver's <paramref name="events"/>, timed on <paramref name="scheduler"/>.</summary>
-        public static IObservable<HarpMessage> Home(IObservable<HarpMessage> events, LickSpoutDriver driver, int motor, TimeSpan timeout, IScheduler scheduler)
+        /// <summary>Homes <paramref name="motor"/> from its driver's <paramref name="events"/>, then sets its limit if it has one, timed on <paramref name="scheduler"/>.</summary>
+        public static IObservable<HarpMessage> Home(IObservable<HarpMessage> events, LickSpoutDriver driver, int motor, int? maxSteps, TimeSpan timeout, IScheduler scheduler)
         {
             var homing = events.Publish(shared =>
             {
@@ -189,9 +220,12 @@ namespace OpenRigs.Devices
                     : Observable.Timer(TimeSpan.Zero, StepOffInterval, scheduler)
                         .Select(_ => LickSpoutDrivers.MoveRelative(motor, StepOff))
                         .TakeUntil(away.Where(isOff => isOff)));
+                var homed = maxSteps.HasValue
+                    ? new[] { LickSpoutDrivers.SetZero(motor), LickSpoutDrivers.SetMaxSteps(motor, maxSteps.Value) }
+                    : new[] { LickSpoutDrivers.SetZero(motor) };
                 var driveHome = Observable.Merge(
                     Observable.Timer(SettleTime, scheduler).Select(_ => LickSpoutDrivers.MoveRelative(motor, DriveHome)),
-                    away.Where(isOff => !isOff).Take(1).Select(_ => LickSpoutDrivers.SetZero(motor)));
+                    away.Where(isOff => !isOff).Take(1).SelectMany(_ => homed));
                 return Observable.Return(LickSpoutDrivers.ReadSwitches()).Concat(stepOff).Concat(driveHome);
             });
             return homing.Timeout(timeout, Observable.Defer(() => Observable.Throw<HarpMessage>(new TimeoutException(string.Format(

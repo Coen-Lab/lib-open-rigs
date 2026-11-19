@@ -1014,6 +1014,114 @@
       "title": "LiveView",
       "type": "object"
     },
+    "MotorLine": {
+      "description": "What one motor output of a Harp StepperDriver drives, and how far it may go.",
+      "properties": {
+        "device": {
+          "description": "What is on the line: one of the wiredDevices in the lab's device dictionary (config\\device-dictionary.json on its share). Nothing checks it against that list.",
+          "examples": [
+            "RewardValve",
+            "CameraTrigger",
+            "Photodiode",
+            "ZapitTrigger"
+          ],
+          "title": "Device",
+          "type": "string"
+        },
+        "side": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Side"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The side it serves, where that matters (a lick spout stage's motor).",
+          "title": "Side"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The device's own name where it is a piece of its own: a reward valve's, its piece RewardValve-<Name> (left: RewardValve-Left), one valve to a name on the rig.",
+          "examples": [
+            "left",
+            "right",
+            "centre"
+          ],
+          "title": "Name"
+        },
+        "targets": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The rig's devices this line drives or reads, by their Kind-Instance names in this rig.yml.",
+          "examples": [
+            [
+              "Camera-Face",
+              "Camera-Pupil",
+              "Camera-Body"
+            ]
+          ],
+          "title": "Targets"
+        },
+        "part": {
+          "default": null,
+          "description": "The physical part, for people; never compared.",
+          "title": "Part",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "default": null,
+          "description": "Anything else about the line (a cable label, a patch panel), for people; never compared.",
+          "title": "Note",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maxSteps": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The farthest the motor may go from its home switch, in steps: the driver moves it no further (its Motor<n>MaxPosition, set each time the motor is homed). Left out, no limit.",
+          "title": "MaxSteps"
+        }
+      },
+      "required": [
+        "device"
+      ],
+      "title": "MotorLine",
+      "type": "object"
+    },
     "Projector": {
       "description": "File-based calibration assets for mesh-mapped projection displays.",
       "properties": {
@@ -1334,30 +1442,30 @@
       "type": "object"
     },
     "SpoutPositions": {
-      "description": "The lick spout stage's five axes, in motor steps from each axis's home switch.",
+      "description": "The lick spout stage's five axes, in motor steps from each axis's home switch. Each axis's motor is\nthe stepperDriver motor whose wiring names it.",
       "properties": {
         "baseTransverse": {
-          "description": "Base transverse axis (StepperDriver-A Motor0), in steps.",
+          "description": "Base transverse axis (the motor wired BaseTransverse), in steps.",
           "title": "BaseTransverse",
           "type": "integer"
         },
         "radialLeft": {
-          "description": "Left spout radial axis (StepperDriver-A Motor1), in steps; more is towards the mouse.",
+          "description": "Left spout radial axis (the motor wired Radial, side left), in steps; more is towards the mouse.",
           "title": "RadialLeft",
           "type": "integer"
         },
         "radialRight": {
-          "description": "Right spout radial axis (StepperDriver-A Motor2), in steps; more is towards the mouse.",
+          "description": "Right spout radial axis (the motor wired Radial, side right), in steps; more is towards the mouse.",
           "title": "RadialRight",
           "type": "integer"
         },
         "elevationLeft": {
-          "description": "Left spout elevation axis (StepperDriver-B Motor0), in steps.",
+          "description": "Left spout elevation axis (the motor wired Elevation, side left), in steps.",
           "title": "ElevationLeft",
           "type": "integer"
         },
         "elevationRight": {
-          "description": "Right spout elevation axis (StepperDriver-B Motor1), in steps.",
+          "description": "Right spout elevation axis (the motor wired Elevation, side right), in steps.",
           "title": "ElevationRight",
           "type": "integer"
         }
@@ -1373,12 +1481,12 @@
       "type": "object"
     },
     "StepperWiring": {
-      "description": "What each motor output and digital input of a Harp StepperDriver is connected to, by the\ndriver's own names: the board stays a board, recorded as itself, and a spare motor can drive\nanything else under its own name. A line left out is unknown.",
+      "description": "What each motor output and digital input of a Harp StepperDriver is connected to, by the\ndriver's own names: the board stays a board, recorded as itself, and a spare motor can drive\nanything else under its own name. A line left out is unknown. A lick spout stage's axis motor\n(BaseTransverse, Radial or Elevation, with its side) has its home switch on the input of the\nsame number (BaseTransverseHome, RadialHome or ElevationHome).",
       "properties": {
         "Motor0": {
           "anyOf": [
             {
-              "$ref": "#/$defs/WiredLine"
+              "$ref": "#/$defs/MotorLine"
             },
             {
               "type": "null"
@@ -1391,7 +1499,7 @@
         "Motor1": {
           "anyOf": [
             {
-              "$ref": "#/$defs/WiredLine"
+              "$ref": "#/$defs/MotorLine"
             },
             {
               "type": "null"
@@ -1404,7 +1512,7 @@
         "Motor2": {
           "anyOf": [
             {
-              "$ref": "#/$defs/WiredLine"
+              "$ref": "#/$defs/MotorLine"
             },
             {
               "type": "null"
@@ -1417,7 +1525,7 @@
         "Motor3": {
           "anyOf": [
             {
-              "$ref": "#/$defs/WiredLine"
+              "$ref": "#/$defs/MotorLine"
             },
             {
               "type": "null"

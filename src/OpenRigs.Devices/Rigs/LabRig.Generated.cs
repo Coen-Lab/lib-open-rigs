@@ -2410,6 +2410,215 @@ namespace OpenRigs.Devices.Rigs
 
 
     /// <summary>
+    /// What one motor output of a Harp StepperDriver drives, and how far it may go.
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
+    [System.ComponentModel.DescriptionAttribute("What one motor output of a Harp StepperDriver drives, and how far it may go.")]
+    [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
+    [Bonsai.CombinatorAttribute(MethodName="Generate")]
+    public partial class MotorLine
+    {
+    
+        private string _device;
+    
+        private Side? _side;
+    
+        private string _name;
+    
+        private System.Collections.Generic.List<string> _targets;
+    
+        private string _part;
+    
+        private string _note;
+    
+        private int? _maxSteps;
+    
+        public MotorLine()
+        {
+        }
+    
+        protected MotorLine(MotorLine other)
+        {
+            _device = other._device;
+            _side = other._side;
+            _name = other._name;
+            _targets = other._targets;
+            _part = other._part;
+            _note = other._note;
+            _maxSteps = other._maxSteps;
+        }
+    
+        /// <summary>
+        /// What is on the line: one of the wiredDevices in the lab's device dictionary (config\device-dictionary.json on its share). Nothing checks it against that list.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("device", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="device")]
+        [System.ComponentModel.DescriptionAttribute("What is on the line: one of the wiredDevices in the lab\'s device dictionary (conf" +
+            "ig\\device-dictionary.json on its share). Nothing checks it against that list.")]
+        public string Device
+        {
+            get
+            {
+                return _device;
+            }
+            set
+            {
+                _device = value;
+            }
+        }
+    
+        /// <summary>
+        /// The side it serves, where that matters (a lick spout stage's motor).
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("side")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="side")]
+        [System.ComponentModel.DescriptionAttribute("The side it serves, where that matters (a lick spout stage\'s motor).")]
+        public Side? Side
+        {
+            get
+            {
+                return _side;
+            }
+            set
+            {
+                _side = value;
+            }
+        }
+    
+        /// <summary>
+        /// The device's own name where it is a piece of its own: a reward valve's, its piece RewardValve-<Name> (left: RewardValve-Left), one valve to a name on the rig.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("name")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="name")]
+        [System.ComponentModel.DescriptionAttribute("The device\'s own name where it is a piece of its own: a reward valve\'s, its piece" +
+            " RewardValve-<Name> (left: RewardValve-Left), one valve to a name on the rig.")]
+        public string Name
+        {
+            get
+            {
+                return _name;
+            }
+            set
+            {
+                _name = value;
+            }
+        }
+    
+        /// <summary>
+        /// The rig's devices this line drives or reads, by their Kind-Instance names in this rig.yml.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("targets")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="targets")]
+        [System.ComponentModel.DescriptionAttribute("The rig\'s devices this line drives or reads, by their Kind-Instance names in this" +
+            " rig.yml.")]
+        public System.Collections.Generic.List<string> Targets
+        {
+            get
+            {
+                return _targets;
+            }
+            set
+            {
+                _targets = value;
+            }
+        }
+    
+        /// <summary>
+        /// The physical part, for people; never compared.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("part")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="part")]
+        [System.ComponentModel.DescriptionAttribute("The physical part, for people; never compared.")]
+        public string Part
+        {
+            get
+            {
+                return _part;
+            }
+            set
+            {
+                _part = value;
+            }
+        }
+    
+        /// <summary>
+        /// Anything else about the line (a cable label, a patch panel), for people; never compared.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("note")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="note")]
+        [System.ComponentModel.DescriptionAttribute("Anything else about the line (a cable label, a patch panel), for people; never co" +
+            "mpared.")]
+        public string Note
+        {
+            get
+            {
+                return _note;
+            }
+            set
+            {
+                _note = value;
+            }
+        }
+    
+        /// <summary>
+        /// The farthest the motor may go from its home switch, in steps: the driver moves it no further (its Motor<n>MaxPosition, set each time the motor is homed). Left out, no limit.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("maxSteps")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="maxSteps")]
+        [System.ComponentModel.DescriptionAttribute("The farthest the motor may go from its home switch, in steps: the driver moves it" +
+            " no further (its Motor<n>MaxPosition, set each time the motor is homed). Left ou" +
+            "t, no limit.")]
+        public int? MaxSteps
+        {
+            get
+            {
+                return _maxSteps;
+            }
+            set
+            {
+                _maxSteps = value;
+            }
+        }
+    
+        public System.IObservable<MotorLine> Generate()
+        {
+            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new MotorLine(this)));
+        }
+    
+        public System.IObservable<MotorLine> Generate<TSource>(System.IObservable<TSource> source)
+        {
+            return System.Reactive.Linq.Observable.Select(source, _ => new MotorLine(this));
+        }
+    
+        protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
+        {
+            stringBuilder.Append("Device = " + _device + ", ");
+            stringBuilder.Append("Side = " + _side + ", ");
+            stringBuilder.Append("Name = " + _name + ", ");
+            stringBuilder.Append("Targets = " + _targets + ", ");
+            stringBuilder.Append("Part = " + _part + ", ");
+            stringBuilder.Append("Note = " + _note + ", ");
+            stringBuilder.Append("MaxSteps = " + _maxSteps);
+            return true;
+        }
+    
+        public override string ToString()
+        {
+            System.Text.StringBuilder stringBuilder = new System.Text.StringBuilder();
+            stringBuilder.Append(GetType().Name);
+            stringBuilder.Append(" { ");
+            if (PrintMembers(stringBuilder))
+            {
+                stringBuilder.Append(" ");
+            }
+            stringBuilder.Append("}");
+            return stringBuilder.ToString();
+        }
+    }
+
+
+    /// <summary>
     /// File-based calibration assets for mesh-mapped projection displays.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
@@ -3412,10 +3621,12 @@ namespace OpenRigs.Devices.Rigs
 
 
     /// <summary>
-    /// The lick spout stage's five axes, in motor steps from each axis's home switch.
+    /// The lick spout stage's five axes, in motor steps from each axis's home switch. Each axis's motor is
+    ///the stepperDriver motor whose wiring names it.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("The lick spout stage\'s five axes, in motor steps from each axis\'s home switch.")]
+    [System.ComponentModel.DescriptionAttribute("The lick spout stage\'s five axes, in motor steps from each axis\'s home switch. Ea" +
+        "ch axis\'s motor is\nthe stepperDriver motor whose wiring names it.")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class SpoutPositions
@@ -3445,11 +3656,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Base transverse axis (StepperDriver-A Motor0), in steps.
+        /// Base transverse axis (the motor wired BaseTransverse), in steps.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("baseTransverse", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="baseTransverse")]
-        [System.ComponentModel.DescriptionAttribute("Base transverse axis (StepperDriver-A Motor0), in steps.")]
+        [System.ComponentModel.DescriptionAttribute("Base transverse axis (the motor wired BaseTransverse), in steps.")]
         public int BaseTransverse
         {
             get
@@ -3463,12 +3674,12 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Left spout radial axis (StepperDriver-A Motor1), in steps; more is towards the mouse.
+        /// Left spout radial axis (the motor wired Radial, side left), in steps; more is towards the mouse.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("radialLeft", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="radialLeft")]
-        [System.ComponentModel.DescriptionAttribute("Left spout radial axis (StepperDriver-A Motor1), in steps; more is towards the mo" +
-            "use.")]
+        [System.ComponentModel.DescriptionAttribute("Left spout radial axis (the motor wired Radial, side left), in steps; more is tow" +
+            "ards the mouse.")]
         public int RadialLeft
         {
             get
@@ -3482,12 +3693,12 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Right spout radial axis (StepperDriver-A Motor2), in steps; more is towards the mouse.
+        /// Right spout radial axis (the motor wired Radial, side right), in steps; more is towards the mouse.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("radialRight", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="radialRight")]
-        [System.ComponentModel.DescriptionAttribute("Right spout radial axis (StepperDriver-A Motor2), in steps; more is towards the m" +
-            "ouse.")]
+        [System.ComponentModel.DescriptionAttribute("Right spout radial axis (the motor wired Radial, side right), in steps; more is t" +
+            "owards the mouse.")]
         public int RadialRight
         {
             get
@@ -3501,11 +3712,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Left spout elevation axis (StepperDriver-B Motor0), in steps.
+        /// Left spout elevation axis (the motor wired Elevation, side left), in steps.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("elevationLeft", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="elevationLeft")]
-        [System.ComponentModel.DescriptionAttribute("Left spout elevation axis (StepperDriver-B Motor0), in steps.")]
+        [System.ComponentModel.DescriptionAttribute("Left spout elevation axis (the motor wired Elevation, side left), in steps.")]
         public int ElevationLeft
         {
             get
@@ -3519,11 +3730,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Right spout elevation axis (StepperDriver-B Motor1), in steps.
+        /// Right spout elevation axis (the motor wired Elevation, side right), in steps.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("elevationRight", Required=Newtonsoft.Json.Required.Always)]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="elevationRight")]
-        [System.ComponentModel.DescriptionAttribute("Right spout elevation axis (StepperDriver-B Motor1), in steps.")]
+        [System.ComponentModel.DescriptionAttribute("Right spout elevation axis (the motor wired Elevation, side right), in steps.")]
         public int ElevationRight
         {
             get
@@ -3574,25 +3785,28 @@ namespace OpenRigs.Devices.Rigs
     /// <summary>
     /// What each motor output and digital input of a Harp StepperDriver is connected to, by the
     ///driver's own names: the board stays a board, recorded as itself, and a spare motor can drive
-    ///anything else under its own name. A line left out is unknown.
+    ///anything else under its own name. A line left out is unknown. A lick spout stage's axis motor
+    ///(BaseTransverse, Radial or Elevation, with its side) has its home switch on the input of the
+    ///same number (BaseTransverseHome, RadialHome or ElevationHome).
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("What each motor output and digital input of a Harp StepperDriver is connected to," +
-        " by the\ndriver\'s own names: the board stays a board, recorded as itself, and a s" +
-        "pare motor can drive\nanything else under its own name. A line left out is unknow" +
-        "n.")]
+    [System.ComponentModel.DescriptionAttribute(@"What each motor output and digital input of a Harp StepperDriver is connected to, by the
+    driver's own names: the board stays a board, recorded as itself, and a spare motor can drive
+    anything else under its own name. A line left out is unknown. A lick spout stage's axis motor
+    (BaseTransverse, Radial or Elevation, with its side) has its home switch on the input of the
+    same number (BaseTransverseHome, RadialHome or ElevationHome).")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class StepperWiring
     {
     
-        private WiredLine _motor0;
+        private MotorLine _motor0;
     
-        private WiredLine _motor1;
+        private MotorLine _motor1;
     
-        private WiredLine _motor2;
+        private MotorLine _motor2;
     
-        private WiredLine _motor3;
+        private MotorLine _motor3;
     
         private WiredLine _input0;
     
@@ -3625,7 +3839,7 @@ namespace OpenRigs.Devices.Rigs
         [Newtonsoft.Json.JsonPropertyAttribute("Motor0")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="Motor0")]
         [System.ComponentModel.DescriptionAttribute("What is plugged into Motor0 (motor output 0); left out when unknown.")]
-        public WiredLine Motor0
+        public MotorLine Motor0
         {
             get
             {
@@ -3644,7 +3858,7 @@ namespace OpenRigs.Devices.Rigs
         [Newtonsoft.Json.JsonPropertyAttribute("Motor1")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="Motor1")]
         [System.ComponentModel.DescriptionAttribute("What is plugged into Motor1 (motor output 1); left out when unknown.")]
-        public WiredLine Motor1
+        public MotorLine Motor1
         {
             get
             {
@@ -3663,7 +3877,7 @@ namespace OpenRigs.Devices.Rigs
         [Newtonsoft.Json.JsonPropertyAttribute("Motor2")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="Motor2")]
         [System.ComponentModel.DescriptionAttribute("What is plugged into Motor2 (motor output 2); left out when unknown.")]
-        public WiredLine Motor2
+        public MotorLine Motor2
         {
             get
             {
@@ -3682,7 +3896,7 @@ namespace OpenRigs.Devices.Rigs
         [Newtonsoft.Json.JsonPropertyAttribute("Motor3")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="Motor3")]
         [System.ComponentModel.DescriptionAttribute("What is plugged into Motor3 (motor output 3); left out when unknown.")]
-        public WiredLine Motor3
+        public MotorLine Motor3
         {
             get
             {
@@ -4670,6 +4884,11 @@ namespace OpenRigs.Devices.Rigs
             return Process<LiveView>(source);
         }
 
+        public System.IObservable<string> Process(System.IObservable<MotorLine> source)
+        {
+            return Process<MotorLine>(source);
+        }
+
         public System.IObservable<string> Process(System.IObservable<Projector> source)
         {
             return Process<Projector>(source);
@@ -4766,6 +4985,7 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<HarpTimestampGeneratorGen3>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LicketySplit>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LiveView>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<MotorLine>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Projector>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseController>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutput>))]
@@ -5001,6 +5221,11 @@ namespace OpenRigs.Devices.Rigs
             return Process<LiveView>(source);
         }
 
+        public System.IObservable<string> Process(System.IObservable<MotorLine> source)
+        {
+            return Process<MotorLine>(source);
+        }
+
         public System.IObservable<string> Process(System.IObservable<Projector> source)
         {
             return Process<Projector>(source);
@@ -5097,6 +5322,7 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<HarpTimestampGeneratorGen3>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LicketySplit>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<LiveView>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<MotorLine>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Projector>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseController>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutput>))]

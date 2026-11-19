@@ -16,19 +16,19 @@ namespace OpenRigs.Devices
         /// <summary>The axes in file and rig.yml order.</summary>
         public static readonly string[] AxisNames = { "baseTransverse", "radialLeft", "radialRight", "elevationLeft", "elevationRight" };
 
-        /// <summary>Gets or sets the base's transverse axis (StepperDriver-A Motor0).</summary>
+        /// <summary>Gets or sets the base's transverse axis.</summary>
         public int BaseTransverse { get; set; }
 
-        /// <summary>Gets or sets the left spout's radial axis (StepperDriver-A Motor1).</summary>
+        /// <summary>Gets or sets the left spout's radial axis.</summary>
         public int RadialLeft { get; set; }
 
-        /// <summary>Gets or sets the right spout's radial axis (StepperDriver-A Motor2).</summary>
+        /// <summary>Gets or sets the right spout's radial axis.</summary>
         public int RadialRight { get; set; }
 
-        /// <summary>Gets or sets the left spout's elevation axis (StepperDriver-B Motor0).</summary>
+        /// <summary>Gets or sets the left spout's elevation axis.</summary>
         public int ElevationLeft { get; set; }
 
-        /// <summary>Gets or sets the right spout's elevation axis (StepperDriver-B Motor1).</summary>
+        /// <summary>Gets or sets the right spout's elevation axis.</summary>
         public int ElevationRight { get; set; }
 
         /// <summary>The axes in <see cref="AxisNames"/> order.</summary>

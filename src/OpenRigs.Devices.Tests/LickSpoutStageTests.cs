@@ -21,11 +21,21 @@ namespace OpenRigs.Devices.Tests
             return folder;
         }
 
-        static string RigFile(string folder)
+        // The rig template's wiring, with {0} added to the left radial motor's line.
+        const string Wiring = "stepperDriver:\n" +
+            "  a:\n    wiring:\n" +
+            "      Motor0: { device: BaseTransverse }\n      Motor1: { device: Radial, side: left{0} }\n      Motor2: { device: Radial, side: right }\n" +
+            "      Input0: { device: BaseTransverseHome }\n      Input1: { device: RadialHome, side: left }\n      Input2: { device: RadialHome, side: right }\n" +
+            "  b:\n    wiring:\n" +
+            "      Motor0: { device: Elevation, side: left }\n      Motor1: { device: Elevation, side: right }\n" +
+            "      Input0: { device: ElevationHome, side: left }\n      Input1: { device: ElevationHome, side: right }\n";
+
+        static string RigFile(string folder, string wiring = null)
         {
             var path = Path.Combine(folder, "rig.yml");
             File.WriteAllText(path,
-                "rootPath: x\nlickSpoutDefaultPosition:\n  baseTransverse: 10\n  radialLeft: 2000\n  radialRight: 2100\n  elevationLeft: 3000\n  elevationRight: 3100\n");
+                "rootPath: x\nlickSpoutDefaultPosition:\n  baseTransverse: 10\n  radialLeft: 2000\n  radialRight: 2100\n  elevationLeft: 3000\n  elevationRight: 3100\n" +
+                (wiring ?? Wiring.Replace("{0}", "")));
             return path;
         }
 
@@ -46,7 +56,7 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual("M1 baseTransverse=10 radialLeft=2000 radialRight=2100 elevationLeft=3150 elevationRight=3100", saved.Detail);
             Assert.IsNull(saved.Target);
             CollectionAssert.AreEqual(new[] { Header, "M1,10,2000,2100,3150,3100" }, File.ReadAllLines(list));
-            var again = LickSpoutStage.Start(null, list, "M1");
+            var again = LickSpoutStage.Start(RigFile(folder), list, "M1");
             Assert.AreEqual("10,2000,2100,3150,3100", again.In.ToString(), "the row wins over rig.yml");
             Assert.AreEqual(LickSpoutStep.FromList, again.StartedFrom);
         }
@@ -170,20 +180,74 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void SetupAndMovesAddressEachDriversMotors()
         {
-            var setupA = LickSpoutDrivers.Setup(LickSpoutDriver.A);
-            var setupB = LickSpoutDrivers.Setup(LickSpoutDriver.B);
-            Assert.AreEqual(8 + 4 * 3, setupA.Count);
-            Assert.AreEqual(8 + 4 * 2, setupB.Count);
+            var wiring = LickSpoutWiring.FromRigFile(RigFile(TempFolder()));
+            var setupA = LickSpoutDrivers.Setup(LickSpoutDriver.A, wiring);
+            var setupB = LickSpoutDrivers.Setup(LickSpoutDriver.B, wiring);
+            Assert.AreEqual(8 + 5 * 3, setupA.Count);
+            Assert.AreEqual(8 + 5 * 2, setupB.Count);
             Assert.AreEqual(StepperMotors.Motor0 | StepperMotors.Motor1, EnableDriver.GetPayload(setupB[1]));
             Assert.AreEqual(0.5f, Motor2MaximumRunCurrent.GetPayload(setupA.Single(m => m.Address == Motor2MaximumRunCurrent.Address)));
             Assert.AreEqual(280, (int)Motor1StepInterval.GetPayload(setupB.Single(m => m.Address == Motor1StepInterval.Address)));
             Assert.AreEqual("StopMotor1OnFalling", Input1OpMode.GetPayload(setupB.Single(m => m.Address == Input1OpMode.Address)).ToString());
+            Assert.AreEqual(0, Motor2MaxPosition.GetPayload(setupA.Single(m => m.Address == Motor2MaxPosition.Address)), "a limit from a run before is cleared until homing");
 
             var target = SpoutPositions.FromArray(new[] { 1, 2, 3, 4, 5 });
-            var a = LickSpoutDrivers.Move(LickSpoutDriver.A, target);
-            var b = LickSpoutDrivers.Move(LickSpoutDriver.B, target);
+            var a = LickSpoutDrivers.Move(LickSpoutDriver.A, wiring, target);
+            var b = LickSpoutDrivers.Move(LickSpoutDriver.B, wiring, target);
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, new[] { Motor0MoveAbsolute.GetPayload(a[0]), Motor1MoveAbsolute.GetPayload(a[1]), Motor2MoveAbsolute.GetPayload(a[2]) });
             CollectionAssert.AreEqual(new[] { 4, 5 }, new[] { Motor0MoveAbsolute.GetPayload(b[0]), Motor1MoveAbsolute.GetPayload(b[1]) });
+        }
+
+        [TestMethod]
+        public void AnAxisMovedToASpareMotorIsDrivenThereAndTheOldMotorIsLeftAlone()
+        {
+            var moved = Wiring.Replace("{0}", "")
+                .Replace("Motor1: { device: Radial, side: left }", "Motor1: { device: Shutter }\n      Motor3: { device: Radial, side: left }")
+                .Replace("Input1: { device: RadialHome, side: left }", "Input3: { device: RadialHome, side: left }");
+            var wiring = LickSpoutWiring.FromRigFile(RigFile(TempFolder(), moved));
+            Assert.AreEqual(3, wiring.Axes[1].Motor);
+            var setupA = LickSpoutDrivers.Setup(LickSpoutDriver.A, wiring);
+            Assert.AreEqual(StepperMotors.Motor0 | StepperMotors.Motor2 | StepperMotors.Motor3, EnableDriver.GetPayload(setupA[1]));
+            Assert.AreEqual(QuadratureEncoders.Encoder0 | QuadratureEncoders.Encoder2, EnableEncoders.GetPayload(setupA[2]), "Motor3 has no encoder");
+            Assert.IsFalse(setupA.Any(m => m.Address == Motor1MaximumRunCurrent.Address), "the shutter's motor is not the stage's");
+            var a = LickSpoutDrivers.Move(LickSpoutDriver.A, wiring, SpoutPositions.FromArray(new[] { 1, 2, 3, 4, 5 }));
+            Assert.AreEqual(2, Motor3MoveAbsolute.GetPayload(a.Single(m => m.Address == Motor3MoveAbsolute.Address)));
+            Assert.IsFalse(a.Any(m => m.Address == Motor1MoveAbsolute.Address));
+        }
+
+        [DataTestMethod]
+        [DataRow("Motor2: { device: Radial, side: right }", "Motor2: { device: Radial, side: left }", "both drive the radialLeft axis")]
+        [DataRow("Motor2: { device: Radial, side: right }", "Motor2: { device: Shutter }", "no stepperDriver motor is wired to radialRight ({ device: Radial, side: right })")]
+        [DataRow("Input2: { device: RadialHome, side: right }", "Input2: { device: RadialHome, side: left }", "stepperDriver.a.wiring.Motor2 drives the radialRight axis, so its home switch must be Input2: { device: RadialHome, side: right }")]
+        [DataRow("side: right }\n      Input0", "side: right, maxSteps: 0 }\n      Input0", "stepperDriver.a.wiring.Motor2.maxSteps must be a whole number of steps, 1 or more")]
+        public void WiringThatDoesNotGiveEachAxisOneMotorIsRefused(string line, string wrong, string message)
+        {
+            var text = Wiring.Replace("{0}", "");
+            Assert.IsTrue(text.Contains(line), line);
+            var rig = RigFile(TempFolder(), text.Replace(line, wrong));
+            var ex = Assert.ThrowsException<InvalidDataException>(() => LickSpoutWiring.FromRigFile(rig));
+            StringAssert.Contains(ex.Message, message);
+        }
+
+        [TestMethod]
+        public void NoWiringIsRefusedNamingTheEntry()
+        {
+            var ex = Assert.ThrowsException<InvalidDataException>(() => LickSpoutWiring.FromRigFile(RigFile(TempFolder(), "stepperDriver:\n  a: {}\n")));
+            StringAssert.Contains(ex.Message, "stepperDriver.a has no wiring");
+        }
+
+        [TestMethod]
+        public void PositionsAreHeldToTheAxisLimit()
+        {
+            var folder = TempFolder();
+            var list = Path.Combine(folder, "LickSpoutPositions.csv");
+            File.WriteAllText(list, Header + "\nM1,10,9500,2100,3000,3100\n");
+            var state = LickSpoutStage.Start(RigFile(folder, Wiring.Replace("{0}", ", maxSteps: 9000")), list, "M1");
+            Assert.AreEqual("10,9000,2100,3000,3100", state.In.ToString(), "a saved position past the limit starts at it");
+            state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
+            Assert.AreEqual(9000, state.Apply(LickSpoutCommand.LeftIn, 150, 1500).RadialLeft, "a nudge stops at the limit");
+            Assert.AreEqual(8850, state.Apply(LickSpoutCommand.LeftOut, 150, 1500).RadialLeft);
+            Assert.AreEqual(9100, state.Apply(LickSpoutCommand.RightIn, 7000, 1500).RadialRight, "an axis with no maxSteps has no limit");
         }
 
         static HarpMessage Switches(params int[] away)
@@ -198,7 +262,7 @@ namespace OpenRigs.Devices.Tests
             var events = new Subject<HarpMessage>();
             var sent = new List<HarpMessage>();
             var completed = false;
-            HomeLickSpoutMotor.Home(events, LickSpoutDriver.A, 1, TimeSpan.FromSeconds(60), scheduler)
+            HomeLickSpoutDriver.Home(events, LickSpoutDriver.A, 1, null, TimeSpan.FromSeconds(60), scheduler)
                 .Subscribe(sent.Add, () => completed = true);
 
             Assert.AreEqual(DigitalInputState.Address, sent.Single().Address, "first it reads the switches");
@@ -221,7 +285,7 @@ namespace OpenRigs.Devices.Tests
             var scheduler = new HistoricalScheduler();
             var events = new Subject<HarpMessage>();
             var sent = new List<HarpMessage>();
-            HomeLickSpoutMotor.Home(events, LickSpoutDriver.B, 0, TimeSpan.FromSeconds(60), scheduler).Subscribe(sent.Add);
+            HomeLickSpoutDriver.Home(events, LickSpoutDriver.B, 0, null, TimeSpan.FromSeconds(60), scheduler).Subscribe(sent.Add);
             events.OnNext(Switches(0));
             scheduler.AdvanceBy(TimeSpan.FromSeconds(1));
             Assert.AreEqual(2, sent.Count);
@@ -229,11 +293,28 @@ namespace OpenRigs.Devices.Tests
         }
 
         [TestMethod]
+        public void HomingSetsTheLimitOnlyOnceTheMotorIsZeroed()
+        {
+            var scheduler = new HistoricalScheduler();
+            var events = new Subject<HarpMessage>();
+            var sent = new List<HarpMessage>();
+            var completed = false;
+            HomeLickSpoutDriver.Home(events, LickSpoutDriver.A, 1, 9000, TimeSpan.FromSeconds(60), scheduler).Subscribe(sent.Add, () => completed = true);
+            events.OnNext(Switches(1));
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(1));
+            Assert.IsFalse(sent.Any(m => m.Address == Motor1MaxPosition.Address), "no limit while it drives home");
+            events.OnNext(Switches());
+            CollectionAssert.AreEqual(new[] { Motor1AccumulatedSteps.Address, Motor1MaxPosition.Address }, sent.Skip(sent.Count - 2).Select(m => m.Address).ToArray());
+            Assert.AreEqual(9000, Motor1MaxPosition.GetPayload(sent.Last()));
+            Assert.IsTrue(completed);
+        }
+
+        [TestMethod]
         public void HomingThatNeverEndsNamesTheMotor()
         {
             var scheduler = new HistoricalScheduler();
             Exception error = null;
-            HomeLickSpoutMotor.Home(new Subject<HarpMessage>(), LickSpoutDriver.B, 1, TimeSpan.FromSeconds(60), scheduler)
+            HomeLickSpoutDriver.Home(new Subject<HarpMessage>(), LickSpoutDriver.B, 1, null, TimeSpan.FromSeconds(60), scheduler)
                 .Subscribe(_ => { }, e => error = e);
             scheduler.AdvanceBy(TimeSpan.FromSeconds(61));
             Assert.IsInstanceOfType(error, typeof(TimeoutException));

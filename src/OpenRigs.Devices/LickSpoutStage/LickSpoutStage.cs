@@ -99,9 +99,12 @@ namespace OpenRigs.Devices
         {
             if (string.IsNullOrEmpty(positionsFile)) throw new InvalidOperationException("LickSpoutStage has no PositionsFile.");
             var row = subjectId == NoMouse ? null : SpoutPositions.Load(positionsFile, subjectId);
+            var positions = row ?? SpoutPositions.FromRigFile(rigFile);
+            var wiring = LickSpoutWiring.FromRigFile(rigFile);
             return new StageState
             {
-                In = row ?? SpoutPositions.FromRigFile(rigFile),
+                Wiring = wiring,
+                In = wiring.Limit(positions),
                 StartedFrom = row != null ? LickSpoutStep.FromList : LickSpoutStep.FromDefault,
                 RigFile = rigFile,
                 PositionsFile = positionsFile,
@@ -113,8 +116,11 @@ namespace OpenRigs.Devices
         /// <summary>The stage's in positions and its current placement.</summary>
         public class StageState
         {
-            /// <summary>Gets or sets the mouse's in positions.</summary>
+            /// <summary>Gets or sets the mouse's in positions, each held to its axis's limit.</summary>
             public SpoutPositions In { get; set; }
+
+            /// <summary>Gets or sets the stage's wiring, whose limits hold every position.</summary>
+            public LickSpoutWiring Wiring { get; set; }
 
             /// <summary>Gets or sets the rig's positions list.</summary>
             public string PositionsFile { get; set; }
@@ -158,7 +164,7 @@ namespace OpenRigs.Devices
                         Placement = command;
                         return Target(retractSteps);
                     case LickSpoutCommand.SpoutsDefault:
-                        In = SpoutPositions.FromRigFile(RigFile);
+                        In = Wiring.Limit(SpoutPositions.FromRigFile(RigFile));
                         Placement = LickSpoutCommand.SpoutsIn;
                         return Target(retractSteps);
                     case LickSpoutCommand.LeftUp: values[3] += stepSize; break;
@@ -173,7 +179,7 @@ namespace OpenRigs.Devices
                     case LickSpoutCommand.BaseRight: values[0] -= stepSize; break;
                     default: throw new ArgumentOutOfRangeException(nameof(command), command, null);
                 }
-                In = SpoutPositions.FromArray(values);
+                In = Wiring.Limit(SpoutPositions.FromArray(values));
                 return Placement == LickSpoutCommand.SpoutsHome ? null : Target(retractSteps);
             }
 

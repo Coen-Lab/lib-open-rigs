@@ -70,15 +70,27 @@ class BoardWiring(BaseSchema):
     analog_input1: Optional[WiredLine] = _wired("AnalogInput1", "analog input 1, ADC1")
 
 
+class MotorLine(WiredLine):
+    """What one motor output of a Harp StepperDriver drives, and how far it may go."""
+
+    max_steps: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="The farthest the motor may go from its home switch, in steps: the driver moves it no further (its Motor<n>MaxPosition, set each time the motor is homed). Left out, no limit.",
+    )
+
+
 class StepperWiring(BaseSchema):
     """What each motor output and digital input of a Harp StepperDriver is connected to, by the
     driver's own names: the board stays a board, recorded as itself, and a spare motor can drive
-    anything else under its own name. A line left out is unknown."""
+    anything else under its own name. A line left out is unknown. A lick spout stage's axis motor
+    (BaseTransverse, Radial or Elevation, with its side) has its home switch on the input of the
+    same number (BaseTransverseHome, RadialHome or ElevationHome)."""
 
-    motor0: Optional[WiredLine] = _wired("Motor0", "motor output 0")
-    motor1: Optional[WiredLine] = _wired("Motor1", "motor output 1")
-    motor2: Optional[WiredLine] = _wired("Motor2", "motor output 2")
-    motor3: Optional[WiredLine] = _wired("Motor3", "motor output 3")
+    motor0: Optional[MotorLine] = _wired("Motor0", "motor output 0")
+    motor1: Optional[MotorLine] = _wired("Motor1", "motor output 1")
+    motor2: Optional[MotorLine] = _wired("Motor2", "motor output 2")
+    motor3: Optional[MotorLine] = _wired("Motor3", "motor output 3")
     input0: Optional[WiredLine] = _wired("Input0", "digital input 0")
     input1: Optional[WiredLine] = _wired("Input1", "digital input 1")
     input2: Optional[WiredLine] = _wired("Input2", "digital input 2")
