@@ -212,15 +212,26 @@ OUTCOMES = ("correct", "incorrect", "noResponse", "probe")  # in the task's came
 GO_NO_GO = ("go", "noGo", "noReward")  # a go/no-go task's targets: one spout by design, noReward its probe
 
 
+def _responded(r: Dict[str, Any]) -> bool:
+    """Whether the mouse responded in a trial row: its choice where the row has one, else an outcome other than noResponse
+    that the auto-reward (autoReward and rewarded, with no choice) did not bring."""
+    if "choice" in r:
+        return str(r.get("choice") or "noResponse") != "noResponse"
+    auto = _true(r.get("autoReward", False)) and _true(r.get("rewarded", False))
+    return str(r.get("outcome") or "noResponse") != "noResponse" and not auto
+
+
 def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
     """Performance and the response rate of trial rows (text or typed cells), each NaN with no trial to count.
 
     Performance is correct / (correct + incorrect) over the trials not offered a single spout as a guide (singleSpoutOffered
     False, as where the task does not record it) and every go/no-go trial (target go or noGo; one spout by design), a go
     trial with no lick (noResponse) counted incorrect. The response rate is the share of trials the mouse responded to: in
-    a go/no-go task (a target go, noGo or noReward) the go trials it licked on, as withholding is a noGo's answer; else the
-    trials not noResponse, of those not probe. A probe (no right answer) counts in neither, though rewarded and penalised
-    say what it got."""
+    a go/no-go task (a target go, noGo or noReward) the go trials, else the trials not probe, of those the ones responded to:
+    where the row has a choice, any choice but noResponse (a withheld noGo, an unlicked probe, and an auto-reward trial
+    with no choice are none; an auto-reward trial where the mouse chose a side is one); with no choice column, an outcome
+    not noResponse that the auto-reward did not bring (a trial the drift carried into the reward zone, with no movement
+    by the mouse). A probe (no right answer) counts in neither, though rewarded and penalised say what it got."""
     rows = list(rows)
     go_no_go = any(str(r.get("target")) in GO_NO_GO for r in rows)
     correct = counted = 0
@@ -231,7 +242,7 @@ def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
             counted += 1
             correct += outcome == "correct"
     asked = [r for r in rows if (str(r.get("target")) == "go" if go_no_go else r["outcome"] != "probe")]
-    answered = sum(r["outcome"] != "noResponse" for r in asked)
+    answered = sum(map(_responded, asked))
     return (correct / counted if counted else float("nan"), answered / len(asked) if asked else float("nan"))
 
 
@@ -359,6 +370,9 @@ def summarise(folder: Path, videos: bool = False) -> Summary:
     """One experiment's summary and failed checks, from its files alone; with videos, each camera video against its CSV."""
     folder = Path(folder)
     s = _summarise(folder)
+    if not folder.is_dir():  # a mistyped folder reads as an empty run: said, so main exits 1
+        s.problems.append(f"{folder} is not a folder")
+        return s
     s.notes += skipped(folder)
     if videos:
         checks = video_frames.check_videos(folder)

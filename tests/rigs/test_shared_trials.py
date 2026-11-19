@@ -307,6 +307,42 @@ def test_go_no_go_counts_its_one_spout_a_go_miss_as_incorrect_and_responds_on_go
     assert trials_module.performance(typed) == (0.5, 0.5)  # typed rows (open_rigs.trial_log.read) read the same
 
 
+def test_an_auto_rewarded_trial_is_no_response(tmp_path):
+    # Navigation: the drift carries the trial into the zone, correct and auto-rewarded, with no movement by the mouse.
+    trials = _chain(4)
+    for t in trials:
+        t["autoReward"] = True
+    s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["autoReward"]))
+    assert s.responded == 0.5  # the two correct (rewarded) trials are the drift's; the two incorrect, unrewarded, are the mouse's
+    rows = [{"outcome": "correct", "autoReward": "True", "rewarded": "True"},
+            {"outcome": "correct", "autoReward": "False", "rewarded": "True"}]
+    assert trials_module.performance(rows) == (1.0, 0.5)
+
+
+def test_with_a_choice_column_the_response_is_the_choice():
+    def rate(*rows):
+        return trials_module.performance(list(rows))[1]
+    # a withheld noGo is no response: only the go trial counts, and it was licked
+    assert rate({"target": "go", "outcome": "correct", "choice": "left"},
+                {"target": "noGo", "outcome": "correct", "choice": "noResponse"}) == 1.0
+    # an unlicked probe is left out of the asked trials, so it cannot respond
+    assert rate({"outcome": "correct", "choice": "left"}, {"outcome": "probe", "choice": "noResponse"}) == 1.0
+    auto = {"autoReward": True, "rewarded": True, "outcome": "correct"}
+    assert rate({**auto, "choice": "noResponse"}, {"outcome": "correct", "choice": "left"}) == 0.5  # no choice: not one
+    assert rate({**auto, "choice": "left"}, {"outcome": "correct", "choice": "left"}) == 1.0  # chose a side: one
+    assert rate({"outcome": "incorrect", "choice": "noResponse"}) == 0.0  # the choice rules, not the outcome
+
+
+def test_without_a_choice_column_an_auto_reward_is_not_a_response():
+    auto = {"autoReward": True, "rewarded": True, "outcome": "correct"}
+    assert trials_module.performance([auto, {"outcome": "correct"}, {"outcome": "noResponse"}])[1] == 1 / 3
+
+
+def test_a_folder_that_does_not_exist_is_a_problem(tmp_path):
+    s = summarise(tmp_path / "ses-NOPE")
+    assert s.problems == [f"{tmp_path / 'ses-NOPE'} is not a folder"]
+
+
 def test_a_probe_trial_is_accepted_and_left_out_of_performance_and_the_response_rate(tmp_path):
     trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="probe")]
     s = summarise(_experiment(tmp_path, trials, []))
