@@ -96,20 +96,30 @@ namespace OpenRigs.Core
             return (YamlMappingNode)((YamlMappingNode)stream.Documents[0].RootNode).Children[new YamlScalarNode("taskParameters")];
         }
 
-        /// <summary>The node at a dotted path; a key the file leaves out is read as null, an empty scalar.</summary>
+        /// <summary>The node at a dotted path; a key the file leaves out, or a parent map it leaves out, is read as null, an empty scalar.</summary>
         public static YamlNode At(IDictionary<YamlNode, YamlNode> nodes, string path)
         {
             var parts = path.Split('.');
-            for (int i = 0; i < parts.Length - 1; i++) nodes = ((YamlMappingNode)nodes[new YamlScalarNode(parts[i])]).Children;
             YamlNode node;
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                if (!nodes.TryGetValue(new YamlScalarNode(parts[i]), out node)) return new YamlScalarNode();
+                nodes = ((YamlMappingNode)node).Children;
+            }
             return nodes.TryGetValue(new YamlScalarNode(parts[parts.Length - 1]), out node) ? node : new YamlScalarNode();
         }
 
-        /// <summary>Writes the node at a dotted path whose parents are maps.</summary>
+        /// <summary>Writes the node at a dotted path whose parents are maps, adding each parent map the file leaves out.</summary>
         public static void Put(IDictionary<YamlNode, YamlNode> nodes, string path, YamlNode value)
         {
             var parts = path.Split('.');
-            for (int i = 0; i < parts.Length - 1; i++) nodes = ((YamlMappingNode)nodes[new YamlScalarNode(parts[i])]).Children;
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                YamlNode node;
+                var key = new YamlScalarNode(parts[i]);
+                if (!nodes.TryGetValue(key, out node)) nodes[key] = node = new YamlMappingNode();
+                nodes = ((YamlMappingNode)node).Children;
+            }
             nodes[new YamlScalarNode(parts[parts.Length - 1])] = value;
         }
 

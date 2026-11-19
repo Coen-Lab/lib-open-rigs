@@ -209,6 +209,11 @@ SoundLevelDbfs = Annotated[
     Annotated[float, Field(ge=QUIETEST_LEVEL_DBFS, le=PEAK_LIMIT_DBFS)] | Literal["mute"],
     WithJsonSchema({"oneOf": [{"type": "number", "minimum": QUIETEST_LEVEL_DBFS, "maximum": PEAK_LIMIT_DBFS}, {"const": MUTE, "type": "string"}]}),
 ]
+# A sound level that may be null, still one oneOf.
+NullableSoundLevelDbfs = Annotated[
+    Annotated[float, Field(ge=QUIETEST_LEVEL_DBFS, le=PEAK_LIMIT_DBFS)] | Literal["mute"] | None,
+    WithJsonSchema({"oneOf": [{"type": "number", "minimum": QUIETEST_LEVEL_DBFS, "maximum": PEAK_LIMIT_DBFS}, {"const": MUTE, "type": "string"}, {"type": "null"}]}),
+]
 
 
 def level_dbfs(default: float, sound: str):
@@ -235,9 +240,33 @@ class PenaltySound(TaskBlock):
     level_dbfs: SoundLevelDbfs = level_dbfs(PENALTY_LEVEL_DBFS, "The penalty sound")
 
 
-class Penalty(TaskBlock):
-    """What a wrong or missed trial costs: a timeout (the trial log's penaltyTimeoutSeconds), and the penalty sound with it
-    unless its level is mute. Each task says which trials are penalised; timeoutSeconds has no lab default: each task file gives it."""
+class PenaltyCostSound(TaskBlock):
+    """A penalised miss's penalty sound: its level, or null for the penalised choice's (penalty.sound.levelDbfs)."""
 
-    timeout_seconds: float = Field(ge=0, description="Timeout after a penalised trial, in seconds; the next interval starts after it")
+    level_dbfs: NullableSoundLevelDbfs = Field(
+        default=None,
+        description=f"The penalty sound's level on a penalised miss, in dBFS RMS as penalty.sound.levelDbfs; {MUTE}: no sound; null: penalty.sound.levelDbfs",
+    )
+
+
+class PenaltyCost(TaskBlock):
+    """What a penalised miss costs, each field null for the penalised choice's (penalty's own): never null itself, so a
+    condition or a training stage can set any one of its fields by its dotted path."""
+
+    timeout_seconds: float | None = Field(
+        default=None, ge=0, description="Timeout after a penalised miss, in seconds; null: penalty.timeoutSeconds"
+    )
+    sound: PenaltyCostSound = Field(default=PenaltyCostSound(), description="The penalty sound on a penalised miss")
+
+
+class Penalty(TaskBlock):
+    """What a penalised trial costs: a timeout (the trial log's penaltyTimeoutSeconds), and the penalty sound with it
+    unless its level is mute. A penalised choice costs this block's own values, a penalised miss its noResponse override
+    (a null field the choice's). Each task decides which trials are penalised and which are misses; timeoutSeconds has no
+    lab default: each task file gives it."""
+
+    timeout_seconds: float = Field(ge=0, description="Timeout after a penalised choice, in seconds, and after a penalised miss unless noResponse.timeoutSeconds sets its own; the next interval starts after it")
     sound: PenaltySound = Field(default=PenaltySound(), description="The penalty sound, with every timeout")
+    no_response: PenaltyCost = Field(
+        default=PenaltyCost(), description="What a penalised miss costs where it differs from a penalised choice: each null field the choice's"
+    )

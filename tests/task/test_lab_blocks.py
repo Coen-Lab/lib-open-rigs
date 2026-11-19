@@ -138,6 +138,19 @@ def test_penalty_sound_has_only_a_level_mute_its_off_and_the_timeout_has_no_lab_
         Penalty.model_validate({})
 
 
+def test_a_penalised_miss_costs_the_choice_s_values_unless_its_override_sets_its_own():
+    penalty = Penalty.model_validate({"timeoutSeconds": 2})
+    assert penalty.model_dump(by_alias=True)["noResponse"] == {"timeoutSeconds": None, "sound": {"levelDbfs": None}}
+    miss = Penalty.model_validate({"timeoutSeconds": 2, "noResponse": {"timeoutSeconds": 0, "sound": {"levelDbfs": "mute"}}}).no_response
+    assert (miss.timeout_seconds, miss.sound.level_dbfs) == (0, "mute")
+    for refused in ({"timeoutSeconds": -1}, {"sound": {"levelDbfs": "off"}}, {"sound": {"levelDbfs": 0}}):
+        with pytest.raises(ValidationError):
+            Penalty.model_validate({"timeoutSeconds": 2, "noResponse": refused})
+    # One oneOf with null, never an anyOf (Bonsai.Sgen makes an empty class of an anyOf item).
+    level = Penalty.model_json_schema(by_alias=True)["$defs"]["PenaltyCostSound"]["properties"]["levelDbfs"]
+    assert "anyOf" not in level and {"type": "null"} in level["oneOf"]
+
+
 def test_sound_levels_have_the_lab_defaults_in_dbfs_rms():
     # The lab's defaults: stimuli -30, penalty -35, reward tone -35; the background a lab constant, -60 (P15).
     assert (task.STIMULUS_LEVEL_DBFS, Penalty(timeout_seconds=1).sound.level_dbfs, RewardTone().level_dbfs, task.BACKGROUND_LEVEL_DBFS) == (-30, -35, -35, -60)

@@ -46,6 +46,36 @@ namespace OpenRigs.Trials.Tests
 
     public class Logic { [YamlDotNet.Serialization.YamlMember(Alias = "taskParameters")] public Params TaskParameters { get; set; } = new Params(); }
 
+    public class CostSound
+    {
+        [YamlDotNet.Serialization.YamlMember(Alias = "levelDbfs")][Newtonsoft.Json.JsonProperty("levelDbfs")] public object LevelDbfs { get; set; }
+    }
+
+    public class Cost
+    {
+        [YamlDotNet.Serialization.YamlMember(Alias = "timeoutSeconds")][Newtonsoft.Json.JsonProperty("timeoutSeconds")] public double? TimeoutSeconds { get; set; }
+        [YamlDotNet.Serialization.YamlMember(Alias = "sound")][Newtonsoft.Json.JsonProperty("sound")] public CostSound Sound { get; set; } = new CostSound();
+    }
+
+    public class PenaltyBlock
+    {
+        [YamlDotNet.Serialization.YamlMember(Alias = "timeoutSeconds")][Newtonsoft.Json.JsonProperty("timeoutSeconds")] public double TimeoutSeconds { get; set; }
+        [YamlDotNet.Serialization.YamlMember(Alias = "sound")][Newtonsoft.Json.JsonProperty("sound")] public CostSound Sound { get; set; } = new CostSound { LevelDbfs = -35.0 };
+        [YamlDotNet.Serialization.YamlMember(Alias = "noResponse")][Newtonsoft.Json.JsonProperty("noResponse")] public Cost NoResponse { get; set; } = new Cost();
+    }
+
+    public class PenaltyParams : IConditionedTask
+    {
+        public double? RngSeed { get; set; }
+        [YamlDotNet.Serialization.YamlMember(Alias = "trialConditions")][Newtonsoft.Json.JsonProperty("trialConditions")] public List<Condition> TrialConditions { get; set; } = new List<Condition>();
+        [YamlDotNet.Serialization.YamlMember(Alias = "penalty")][Newtonsoft.Json.JsonProperty("penalty")] public PenaltyBlock Penalty { get; set; } = new PenaltyBlock();
+        IList<ITrialCondition> IConditionedTask.Conditions { get { return TrialConditions.Cast<ITrialCondition>().ToList(); } }
+        ICurriculum IConditionedTask.Stage { get { return null; } }
+        bool IConditionedTask.OptogeneticsEnabled { get { return false; } }
+    }
+
+    public class PenaltyLogic { [YamlDotNet.Serialization.YamlMember(Alias = "taskParameters")] public PenaltyParams TaskParameters { get; set; } = new PenaltyParams(); }
+
     [TestClass]
     public class TrialConditionsTests
     {
@@ -181,6 +211,38 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual("trialConditions[0] (visual) with contrasts [0.5], delaySeconds 3", max.Where);
             Assert.AreEqual(1, MaxSoundLevel.Of(built, t => t.DelaySeconds < 2 ? (object)t.DelaySeconds : SoundLevels.Mute).LevelDbfs);   // mute plays nothing
             Assert.IsTrue(double.IsNaN(MaxSoundLevel.Of(built, t => SoundLevels.Mute).LevelDbfs));
+        }
+
+        // A condition sets a penalised miss's level by its three-level path, though the task file leaves the block out (its leaves null).
+        [TestMethod]
+        public void AConditionSetsAPenalisedMisssLevelAndTheMaxCountsIt()
+        {
+            var text = "taskParameters:\n  penalty:\n    timeoutSeconds: 4\n  trialConditions:\n  - {weight: 1}\n  - {weight: 1, set: {penalty.noResponse.sound.levelDbfs: -20}}\n";
+            var problems = new List<string>();
+            var schema = new ConditionsSchema(new[] { "trialConditions" }, new string[0], 8, @"[{""trialType"":""any""}]");
+            var built = TrialConditions.Build(text, TaskYaml.Read<PenaltyLogic>(text).TaskParameters, t => TaskYaml.Read<PenaltyLogic>(t).TaskParameters, schema, problems);
+            CollectionAssert.AreEqual(new string[0], problems);
+            Assert.IsNull(built[0].Combinations[0].Task.Penalty.NoResponse.Sound.LevelDbfs);
+            var max = MaxSoundLevel.Of(built, t => t.Penalty.Sound.LevelDbfs, t => t.Penalty.NoResponse.Sound.LevelDbfs);
+            Assert.AreEqual(-20, max.LevelDbfs);
+            Assert.AreEqual("trialConditions[1] (any)", max.Where);
+            Assert.AreEqual(-35, MaxSoundLevel.Of(built, t => t.Penalty.Sound.LevelDbfs, t => (object)null).LevelDbfs, "a null level is skipped");
+            Assert.ThrowsException<InvalidOperationException>(() => MaxSoundLevel.Of(built, t => t.Penalty.NoResponse.Sound.LevelDbfs), "one selector refuses a null");
+        }
+
+        [TestMethod]
+        public void APenalisedMissCostsItsOverrideAndANullFieldTheChoices()
+        {
+            var choice = Penalties.Resolve(4, -35.0, 1, SoundLevels.Mute, false);
+            Assert.AreEqual(4, choice.TimeoutSeconds);
+            Assert.AreEqual(-35, choice.LevelDbfs);
+            var miss = Penalties.Resolve(4, -35.0, 1, SoundLevels.Mute, true);
+            Assert.AreEqual(1, miss.TimeoutSeconds);
+            Assert.IsTrue(double.IsNaN(miss.LevelDbfs), "mute is NaN");
+            var inherited = Penalties.Resolve(4, "mute", null, null, true);
+            Assert.AreEqual(4, inherited.TimeoutSeconds);
+            Assert.IsTrue(double.IsNaN(inherited.LevelDbfs));
+            Assert.AreEqual(-40, Penalties.Resolve(4, -35.0, null, "-40", true).LevelDbfs);
         }
 
         [TestMethod]

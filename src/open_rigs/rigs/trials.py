@@ -101,11 +101,12 @@ CORE_COLUMNS: List[Column] = [
      "board had not answered by the next outcome. A stop before the board answered leaves the trial with no row. Which "
      "outcomes are rewarded is the task's (its note)."),
     ("penaltyTimeoutSeconds", "double", "s",
-     "The timeout after this trial: the task's penalty.timeoutSeconds when the trial was penalised, else 0. The next "
-     "interval starts after it (itiStartTime)."),
+     "The timeout after this trial when it was penalised, else 0: the trial's penalty.timeoutSeconds, or on a miss its "
+     "penalty.noResponse.timeoutSeconds unless null. The next interval starts after it (itiStartTime)."),
     ("penalised", "bool", None,
-     "True when the trial was penalised: the task's penalty timeout (penaltyTimeoutSeconds) and the penalty sound at the "
-     "trial's penalty.sound.levelDbfs (none when mute) followed its outcome. Which outcomes are penalised is the task's (its note)."),
+     "True when the trial was penalised: the timeout (penaltyTimeoutSeconds) and the penalty sound at the trial's "
+     "penalty.sound.levelDbfs, or on a miss its penalty.noResponse.sound.levelDbfs unless null (none when mute), followed "
+     "its outcome. Which trials are penalised, and which are misses, is the task's (its note)."),
 ]
 
 QUIET_WAIT_COLUMNS: List[Column] = [
@@ -380,22 +381,49 @@ def _requested(detail: str) -> Optional[float]:
     return None
 
 
+TIMEOUT_PATH = "penalty.timeoutSeconds"  # a penalised choice's timeout
+MISS_TIMEOUT_PATH = "penalty.noResponse.timeoutSeconds"  # a penalised miss's, null for the choice's
+
+
 @dataclass
 class _Task:
     laser_to_stimulus: float  # optogenetics.laserToStimulusSeconds: signed, the trigger before the stimulus
-    timeout_seconds: float  # penalty.timeoutSeconds
+    timeouts: Dict[str, Any]  # TIMEOUT_PATH and MISS_TIMEOUT_PATH as the task file has them
+    combinations: Optional[Dict[int, Dict[str, Any]]]  # Settings_Combinations' values by trialCombinationId; None without it
 
     @property
     def lead(self) -> float:
         return max(self.laser_to_stimulus, 0.0)
 
+    def timeout(self, row: Dict[str, str]) -> float:
+        """A penalised trial's timeout: its combination's (else the task file's) penalty.timeoutSeconds, or on a miss (no
+        choice where the row has one, else outcome noResponse) penalty.noResponse.timeoutSeconds unless null. Raises
+        ValueError for a trialCombinationId the table does not have."""
+        values = dict(self.timeouts)
+        if self.combinations is not None and trial_log.ID in row:
+            combination = self.combinations.get(int(float(row[trial_log.ID])))
+            if combination is None:
+                raise ValueError(f"{trial_log.ID} {row[trial_log.ID]} is not a row of {trial_log.COMBINATIONS_FILE[1]}")
+            values.update({path: combination[path] for path in self.timeouts if path in combination})
+        miss = values[MISS_TIMEOUT_PATH]
+        return float(values[TIMEOUT_PATH] if _responded(row) or miss is None else miss)
+
 
 def _task(folder: Path) -> Optional[_Task]:
-    """The experiment's task file values the checks need (Settings/Settings_Task_<time>.json), or None."""
+    """The experiment's task file values the checks need (Settings/Settings_Task_<time>.json), and its combinations'
+    (Settings/Settings_Combinations_<time>.json) where it has one, or None."""
     for path in _chunks(folder, TASK_FILES):
         try:
             p = json.loads(path.read_text(encoding="utf-8-sig"))["taskParameters"]
-            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), float(p["penalty"]["timeoutSeconds"]))
+            penalty = p["penalty"]
+            timeouts = {TIMEOUT_PATH: float(penalty["timeoutSeconds"]),
+                        MISS_TIMEOUT_PATH: (penalty.get("noResponse") or {}).get("timeoutSeconds")}  # a file from before noResponse: the choice's
+            tables = _chunks(folder, trial_log.COMBINATIONS_FILE)
+            combinations = None
+            if tables:
+                rows = json.loads(tables[0].read_text(encoding="utf-8-sig"))["rows"]
+                combinations = {int(r[trial_log.ID]): r["values"] for r in rows}
+            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), timeouts, combinations)
         except (OSError, ValueError, KeyError, TypeError):
             return None
     return None
@@ -482,7 +510,11 @@ def _summarise(folder: Path) -> Summary:
                 s.problems.append(f"trial {number}: laser trigger {trigger - due:+.4f} s from laserToStimulusSeconds "
                                   f"({task.laser_to_stimulus:g} s) before the stimulus was due")
             penalised, timeout = _true(row["penalised"]), _f(row, "penaltyTimeoutSeconds")
-            want = task.timeout_seconds if penalised else 0.0
+            try:
+                want = task.timeout(row) if penalised else 0.0
+            except ValueError as e:
+                s.problems.append(f"trial {number}: {e}, so its timeout is not checked")
+                want = timeout
             if abs(timeout - want) > 1e-9:
                 s.problems.append(f"trial {number}: penaltyTimeoutSeconds {timeout:g} on a trial "
                                   f"{'penalised' if penalised else 'not penalised'}, not {want:g}")

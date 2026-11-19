@@ -497,3 +497,19 @@ def test_summarise_reads_only_chunk_names_and_notes_the_rest(tmp_path):
     assert (s.trials, s.problems) == (2, [])
     assert s.notes == ["WorkflowData/WorkflowData_Trials_2026-11-14T01-00-00_copy.csv: not read, not named WorkflowData_Trials_<time>.csv",
                        "Settings/Settings_Task_x.json: not read, not named Settings_Task_<time>.json"]
+
+
+def test_a_penalised_miss_s_timeout_is_its_override_and_a_combination_s_value_is_its_trial_s(tmp_path):
+    trials, start = [], 1000.0
+    for i, (outcome, timeout) in enumerate([("incorrect", 4.0), ("noResponse", 1.0), ("incorrect", 6.0), ("noResponse", 4.0)], 1):
+        t = _trial(i, start, 2.5, 3.0, outcome=outcome, timeout=timeout)
+        t["trialCombinationId"] = 0 if i < 3 else 1
+        trials.append(t)
+        start = t["outcomeTime"] + timeout
+    task = {**TASK, "penalty": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -45}, "noResponse": {"timeoutSeconds": 1.0, "sound": {"levelDbfs": "mute"}}}}
+    folder = _experiment(tmp_path, trials, [], columns=COLUMNS + ["trialCombinationId"], task=task)
+    combinations = {"rows": [{"trialCombinationId": 0, "values": {}},
+                             {"trialCombinationId": 1, "values": {"penalty.timeoutSeconds": 6.0, "penalty.noResponse.timeoutSeconds": None}}]}
+    (folder / "Settings" / "Settings_Combinations_2026-11-14T01-00-00.json").write_text(json.dumps(combinations))
+    # trial 4, a miss whose combination's override is null, costs its combination's 6 s, not the task file's 4 s
+    assert summarise(folder).problems == ["trial 4: penaltyTimeoutSeconds 4 on a trial penalised, not 6"]

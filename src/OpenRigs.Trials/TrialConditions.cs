@@ -92,15 +92,34 @@ namespace OpenRigs.Trials
         /// <summary>The highest level of the weighted conditions' combinations, by the task's level (a number or mute, SoundLevels.Parse).</summary>
         public static MaxSoundLevel Of<TTask>(IEnumerable<BuiltTrialCondition<TTask>> conditions, Func<TTask, object> levelDbfs)
         {
+            return Of(conditions, new[] { levelDbfs }, false);
+        }
+
+        /// <summary>The highest of several levels of the weighted conditions' combinations, one sound's buffer for all of them:
+        /// a selector's null is a level another selector gives (penalty.noResponse.sound.levelDbfs, the choice's), skipped.
+        /// A penalty sound's: Of(conditions, t => t.Penalty.Sound.LevelDbfs, t => t.Penalty.NoResponse.Sound.LevelDbfs),
+        /// the second giving null where the task never penalises a miss.</summary>
+        public static MaxSoundLevel Of<TTask>(IEnumerable<BuiltTrialCondition<TTask>> conditions, params Func<TTask, object>[] levelsDbfs)
+        {
+            return Of(conditions, levelsDbfs, true);
+        }
+
+        static MaxSoundLevel Of<TTask>(IEnumerable<BuiltTrialCondition<TTask>> conditions, Func<TTask, object>[] levelsDbfs, bool skipNull)
+        {
             var max = new MaxSoundLevel { LevelDbfs = double.NaN, Where = "no condition" };
             foreach (var condition in conditions.Where(c => c.Weight > 0))
             {
                 foreach (var combination in condition.Combinations)
                 {
-                    var value = SoundLevels.Parse(levelDbfs(combination.Task));
-                    if (value > max.LevelDbfs || (double.IsNaN(max.LevelDbfs) && !double.IsNaN(value)))
+                    foreach (var levelDbfs in levelsDbfs)
                     {
-                        max = new MaxSoundLevel { LevelDbfs = value, Where = condition.Where + (combination.Picks.Length == 0 ? "" : " with " + combination.Picks) };
+                        var level = levelDbfs(combination.Task);
+                        if (level == null && skipNull) continue;
+                        var value = SoundLevels.Parse(level);
+                        if (value > max.LevelDbfs || (double.IsNaN(max.LevelDbfs) && !double.IsNaN(value)))
+                        {
+                            max = new MaxSoundLevel { LevelDbfs = value, Where = condition.Where + (combination.Picks.Length == 0 ? "" : " with " + combination.Picks) };
+                        }
                     }
                 }
             }

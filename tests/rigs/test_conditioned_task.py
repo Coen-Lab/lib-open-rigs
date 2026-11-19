@@ -140,3 +140,18 @@ def test_auditory_azimuths_are_numbers_in_range_or_all():
     assert ct.AuditoryStimulus(initial_azimuths_deg=["all", -60]).initial_azimuths_deg == ["all", -60]
     with pytest.raises(ValidationError, match="outside"):
         ct.AuditoryStimulus(initial_azimuths_deg=[200])
+
+
+def test_a_condition_sets_a_penalised_miss_s_sound_level_by_its_three_level_path():
+    from open_rigs.core.task import Penalty
+    from open_rigs.rigs import conditions
+
+    class Penalised(Params):
+        penalty: Penalty = Penalty(timeout_seconds=2)
+
+    path = "penalty.noResponse.sound.levelDbfs"
+    assert conditions.flatten(Penalised.model_validate(task()).model_dump(by_alias=True, mode="json"))[path] is None
+    rows = ct.expected_combination_rows(Penalised, task(set={path: ["mute", -40]}))
+    assert [row["values"][path] for row in rows] == ["mute", "mute", -40, -40]  # azimuthsDeg picks fastest
+    with pytest.raises(ValidationError, match="levelDbfs"):
+        Penalised.model_validate(task(set={path: "off"}))
