@@ -19,7 +19,7 @@ namespace OpenRigs.Audio
         public const double StimulusDbfs = -30;
 
         /// <summary>The lab's default level of the penalty sound, in dBFS RMS.</summary>
-        public const double PenaltyDbfs = -30;
+        public const double PenaltyDbfs = -35;
 
         /// <summary>The lab's default level of a reward tone, in dBFS RMS.</summary>
         public const double RewardToneDbfs = -35;

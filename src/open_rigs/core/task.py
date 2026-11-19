@@ -197,7 +197,7 @@ class Optogenetics(TaskBlock):
 # scale (OpenRigs.Audio SoundLevel, the same numbers and rule). Defaults only: each task file states its own; they become
 # dB SPL once the speakers are calibrated for loudness. The background noise has no task setting: BACKGROUND_LEVEL_DBFS.
 STIMULUS_LEVEL_DBFS = -30.0
-PENALTY_LEVEL_DBFS = -30.0
+PENALTY_LEVEL_DBFS = -35.0
 REWARD_TONE_LEVEL_DBFS = -35.0
 BACKGROUND_LEVEL_DBFS = -60.0
 PEAK_LIMIT_DBFS = -1.0  # every buffer's peak stays under this after equalisation, checked as the buffer is built

@@ -128,7 +128,7 @@ def test_optogenetics_schema_holds_the_same_rule():
 
 def test_penalty_sound_has_only_a_level_mute_its_off_and_the_timeout_has_no_lab_default():
     penalty = Penalty.model_validate({"timeoutSeconds": 2})
-    assert penalty.sound.level_dbfs == -30
+    assert penalty.sound.level_dbfs == -35
     assert set(Penalty.model_json_schema(by_alias=True)["$defs"]["PenaltySound"]["properties"]) == {"levelDbfs"}
     assert Penalty.model_validate({"timeoutSeconds": 2, "sound": {"levelDbfs": "mute"}}).sound.level_dbfs == "mute"
     for refused in ("off", False, -0.5):
@@ -139,8 +139,8 @@ def test_penalty_sound_has_only_a_level_mute_its_off_and_the_timeout_has_no_lab_
 
 
 def test_sound_levels_have_the_lab_defaults_in_dbfs_rms():
-    # The lab's defaults: stimuli -30, penalty -30, reward tone -35; the background a lab constant, -60 (P15).
-    assert (task.STIMULUS_LEVEL_DBFS, Penalty(timeout_seconds=1).sound.level_dbfs, RewardTone().level_dbfs, task.BACKGROUND_LEVEL_DBFS) == (-30, -30, -35, -60)
+    # The lab's defaults: stimuli -30, penalty -35, reward tone -35; the background a lab constant, -60 (P15).
+    assert (task.STIMULUS_LEVEL_DBFS, Penalty(timeout_seconds=1).sound.level_dbfs, RewardTone().level_dbfs, task.BACKGROUND_LEVEL_DBFS) == (-30, -35, -35, -60)
     assert not hasattr(task, "BackgroundNoise") and not hasattr(task, "StimulusSound")
 
 

@@ -37,7 +37,7 @@ speakerArray:
 
 ## Levels
 
-Every sound plays at a level, never a gain: `levelDbfs`, in dBFS RMS, the RMS of the sound over its whole length as the task gives it (one row, before equalisation) against full scale 1, so a full-scale square wave is 0 dBFS and a full-scale sine -3 dBFS (`SoundLevel.RmsDbfs`). The level sets the sound's gain (`SoundLevel.Gain`); equalisation then shapes it for each speaker. Every buffer's peak, on every channel, must stay under -1 dBFS after equalisation (`SoundLevel.CheckPeak`): a louder one stops the workflow, naming the sound, its peak and channel, and how far to lower its level. The lab's defaults (`SoundLevel`, and `open_rigs.core.task` for the task file) are stimuli -30, penalty sound -30, reward tone -36 and background noise -50; each task file states its own. They become dB SPL once each speaker is calibrated for loudness.
+Every sound plays at a level, never a gain: `levelDbfs`, in dBFS RMS, the RMS of the sound over its whole length as the task gives it (one row, before equalisation) against full scale 1, so a full-scale square wave is 0 dBFS and a full-scale sine -3 dBFS (`SoundLevel.RmsDbfs`). The level sets the sound's gain (`SoundLevel.Gain`); equalisation then shapes it for each speaker. Every buffer's peak, on every channel, must stay under -1 dBFS after equalisation (`SoundLevel.CheckPeak`): a louder one stops the workflow, naming the sound, its peak and channel, and how far to lower its level. The lab's defaults (`SoundLevel`, and `open_rigs.core.task` for the task file) are stimuli -30, penalty sound -35, reward tone -35 and background noise -60; each task file states its own. They become dB SPL once each speaker is calibrated for loudness.
 
 ---
 
