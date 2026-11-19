@@ -18,7 +18,7 @@ namespace OpenRigs.Video
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Sink)]
-    [Description("Records camera frames to an H.264 .mkv through ffmpeg.exe (rig.yml's videoEncoder: codec, ffmpegPath; else libx264 and the ffmpeg.exe on PATH), with a .csv beside it: harpTime, frameId, cameraClockNs, exposureUs, gainDb, one row per frame in the video. Stops the workflow at Start without ffmpeg.exe, and when ffmpeg fails. At the frames' end or Stop it closes the file, waiting at most 20 s, then kills ffmpeg; frames dropped (the queue of 250 full) or ffmpeg failing are an error, or at Stop are written to stderr and a .error.txt beside the video.")]
+    [Description("Records camera frames to an H.264 .mkv through ffmpeg.exe (rig.yml's videoEncoder: codec, ffmpegPath; else libx264 and the ffmpeg.exe on PATH), with a .csv beside it: harpTime, frameId, cameraClockNs, one row per frame in the video. Stops the workflow at Start without ffmpeg.exe, and when ffmpeg fails. At the frames' end or Stop it closes the file, waiting at most 20 s, then kills ffmpeg; frames dropped (the queue of 250 full) or ffmpeg failing are an error, or at Stop are written to stderr and a .error.txt beside the video.")]
     public class FfmpegVideoWriter
     {
         /// <summary>How many frames may wait for ffmpeg: 5 s at 50 Hz, 390 MB of 1440 x 1080 Mono8 frames.</summary>
@@ -51,7 +51,7 @@ namespace OpenRigs.Video
         /// what went wrong. Disposed before the frames end (a Stop, or the next hour's file), it
         /// returns at once and the file closes on its own, the process kept open until it has.
         /// A frame is a <see cref="VideoDataFrame"/> or any type with the same members (Image, and
-        /// ChunkData with FrameID, Timestamp and optionally ExposureTime and Gain), as
+        /// ChunkData with FrameID and Timestamp), as
         /// OpenRigs.Devices' TriggeredSpinnaker include gives.
         /// </summary>
         public IObservable<Timestamped<TFrame>> Process<TFrame>(IObservable<Timestamped<TFrame>> source)

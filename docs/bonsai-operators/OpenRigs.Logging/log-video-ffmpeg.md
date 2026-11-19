@@ -27,8 +27,8 @@ The CSV has one row per frame in the video, in the video's order, written once t
 | `harpTime` | Harp time of the frame's trigger, in seconds |
 | `frameId` | The camera's frame counter (Spinnaker chunk `FrameID`) |
 | `cameraClockNs` | The camera's own clock at the exposure, in nanoseconds (chunk `Timestamp`) |
-| `exposureUs` | The exposure the camera reports for this frame, in microseconds; NaN where unknown |
-| `gainDb` | The gain the camera reports for this frame, in dB; NaN where unknown |
+
+Exposure and gain are not columns: both are fixed while recording, so they are saved once, in `Settings_Rig` (rig.yml's `exposureUs` and `gainDb`) and, where `CameraLiveControls` makes them experiment parameters, in `Settings_Experiment` as they stood at Go.
 
 ---
 

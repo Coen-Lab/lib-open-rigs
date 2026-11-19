@@ -7,8 +7,7 @@ namespace OpenRigs.Video
 {
     /// <summary>
     /// Reads a camera frame of any type as a <see cref="VideoDataFrame"/>, by member name: its
-    /// <c>Image</c> (an IplImage) and its <c>ChunkData</c>'s <c>FrameID</c> and <c>Timestamp</c>, and
-    /// <c>ExposureTime</c> and <c>Gain</c> where it has them (NaN where not). So the writer takes
+    /// <c>Image</c> (an IplImage) and its <c>ChunkData</c>'s <c>FrameID</c> and <c>Timestamp</c>. So the writer takes
     /// what LogVideo takes: OpenRigs.Devices' TriggeredSpinnaker include gives an anonymous type of
     /// those members, not a VideoDataFrame.
     /// </summary>
@@ -26,11 +25,9 @@ namespace OpenRigs.Video
             var image = Member(frame, "Image", typeof(IplImage));
             var chunk = Member(frame, "ChunkData", null);
             var chunkData = Expression.New(
-                typeof(VideoChunkData).GetConstructor(new[] { typeof(long), typeof(long), typeof(double), typeof(double) })!,
+                typeof(VideoChunkData).GetConstructor(new[] { typeof(long), typeof(long) })!,
                 Member(chunk, "FrameID", typeof(long)),
-                Member(chunk, "Timestamp", typeof(long)),
-                OptionalMember(chunk, "ExposureTime"),
-                OptionalMember(chunk, "Gain"));
+                Member(chunk, "Timestamp", typeof(long)));
             Expression body = Expression.New(
                 typeof(VideoDataFrame).GetConstructor(new[] { typeof(IplImage), typeof(VideoChunkData) })!, image, chunkData);
             if (!typeof(TFrame).IsValueType)
@@ -55,11 +52,6 @@ namespace OpenRigs.Video
                 throw new InvalidOperationException("FfmpegVideoWriter needs " + name + " as " + type.Name + ", but " +
                     Describe(owner.Type) + "'s is " + value.Type.Name + ".");
             }
-        }
-
-        static Expression OptionalMember(Expression owner, string name)
-        {
-            return Find(owner.Type, name) == null ? Expression.Constant(double.NaN) : Member(owner, name, typeof(double));
         }
 
         static MemberInfo? Find(Type type, string name)

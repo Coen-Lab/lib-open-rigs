@@ -112,7 +112,7 @@ namespace OpenRigs.Video.Tests
             Assert.AreEqual(75, DecodedFrames(Video));
             Assert.IsFalse(File.Exists(Path.ChangeExtension(Video, ".error.txt")));
             var lines = File.ReadAllLines(Path.ChangeExtension(Video, ".csv"));
-            Assert.AreEqual("harpTime,frameId,cameraClockNs,exposureUs,gainDb", lines[0]);
+            Assert.AreEqual("harpTime,frameId,cameraClockNs", lines[0]);
             Assert.AreEqual(76, lines.Length);
             for (var id = 0; id < 75; id++)
             {
@@ -120,8 +120,7 @@ namespace OpenRigs.Video.Tests
                 Assert.AreEqual(frames[id].Seconds, double.Parse(columns[0], CultureInfo.InvariantCulture));
                 Assert.AreEqual(id.ToString(CultureInfo.InvariantCulture), columns[1]);
                 Assert.AreEqual((1000000L + id * 20000000L).ToString(CultureInfo.InvariantCulture), columns[2]);
-                Assert.AreEqual("19000.5", columns[3]);
-                Assert.AreEqual("0", columns[4]);
+                Assert.AreEqual(3, columns.Length, "exposure and gain are the experiment's settings, not columns");
             }
         }
 
@@ -175,11 +174,11 @@ namespace OpenRigs.Video.Tests
             Assert.AreEqual(30, DecodedFrames(Video));
             var lines = File.ReadAllLines(Path.ChangeExtension(Video, ".csv"));
             Assert.AreEqual(31, lines.Length);
-            Assert.AreEqual(string.Join(",", frames[7].Seconds.ToString("R", CultureInfo.InvariantCulture), "7", (1000000L + 7 * 20000000L).ToString(CultureInfo.InvariantCulture), "19000.5", "1.5"), lines[8]);
+            Assert.AreEqual(string.Join(",", frames[7].Seconds.ToString("R", CultureInfo.InvariantCulture), "7", (1000000L + 7 * 20000000L).ToString(CultureInfo.InvariantCulture)), lines[8]);
         }
 
         [TestMethod]
-        public void AFrameTypeWithoutExposureOrGain_LogsNaN()
+        public void AFrameTypeWithAnIntFrameId_IsTaken()
         {
             RequireFfmpeg();
             var frames = Frames(5).Select(f => Timestamped.Create(new
@@ -191,8 +190,6 @@ namespace OpenRigs.Video.Tests
             writer.Process(frames.ToObservable()).LastOrDefaultAsync().Wait();
             var columns = File.ReadAllLines(Path.ChangeExtension(Video, ".csv"))[3].Split(',');
             Assert.AreEqual("2", columns[1], "an int FrameID is taken too");
-            Assert.AreEqual("NaN", columns[3]);
-            Assert.AreEqual("NaN", columns[4]);
         }
 
         [TestMethod]

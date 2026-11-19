@@ -20,8 +20,8 @@ namespace OpenRigs.Video
     /// </summary>
     internal sealed class FfmpegRecording
     {
-        /// <summary>The CSV's header: the Harp time of the frame's trigger, then the camera's chunk data.</summary>
-        public const string CsvHeader = "harpTime,frameId,cameraClockNs,exposureUs,gainDb";
+        /// <summary>The CSV's header: the Harp time of the frame's trigger, then the camera's frame counter and clock. Exposure and gain are fixed while recording and saved once in the experiment's settings.</summary>
+        public const string CsvHeader = "harpTime,frameId,cameraClockNs";
 
         readonly string fileName;
         readonly double frameRate;
@@ -283,9 +283,7 @@ namespace OpenRigs.Video
             // the frame's own; a row buffered for a second would lose up to a second of rows.
             csv!.Write(frame.Seconds.ToString("R", CultureInfo.InvariantCulture) + "," +
                        chunk.FrameID.ToString(CultureInfo.InvariantCulture) + "," +
-                       chunk.Timestamp.ToString(CultureInfo.InvariantCulture) + "," +
-                       chunk.ExposureTime.ToString("R", CultureInfo.InvariantCulture) + "," +
-                       chunk.Gain.ToString("R", CultureInfo.InvariantCulture) + "\r\n");
+                       chunk.Timestamp.ToString(CultureInfo.InvariantCulture) + "\r\n");
             csv.Flush();
             Interlocked.Increment(ref written);
         }
