@@ -240,13 +240,14 @@ def performance(rows: Iterable[Dict[str, Any]], licks: Optional[Dict[int, bool]]
     Performance is correct / (correct + incorrect) over the trials not offered a single spout as a guide (singleSpoutOffered
     False, as where the task does not record it) and every go/no-go trial (target go or noGo; one spout by design), a go
     trial with no lick (noResponse) counted incorrect. The response rate is the share of trials the mouse responded to: in
-    a go/no-go task (a target go, noGo or noReward) the go trials, else the trials not probe, of those the ones responded to:
+    a go/no-go task (a target go, noGo or noReward) the go trials, else every trial, probes too, of those the ones responded to:
     where the row has a choice, any choice but noResponse (a withheld noGo is none; an auto-reward trial where the mouse
     chose a side is one); with no choice column, an outcome not noResponse. A trial the auto-reward answered (outcome auto,
     or in an older log autoReward and rewarded with no choice made, or correct with no choice column: a trial the drift
     carried into the reward zone) is responded to when the mouse licked in it, between its stimulus onset and its end
     (licks, by trialNumber), and not when it did not; where its licks are unknown it is left out. A probe (no right
-    answer) counts in neither, though rewarded and penalised say what it got."""
+    answer) is left out of Performance; in the response rate it is responded to when the mouse made a choice and not when
+    its choice is noResponse, and left out with no choice column (its outcome, probe, does not say)."""
     rows = list(rows)
     licks = licks or {}
     go_no_go = any(str(r.get("target")) in GO_NO_GO for r in rows)
@@ -259,7 +260,7 @@ def performance(rows: Iterable[Dict[str, Any]], licks: Optional[Dict[int, bool]]
             correct += outcome == "correct"
     answered = asked = 0
     for r in rows:
-        if not (str(r.get("target")) == "go" if go_no_go else r["outcome"] != "probe"):
+        if go_no_go and str(r.get("target")) != "go" or r["outcome"] == "probe" and "choice" not in r:
             continue
         if _auto(r):
             number = _trial_number(r)

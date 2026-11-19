@@ -363,8 +363,9 @@ def test_with_a_choice_column_the_response_is_the_choice():
     # a withheld noGo is no response: only the go trial counts, and it was licked
     assert rate({"target": "go", "outcome": "correct", "choice": "left"},
                 {"target": "noGo", "outcome": "correct", "choice": "noResponse"}) == 1.0
-    # an unlicked probe is left out of the asked trials, so it cannot respond
-    assert rate({"outcome": "correct", "choice": "left"}, {"outcome": "probe", "choice": "noResponse"}) == 1.0
+    # a probe counts in the response rate: a choice is a response, noResponse is none
+    assert rate({"outcome": "correct", "choice": "left"}, {"outcome": "probe", "choice": "noResponse"}) == 0.5
+    assert rate({"outcome": "correct", "choice": "left"}, {"outcome": "probe", "choice": "right"}) == 1.0
     auto = {"autoReward": True, "rewarded": True, "outcome": "correct"}
     assert rate({**auto, "choice": "noResponse"}, {"outcome": "noResponse", "choice": "noResponse"}) == 0.0  # no choice: auto, left out
     assert rate({**auto, "choice": "left"}, {"outcome": "correct", "choice": "left"}) == 1.0  # chose a side: one
@@ -381,7 +382,7 @@ def test_a_folder_that_does_not_exist_is_a_problem(tmp_path):
     assert s.problems == [f"{tmp_path / 'ses-NOPE'} is not a folder"]
 
 
-def test_a_probe_trial_is_accepted_and_left_out_of_performance_and_the_response_rate(tmp_path):
+def test_a_probe_trial_is_accepted_and_left_out_of_performance_and_without_a_choice_of_the_response_rate(tmp_path):
     trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="probe")]
     s = summarise(_experiment(tmp_path, trials, []))
     assert not any("not one of" in p for p in s.problems)
