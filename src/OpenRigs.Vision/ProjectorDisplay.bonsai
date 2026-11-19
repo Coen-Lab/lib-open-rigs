@@ -4,8 +4,10 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:vis="clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision"
+                 xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders"
+                 xmlns:res="clr-namespace:Bonsai.Resources;assembly=Bonsai.System"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A projector's display: the projector's window (ProjectorWindow: DisplayDevice, an orthographic view of azimuth -135 to 135 and elevation -22.5 to 82.5 degrees, created once the whole workflow has subscribed), then mesh mapping and gamma correction from the input (rig.yml's projector: meshPath, gammaPath, each relative to rig.yml's folder, the RigFile subject, as calibration/Projector-Mesh.csv). Stimuli draw on the DrawStimuli subject. Stops the workflow at start, saying so, if the input is null (rig.yml has no projector), either path is a full path or names no file (ResolveRigFile), or DisplayDevice is not a display on this machine (RequireDisplay). Disposed on the render thread (DisposeOnRenderThread), so stopping from another thread cannot crash Bonsai. RawProjectorDisplay is the same window without the two corrections.</Description>
+  <Description>A projector's display: a BonVision window on DisplayDevice (created once the whole workflow has subscribed, as ProjectorWindow's is) with an orthographic view of azimuth -135 to 135 and elevation -22.5 to 82.5 degrees, then mesh mapping and gamma correction from the input (rig.yml's projector: meshPath, gammaPath, each relative to rig.yml's folder, the RigFile subject, as calibration/Projector-Mesh.csv). Stimuli draw on the DrawStimuli subject. Stops the workflow at start, saying so, if the input is null (rig.yml has no projector), either path is a full path or names no file (ResolveRigFile), or DisplayDevice is not a display on this machine (RequireDisplay). Disposed on the render thread (DisposeOnRenderThread), so stopping from another thread cannot crash Bonsai. RawProjectorDisplay is the same window without the two corrections. The window, DrawStimuli and the corrections are one group of two branches, with no output: fed from ProjectorWindow's output across an include, the corrections left the window never created, with no error.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -30,12 +32,63 @@
               <Property Name="Width" />
               <Property Name="Height" />
             </Expression>
-            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Vision:ProjectorWindow.bonsai">
-              <DisplayDevice>First</DisplayDevice>
-              <WindowState>Fullscreen</WindowState>
-              <Width>1920</Width>
-              <Height>1080</Height>
-              <ClearColor>Gray</ClearColor>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="gl:CreateWindow">
+                <gl:Width>1920</gl:Width>
+                <gl:Height>1080</gl:Height>
+                <gl:VSync>On</gl:VSync>
+                <gl:SwapSync>false</gl:SwapSync>
+                <gl:ClearColor>Gray</gl:ClearColor>
+                <gl:ClearMask>DepthBufferBit ColorBufferBit</gl:ClearMask>
+                <gl:CursorVisible>false</gl:CursorVisible>
+                <gl:Location xsi:nil="true" />
+                <gl:WindowBorder>Fixed</gl:WindowBorder>
+                <gl:WindowState>Fullscreen</gl:WindowState>
+                <gl:DisplayDevice>First</gl:DisplayDevice>
+                <gl:TargetRenderFrequency>60</gl:TargetRenderFrequency>
+                <gl:TargetUpdateFrequency>60</gl:TargetUpdateFrequency>
+                <gl:RenderState />
+                <gl:GraphicsMode>
+                  <gl:ColorFormat>
+                    <gl:Red>8</gl:Red>
+                    <gl:Green>8</gl:Green>
+                    <gl:Blue>8</gl:Blue>
+                    <gl:Alpha>8</gl:Alpha>
+                  </gl:ColorFormat>
+                  <gl:Depth>16</gl:Depth>
+                  <gl:Stencil>0</gl:Stencil>
+                  <gl:Samples>0</gl:Samples>
+                  <gl:AccumulatorFormat>
+                    <gl:Red>0</gl:Red>
+                    <gl:Green>0</gl:Green>
+                    <gl:Blue>0</gl:Blue>
+                    <gl:Alpha>0</gl:Alpha>
+                  </gl:AccumulatorFormat>
+                  <gl:Buffers>2</gl:Buffers>
+                  <gl:Stereo>false</gl:Stereo>
+                </gl:GraphicsMode>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:SubscribeOn">
+                <rx:Scheduler>CurrentThreadScheduler</rx:Scheduler>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.BonVisionResources.bonsai" />
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="res:LoadResources" />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="gl:RenderFrame" />
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.OrthographicView.bonsai">
+              <Left>-135</Left>
+              <Right>135</Right>
+              <Bottom>-22.5</Bottom>
+              <Top>82.5</Top>
+            </Expression>
+            <Expression xsi:type="rx:PublishSubject">
+              <Name>DrawStimuli</Name>
             </Expression>
             <Expression xsi:type="ExternalizedMapping">
               <Property Name="FileName" />
@@ -54,10 +107,15 @@
           </Nodes>
           <Edges>
             <Edge From="0" To="1" Label="Source1" />
-            <Edge From="1" To="3" Label="Source1" />
-            <Edge From="2" To="3" Label="Source2" />
-            <Edge From="3" To="5" Label="Source1" />
-            <Edge From="4" To="5" Label="Source2" />
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="2" To="3" Label="Source1" />
+            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="5" To="6" Label="Source1" />
+            <Edge From="6" To="7" Label="Source1" />
+            <Edge From="7" To="9" Label="Source1" />
+            <Edge From="8" To="9" Label="Source2" />
+            <Edge From="9" To="11" Label="Source1" />
+            <Edge From="10" To="11" Label="Source2" />
           </Edges>
         </Workflow>
       </Expression>

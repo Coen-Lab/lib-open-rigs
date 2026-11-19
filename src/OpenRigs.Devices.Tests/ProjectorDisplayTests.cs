@@ -12,7 +12,7 @@ using System.Xml.Linq;
 namespace OpenRigs.Devices.Tests
 {
     /// <summary>
-    /// ProjectorDisplay and RawProjectorDisplay share one window (ProjectorWindow) and differ only in the corrections
+    /// ProjectorDisplay and RawProjectorDisplay open the same window (ProjectorWindow's) and differ only in the corrections
     /// after it; each refuses a display that is not there, naming itself, before the window opens.
     /// </summary>
     [TestClass]
@@ -22,17 +22,26 @@ namespace OpenRigs.Devices.Tests
         static readonly XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
         static readonly XNamespace Vision = "clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision";
 
+        // RawProjectorDisplay includes ProjectorWindow; ProjectorDisplay keeps the same window in one group with its corrections
+        // (fed from ProjectorWindow's output, they left the window never created), so its window must stay ProjectorWindow's.
         [TestMethod]
-        public void BothDisplaysCheckThenDisposeTheOneSharedWindow()
+        public void BothDisplaysCheckThenDisposeTheSameWindow()
         {
+            XElement[] WindowChain(XDocument d) => d.Descendants(Bonsai + "Combinator")
+                .Where(c => ((string)c.Attribute(Xsi + "type")).EndsWith(":CreateWindow") || ((string)c.Attribute(Xsi + "type")) == "rx:SubscribeOn")
+                .ToArray();
+            var shared = WindowChain(Embedded("ProjectorWindow"));
+            Assert.AreEqual(2, shared.Length, "ProjectorWindow has one CreateWindow and one SubscribeOn");
+            Assert.AreEqual(1, Embedded("RawProjectorDisplay").Descendants(Bonsai + "Expression")
+                .Count(e => (string)e.Attribute("Path") == "OpenRigs.Vision:ProjectorWindow.bonsai"), "RawProjectorDisplay includes ProjectorWindow once");
+            var own = WindowChain(Embedded("ProjectorDisplay"));
+            string Settings(XElement[] chain) => string.Join("\n", chain.SelectMany(c => c.DescendantsAndSelf())
+                .Select(e => e.Name + "=" + (string)e.Attribute(Xsi + "type") + (string)e.Attribute(Xsi + "nil") + (e.HasElements ? "" : e.Value)));
+            Assert.AreEqual(Settings(shared), Settings(own), "ProjectorDisplay's window differs from ProjectorWindow's");
+
             foreach (var name in new[] { "ProjectorDisplay", "RawProjectorDisplay" })
             {
                 var display = Embedded(name);
-                Assert.IsFalse(display.Descendants(Bonsai + "Combinator").Any(c => ((string)c.Attribute(Xsi + "type")).EndsWith(":CreateWindow")),
-                    name + " has a window of its own");
-                Assert.AreEqual(1, display.Descendants(Bonsai + "Expression")
-                    .Count(e => (string)e.Attribute("Path") == "OpenRigs.Vision:ProjectorWindow.bonsai"), name + " includes ProjectorWindow once");
-
                 var nodes = display.Root.Element(Bonsai + "Workflow").Element(Bonsai + "Nodes").Elements(Bonsai + "Expression").ToList();
                 var edges = display.Root.Element(Bonsai + "Workflow").Element(Bonsai + "Edges").Elements(Bonsai + "Edge").ToList();
                 int Index(string type) => nodes.FindIndex(n => (string)n.Element(Bonsai + "Combinator")?.Attribute(Xsi + "type") == type);
@@ -147,6 +156,102 @@ namespace OpenRigs.Devices.Tests
             StringAssert.Contains(error.Message, string.Format(refusal, Path.Combine(rig, "calibration", "Projector-Mesh.csv")));
         }
 
+        // A projector with a mesh and a gamma file, as a projector rig's rig.yml has it: the window opens and renders frames on
+        // DrawStimuli (64 px and windowed on the first display). With the corrections fed from ProjectorWindow's
+        // output across an include, no window was created and no frame came, with no error.
+        [TestMethod]
+        public void ProjectorDisplayRendersFrames_WithMeshAndGamma()
+        {
+            if (DisplayDevice.GetDisplay(DisplayIndex.First) == null) Assert.Inconclusive("No display here, so no window can open.");
+            var root = Path.Combine(Path.GetTempPath(), "ProjectorDisplayTests", Guid.NewGuid().ToString("N"));
+            var rig = Path.Combine(root, Environment.MachineName);
+            Directory.CreateDirectory(Path.Combine(rig, "calibration"));
+            WriteIdentityMesh(Path.Combine(rig, "calibration", "Projector-Mesh.csv"));
+            WriteGammaRamp(Path.Combine(rig, "calibration", "Projector-Gamma.bmp"));
+            File.WriteAllText(Path.Combine(rig, "rig.yml"), "rootPath: " + root
+                + "\nprojector:\n  meshPath: calibration/Projector-Mesh.csv\n  gammaPath: calibration/Projector-Gamma.bmp\n");
+            var xml = $@"<WorkflowBuilder Version=""2.9.0"" xmlns:xsi=""{Xsi}"" xmlns:t=""clr-namespace:OpenRigs.Devices.Tests;assembly=OpenRigs.Devices.Tests"" xmlns=""{Bonsai}"">
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type=""IncludeWorkflow"" Path=""OpenRigs.Devices:ReadLabRig.bonsai"">
+        <ConfigRoot>{System.Security.SecurityElement.Escape(root)}</ConfigRoot>
+      </Expression>
+      <Expression xsi:type=""SubscribeSubject"">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type=""MemberSelector"">
+        <Selector>Projector</Selector>
+      </Expression>
+      <Expression xsi:type=""IncludeWorkflow"" Path=""OpenRigs.Vision:ProjectorDisplay.bonsai"">
+        <DisplayDevice>First</DisplayDevice>
+        <WindowState>Normal</WindowState>
+        <Width>64</Width>
+        <Height>64</Height>
+      </Expression>
+      <Expression xsi:type=""SubscribeSubject"">
+        <Name>DrawStimuli</Name>
+      </Expression>
+      <Expression xsi:type=""Combinator"">
+        <Combinator xsi:type=""t:{nameof(FrameSeen)}"" />
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From=""1"" To=""2"" Label=""Source1"" />
+      <Edge From=""2"" To=""3"" Label=""Source1"" />
+      <Edge From=""4"" To=""5"" Label=""Source1"" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>";
+            WorkflowBuilder builder;
+            using (var reader = XmlReader.Create(new StringReader(xml)))
+            {
+                builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            }
+
+            FrameSeen.Seen.Reset();
+            Exception error = null;
+            bool rendered;
+            try
+            {
+                using (builder.Workflow.BuildObservable().Subscribe(_ => { }, e => error = e))
+                {
+                    rendered = FrameSeen.Seen.Wait(TimeSpan.FromSeconds(20));
+                }
+            }
+            finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+
+            Assert.IsNull(error, "ProjectorDisplay stopped: " + error);
+            Assert.IsTrue(rendered, "ProjectorDisplay rendered no frame in 20 s: no window was created.");
+        }
+
+        // BonVision's mesh: 30 by 30 rows of x, y, u, v, intensity, u fastest; here the identity map.
+        static void WriteIdentityMesh(string path)
+        {
+            const int n = 30;
+            var rows = from v in Enumerable.Range(0, n) from u in Enumerable.Range(0, n)
+                       select string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0},{1},{2},{3},1",
+                           2.0 * u / (n - 1) - 1, 2.0 * v / (n - 1) - 1, (double)u / (n - 1), (double)v / (n - 1));
+            File.WriteAllLines(path, rows);
+        }
+
+        // A 256 by 1, 24-bit gamma lookup: the identity ramp.
+        static void WriteGammaRamp(string path)
+        {
+            const int width = 256, header = 54, size = header + width * 3;
+            var bmp = new byte[size];
+            bmp[0] = (byte)'B'; bmp[1] = (byte)'M';
+            BitConverter.GetBytes(size).CopyTo(bmp, 2);
+            BitConverter.GetBytes(header).CopyTo(bmp, 10);
+            BitConverter.GetBytes(40).CopyTo(bmp, 14);
+            BitConverter.GetBytes(width).CopyTo(bmp, 18);
+            BitConverter.GetBytes(1).CopyTo(bmp, 22);
+            BitConverter.GetBytes((short)1).CopyTo(bmp, 26);
+            BitConverter.GetBytes((short)24).CopyTo(bmp, 28);
+            BitConverter.GetBytes(width * 3).CopyTo(bmp, 34);
+            for (var i = 0; i < width; i++) bmp[header + 3 * i] = bmp[header + 3 * i + 1] = bmp[header + 3 * i + 2] = (byte)i;
+            File.WriteAllBytes(path, bmp);
+        }
+
         static XDocument Embedded(string name)
         {
             using (var stream = typeof(OpenRigs.Vision.RequireDisplay).Assembly.GetManifestResourceStream("OpenRigs.Vision." + name + ".bonsai"))
@@ -154,6 +259,20 @@ namespace OpenRigs.Devices.Tests
                 Assert.IsNotNull(stream, name + ".bonsai is not embedded in OpenRigs.Vision.");
                 return XDocument.Load(stream);
             }
+        }
+    }
+
+    /// <summary>Sets <see cref="Seen"/> on the first value: here, the first frame drawn on DrawStimuli.</summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Sink)]
+    public class FrameSeen
+    {
+        internal static readonly ManualResetEventSlim Seen = new ManualResetEventSlim();
+
+        /// <summary>Passes the sequence on, setting <see cref="Seen"/> at its first value.</summary>
+        public IObservable<TSource> Process<TSource>(IObservable<TSource> source)
+        {
+            return System.Reactive.Linq.Observable.Do(source, _ => Seen.Set());
         }
     }
 }

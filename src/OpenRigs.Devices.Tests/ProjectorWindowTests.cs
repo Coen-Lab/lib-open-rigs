@@ -21,7 +21,7 @@ namespace OpenRigs.Devices.Tests
     /// source from the workflow's own subscription at that moment takes the connection lock first and
     /// then waits for the replay lock: neither thread moves, the workflow never finishes starting, and
     /// no error can stop it (on a rig, two launches in ten, Bonsai left in Starting until
-    /// killed). ProjectorWindow, the window of ProjectorDisplay and RawProjectorDisplay, is therefore created only once the workflow has subscribed.
+    /// killed). The window of RawProjectorDisplay (ProjectorWindow) and of ProjectorDisplay is therefore created only once the workflow has subscribed.
     /// </summary>
     [TestClass]
     public class ProjectorWindowTests
@@ -32,6 +32,7 @@ namespace OpenRigs.Devices.Tests
 
         // ProjectorWindow as it creates the window, small and windowed, then a node that subscribes the
         // window source while the window loads, as the stimuli a task draws do.
+        // ProjectorDisplay's copy of the window is held equal to this one (ProjectorDisplayTests), so this tests both.
         [TestMethod]
         public void TheWorkflowFinishesSubscribing_WhileItsWindowLoads()
         {

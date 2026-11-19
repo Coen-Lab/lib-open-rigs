@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFrameworks>net472</TargetFrameworks>
     <Nullable>disable</Nullable>
+    <!-- Pulls in the native OpenCV binaries ProjectorDisplay's gamma image loads with -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
