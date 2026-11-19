@@ -525,7 +525,7 @@ def block_text(path: str) -> str:
 def test_the_fixed_logs_are_the_names_their_blocks_write():
     for path, logs in lint.FIXED_LOGS.items():
         text = block_text(path)
-        for inner in ("OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai"):
+        for inner in (lint.TASK_LOGS, "OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai"):
             if f'Path="{inner}"' in text:  # a block that includes another writes its logs too
                 text += block_text(inner)
         assert all(f">{name}<" in text for name, _ in logs), path
@@ -561,6 +561,28 @@ def test_the_task_logs_are_the_lab_s_include_given_the_task_file_as_json(tmp_pat
         "TaskLogs is not given the task file as JSON (the task's SerializeToJson)"]
     expected = "Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;Settings/Settings_ZapitConditions_?Optogenetics"
     assert lint.expected_files_problems(workflow(tmp_path / "d", include(lint.TASK_LOGS) + manifest_node(expected))) == []
+
+
+def test_conditioned_task_logs_count_as_task_logs_and_write_settings_combinations(tmp_path):
+    serialize = '<Expression xsi:type="Combinator"><Combinator xsi:type="t:SerializeToJson" xmlns:t="clr-namespace:Task;assembly=Extensions" /></Expression>'
+    edge = '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow></Expression>'
+    group = '<Expression xsi:type="GroupWorkflow"><Workflow><Nodes>'
+    assert lint.task_logs_problems(workflow(tmp_path, group + serialize + include(lint.CONDITIONED_TASK_LOGS) + edge)) == []
+    # Beside TaskLogs, or with the workflow's own Settings_Combinations writer, refused.
+    both = include(lint.CONDITIONED_TASK_LOGS) + include(lint.TASK_LOGS) + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Combinations</Name>")
+    assert lint.task_logs_problems(workflow(tmp_path / "b", both)) == [
+        "the workflow includes TaskLogs 2 times, not once",
+        "the workflow logs Settings_Combinations itself (ConditionedTaskLogs does)",
+        "ConditionedTaskLogs is not given the task file as JSON (the task's SerializeToJson)",
+        "TaskLogs is not given the task file as JSON (the task's SerializeToJson)"]
+    expected = "Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;Settings/Settings_ZapitConditions_?Optogenetics"
+    assert lint.expected_files_problems(workflow(tmp_path / "c", include(lint.CONDITIONED_TASK_LOGS) + manifest_node(expected))) == [
+        "Settings/Settings_Combinations_ is written but not in ExpectedFiles"]
+    expected += ";Settings/Settings_Combinations_"
+    assert lint.expected_files_problems(workflow(tmp_path / "d", include(lint.CONDITIONED_TASK_LOGS) + manifest_node(expected))) == []
+    # Known by name: the embedded piece writes exactly these.
+    text = block_text(lint.CONDITIONED_TASK_LOGS)
+    assert f'Path="{lint.TASK_LOGS}"' in text and "<Name>Settings_Combinations</Name>" in text
 
 
 def test_no_include_ends_its_logs_when_a_one_shot_write_completes():

@@ -52,6 +52,8 @@ PLAY_PENALTY_SOUND = "OpenRigs.Audio:PlayPenaltySound.bonsai"
 SET_ZAPIT_TRIGGER_LINE = "OpenRigs.Devices:SetZapitTriggerLine.bonsai"
 LOG_RNG_SEED = "OpenRigs.Logging:LogRngSeed.bonsai"
 TASK_LOGS = "OpenRigs.Logging:TaskLogs.bonsai"
+# TaskLogs with Settings_Combinations, its one writer: a conditioned task includes it in place of TaskLogs.
+CONDITIONED_TASK_LOGS = "OpenRigs.Logging:ConditionedTaskLogs.bonsai"
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
 DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
@@ -1057,18 +1059,22 @@ def rng_seed_problems(wf: Workflow) -> list[str]:
 
 
 def task_logs_problems(wf: Workflow) -> list[str]:
-    """A task's trial log, Settings_Task and Zapit's logs are OpenRigs.Logging's TaskLogs, included once and given the
-    task file as JSON; the workflow includes no LogTrials or ZapitLogs and logs no Settings_Task itself."""
-    count = wf.text.count(f'Path="{TASK_LOGS}"')
+    """A task's trial log, Settings_Task and Zapit's logs are OpenRigs.Logging's TaskLogs (or ConditionedTaskLogs, which
+    includes it and writes Settings_Combinations), included once and given the task file as JSON; the workflow includes
+    no LogTrials or ZapitLogs and logs no Settings_Task (nor, with ConditionedTaskLogs, Settings_Combinations) itself."""
+    conditioned = wf.text.count(f'Path="{CONDITIONED_TASK_LOGS}"')
+    count = wf.text.count(f'Path="{TASK_LOGS}"') + conditioned
     problems = [] if count == 1 else [f"the workflow includes TaskLogs {count} times, not once"]
     problems += [f"the workflow includes {path.split(':')[1].removesuffix('.bonsai').split('.')[-1]} itself (TaskLogs does)"
                  for path in ("OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai") if f'Path="{path}"' in wf.text]
     if "<Name>Settings_Task</Name>" in wf.text:
         problems.append("the workflow logs Settings_Task itself (TaskLogs does)")
+    if conditioned and "<Name>Settings_Combinations</Name>" in wf.text:
+        problems.append("the workflow logs Settings_Combinations itself (ConditionedTaskLogs does)")
     for nodes, edges in _scopes(wf.root):
         for i, n in enumerate(nodes):
-            if n.get("Path") == TASK_LOGS and not any(kind(nodes[a]).endswith(":SerializeToJson") for a, b, _ in edges if b == i):
-                problems.append("TaskLogs is not given the task file as JSON (the task's SerializeToJson)")
+            if n.get("Path") in (TASK_LOGS, CONDITIONED_TASK_LOGS) and not any(kind(nodes[a]).endswith(":SerializeToJson") for a, b, _ in edges if b == i):
+                problems.append(f"{n.get('Path').split(':')[1].removesuffix('.bonsai')} is not given the task file as JSON (the task's SerializeToJson)")
     return problems
 
 
@@ -1098,6 +1104,7 @@ FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is
     "OpenRigs.Devices:ZapitLogs.bonsai": [("Settings_ZapitConditions", "Optogenetics")],  # its replies are Events rows
 }
 FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrials.bonsai"], *FIXED_LOGS["OpenRigs.Devices:ZapitLogs.bonsai"]]
+FIXED_LOGS[CONDITIONED_TASK_LOGS] = [("Settings_Combinations", None), *FIXED_LOGS[TASK_LOGS]]
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
                *DEVICE_GROUPS, LICK_SPOUT_STAGE, REWARD_VALVE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)

@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFrameworks>net472</TargetFrameworks>
     <Nullable>disable</Nullable>
+    <!-- Pulls in the native OpenCV binaries PlayPenaltySound's speakers run on -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,8 +13,16 @@
     <PackageReference Include="MSTest.TestFramework" Version="3.6.3" />
   </ItemGroup>
 
+  <!-- PiecesTests: each workflow piece built and run here, so every assembly its workflow names -->
+  <ItemGroup>
+    <None Update="Pieces\**" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="Bonsai.Scripting.Expressions" Version="2.10.0" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Trials\OpenRigs.Trials.csproj" />
+    <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
+    <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
   </ItemGroup>
 
 </Project>

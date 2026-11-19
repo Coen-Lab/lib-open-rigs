@@ -4,8 +4,12 @@
     <Description>A package providing the trial loop every Open Rigs task runs: its rules, timing, outcome and the trial row's shared columns.</Description>
     <PackageTags>$(PackageTags) Trials</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.3</Version>
+    <Version>0.1.1-coen-lab.4</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="**\*.bonsai" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Devices\OpenRigs.Devices.csproj" />

@@ -3,17 +3,21 @@
 .vscode
 bin
 obj
-Packages
-Bonsai.exe.WebView2
-Bonsai/Settings/
 *.bin
 *.avi
 *.dll
 *.exe
 *.exe.settings
 *.layout
+# The workflow's editor layout, which .bonsai\Setup.ps1 copies to the machine's (camera preview, exposure and gain).
+!config/main.layout
 *.editor
-local
+.bonsai/**
+!.bonsai/Bonsai.config
+!.bonsai/NuGet.config
+!.bonsai/Setup.cmd
+!.bonsai/Setup.ps1
+
 .venv
 
 

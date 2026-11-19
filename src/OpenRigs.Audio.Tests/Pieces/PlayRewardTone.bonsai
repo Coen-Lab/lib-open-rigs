@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:cv="clr-namespace:OpenCV.Net;assembly=OpenCV.Net"
+                 xmlns:test="clr-namespace:OpenRigs.Audio.Tests;assembly=OpenRigs.Audio.Tests"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>PlayRewardTone: the task file (reward tone at -20 dBFS) and the speakers of RIG_FILE at Start, TONE_FILE the tone; two rewarded trials at 0.5 s and 0.7 s. The output describes each buffer sent into RewardToneSounds.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:ToneTaskConfigSource">
+          <test:LevelDbfs>-20</test:LevelDbfs>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>TaskConfig</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:ToneSpeakers">
+          <test:RigFile>RIG_FILE</test:RigFile>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>Speakers</Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="cv:Mat">
+        <rx:Name>RewardToneSounds</rx:Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Timer">
+          <rx:DueTime>PT0.5S</rx:DueTime>
+          <rx:Period>PT0.2S</rx:Period>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Take">
+          <rx:Count>2</rx:Count>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:PlayRewardTone.bonsai">
+        <RewardToneFile>TONE_FILE</RewardToneFile>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardToneSounds</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:ToneDescribe" />
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

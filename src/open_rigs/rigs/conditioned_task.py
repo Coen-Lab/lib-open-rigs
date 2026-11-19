@@ -1,9 +1,9 @@
-"""A task whose trials are drawn from weighted trial conditions, once for every such task (the dome tasks).
+"""A task whose trials are drawn from weighted trial conditions, once for every such task.
 
 A task's parameters model takes `ConditionedTask` beside its lab blocks and states its own RULES, TRIAL_TYPES, REQUIRED and
 SESSION_FIELDS (COMMON_SESSION_FIELDS and its own) as class attributes; the mixin then validates its trial conditions as the
 C# draw (OpenRigs.Trials TrialConditions) builds them, every combination checked as a task, and calls the task's
-`between_trials` hook on the weighted combinations. `schema_extra` gives the model_config's x- keys app-rig-control reads.
+`between_trials` hook on the weighted combinations. `schema_extra` gives the model_config's x- keys the experiment launcher reads.
 `condition_combinations` is the Python copy of the C# build; `expected_combination_rows` turns it into Settings_Combinations'
 rows for the agreement test each task runs on its golden files (test_combinations).
 """
@@ -148,7 +148,7 @@ class TrialCondition(TaskBlock, Generic[TrialTypeT]):
 
 
 class Curriculum(TaskBlock):
-    """The Mouse Curriculum stage these values are, and the task file's only record of the stage: app-rig-control fills it at
+    """The Mouse Curriculum stage these values are, and the task file's only record of the stage: the launcher fills it at
     launch from the share's curriculum file, its stage's values written over the task file's; empty in a repo's task files.
     Bonsai only records it (OpenRigs.Core CurriculumCheck.Problem, the same rules)."""
 
@@ -348,7 +348,7 @@ def combination_agreement_problems(model: type[pydantic.BaseModel], fixtures: Pa
 
 
 def handover_problems(model: type[pydantic.BaseModel], fixtures: Path, overridden: dict[tuple[str, int], str] | None = None) -> list[str]:
-    """Each golden task file (fixtures/handover/*.yml, written by app-rig-control) the task model refuses, and each condition
+    """Each golden task file (fixtures/handover/*.yml, written by the experiment launcher) the task model refuses, and each condition
     whose trialType is not the one x-trial-types derives (unless `overridden` names it, file and index, with the reason);
     an override matching no golden condition is a problem too."""
     import yaml
@@ -356,7 +356,7 @@ def handover_problems(model: type[pydantic.BaseModel], fixtures: Path, overridde
     overridden = overridden or {}
     golden = sorted((fixtures / "handover").glob("*.yml"))
     if not golden:
-        return [f"{fixtures / 'handover'} is empty: run app-rig-control's tests/test_handover.py with HANDOVER_REGEN=1"]
+        return [f"{fixtures / 'handover'} is empty: run the launcher's tests/test_handover.py with HANDOVER_REGEN=1"]
     problems = []
     counts = {}
     for path in golden:

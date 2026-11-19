@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>What every trial's outcome sets off, the same in every task: give it each trial's outcome (a TrialOutcome or a type derived from it, as the trial loop's Outcome event carries it). Its Row is sent into TrialRow; on a rewarded outcome (Rewarded) its Reward into RewardRequests (OpenRigs.Devices Rewards); with the penalty sound (PenaltySoundOn) it plays the lab's penalty sound (OpenRigs.Audio PlayPenaltySound). Each outcome is passed on, for what a task sets off at the outcome itself (its spouts, a reward tone). Needs TrialRow and RewardRequests declared, and what PlayPenaltySound needs (TaskConfig, Speakers).</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Row</Selector>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>TrialRow</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>Rewarded?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Rewarded</Selector>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Reward</Selector>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>RewardRequests</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>PenaltySoundOn?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>PenaltySoundOn</Selector>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:PlayPenaltySound.bonsai" />
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="0" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="0" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="0" To="8" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

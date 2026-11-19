@@ -14,7 +14,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Pieces\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
+    <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
   </ItemGroup>
 
 </Project>

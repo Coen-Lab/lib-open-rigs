@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:cv="clr-namespace:OpenCV.Net;assembly=OpenCV.Net"
+                 xmlns:test="clr-namespace:OpenRigs.Trials.Tests;assembly=OpenRigs.Trials.Tests"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>TrialOutcomeEffects: the task file (penalty level -30) and the speakers of RIG_FILE at Start, then three outcomes (PieceOutcomes: rewarded, penalty sound, neither). The output describes the include's output, TrialRow, RewardRequests and PenaltySounds.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceTaskConfigSource" />
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>TaskConfig</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceSpeakers">
+          <test:RigFile>RIG_FILE</test:RigFile>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>Speakers</Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:Timestamped(test:PieceRow)">
+        <rx:Name>TrialRow</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Tuple(sys:String,sys:Double)">
+        <rx:Name>RewardRequests</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="cv:Mat">
+        <rx:Name>PenaltySounds</rx:Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceOutcomes" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Trials:TrialOutcomeEffects.bonsai" />
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceDescribe" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TrialRow</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceDescribe" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardRequests</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceDescribe" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PenaltySounds</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceDescribe" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="9" To="16" Label="Source1" />
+      <Edge From="11" To="16" Label="Source2" />
+      <Edge From="13" To="16" Label="Source3" />
+      <Edge From="15" To="16" Label="Source4" />
+      <Edge From="16" To="17" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

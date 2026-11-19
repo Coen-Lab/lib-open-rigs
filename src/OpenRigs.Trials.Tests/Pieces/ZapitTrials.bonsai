@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
+                 xmlns:test="clr-namespace:OpenRigs.Trials.Tests;assembly=OpenRigs.Trials.Tests"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>ZapitTrials: the ZapitTrigger line DO1, the rules at 0.1 s with a laser stopping as STOP (HARDWARE triggered, cap LASER_MAX s), then trial 1's Arm, Trigger, Outcome (at OUTCOME_AT s, none at 0) and TriggerOff as TrialEvents. The output describes ZapitCommands and BehaviorBoard-Main.Commands.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceTriggerLine" />
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>ZapitTriggerLine</Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="zap:ZapitCommand">
+        <rx:Name>ZapitCommands</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>BehaviorBoard-Main.Commands</rx:Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceZapitEvents">
+          <test:OutcomeAt>OUTCOME_AT</test:OutcomeAt>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>TrialEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceZapitRun">
+          <test:Stop>STOP</test:Stop>
+          <test:HardwareTriggered>HARDWARE</test:HardwareTriggered>
+          <test:LaserMaxSeconds>LASER_MAX</test:LaserMaxSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Trials:ZapitTrials.bonsai" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ZapitCommands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceDescribe" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceDescribe" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="9" To="12" Label="Source1" />
+      <Edge From="11" To="12" Label="Source2" />
+      <Edge From="12" To="13" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
