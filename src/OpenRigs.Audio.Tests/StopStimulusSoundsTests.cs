@@ -21,6 +21,7 @@ namespace OpenRigs.Audio.Tests.Mixer
         public readonly List<long> Buffers = new List<long>();
         public readonly List<double> Stops = new List<double>();
         public float Gain;
+        public bool Looping;
 
         public void Append(long buffer)
         {
@@ -37,7 +38,7 @@ namespace OpenRigs.Audio.Tests.Mixer
 
         public MixerSource CreateSource(bool looping, bool playing, float initialGain)
         {
-            var source = new MixerSource { Gain = initialGain };
+            var source = new MixerSource { Gain = initialGain, Looping = looping };
             lock (Sources) Sources.Add(source);
             return source;
         }
@@ -134,7 +135,7 @@ namespace OpenRigs.Audio.Tests
   <Expression xsi:type=""MemberSelector""><Selector>Item2</Selector></Expression>
   <Expression xsi:type=""scr:ExpressionTransform""><scr:Expression>CreateSource(false, true, 1)</scr:Expression></Expression>
   <Expression xsi:type=""MulticastSubject""><Name>StimulusSource</Name></Expression>
-  <Expression xsi:type=""Combinator""><Combinator xsi:type=""rx:Timer""><rx:DueTime>PT0.4S</rx:DueTime><rx:Period>PT0.2S</rx:Period></Combinator></Expression>
+  <Expression xsi:type=""Combinator""><Combinator xsi:type=""rx:Timer""><rx:DueTime>BUFFERS</rx:DueTime><rx:Period>PT0.2S</rx:Period></Combinator></Expression>
   <Expression xsi:type=""rx:SelectMany""><Name>PlayStim</Name><Workflow><Nodes>
     <Expression xsi:type=""WorkflowInput""><Name>Source1</Name></Expression>
     <Expression xsi:type=""Combinator""><Combinator xsi:type=""rx:Take""><rx:Count>1</rx:Count></Combinator></Expression>
@@ -149,7 +150,41 @@ namespace OpenRigs.Audio.Tests
     <Expression xsi:type=""MulticastSubject""><Name>StopStimulusSounds</Name></Expression>
     <Expression xsi:type=""WorkflowOutput"" />
   </Nodes><Edges><Edge From=""0"" To=""1"" Label=""Source1"" /><Edge From=""1"" To=""2"" Label=""Source1"" /><Edge From=""2"" To=""3"" Label=""Source1"" /></Edges></Workflow></Expression>
+  <Expression xsi:type=""rx:BehaviorSubject"" TypeArguments=""sys:Int64""><rx:Name>LoopStimulusSounds</rx:Name></Expression>
+  <Expression xsi:type=""SubscribeSubject""><Name>LoopStimulusSounds</Name></Expression>
+  <Expression xsi:type=""SubscribeSubject""><Name>Mixer</Name></Expression>
+  <Expression xsi:type=""Combinator""><Combinator xsi:type=""aud:CheckMixerStarted""><aud:Sound>LoopStimulusSounds</aud:Sound></Combinator></Expression>
+  <Expression xsi:type=""rx:PublishSubject""><Name>MixerLoopStimulusSounds</Name></Expression>
+  <Expression xsi:type=""SubscribeSubject""><Name>MixerLoopStimulusSounds</Name></Expression>
+  <Expression xsi:type=""MulticastSubject""><Name>StopStimulusSounds</Name></Expression>
+  <Expression xsi:type=""rx:SelectMany""><Name>PlayStimulusLoop</Name><Workflow><Nodes>
+    <Expression xsi:type=""WorkflowInput""><Name>Source1</Name></Expression>
+    <Expression xsi:type=""SubscribeSubject""><Name>Mixer</Name></Expression>
+    <Expression xsi:type=""Combinator""><Combinator xsi:type=""rx:Take""><rx:Count>1</rx:Count></Combinator></Expression>
+    <Expression xsi:type=""scr:ExpressionTransform""><scr:Expression>CreateSource(true, true, 1)</scr:Expression></Expression>
+    <Expression xsi:type=""MulticastSubject""><Name>LoopSource</Name></Expression>
+    <Expression xsi:type=""Combinator""><Combinator xsi:type=""mix:AppendBuffer"" /></Expression>
+    <Expression xsi:type=""WorkflowOutput"" />
+  </Nodes><Edges><Edge From=""0"" To=""5"" Label=""Source1"" /><Edge From=""1"" To=""2"" Label=""Source1"" /><Edge From=""2"" To=""3"" Label=""Source1"" /><Edge From=""3"" To=""4"" Label=""Source1"" /><Edge From=""4"" To=""5"" Label=""Source2"" /><Edge From=""5"" To=""6"" Label=""Source1"" /></Edges></Workflow></Expression>
+  <Expression xsi:type=""rx:BehaviorSubject"" TypeArguments=""mix:MixerSource""><rx:Name>LoopSource</rx:Name></Expression>
+  <Expression xsi:type=""SubscribeSubject""><Name>StopStimulusSounds</Name></Expression>
+  <Expression xsi:type=""SubscribeSubject""><Name>LoopSource</Name></Expression>
+  <Expression xsi:type=""Combinator""><Combinator xsi:type=""rx:WithLatestFrom"" /></Expression>
+  <Expression xsi:type=""MemberSelector""><Selector>Item2</Selector></Expression>
+  <Expression xsi:type=""Combinator""><Combinator xsi:type=""mix:StopSource""><mix:FadeDuration>0.005</mix:FadeDuration></Combinator></Expression>
+  <Expression xsi:type=""Combinator""><Combinator xsi:type=""rx:Timer""><rx:DueTime>LOOPS</rx:DueTime><rx:Period>PT0.4S</rx:Period></Combinator></Expression>
+  <Expression xsi:type=""rx:SelectMany""><Name>LoopStim</Name><Workflow><Nodes>
+    <Expression xsi:type=""WorkflowInput""><Name>Source1</Name></Expression>
+    <Expression xsi:type=""Combinator""><Combinator xsi:type=""rx:Take""><rx:Count>1</rx:Count></Combinator></Expression>
+    <Expression xsi:type=""scr:ExpressionTransform""><scr:Expression>it + 100</scr:Expression></Expression>
+    <Expression xsi:type=""MulticastSubject""><Name>LoopStimulusSounds</Name></Expression>
+    <Expression xsi:type=""WorkflowOutput"" />
+  </Nodes><Edges><Edge From=""0"" To=""1"" Label=""Source1"" /><Edge From=""1"" To=""2"" Label=""Source1"" /><Edge From=""2"" To=""3"" Label=""Source1"" /><Edge From=""3"" To=""4"" Label=""Source1"" /></Edges></Workflow></Expression>
 </Nodes><Edges>
+  <Edge From=""29"" To=""31"" Label=""Source1"" /><Edge From=""30"" To=""31"" Label=""Source2"" /><Edge From=""31"" To=""32"" Label=""Source1"" />
+  <Edge From=""33"" To=""34"" Label=""Source1"" /><Edge From=""34"" To=""35"" Label=""Source1"" />
+  <Edge From=""37"" To=""39"" Label=""Source1"" /><Edge From=""38"" To=""39"" Label=""Source2"" /><Edge From=""39"" To=""40"" Label=""Source1"" /><Edge From=""40"" To=""41"" Label=""Source1"" />
+  <Edge From=""42"" To=""43"" Label=""Source1"" />
   <Edge From=""2"" To=""3"" Label=""Source1"" />
   <Edge From=""4"" To=""6"" Label=""Source1"" /><Edge From=""5"" To=""6"" Label=""Source2"" /><Edge From=""6"" To=""7"" Label=""Source1"" />
   <Edge From=""8"" To=""9"" Label=""Source1"" /><Edge From=""9"" To=""10"" Label=""Source1"" /><Edge From=""11"" To=""12"" Label=""Source1"" />
@@ -162,12 +197,13 @@ namespace OpenRigs.Audio.Tests
 </WorkflowBuilder>
 ";
 
-        // Sounds 0-3 at 0.4, 0.6, 0.8 and 1.0 s, the mixer at 0.25 s and stops from `stops` every 0.4 s; each source's
-        // buffers and stops at 1.2 s, before the workflow is disposed.
-        static List<Mixer.MixerSource> Run(string stops)
+        // The mixer at 0.25 s; sounds 0, 1, 2... every 0.2 s from `buffers`, stops and looped sounds 100, 101... every 0.4 s
+        // from `stops` and `loops`; each source's buffers and stops at 1.2 s, before the workflow is disposed.
+        static List<Mixer.MixerSource> Run(string stops, string buffers = "PT0.4S", string loops = "PT1H")
         {
             WorkflowBuilder builder;
-            using (var reader = XmlReader.Create(new StringReader(Workflow.Replace("STOPS", stops)))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            var xml = Workflow.Replace("STOPS", stops).Replace("BUFFERS", buffers).Replace("LOOPS", loops);
+            using (var reader = XmlReader.Create(new StringReader(xml))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
             var run = Expression.Lambda<Func<IObservable<long>>>(builder.Workflow.Build()).Compile()();
             lock (Mixer.MixerContext.Sources) Mixer.MixerContext.Sources.Clear();
             Exception error = null;
@@ -178,7 +214,7 @@ namespace OpenRigs.Audio.Tests
                 // Copies, as the workflow's disposal stops CreateSource's source.
                 lock (Mixer.MixerContext.Sources) return Mixer.MixerContext.Sources.Select(s =>
                 {
-                    var copy = new Mixer.MixerSource { Gain = s.Gain };
+                    var copy = new Mixer.MixerSource { Gain = s.Gain, Looping = s.Looping };
                     copy.Buffers.AddRange(s.Buffers);
                     copy.Stops.AddRange(s.Stops);
                     return copy;
@@ -211,6 +247,36 @@ namespace OpenRigs.Audio.Tests
         }
 
         [TestMethod]
+        public void ALoopPlaysUntilAStopAndASecondLoopReplacesTheFirst()
+        {
+            // Loops at 0.3 s and 0.7 s, a stop at 0.9 s, a third loop at 1.1 s; no plain stimulus sounds.
+            var sources = Run("PT0.9S", buffers: "PT1H", loops: "PT0.3S");
+            var loops = sources.Where(s => s.Looping).ToList();
+            Assert.AreEqual(3, loops.Count);
+            CollectionAssert.AreEqual(new long[] { 100 }, loops[0].Buffers);
+            Assert.AreEqual(0.005, loops[0].Stops.FirstOrDefault(), "the second loop stops the first");
+            CollectionAssert.AreEqual(new long[] { 101 }, loops[1].Buffers);
+            Assert.AreEqual(0.005, loops[1].Stops.FirstOrDefault(), "the stop at 0.9 s stops the second loop");
+            CollectionAssert.AreEqual(new long[] { 102 }, loops[2].Buffers);
+            Assert.AreEqual(0, loops[2].Stops.Count, "the third loop plays on");
+            Assert.IsTrue(sources.All(s => s.Gain == 1));
+            Assert.IsTrue(sources.Where(s => !s.Looping).All(s => s.Buffers.Count == 0), "a loop never reaches the stimulus source");
+        }
+
+        [TestMethod]
+        public void ALoopStopsTheStimulusPlayingAndTheNextStimulusPlaysOnAFreshSource()
+        {
+            // Sounds at 0.4, 0.6 s..., a loop at 0.5 s (sound 0 playing): sound 0 stops, the loop plays, and sound 1 at
+            // 0.6 s plays on a fresh stimulus source beside it.
+            var sources = Run("PT1H", loops: "PT0.5S");
+            var plain = sources.Where(s => !s.Looping).ToList();
+            CollectionAssert.AreEqual(new long[] { 0 }, plain[0].Buffers);
+            CollectionAssert.AreEqual(new[] { 0.005 }, plain[0].Stops);
+            CollectionAssert.AreEqual(new long[] { 100 }, sources.First(s => s.Looping).Buffers);
+            CollectionAssert.AreEqual(new long[] { 1, 2 }, plain[1].Buffers);
+        }
+
+        [TestMethod]
         public void SpeakerMixerHasTheStopPathTested()
         {
             string xml;
@@ -219,6 +285,10 @@ namespace OpenRigs.Audio.Tests
             StringAssert.Matches(xml, new Regex("TypeArguments=\"sys:Object\">\\s*<rx:Name>StopStimulusSounds</rx:Name>"));
             StringAssert.Contains(xml, "<mix:FadeDuration>0.005</mix:FadeDuration>");
             StringAssert.Contains(xml, "<scr:Expression>CreateSource(false, true, 1)</scr:Expression>");
-            StringAssert.Contains(xml, "<Name>AppendStimulusSound</Name>");        }
+            StringAssert.Contains(xml, "<Name>AppendStimulusSound</Name>");
+            StringAssert.Matches(xml, new Regex("TypeArguments=\"cvn:Mat\">\\s*<rx:Name>LoopStimulusSounds</rx:Name>"));
+            StringAssert.Contains(xml, "<scr:Expression>CreateSource(true, true, 1)</scr:Expression>");
+            StringAssert.Contains(xml, "<Name>PlayStimulusLoop</Name>");
+        }
     }
 }

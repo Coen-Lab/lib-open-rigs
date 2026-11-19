@@ -9,7 +9,7 @@
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A rig's speakers and their mixer, for every workflow that plays sounds. Loads rig.yml's speakers and their filters once at Start (LoadSpeakers, from RigFile) into the AsyncSubject Speakers, and starts the mixer on rig.yml's speakerArray.device (from RigConfigs) no sooner than 3 s after Start, or rig.yml's longer bootDelaySeconds: deliberate, as a fault while the sound card boots can blue-screen the PC, so never remove or shorten it. It plays four sounds over each other, each a mixer buffer already at its level (SpeakerBuffer, PenaltySoundBuffer, SpeakerSet.Buffer: every level in dBFS RMS, from the task file, each buffer carrying its own), multicast into the BehaviorSubject it declares for it: StimulusSounds (each trial's stimulus), RewardToneSounds, PenaltySounds and BackgroundNoise (one buffer, looped, faded in over 2 s when it comes). The mixer plays StimulusSounds, RewardToneSounds and PenaltySounds through a PublishSubject each (Mixer&lt;name&gt;): a sound starts only once the one before it on its source has finished. Any value a workflow multicasts into StopStimulusSounds (a BehaviorSubject of Object it declares) fades the stimulus sound playing then out over 5 ms and drops it, with any stimulus buffer queued behind it; the next StimulusSounds buffer plays at its level on a fresh source (StimulusSource). A stop with no stimulus playing is unheard. A stimulus or penalty sound sent before the mixer has started stops the workflow, naming it (CheckMixerStarted); a reward tone sent before is not played, as a manual drop before Go may be. BackgroundNoise plays when the mixer starts. Once the mixer has started it announces MixerStarted into ReadyStages (OpenRigs.Core AnnounceStage, which never completes it), so Ready waits for it on a workflow that adds MixerStarted to ReadyGate's PieceStages. A workflow sends only what it plays. Needs RigFile, RigConfigs and ReadyStages (OpenRigs.Devices ReadLabRig and ReadyGate) and Bonsai.Mixer in the workflow's environment.</Description>
+  <Description>A rig's speakers and their mixer, for every workflow that plays sounds. Loads rig.yml's speakers and their filters once at Start (LoadSpeakers, from RigFile) into the AsyncSubject Speakers, and starts the mixer on rig.yml's speakerArray.device (from RigConfigs) no sooner than 3 s after Start, or rig.yml's longer bootDelaySeconds: deliberate, as a fault while the sound card boots can blue-screen the PC, so never remove or shorten it. It plays four sounds over each other, each a mixer buffer already at its level (SpeakerBuffer, PenaltySoundBuffer, SpeakerSet.Buffer: every level in dBFS RMS, from the task file, each buffer carrying its own), multicast into the BehaviorSubject it declares for it: StimulusSounds (each trial's stimulus), RewardToneSounds, PenaltySounds and BackgroundNoise (one buffer, looped, faded in over 2 s when it comes). The mixer plays StimulusSounds, RewardToneSounds and PenaltySounds through a PublishSubject each (Mixer&lt;name&gt;): a sound starts only once the one before it on its source has finished. Each buffer multicast into LoopStimulusSounds (a BehaviorSubject of Mat it declares) plays over and over, its sync copy with it, on a fresh looping source (LoopSource), once any stimulus playing has been stopped as StopStimulusSounds stops it. Any value a workflow multicasts into StopStimulusSounds (a BehaviorSubject of Object it declares) fades the stimulus playing then, looped or not, out over 5 ms and drops it, with any stimulus buffer queued behind it; the next StimulusSounds buffer plays at its level on a fresh source (StimulusSource). A stop with no stimulus playing is unheard. A stimulus, looped stimulus or penalty sound sent before the mixer has started stops the workflow, naming it (CheckMixerStarted); a reward tone sent before is not played, as a manual drop before Go may be. BackgroundNoise plays when the mixer starts. Once the mixer has started it announces MixerStarted into ReadyStages (OpenRigs.Core AnnounceStage, which never completes it), so Ready waits for it on a workflow that adds MixerStarted to ReadyGate's PieceStages. A workflow sends only what it plays. Needs RigFile, RigConfigs and ReadyStages (OpenRigs.Devices ReadLabRig and ReadyGate) and Bonsai.Mixer in the workflow's environment.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -318,6 +318,88 @@
       <Expression xsi:type="MulticastSubject">
         <Name>StimulusSource</Name>
       </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="cvn:Mat">
+        <rx:Name>LoopStimulusSounds</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LoopStimulusSounds</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Mixer</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="aud:CheckMixerStarted">
+          <aud:Sound>LoopStimulusSounds</aud:Sound>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>MixerLoopStimulusSounds</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>MixerLoopStimulusSounds</Name>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>StopStimulusSounds</Name>
+      </Expression>
+      <Expression xsi:type="rx:SelectMany">
+        <Name>PlayStimulusLoop</Name>
+        <Description>Plays the buffer over and over on a fresh looping source (LoopSource), once the stimulus playing has been stopped.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Mixer</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Take">
+                <rx:Count>1</rx:Count>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>CreateSource(true, true, 1)</scr:Expression>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>LoopSource</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="mix:AppendBuffer" />
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="5" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="2" To="3" Label="Source1" />
+            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="4" To="5" Label="Source2" />
+            <Edge From="5" To="6" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="mix:MixerSourceContext">
+        <rx:Name>LoopSource</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>StopStimulusSounds</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>LoopSource</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Item2</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Name>LoopFadeOut</Name>
+        <Description>Fades the looping stimulus out over 5 ms and drops it.</Description>
+        <Combinator xsi:type="mix:StopSource">
+          <mix:FadeDuration>0.005</mix:FadeDuration>
+        </Combinator>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -358,6 +440,15 @@
       <Edge From="53" To="54" Label="Source1" />
       <Edge From="54" To="55" Label="Source1" />
       <Edge From="55" To="56" Label="Source1" />
+      <Edge From="58" To="60" Label="Source1" />
+      <Edge From="59" To="60" Label="Source2" />
+      <Edge From="60" To="61" Label="Source1" />
+      <Edge From="62" To="63" Label="Source1" />
+      <Edge From="63" To="64" Label="Source1" />
+      <Edge From="66" To="68" Label="Source1" />
+      <Edge From="67" To="68" Label="Source2" />
+      <Edge From="68" To="69" Label="Source1" />
+      <Edge From="69" To="70" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
