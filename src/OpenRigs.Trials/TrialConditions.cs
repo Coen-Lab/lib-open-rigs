@@ -12,8 +12,6 @@ namespace OpenRigs.Trials
     /// TrialCondition implements it in a small partial class.</summary>
     public interface ITrialCondition
     {
-        /// <summary>Gets the condition's trialType, the task's enum.</summary>
-        Enum TrialType { get; }
         /// <summary>Gets its relative draw weight.</summary>
         int Weight { get; }
         /// <summary>Gets the groups of paths whose lists share one picked index.</summary>
@@ -36,15 +34,16 @@ namespace OpenRigs.Trials
         bool OptogeneticsEnabled { get; }
     }
 
-    /// <summary>What a task's C# reads from its schema (its generated TaskSchema): x-session-fields, the list fields, x-max-combinations.</summary>
+    /// <summary>What a task's C# reads from its schema (its generated TaskSchema): x-session-fields, the list fields, x-max-combinations, x-trial-types.</summary>
     public sealed class ConditionsSchema
     {
-        /// <summary>Creates the schema's facts.</summary>
-        public ConditionsSchema(IEnumerable<string> sessionFields, IEnumerable<string> listFields, int maxCombinations)
+        /// <summary>Creates the schema's facts; trialTypes is x-trial-types as JSON.</summary>
+        public ConditionsSchema(IEnumerable<string> sessionFields, IEnumerable<string> listFields, int maxCombinations, string trialTypes)
         {
             SessionFields = sessionFields.ToArray();
             ListFields = listFields.ToArray();
             MaxCombinations = maxCombinations;
+            TrialTypes = Newtonsoft.Json.Linq.JArray.Parse(trialTypes);
         }
 
         /// <summary>Gets what a condition may not set (the path or any path under it).</summary>
@@ -53,12 +52,14 @@ namespace OpenRigs.Trials
         public string[] ListFields { get; private set; }
         /// <summary>Gets the most combinations one condition may expand into.</summary>
         public int MaxCombinations { get; private set; }
+        /// <summary>Gets x-trial-types: how a condition's trialType is derived from its values (OpenRigs.Trials TrialTypes).</summary>
+        public Newtonsoft.Json.Linq.JArray TrialTypes { get; private set; }
     }
 
     /// <summary>One of the task's trialConditions as built at Go (TrialConditions.Build).</summary>
     public class TrialConditionDraw<TTask>
     {
-        /// <summary>The condition's trialType, its trials'.</summary>
+        /// <summary>The condition's trialType, its trials', derived from its values (TrialTypes.Derive).</summary>
         public string TrialType;
         /// <summary>Its relative draw weight.</summary>
         public int Weight;
@@ -117,8 +118,9 @@ namespace OpenRigs.Trials
         /// trialConditions) at their dotted paths and read back, once for every combination: each pairs group's lists (the
         /// set's, else the task's) zipped, equally long; then by path each other list cell of its set and every list field one
         /// pick (a scalar field's list one value, a list field's entry a one-entry list); all combined as a product, the first
-        /// cell's pick changing fastest (each combination's Id its row, across the session), at most MaxCombinations. Refused,
-        /// each named: a session field, a path that is not a task field, an optogenetics path with optogenetics off, a missing
+        /// cell's pick changing fastest (each combination's Id its row, across the session), at most MaxCombinations. Each
+        /// condition's trialType is derived from its set over the task's values (TrialTypes.Derive). Refused, each named: a
+        /// condition no x-trial-types entry names, a session field, a path that is not a task field, an optogenetics path with optogenetics off, a missing
         /// weight, a YAML merge key, a set that is not a map or a key that is not a path, a bad pairs group. Adds a problem for
         /// each condition that cannot be built, and returns null then.</summary>
         public static List<TrialConditionDraw<TTask>> Build<TTask>(string taskText, IConditionedTask task, Func<string, TTask> read, ConditionsSchema schema, List<string> problems)
@@ -142,12 +144,23 @@ namespace OpenRigs.Trials
             var writer = new StringWriter();
             stripped.Save(writer, false);
             var baseText = writer.ToString();
+            var leaves = TaskYaml.Flatten(task, new string[0]);
             var built = new List<TrialConditionDraw<TTask>>();
             int id = 0;
             for (int i = 0; i < typed.Count; i++)
             {
                 var c = typed[i];
-                var trialType = EnumNames.Name(c.TrialType);
+                string trialType;
+                try
+                {
+                    var setValues = c.Set is System.Collections.IDictionary ? Newtonsoft.Json.Linq.JObject.FromObject(c.Set).Properties().ToDictionary(p => p.Name, p => p.Value) : new Dictionary<string, Newtonsoft.Json.Linq.JToken>();
+                    trialType = TrialTypes.Derive(schema.TrialTypes, leaves, setValues, c.Pairs);
+                }
+                catch (InvalidOperationException e)
+                {
+                    problems.Add(string.Format("trialConditions[{0}]: {1}", i, e.Message));
+                    continue;
+                }
                 var where = string.Format("trialConditions[{0}] ({1})", i, trialType);
                 var before = problems.Count;
                 if (c.Weight < 0) problems.Add(where + ": its weight is below 0");

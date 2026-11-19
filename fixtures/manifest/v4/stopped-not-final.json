@@ -68,6 +68,7 @@
   ],
   "spout_positions": null,
   "trial_columns": null,
+  "stream_columns": null,
   "run": {
     "outcome": "stopped",
     "final": false,

@@ -69,9 +69,13 @@ def curriculum_stage(session: Path) -> dict[str, Any] | None:
 
 def trial_conditions(session: Path) -> list[dict[str, Any]] | None:
     """The trialConditions a session ran with, from its Settings_Task: the list the trialConditionId column indexes, each
-    {trialType, weight, pairs, set} (a missing set as {}). None without a task file."""
+    {trialType, weight, pairs, set} (a missing set as {}), its trialType the one derived at Go (Settings_Combinations'
+    rows). None without a task file."""
     task = _task(session)
-    return None if task is None else [{**c, "set": c.get("set") or {}} for c in task["trialConditions"]]
+    if task is None:
+        return None
+    names = {row["trialConditionId"]: row["trialType"] for row in _settings(session, "Combinations").get("rows", [])}
+    return [{"trialType": names[i], **c, "set": c.get("set") or {}} for i, c in enumerate(task["trialConditions"])]
 
 
 def trial_weights(session: Path) -> dict[str, float] | None:

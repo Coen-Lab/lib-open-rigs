@@ -72,8 +72,8 @@ namespace OpenRigs.Core
             return problems;
         }
 
-        /// <summary>A stimulus: the contrasts each finite, 0 or more, at least one; the sound's amplitude finite, 0 or more.</summary>
-        public static List<string> StimulusProblems(IList<double> contrasts, double amplitude)
+        /// <summary>A stimulus: the contrasts each finite, 0 or more, at least one; the sound's level in dBFS RMS from -120 to -1, or NaN for mute.</summary>
+        public static List<string> StimulusProblems(IList<double> contrasts, double levelDbfs)
         {
             var problems = new List<string>();
             var any = false;
@@ -83,8 +83,8 @@ namespace OpenRigs.Core
                 any = true;
                 if (!(c >= 0) || double.IsInfinity(c)) bad = true;
             }
-            if (!any || bad) problems.Add("contrasts must each be a finite number, 0 or more, at least one");
-            if (!(amplitude >= 0) || double.IsInfinity(amplitude)) problems.Add("auditoryStimulus.amplitude must be a finite number, 0 or more");
+            if (!any || bad) problems.Add("visualStimulus.contrasts must each be a finite number, 0 or more, at least one");
+            if (!double.IsNaN(levelDbfs) && !(levelDbfs >= -120 && levelDbfs <= -1)) problems.Add("auditoryStimulus.levelDbfs must be mute or a number of dBFS RMS from -120 to -1");
             return problems;
         }
 

@@ -59,8 +59,21 @@ namespace OpenRigs.Audio.Tests
         [TestMethod]
         public void ReadsMonoPcm()
         {
-            var sound = Wave.Read(Riff(Chunk("fmt ", Fmt()), Chunk("data", Samples(-32768, 32767))), "test", 48000);
-            CollectionAssert.AreEqual(new[] { -1f, 1f }, Values(sound));
+            var sound = Wave.Read(Riff(Chunk("fmt ", Fmt()), Chunk("data", Samples(-32768, 0, 16384, 32767))), "test", 48000);
+            CollectionAssert.AreEqual(new[] { -1f, 0f, 0.5f, 32767f / 32768f }, Values(sound));
+        }
+
+        // Digital silence reads exactly 0, so an int16 pulse train's gaps are silent stretches:
+        // 47.6 ms on, 77.4 ms of zeros measures 4.19 dB above its whole-length RMS.
+        [TestMethod]
+        public void AnInt16PulseTrainsZeroGapsAreLeftOutOfItsLevel()
+        {
+            var on = (int)(0.0476 * 48000);
+            var samples = Enumerable.Range(0, 8 * 6000).Select(i => (short)(i % 6000 < on ? (i % 2 == 0 ? 16384 : -16384) : 0)).ToArray();
+            var train = Wave.Read(Riff(Chunk("fmt ", Fmt()), Chunk("data", Samples(samples))), "test", 48000);
+            var whole = 10 * Math.Log10(Values(train).Sum(s => (double)s * s) / samples.Length);
+            Assert.AreEqual(4.19, SoundLevel.RmsDbfs(train, 48000) - whole, 0.01);
+            Assert.AreEqual(-6.0206, SoundLevel.RmsDbfs(train, 48000), 1e-4);
         }
 
         // A chunk id is four bytes, not four UTF-8 characters: bytes that are one UTF-8 character

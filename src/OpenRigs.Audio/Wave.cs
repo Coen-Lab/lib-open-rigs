@@ -15,8 +15,8 @@ namespace OpenRigs.Audio
         }
 
         /// <summary>
-        /// A mono WAV as one row of floats: 16-bit PCM in -1 to 1 (-32768 to 32767 onto -1 to 1, as production's
-        /// Rescale), 32-bit float as stored; stops unless it is at the audio device's rate, as nothing converts a rate.
+        /// A mono WAV as one row of floats: 16-bit PCM divided by 32768 (digital silence
+        /// reads exactly 0, so SoundLevel can find silent stretches), 32-bit float as stored; stops unless it is at the audio device's rate, as nothing converts a rate.
         /// </summary>
         public static Mat Read(string path, int sampleRate)
         {
@@ -68,7 +68,7 @@ namespace OpenRigs.Audio
                     }
                     int count = size / (bits / 8);
                     var values = new float[count];
-                    for (int i = 0; i < count; i++) values[i] = ieee ? reader.ReadSingle() : (reader.ReadInt16() + 32768f) * (2f / 65535f) - 1f;
+                    for (int i = 0; i < count; i++) values[i] = ieee ? reader.ReadSingle() : reader.ReadInt16() / 32768f;
                     var sound = new Mat(1, count, Depth.F32, 1);
                     Marshal.Copy(values, 0, sound.Data, count);
                     return Tuple.Create(rate, sound);

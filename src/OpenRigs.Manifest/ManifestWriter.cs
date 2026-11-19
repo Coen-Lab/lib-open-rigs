@@ -24,6 +24,7 @@ namespace OpenRigs.Manifest
         public JsonObject Launch;
         public List<object> ConfigFiles = new List<object>();
         public JsonObject TrialColumns;
+        public JsonObject StreamColumns;
         public JsonObject SpoutPositions;
         public List<object> Notes = new List<object>();
     }
@@ -61,8 +62,8 @@ namespace OpenRigs.Manifest
 
         public string ManifestPath { get { return manifestPath; } }
 
-        /// <summary>Reads what the manifest takes from Start: the workflow, its repository and commit, the command line, each configuration file and the trial columns file.</summary>
-        public static StartSnapshot Snapshot(string configFiles, string configRoot, bool hasRunInput, string trialColumns = null)
+        /// <summary>Reads what the manifest takes from Start: the workflow, its repository and commit, the command line, each configuration file and the columns files.</summary>
+        public static StartSnapshot Snapshot(string configFiles, string configRoot, bool hasRunInput, string trialColumns = null, string streamColumns = null)
         {
             var snapshot = new StartSnapshot();
             var args = Environment.GetCommandLineArgs();
@@ -86,6 +87,17 @@ namespace OpenRigs.Manifest
             string trialNote;
             snapshot.TrialColumns = Manifest.TrialColumns.Read(trialColumns, root ?? workflowFolder, out trialNote);
             if (trialNote != null) snapshot.Notes.Add(trialNote);
+            var streams = Manifest.TrialColumns.Streams(streamColumns);
+            if (streams.Count > 0)
+            {
+                snapshot.StreamColumns = new JsonObject();
+                foreach (var stream in streams)
+                {
+                    string streamNote;
+                    snapshot.StreamColumns.Add(stream.Key, Manifest.TrialColumns.Read(stream.Value, root ?? workflowFolder, out streamNote, stream.Key + " columns"));
+                    if (streamNote != null) snapshot.Notes.Add(streamNote);
+                }
+            }
             if (!hasRunInput) snapshot.Notes.Add("No run input: the outcome is read from OpenRigs.Control's phase when the workflow stops.");
             var note = ConfigRootNote(configRoot, RigConfigPath(configFiles, configRoot));
             if (note != null) snapshot.Notes.Add(note);
@@ -348,6 +360,7 @@ namespace OpenRigs.Manifest
             doc.Add("config_files", start.ConfigFiles);
             doc.Add("spout_positions", start.SpoutPositions);
             doc.Add("trial_columns", start.TrialColumns);
+            doc.Add("stream_columns", start.StreamColumns);
             doc.Add("run", run);
             doc.Add("expected", expected);
             doc.Add("notes", notes.Cast<object>().ToList());

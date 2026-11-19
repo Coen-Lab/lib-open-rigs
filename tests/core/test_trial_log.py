@@ -134,7 +134,7 @@ TABLE_COLUMNS = {
     "rewardUl": {"type": "double", "copyOf": "reward.sizeUl"}, "delay": {"type": "double", "copyOf": "delaySeconds"},
 }
 TABLE_TASK = {"taskParameters": {"contrasts": [0, 1], "target": "left", "stim": {"azimuth": [-60]}, "reward": {"sizeUl": 3},
-                                 "delaySeconds": "NaN", "trialConditions": [{"trialType": "visual"}, {"trialType": "auditory"}]}}
+                                 "delaySeconds": "NaN", "trialConditions": [{"weight": 1}, {"weight": 1}]}}
 TABLE = {"rows": [
     {"trialCombinationId": 0, "trialConditionId": 0, "trialType": "visual", "conditionWeight": 1, "values": {"contrasts": 0, "reward.sizeUl": 3, "target": "left"}},
     {"trialCombinationId": 1, "trialConditionId": 0, "trialType": "visual", "conditionWeight": 1, "values": {"contrasts": 1, "reward.sizeUl": float("nan"), "target": "left"}},
@@ -210,6 +210,19 @@ def test_check_catches_a_planted_mismatch(tmp_path, trial, column, value, words)
     for call in (trial_log.check, trial_log.read):
         with pytest.raises(ValueError, match=re.escape(words)):
             call(run)
+
+
+def test_a_level_s_mute_is_logged_as_nan(tmp_path):
+    table = {"rows": [{**row, "values": {**row["values"], "sound.levelDbfs": level}} for row, level in zip(TABLE["rows"], ("mute", -40, "mute"))]}
+    log = [{**row, "auditoryLevelDbfs": level} for row, level in zip(TABLE_LOG, ("NaN", "-40", "NaN"))]
+    run = table_run(tmp_path / "clean", log=log, table=table)
+    manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "auditoryLevelDbfs": {"type": "double", "copyOf": "sound.levelDbfs"}}})
+    trial_log.check(run)
+    log[0]["auditoryLevelDbfs"] = "-40"
+    run = table_run(tmp_path / "planted", log=log, table=table)
+    manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "auditoryLevelDbfs": {"type": "double", "copyOf": "sound.levelDbfs"}}})
+    with pytest.raises(ValueError, match="trial 1: auditoryLevelDbfs -40.0, its combination 0's sound.levelDbfs is nan"):
+        trial_log.check(run)
 
 
 def test_copy_of_comes_from_the_manifest_only(tmp_path):

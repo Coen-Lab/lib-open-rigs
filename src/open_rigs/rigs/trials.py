@@ -129,7 +129,8 @@ OPTOGENETICS_COLUMNS: List[Column] = [
 CONDITIONS_COLUMNS: List[Column] = [
     ("trialConditionId", "int", None,
      "The 0-based index of the trial's condition in trialConditions of the task file as run (Settings_Task), which gives its "
-     "trialType, weight, pairs and condition-level values (set). A repeat keeps the condition of the trial it repeats."),
+     "weight, pairs and condition-level values (set), from which its trialType is derived at Go. A repeat keeps the condition of "
+     "the trial it repeats."),
     ("trialCombinationId", "int", None,
      "The trial's row in the experiment's Settings_Combinations (0-based, session-wide): the combination it was drawn from, one "
      "pick of every list (pairs zipped), whose values that differ between combinations or from Settings_Task are the row's "

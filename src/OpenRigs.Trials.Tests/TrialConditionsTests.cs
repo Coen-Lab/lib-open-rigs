@@ -11,11 +11,9 @@ namespace OpenRigs.Trials.Tests
 
     public class Condition : ITrialCondition
     {
-        [YamlDotNet.Serialization.YamlMember(Alias = "trialType")][Newtonsoft.Json.JsonProperty("trialType")] public Kind TrialType { get; set; }
         [YamlDotNet.Serialization.YamlMember(Alias = "weight")][Newtonsoft.Json.JsonProperty("weight")] public int Weight { get; set; }
         [YamlDotNet.Serialization.YamlMember(Alias = "pairs")][Newtonsoft.Json.JsonProperty("pairs")] public List<List<string>> Pairs { get; set; } = new List<List<string>>();
         [YamlDotNet.Serialization.YamlMember(Alias = "set")][Newtonsoft.Json.JsonProperty("set")] public object Set { get; set; }
-        Enum ITrialCondition.TrialType { get { return TrialType; } }
     }
 
     public class Stage : ICurriculum
@@ -51,7 +49,8 @@ namespace OpenRigs.Trials.Tests
     [TestClass]
     public class TrialConditionsTests
     {
-        static readonly ConditionsSchema Schema = new ConditionsSchema(new[] { "rngSeed", "trialConditions", "optogenetics.enabled" }, new[] { "contrasts" }, 8);
+        const string Types = @"[{""trialType"":""visual"",""if"":{""properties"":{""contrasts"":{""contains"":{""exclusiveMinimum"":0}}},""required"":[""contrasts""]}},{""trialType"":""neutral""}]";
+        static readonly ConditionsSchema Schema = new ConditionsSchema(new[] { "rngSeed", "trialConditions", "optogenetics.enabled" }, new[] { "contrasts" }, 8, Types);
 
         static string Text(string conditions)
         {
@@ -68,7 +67,7 @@ namespace OpenRigs.Trials.Tests
         public void EachConditionExpandsIntoItsCombinationsFirstCellFastest()
         {
             var problems = new List<string>();
-            var built = Build(Text("  - {trialType: visual, weight: 2, set: {delaySeconds: [1, 2]}}\n  - {trialType: visual, weight: 1}\n"), problems);
+            var built = Build(Text("  - {weight: 2, set: {delaySeconds: [1, 2]}}\n  - {weight: 1}\n"), problems);
             CollectionAssert.AreEqual(new string[0], problems);
             var first = built[0].Combinations;
             CollectionAssert.AreEqual(new[] { "1 0.5", "1 1", "2 0.5", "2 1" }, first.Select(m => m.Task.DelaySeconds + " " + m.Task.Contrasts.Single()).ToArray());
@@ -83,15 +82,15 @@ namespace OpenRigs.Trials.Tests
         {
             var cases = new Dictionary<string, string>
             {
-                { "  - {trialType: visual, weight: 1, set: {rngSeed: 1}}\n", "trialConditions[0] (visual) sets or pairs rngSeed, a session field (x-session-fields: rngSeed)" },
-                { "  - {trialType: visual, weight: 1, set: {optogenetics: {enabled: true}}}\n", "trialConditions[0] (visual) sets or pairs optogenetics, a session field (x-session-fields: optogenetics.enabled)" },
-                { "  - {trialType: visual, weight: 1, set: {nope: 1}}\n", "trialConditions[0] (visual) sets or pairs nope, which is not a task field" },
-                { "  - {trialType: visual, weight: 1, set: {optogenetics.power: 2}}\n", "trialConditions[0] (visual) sets optogenetics.power with optogenetics off" },
-                { "  - {trialType: visual}\n", "trialConditions[0] (visual): it has no weight" },
-                { "  - {trialType: visual, weight: 1, set: 3}\n", "trialConditions[0] (visual): its set is not a map" },
-                { "  - {trialType: visual, weight: 1, pairs: [[contrasts]]}\n", "trialConditions[0] (visual): each pairs group needs two paths or more, each path in one group" },
-                { "  - {trialType: visual, weight: 1, set: {delaySeconds: [1, 2, 3]}}\n", "trialConditions[0] (visual) expands into 6 combinations, more than 8 (x-max-combinations)" },
-                { "  - {trialType: visual, weight: 0}\n", "trialConditions needs a condition with a weight above 0" },
+                { "  - {weight: 1, set: {rngSeed: 1}}\n", "trialConditions[0] (visual) sets or pairs rngSeed, a session field (x-session-fields: rngSeed)" },
+                { "  - {weight: 1, set: {optogenetics: {enabled: true}}}\n", "trialConditions[0] (visual) sets or pairs optogenetics, a session field (x-session-fields: optogenetics.enabled)" },
+                { "  - {weight: 1, set: {nope: 1}}\n", "trialConditions[0] (visual) sets or pairs nope, which is not a task field" },
+                { "  - {weight: 1, set: {optogenetics.power: 2}}\n", "trialConditions[0] (visual) sets optogenetics.power with optogenetics off" },
+                { "  - {}\n", "trialConditions[0] (visual): it has no weight" },
+                { "  - {weight: 1, set: 3}\n", "trialConditions[0] (visual): its set is not a map" },
+                { "  - {weight: 1, pairs: [[contrasts]]}\n", "trialConditions[0] (visual): each pairs group needs two paths or more, each path in one group" },
+                { "  - {weight: 1, set: {delaySeconds: [1, 2, 3]}}\n", "trialConditions[0] (visual) expands into 6 combinations, more than 8 (x-max-combinations)" },
+                { "  - {weight: 0}\n", "trialConditions needs a condition with a weight above 0" },
             };
             foreach (var c in cases)
             {
@@ -107,11 +106,53 @@ namespace OpenRigs.Trials.Tests
             }
         }
 
+        // P9: a condition's trialType is derived from its set over the task's values, never stored.
+        [TestMethod]
+        public void EachConditionsTrialTypeIsDerivedFromItsValues()
+        {
+            var problems = new List<string>();
+            var built = Build(Text("  - {weight: 1}\n  - {weight: 1, set: {contrasts: [0]}}\n"), problems);
+            CollectionAssert.AreEqual(new string[0], problems);
+            CollectionAssert.AreEqual(new[] { "visual", "neutral" }, built.Select(c => c.TrialType).ToArray());
+            Assert.AreEqual("trialConditions[1] (neutral)", built[1].Where);
+            StringAssert.Contains(TrialConditions.CombinationsJson(TaskYaml.Read<Logic>(Text("  - {weight: 1}\n")).TaskParameters, built, Schema), "\"trialType\": \"neutral\"");
+        }
+
+        [TestMethod]
+        public void AStoredTrialTypeIsAnUnknownKey()
+        {
+            Assert.ThrowsException<YamlDotNet.Core.YamlException>(() => TaskYaml.Read<Logic>(Text("  - {trialType: visual, weight: 1}\n")));
+        }
+
+        [TestMethod]
+        public void TrialTypesFollowThePythonRule()
+        {
+            var types = Newtonsoft.Json.Linq.JArray.Parse(@"[{""trialType"":""conflict"",""if"":{""properties"":{""v"":{""contains"":{""exclusiveMinimum"":0}}},""required"":[""v""]},""mirrored"":[""v"",""a""]},{""trialType"":""sound"",""if"":{""properties"":{""level"":{""contains"":{""type"":""number""}}},""required"":[""level""]}},{""trialType"":""neutral""}]");
+            Func<object, Newtonsoft.Json.Linq.JToken> j = Newtonsoft.Json.Linq.JToken.FromObject;
+            var task = new Dictionary<string, Newtonsoft.Json.Linq.JToken> { { "v", j(new[] { 60, -60 }) }, { "a", j(new[] { -60.0, 60.0 }) }, { "level", j("mute") } };
+            var paired = new List<List<string>> { new List<string> { "v", "a" } };
+            var none = new Dictionary<string, Newtonsoft.Json.Linq.JToken>();
+            Assert.AreEqual("conflict", TrialTypes.Derive(types, task, none, paired));
+            Assert.AreEqual("neutral", TrialTypes.Derive(types, task, none, new List<List<string>>()), "mirrored needs the pair");
+            Assert.AreEqual("sound", TrialTypes.Derive(types, task, new Dictionary<string, Newtonsoft.Json.Linq.JToken> { { "level", j(-40) } }, new List<List<string>>()));
+            Assert.IsTrue(TrialTypes.Matches(Newtonsoft.Json.Linq.JToken.Parse(@"{""const"":1}"), j(1.0)));
+            Assert.IsFalse(TrialTypes.Matches(Newtonsoft.Json.Linq.JToken.Parse(@"{""const"":1}"), j(true)));
+            var unread = Newtonsoft.Json.Linq.JArray.Parse(@"[{""trialType"":""x"",""if"":{""properties"":{""level"":{""pattern"":""m""}},""required"":[""level""]}},{""trialType"":""y""}]");
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => TrialTypes.Derive(unread, task, none, paired)).Message, "keyword pattern");
+            var missing = Newtonsoft.Json.Linq.JArray.Parse(@"[{""trialType"":""x"",""if"":{""properties"":{""nope"":{}},""required"":[""nope""]}},{""trialType"":""y""}]");
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => TrialTypes.Derive(missing, task, none, paired)).Message, "names nope, not in the values");
+            var problems = new List<string>();
+            var schema = new ConditionsSchema(Schema.SessionFields, Schema.ListFields, 8, @"[{""trialType"":""x"",""if"":{""properties"":{""contrasts"":{""items"":{""const"":9}}},""required"":[""contrasts""]}},{""trialType"":""y"",""mirrored"":[""contrasts"",""delaySeconds""]}]");
+            var text = Text("  - {weight: 1}\n");
+            Assert.IsNull(TrialConditions.Build(text, TaskYaml.Read<Logic>(text).TaskParameters, t => TaskYaml.Read<Logic>(t).TaskParameters, schema, problems));
+            CollectionAssert.Contains(problems, "trialConditions[0]: no x-trial-types entry matches the condition's values");
+        }
+
         [TestMethod]
         public void TooManyCombinationsAreRefused()
         {
             var problems = new List<string>();
-            Assert.IsNull(Build(Text("  - {trialType: visual, weight: 1, set: {delaySeconds: [1, 2, 3, 4, 5]}}\n"), problems));
+            Assert.IsNull(Build(Text("  - {weight: 1, set: {delaySeconds: [1, 2, 3, 4, 5]}}\n"), problems));
             CollectionAssert.Contains(problems, "trialConditions[0] (visual) expands into 10 combinations, more than 8 (x-max-combinations)");
         }
 
@@ -119,7 +160,7 @@ namespace OpenRigs.Trials.Tests
         public void SettingsCombinationsKeepWhatVariesAndNoSessionField()
         {
             var problems = new List<string>();
-            var text = Text("  - {trialType: visual, weight: 2, set: {delaySeconds: 4}}\n");
+            var text = Text("  - {weight: 2, set: {delaySeconds: 4}}\n");
             var task = TaskYaml.Read<Logic>(text).TaskParameters;
             var built = TrialConditions.Build(text, task, t => TaskYaml.Read<Logic>(t).TaskParameters, Schema, problems);
             var json = Newtonsoft.Json.Linq.JObject.Parse(TrialConditions.CombinationsJson(task, built, Schema));
@@ -134,7 +175,7 @@ namespace OpenRigs.Trials.Tests
         public void TheLoudestIsTheWeightedCombinationsLargest()
         {
             var problems = new List<string>();
-            var built = Build(Text("  - {trialType: visual, weight: 1, set: {delaySeconds: [1, 3]}}\n  - {trialType: visual, weight: 0, set: {delaySeconds: 9}}\n"), problems);
+            var built = Build(Text("  - {weight: 1, set: {delaySeconds: [1, 3]}}\n  - {weight: 0, set: {delaySeconds: 9}}\n"), problems);
             var loudest = LoudestSound.Of(built, t => t.DelaySeconds);
             Assert.AreEqual(3, loudest.LevelDbfs);
             Assert.AreEqual("trialConditions[0] (visual) with contrasts [0.5], delaySeconds 3", loudest.Where);
@@ -182,8 +223,9 @@ namespace OpenRigs.Trials.Tests
             CollectionAssert.AreEqual(new[] { "largeMultiplier is 1, not above 1" }, TaskBlocks.LargeRewardProblems(2, 1, 0, 20));
             Assert.AreEqual(0, TaskBlocks.LargeRewardProblems(8, 3, 0, 20).Count);
             CollectionAssert.AreEqual(new[] { "laserOnProbability must be in [0, 1]" }, TaskBlocks.LaserOnProbabilityProblems(1.5));
-            Assert.AreEqual(2, TaskBlocks.StimulusProblems(new List<double>(), double.NaN).Count);
-            Assert.AreEqual(0, TaskBlocks.StimulusProblems(new List<double> { 0, 1 }, 0).Count);
+            CollectionAssert.AreEqual(new[] { "visualStimulus.contrasts must each be a finite number, 0 or more, at least one", "auditoryStimulus.levelDbfs must be mute or a number of dBFS RMS from -120 to -1" }, TaskBlocks.StimulusProblems(new List<double>(), 0));
+            Assert.AreEqual(0, TaskBlocks.StimulusProblems(new List<double> { 0, 1 }, -40).Count);
+            Assert.AreEqual(0, TaskBlocks.StimulusProblems(new List<double> { 1 }, double.NaN).Count);
         }
     }
 }

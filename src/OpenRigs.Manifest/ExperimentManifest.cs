@@ -37,7 +37,7 @@ namespace OpenRigs.Manifest
 
         // Its settings, externalized in its inner workflow so an include can map a property onto them
         // (OpenRigs.Logging's ExperimentRecords: IngestScript, ExpectedFiles).
-        static readonly string[] Externalized = { "IngestScript", "ConfigRoot", "ConfigFiles", "ExpectedFiles", "TrialColumns" };
+        static readonly string[] Externalized = { "IngestScript", "ConfigRoot", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns" };
 
         /// <summary>
         /// Initializes a copy with the given inner workflow. Bonsai copies a group by this
@@ -92,6 +92,14 @@ namespace OpenRigs.Manifest
             set { Settings.TrialColumns = value; }
         }
 
+        /// <summary>Gets or sets each further WorkflowData log's columns file, as Log=path entries separated by ;.</summary>
+        [Description("Each further WorkflowData log's columns file, as Log=path entries separated by ; (WorkflowData_StimulusState=schemas\\stimulus-state-columns.yml): what each of that log's columns means, as TrialColumns for the trial log. Read once at Start and copied into the manifest as stream_columns, by log. A relative path is from the workflow's repository. Blank: no further log. An entry not Log=path, or two logs whose names differ only in case, stops the workflow at Start; a missing or unreadable file is noted, not an error.")]
+        public string StreamColumns
+        {
+            get { return Settings.StreamColumns; }
+            set { Settings.StreamColumns = value; }
+        }
+
         ExperimentManifestSettings Settings
         {
             get { return GroupNode.Settings<ExperimentManifestSettings>(Workflow); }
@@ -124,6 +132,7 @@ namespace OpenRigs.Manifest
             }
             var refusal = ManifestWriter.ConfigRootRefusal(ConfigFiles, ConfigRoot);
             if (refusal != null) throw new InvalidOperationException(refusal);
+            Manifest.TrialColumns.Streams(StreamColumns);
             var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles, ConfigRoot), name => GroupNode.PublishedType(this, name));
             // Each condition (path?Subject) is a bool subject published before this node; one that is not is required always, with a note.
             var names = new List<string>();
@@ -142,7 +151,7 @@ namespace OpenRigs.Manifest
             }
             var conditions = Expression.Call(typeof(ManifestRecorder).GetMethod(nameof(ManifestRecorder.Conditions)),
                 Expression.Constant(names.ToArray()), Expression.NewArrayInit(typeof(IObservable<bool>), subjects));
-            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, ConfigRoot, expected, TrialColumns));
+            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, ConfigRoot, expected, TrialColumns, StreamColumns));
             var observablePath = Expression.Convert(path, typeof(IObservable<string>));
             var run = arguments.FirstOrDefault();
             if (run == null)
@@ -159,7 +168,7 @@ namespace OpenRigs.Manifest
     /// ExperimentManifest's settings, kept as a node in its inner workflow so that they survive
     /// Bonsai's copies of the group. Set them on ExperimentManifest; this node builds to nothing.
     /// </summary>
-    [Description("ExperimentManifest's settings (IngestScript, ConfigRoot, ConfigFiles, ExpectedFiles, TrialColumns), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
+    [Description("ExperimentManifest's settings (IngestScript, ConfigRoot, ConfigFiles, ExpectedFiles, TrialColumns, StreamColumns), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
     public class ExperimentManifestSettings : ZeroArgumentExpressionBuilder
     {
         /// <summary>Gets or sets ExperimentManifest's IngestScript.</summary>
@@ -177,6 +186,9 @@ namespace OpenRigs.Manifest
         /// <summary>Gets or sets ExperimentManifest's TrialColumns.</summary>
         public string TrialColumns { get; set; }
 
+        /// <summary>Gets or sets ExperimentManifest's StreamColumns.</summary>
+        public string StreamColumns { get; set; }
+
         /// <summary>Builds to an empty sequence: the node only holds the settings.</summary>
         /// <param name="arguments">None.</param>
         /// <returns>An empty sequence.</returns>
@@ -190,7 +202,7 @@ namespace OpenRigs.Manifest
     class ExperimentManifestTypeDescriptionProvider : ShownPropertiesProvider
     {
         public ExperimentManifestTypeDescriptionProvider()
-            : base("IngestScript", "ConfigRoot", "ConfigFiles", "ExpectedFiles", "TrialColumns")
+            : base("IngestScript", "ConfigRoot", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns")
         {
         }
     }

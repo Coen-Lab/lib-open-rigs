@@ -1,7 +1,6 @@
 """The conditioned-task mixin and helpers (open_rigs.rigs.conditioned_task) on a small task built here."""
 
 import json
-from enum import StrEnum
 
 import pytest
 import yaml
@@ -11,12 +10,7 @@ from open_rigs.core.task import Optogenetics, TaskParameters
 from open_rigs.rigs import conditioned_task as ct
 
 
-class TrialType(StrEnum):
-    VISUAL = "visual"
-    NEUTRAL = "neutral"
-
-
-class TrialCondition(ct.TrialCondition[TrialType]):
+class TrialCondition(ct.TrialCondition):
     """A condition of the test task."""
 
 
@@ -49,7 +43,7 @@ class Params(TaskParameters, ct.ConditionedTask):
 
 
 def task(**conditions):
-    return {"trialConditions": [{"trialType": "visual", "weight": 1, **conditions}]}
+    return {"trialConditions": [{"weight": 1, **conditions}]}
 
 
 def test_list_fields_are_the_task_s_drawn_lists():
@@ -59,6 +53,19 @@ def test_list_fields_are_the_task_s_drawn_lists():
 def test_a_valid_task_derives_its_trial_types():
     params = Params.model_validate(task(set={"contrasts": [0.5, 1.0]}))
     assert params.derive_trial_type(params.trial_conditions[0]) == "visual"
+
+
+def test_a_stored_trial_type_is_an_unknown_key():
+    with pytest.raises(ValidationError, match="trialType"):
+        Params.model_validate(task(trialType="visual"))
+
+
+def test_a_condition_no_trial_type_matches_is_refused_naming_it():
+    class Untyped(Params):
+        TRIAL_TYPES = ({"trialType": "visual", "if": ct.if_({"contrasts": ct.ABOVE_0})}, {"trialType": "x", "mirrored": ["contrasts", "azimuthsDeg"]})
+
+    with pytest.raises(ValidationError, match=r"trial_conditions\[0\]: no x-trial-types entry matches"):
+        Untyped.model_validate(task(set={"contrasts": [0.0]}))
 
 
 @pytest.mark.parametrize("condition, message", [
@@ -90,6 +97,7 @@ def test_expected_rows_keep_only_paths_that_differ(tmp_path):
     rows = ct.expected_combination_rows(Params, values)
     assert [row["values"] for row in rows] == [{"azimuthsDeg": a, "contrasts": c} for c in (0.5, 1.0) for a in (-60.0, 60.0)]
     assert rows[0]["trialConditionId"] == 0 and [row["trialCombinationId"] for row in rows] == [0, 1, 2, 3]
+    assert {row["trialType"] for row in rows} == {"visual"}
     (tmp_path / "handover").mkdir()
     (tmp_path / "combinations").mkdir()
     (tmp_path / "handover" / "a.yml").write_text(yaml.safe_dump({"taskParameters": values}), encoding="utf-8")
@@ -97,7 +105,9 @@ def test_expected_rows_keep_only_paths_that_differ(tmp_path):
     (tmp_path / "combinations" / "a.json").write_text(json.dumps({"rows": rows}), encoding="utf-8")
     assert ct.combination_agreement_problems(Params, tmp_path) == []
     assert ct.handover_problems(Params, tmp_path) == []
-    assert ct.handover_problems(Params, tmp_path, {("b.yml", 0): "x"}) == ["override b.yml [0] names no golden condition"]
+    stored = {"trialConditions": [{"trialType": "visual", "weight": 1}]}
+    (tmp_path / "handover" / "a.yml").write_text(yaml.safe_dump({"taskParameters": stored}), encoding="utf-8")
+    assert "trialType" in ct.handover_problems(Params, tmp_path)[0]
 
 
 def test_block_order_problems():
@@ -121,7 +131,9 @@ def test_block_order_problems():
 def test_schema_extra_and_task_schema_cs():
     extra = ct.schema_extra(Params.SESSION_FIELDS, Params.RULES, Params.TRIAL_TYPES)
     assert extra["x-session-fields"][:3] == ["rngSeed", "curriculum", "trialConditions"] and extra["x-max-combinations"] == 1024
-    assert 'ListFields = { "a", "b" }' in ct.task_schema_cs(["rngSeed"], ["a", "b"])
+    text = ct.task_schema_cs(["rngSeed"], ["a", "b"], Params.TRIAL_TYPES)
+    assert 'ListFields = { "a", "b" }' in text
+    assert 'TrialTypes = @"[{""trialType"":""visual"",""if"":{""properties"":{""contrasts"":{""contains"":{""exclusiveMinimum"":0}}},""required"":[""contrasts""]}},{""trialType"":""neutral""}]";' in text
 
 
 def test_auditory_azimuths_are_numbers_in_range_or_all():

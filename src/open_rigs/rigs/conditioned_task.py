@@ -12,10 +12,9 @@ import copy
 import json
 import math
 import subprocess
-from enum import Enum
 from functools import cache
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Generic, Literal, TypeVar
+from typing import Annotated, Any, ClassVar, Literal
 
 import pydantic
 from pydantic import ConfigDict, Field, ValidationError, ValidationInfo, WithJsonSchema, field_validator, model_validator
@@ -127,18 +126,13 @@ def session_field(path: str, session_fields) -> str | None:
     return next((field for field in session_fields if path == field or path.startswith(field + ".")), None)
 
 
-TrialTypeT = TypeVar("TrialTypeT", bound=Enum)
-
-
-class TrialCondition(TaskBlock, Generic[TrialTypeT]):
-    """One kind of trial in the mix: its trialType (the task's TrialType enum), its relative weight, its condition-level
-    values (set) by dotted path and the lists it pairs. A task subclasses TrialCondition[TrialType]."""
+class TrialCondition(TaskBlock):
+    """One kind of trial in the mix: its relative weight, its condition-level values (set) by dotted path and the lists it
+    pairs. Its trialType is not stored: it is derived from its values (x-trial-types, derive_trial_type; the C#'s
+    TrialTypes.Derive at Go) and logged as each trial's trialType."""
 
     model_config = ConfigDict(extra="forbid")
 
-    trial_type: TrialTypeT = Field(
-        description="The condition's name, logged as each trial's trialType: derived from its values (x-trial-types, derive_trial_type) unless chosen; it names rows and analysis groups and drives nothing"
-    )
     weight: int = Field(ge=0, le=MAX_WEIGHT, description="Relative draw weight: each new trial picks a condition with these as relative chances")
     pairs: list[list[String]] = Field(
         default_factory=list,
@@ -244,7 +238,10 @@ class ConditionedTask(TaskBlock):
         optogenetics = getattr(self, "optogenetics", None)
         drawn, built = [], {}  # built: each distinct set and pairs' combinations, checked once
         for i, condition in enumerate(self.trial_conditions):  # type: ignore[attr-defined]
-            where = f"trial_conditions[{i}] ({condition.trial_type.value})"
+            try:
+                where = f"trial_conditions[{i}] ({self.derive_trial_type(condition)})"
+            except ValueError as e:
+                raise ValueError(f"trial_conditions[{i}]: {e}") from None
             paired = [path for group in condition.pairs for path in group]
             for path in [*condition.set, *paired]:
                 if field := session_field(path, self.SESSION_FIELDS):
@@ -279,7 +276,7 @@ class ConditionedTask(TaskBlock):
             data = copy.deepcopy(base)
             for path, value in combo.items():
                 put_path(data, path, value)
-            data["trialConditions"] = [{"trialType": condition.trial_type.value, "weight": 1}]
+            data["trialConditions"] = [{"weight": 1}]
             try:
                 type(self).model_validate(data, context={"condition": True})  # type: ignore[attr-defined]
             except ValidationError as e:
@@ -311,11 +308,13 @@ def expected_combination_rows(model: type[pydantic.BaseModel], task: dict) -> li
     condition's combinations in turn, a list field's one-entry pick unwrapped (an x-whole list stays a list), a path kept
     where it differs between rows or from the task's own value. The agreement test holds the C#'s file to it."""
     list_fields = conditions.pick_lists(model.model_json_schema(by_alias=True))
-    base = model.model_validate(task).model_dump(by_alias=True, mode="json")
+    parsed = model.model_validate(task)
+    base = parsed.model_dump(by_alias=True, mode="json")
     rows = []
     for i, condition in enumerate(task["trialConditions"]):
+        trial_type = parsed.derive_trial_type(parsed.trial_conditions[i])  # type: ignore[attr-defined]
         for combo in condition_combinations(base, condition.get("set") or {}, condition.get("pairs") or [], list_fields):
-            rows.append({"trialCombinationId": len(rows), "trialConditionId": i, "trialType": condition["trialType"],
+            rows.append({"trialCombinationId": len(rows), "trialConditionId": i, "trialType": trial_type,
                          "conditionWeight": condition["weight"], "values": {path: _normal(path, value, list_fields) for path, value in combo.items()}})
     paths = {path for row in rows for path in row["values"]}
     own = {path: _normal(path, get_path(base, path), list_fields) for path in paths}
@@ -351,36 +350,28 @@ def combination_agreement_problems(model: type[pydantic.BaseModel], fixtures: Pa
     return problems
 
 
-def handover_problems(model: type[pydantic.BaseModel], fixtures: Path, overridden: dict[tuple[str, int], str] | None = None) -> list[str]:
-    """Each golden task file (fixtures/handover/*.yml, written by the experiment launcher) the task model refuses, and each condition
-    whose trialType is not the one x-trial-types derives (unless `overridden` names it, file and index, with the reason);
-    an override matching no golden condition is a problem too."""
+def handover_problems(model: type[pydantic.BaseModel], fixtures: Path) -> list[str]:
+    """Each golden task file (fixtures/handover/*.yml, written by the experiment launcher) the task model refuses (a stored
+    trialType among them: it is derived, never stored)."""
     import yaml
 
-    overridden = overridden or {}
     golden = sorted((fixtures / "handover").glob("*.yml"))
     if not golden:
         return [f"{fixtures / 'handover'} is empty: run the launcher's tests/test_handover.py with HANDOVER_REGEN=1"]
     problems = []
-    counts = {}
     for path in golden:
         try:
-            task = model.model_validate(yaml.safe_load(path.read_text(encoding="utf-8"))["taskParameters"])
+            model.model_validate(yaml.safe_load(path.read_text(encoding="utf-8"))["taskParameters"])
         except ValidationError as e:
             problems.append(f"{path.name}: {e}")
-            continue
-        counts[path.name] = len(task.trial_conditions)  # type: ignore[attr-defined]
-        for n, condition in enumerate(task.trial_conditions):  # type: ignore[attr-defined]
-            if (path.name, n) not in overridden and task.derive_trial_type(condition) != condition.trial_type.value:  # type: ignore[attr-defined]
-                problems.append(f"{path.name} trialConditions[{n}]: trialType {condition.trial_type.value}, derived {task.derive_trial_type(condition)}")  # type: ignore[attr-defined]
-    problems += [f"override {name} [{n}] names no golden condition" for name, n in overridden if not counts.get(name, 0) > n]
     return problems
 
 
-def task_schema_cs(session_fields, list_fields) -> str:
+def task_schema_cs(session_fields, list_fields, trial_types) -> str:
     """TaskSchema.Generated.cs: what a task's C# reads from its schema rather than copying it."""
     session = ", ".join(f'"{path}"' for path in session_fields)
     lists = ", ".join(f'"{path}"' for path in list_fields)
+    types = json.dumps(list(trial_types), separators=(",", ":")).replace('"', '""')
     return (
         "// Generated by regenerate-schemas from the task schema; do not edit.\n"
         "public static class TaskSchema\n{\n"
@@ -390,6 +381,8 @@ def task_schema_cs(session_fields, list_fields) -> str:
         f"    public const int MaxCombinations = {conditions.MAX_COMBINATIONS};\n"
         "    /// <summary>The list fields one entry of which each trial draws (open_rigs.rigs.conditions.pick_lists), by path.</summary>\n"
         f"    public static readonly string[] ListFields = {{ {lists} }};\n"
+        "    /// <summary>x-trial-types as JSON: how a condition's trialType is derived from its values (OpenRigs.Trials TrialTypes).</summary>\n"
+        f'    public const string TrialTypes = @"{types}";\n'
         "}\n"
     )
 
@@ -397,7 +390,7 @@ def task_schema_cs(session_fields, list_fields) -> str:
 def regenerate(logic: type, parameters: type, schema_file: Path, extensions_root: Path = Path("./src/Extensions/")) -> None:
     """A conditioned task's regenerate-schemas: TaskSchema.Generated.cs, the task logic's JSON schema and its Bonsai.Sgen C#."""
     schema_file.parent.mkdir(parents=True, exist_ok=True)
-    (extensions_root / "TaskSchema.Generated.cs").write_text(task_schema_cs(parameters.SESSION_FIELDS, parameters.list_fields()), encoding="utf-8")
+    (extensions_root / "TaskSchema.Generated.cs").write_text(task_schema_cs(parameters.SESSION_FIELDS, parameters.list_fields(), parameters.TRIAL_TYPES), encoding="utf-8")
     schema = pydantic.RootModel[logic].model_json_schema(by_alias=True, mode="serialization", union_format="primitive_type_array")
     schema_file.write_text(json.dumps(schema, indent=2))
     subprocess.run(["dotnet", "bonsai.sgen", str(schema_file), "--output", str(extensions_root), "--serializer", "json", "--serializer", "yaml"], check=True)

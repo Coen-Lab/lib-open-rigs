@@ -166,6 +166,20 @@ namespace OpenRigs.Manifest.Tests
             var snapshot = ManifestWriter.Snapshot("", null, true, file);
             Check("Snapshot carries the section and its note", snapshot.TrialColumns != null && snapshot.Notes.Cast<string>().Any(n => n.StartsWith("Trial columns not read")), "missing");
             File.Delete(file);
+            // A further WorkflowData log's columns file (StreamColumns), copied as the trial log's is, by log.
+            Check("a workflow with StreamColumns blank has stream_columns null", Field(blankManifest, "stream_columns") == "null", Field(blankManifest, "stream_columns"));
+            File.WriteAllText(Path.Combine(root, "state-columns.yml"), "positionCm:\n  type: double\n  unit: cm\n");
+            snapshot = ManifestWriter.Snapshot("", null, true, null, " WorkflowData_StimulusState = " + Path.Combine(root, "state-columns.yml") + " ; WorkflowData_Other=" + Path.Combine(root, "nowhere.yml"));
+            read = Json.Serialize(snapshot.StreamColumns);
+            Check("each StreamColumns file is copied under its log, and a missing one noted", Field(read, "WorkflowData_StimulusState.columns.positionCm.unit") == "cm"
+                && Field(read, "WorkflowData_Other.missing") == "true" && snapshot.Notes.Cast<string>().Any(n => n.StartsWith("WorkflowData_Other columns not read")), read);
+            foreach (var bad in new[] { "state-columns.yml", "=a.yml", "A=a.yml;a=b.yml" })
+            {
+                string refused = null;
+                try { TrialColumns.Streams(bad); } catch (InvalidOperationException e) { refused = e.Message; }
+                Check("StreamColumns '" + bad + "' is refused", refused != null && refused.StartsWith("ExperimentManifest's StreamColumns"), refused ?? "taken");
+            }
+            File.Delete(Path.Combine(root, "state-columns.yml"));
         }
 
         static DateTime Utc(string iso)
@@ -282,7 +296,7 @@ namespace OpenRigs.Manifest.Tests
             var topKeys = string.Join(",", records["completed"].Select(p => p.Key));
             var fileKeys = string.Join(",", ((JsonObject)((List<object>)records["completed"].First(p => p.Key == "files").Value)[0]).Select(p => p.Key));
             Check("version 4 has no status, completed or ingest, and a file no sha256 or expected", Field(completed, "version") == "4"
-                && topKeys == "version,created,ingest_script,writer,rig,session,source,launch,control,config_files,spout_positions,trial_columns,run,expected,notes,files"
+                && topKeys == "version,created,ingest_script,writer,rig,session,source,launch,control,config_files,spout_positions,trial_columns,stream_columns,run,expected,notes,files"
                 && fileKeys == "path,size,mtime,closed", topKeys + " | " + fileKeys);
             Check("control.launch_id is the LaunchId the controller passed", Field(completed, "control.launch_id") == "rig-AM006-004B1-20261112T101500Z", Field(completed, "control.launch_id"));
             Check("... and null when none was passed", ManifestWriter.ControlSection(null, "a", "b", null, null, null, null).First(p => p.Key == "launch_id").Value == null, "not null");

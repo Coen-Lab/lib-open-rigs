@@ -19,6 +19,7 @@ namespace OpenRigs.Manifest
         readonly string configRoot;
         readonly ExpectedPlan expected;
         readonly string trialColumns;
+        readonly string streamColumns;
 
         // How often the controller's stop is looked for while the run goes on: ControlExperiment is read by name, with nothing to subscribe to.
         internal static TimeSpan StopPoll = TimeSpan.FromMilliseconds(250);
@@ -51,13 +52,14 @@ namespace OpenRigs.Manifest
             return true;
         }
 
-        internal ManifestRecorder(string ingestScript, string configFiles, string configRoot, ExpectedPlan expected, string trialColumns = null)
+        internal ManifestRecorder(string ingestScript, string configFiles, string configRoot, ExpectedPlan expected, string trialColumns = null, string streamColumns = null)
         {
             this.ingestScript = ingestScript;
             this.configFiles = configFiles;
             this.configRoot = configRoot;
             this.expected = expected;
             this.trialColumns = trialColumns;
+            this.streamColumns = streamColumns;
         }
 
         /// <summary>No run input: the end is read from OpenRigs.Control's phase, if it is there.</summary>
@@ -116,7 +118,7 @@ namespace OpenRigs.Manifest
                 // Each run starts with no condition known: a value from an earlier run is not this one's.
                 expected.ClearConditions();
                 // At Start: the launch, the workflow's commit and the config files, as they are now.
-                var writer = new ManifestWriter(ingestScript, ManifestWriter.Snapshot(configFiles, configRoot, run != null, trialColumns), expected);
+                var writer = new ManifestWriter(ingestScript, ManifestWriter.Snapshot(configFiles, configRoot, run != null, trialColumns, streamColumns), expected);
                 var gate = new object();
                 var items = 0L;
                 var begun = false;

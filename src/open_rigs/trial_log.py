@@ -30,6 +30,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 from ruamel.yaml import YAML
 
 from open_rigs import chunks
+from open_rigs.core.task import MUTE
 from open_rigs.rigs import conditions
 
 LOG = "WorkflowData_Trials"
@@ -197,6 +198,8 @@ def _problems(experiment: Path, rows: List[Dict[str, Any]], combos: List[Dict[st
                     problems.append(f"trial {number}: {name} {row[name]!r}, not NaN where {when['column']} is {when['equals']}")
                 continue
             expected = _normal(combo["values"][path]) if path in combo["values"] else task[path]
+            if expected == MUTE:  # a level that plays nothing is logged as NaN
+                expected = math.nan
             if not _same(row[name], expected):
                 problems.append(f"trial {number}: {name} {row[name]!r}, its combination {combo[ID]}'s {path} is {expected!r}")
     return problems
@@ -229,7 +232,7 @@ def check(experiment: Union[str, Path]) -> None:
     """Raises ValueError listing every trial whose recorded columns disagree with its row of the experiment's combinations
     table (Settings/Settings_Combinations_<time>.json): its trialConditionId and trialType, and each column whose entry in
     the manifest's own trial_columns has copyOf, a task path: the row's value, else Settings_Task's (a one-entry list its
-    entry), or NaN on the trials nanWhen {column, equals} names. A column or table key it holds that is missing is a problem,
+    entry; a level's mute is NaN), or NaN on the trials nanWhen {column, equals} names. A column or table key it holds that is missing is a problem,
     never skipped. A log without trialCombinationId has nothing to check."""
     experiment = Path(experiment)
     rows = _typed(experiment, None, True)
