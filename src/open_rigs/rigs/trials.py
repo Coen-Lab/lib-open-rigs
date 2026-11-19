@@ -13,7 +13,7 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
 (the lead and the penalty) and manifest.json (how the run ended), and checks the rows against each other and the task. It reads only files named <Name>_<time><suffix>
 (open_rigs.chunks); any other file named like one it reads is a NOTE, not read:
 
-- trial numbers run 1, 2, 3 ... with none missing, and each outcome is correct, incorrect, noResponse or probe;
+- trial numbers run 1, 2, 3 ... with none missing, and each outcome is correct, incorrect, noResponse, probe or auto;
 - each trial's start (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
   quietWaitSeconds (never negative), within 2 ms;
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
@@ -95,8 +95,9 @@ CORE_COLUMNS: List[Column] = [
      "for it (the task file's reward size, or a larger reward where the task has one); 0 on a trial that offers none. "
      "rewarded says whether it was given; what was delivered is RewardDelivered in WorkflowData_Events."),
     ("rewarded", "bool", None,
-     "True when the trial's outcome delivered its reward (rewardOfferedUl, at outcomeTime): the value the workflow's "
-     "reward command is made from. Which outcomes are rewarded is the task's (its note)."),
+     "True when the valve planned the trial's reward (rewardOfferedUl; its RewardDelivered row in WorkflowData_Events, "
+     "at outcomeTime); false on an outcome that earned it when the stop came first. Which outcomes are rewarded is the "
+     "task's (its note)."),
     ("penaltyTimeoutSeconds", "double", "s",
      "The timeout after this trial: the task's penalty.timeoutSeconds when the trial was penalised, else 0. The next "
      "interval starts after it (itiStartTime)."),
@@ -152,7 +153,8 @@ STIMULUS_COLUMNS: List[Column] = [
 
 AUTO_REWARD_COLUMNS: List[Column] = [
     ("autoReward", "bool", None,
-     "True on an auto-reward trial (drawn with the task's autoRewardProbability): one rewarded without a correct response; "
+     "True on an auto-reward trial (drawn with the task's autoRewardProbability): one rewarded without a correct response, "
+     "its outcome auto when the auto-reward answered it with no response of the mouse's own; "
      "how, and so whether its reward came from the auto-reward, is the task's (its note)."),
 ]
 
@@ -208,17 +210,25 @@ def shared_block_problems(columns: Dict[str, Any], blocks: Iterable[str]) -> Lis
     return problems
 
 
-OUTCOMES = ("correct", "incorrect", "noResponse", "probe")  # in the task's camelCase, as its targets and trialType
+OUTCOMES = ("correct", "incorrect", "noResponse", "probe", "auto")  # in the task's camelCase, as its targets and trialType
 GO_NO_GO = ("go", "noGo", "noReward")  # a go/no-go task's targets: one spout by design, noReward its probe
 
 
+def _auto(r: Dict[str, Any]) -> bool:
+    """Whether the auto-reward answered a trial row, with no response of the mouse's own: outcome auto, or in a log from
+    before that outcome, autoReward and rewarded with no choice made (choice noResponse) or, with no choice column, correct."""
+    if r.get("outcome") == "auto":
+        return True
+    if not (_true(r.get("autoReward", False)) and _true(r.get("rewarded", False))):
+        return False
+    return str(r.get("choice") or "noResponse") == "noResponse" if "choice" in r else r.get("outcome") == "correct"
+
+
 def _responded(r: Dict[str, Any]) -> bool:
-    """Whether the mouse responded in a trial row: its choice where the row has one, else an outcome other than noResponse
-    that the auto-reward (autoReward and rewarded, with no choice) did not bring."""
+    """Whether the mouse responded in a trial row: its choice where the row has one, else an outcome other than noResponse."""
     if "choice" in r:
         return str(r.get("choice") or "noResponse") != "noResponse"
-    auto = _true(r.get("autoReward", False)) and _true(r.get("rewarded", False))
-    return str(r.get("outcome") or "noResponse") != "noResponse" and not auto
+    return str(r.get("outcome") or "noResponse") != "noResponse"
 
 
 def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
@@ -227,11 +237,12 @@ def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
     Performance is correct / (correct + incorrect) over the trials not offered a single spout as a guide (singleSpoutOffered
     False, as where the task does not record it) and every go/no-go trial (target go or noGo; one spout by design), a go
     trial with no lick (noResponse) counted incorrect. The response rate is the share of trials the mouse responded to: in
-    a go/no-go task (a target go, noGo or noReward) the go trials, else the trials not probe, of those the ones responded to:
-    where the row has a choice, any choice but noResponse (a withheld noGo, an unlicked probe, and an auto-reward trial
-    with no choice are none; an auto-reward trial where the mouse chose a side is one); with no choice column, an outcome
-    not noResponse that the auto-reward did not bring (a trial the drift carried into the reward zone, with no movement
-    by the mouse). A probe (no right answer) counts in neither, though rewarded and penalised say what it got."""
+    a go/no-go task (a target go, noGo or noReward) the go trials, else the trials not probe, in either leaving out the
+    trials the auto-reward answered (outcome auto, or in an older log autoReward and rewarded with no choice made, or
+    correct with no choice column: a trial the drift carried into the reward zone), of those the ones responded to: where
+    the row has a choice, any choice but noResponse (a withheld noGo is none; an auto-reward trial where the mouse chose a
+    side is one); with no choice column, an outcome not noResponse. A probe (no right answer) and an auto trial count in
+    neither, though rewarded and penalised say what they got."""
     rows = list(rows)
     go_no_go = any(str(r.get("target")) in GO_NO_GO for r in rows)
     correct = counted = 0
@@ -241,7 +252,7 @@ def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
         if (not _true(r.get("singleSpoutOffered", False)) or target in ("go", "noGo")) and (outcome in ("correct", "incorrect") or go_miss):
             counted += 1
             correct += outcome == "correct"
-    asked = [r for r in rows if (str(r.get("target")) == "go" if go_no_go else r["outcome"] != "probe")]
+    asked = [r for r in rows if (str(r.get("target")) == "go" if go_no_go else r["outcome"] != "probe") and not _auto(r)]
     answered = sum(map(_responded, asked))
     return (correct / counted if counted else float("nan"), answered / len(asked) if asked else float("nan"))
 

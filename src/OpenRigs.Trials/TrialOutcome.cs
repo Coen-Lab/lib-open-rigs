@@ -19,8 +19,11 @@ namespace OpenRigs.Trials
         /// <summary>The trial has no right answer, whatever the response: left out of performance.</summary>
         public const string Probe = "probe";
 
+        /// <summary>The auto-reward answered the trial, with no response of the mouse's own: left out of the response rate.</summary>
+        public const string Auto = "auto";
+
         /// <summary>Every outcome, in OUTCOMES' order.</summary>
-        public static readonly string[] All = { Correct, Incorrect, NoResponse, Probe };
+        public static readonly string[] All = { Correct, Incorrect, NoResponse, Probe, Auto };
     }
 
     /// <summary>

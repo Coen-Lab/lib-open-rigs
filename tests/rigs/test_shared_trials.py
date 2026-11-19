@@ -223,7 +223,7 @@ def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):
     trials[3]["penaltyTimeoutSeconds"] = 3.0  # penalised, the task's timeout 4 s
     text = "\n".join(summarise(_experiment(tmp_path, trials, [])).problems)
     assert "trial 1: trial start (trialStartTime) -5.0000 s from its interval's end less the lead (0.1 s) plus quietWaitSeconds" in text
-    assert "trial 3: outcome 'Banana' is not one of correct, incorrect, noResponse, probe" in text
+    assert "trial 3: outcome 'Banana' is not one of correct, incorrect, noResponse, probe, auto" in text
     assert not any("penaltySound" in line for line in text.splitlines())
     assert "trial 4: penaltyTimeoutSeconds 3 on a trial penalised, not 4" in text
 
@@ -307,16 +307,30 @@ def test_go_no_go_counts_its_one_spout_a_go_miss_as_incorrect_and_responds_on_go
     assert trials_module.performance(typed) == (0.5, 0.5)  # typed rows (open_rigs.trial_log.read) read the same
 
 
-def test_an_auto_rewarded_trial_is_no_response(tmp_path):
-    # Navigation: the drift carries the trial into the zone, correct and auto-rewarded, with no movement by the mouse.
+def test_an_old_auto_rewarded_trial_is_left_out_of_the_response_rate(tmp_path):
+    # Navigation before outcome auto: the drift carries the trial into the zone, correct and auto-rewarded, with no
+    # movement by the mouse, so it is an auto trial and not asked.
     trials = _chain(4)
     for t in trials:
         t["autoReward"] = True
     s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["autoReward"]))
-    assert s.responded == 0.5  # the two correct (rewarded) trials are the drift's; the two incorrect, unrewarded, are the mouse's
+    assert s.responded == 1.0  # the two correct (rewarded) trials are the drift's, left out; the two incorrect are the mouse's
     rows = [{"outcome": "correct", "autoReward": "True", "rewarded": "True"},
-            {"outcome": "correct", "autoReward": "False", "rewarded": "True"}]
+            {"outcome": "correct", "autoReward": "False", "rewarded": "True"},
+            {"outcome": "noResponse", "autoReward": "False", "rewarded": "False"}]
     assert trials_module.performance(rows) == (1.0, 0.5)
+
+
+def test_outcome_auto_is_left_out_of_the_response_rate_and_performance():
+    rows = [{"outcome": "auto", "autoReward": True, "rewarded": True}, {"outcome": "correct"}, {"outcome": "noResponse"}]
+    assert trials_module.performance(rows) == (1.0, 0.5)
+    # go/no-go: only go trials are asked, and an auto go trial is not one of them
+    gng = [{"target": "go", "outcome": "auto", "choice": "noResponse", "autoReward": True, "rewarded": True},
+           {"target": "go", "outcome": "correct", "choice": "go"}, {"target": "noGo", "outcome": "correct", "choice": "noResponse"}]
+    assert trials_module.performance(gng)[1] == 1.0
+    # an old go/no-go log: the auto go trial was noResponse, rewarded, with no choice made
+    gng[0]["outcome"] = "noResponse"
+    assert trials_module.performance(gng)[1] == 1.0
 
 
 def test_with_a_choice_column_the_response_is_the_choice():
@@ -328,14 +342,14 @@ def test_with_a_choice_column_the_response_is_the_choice():
     # an unlicked probe is left out of the asked trials, so it cannot respond
     assert rate({"outcome": "correct", "choice": "left"}, {"outcome": "probe", "choice": "noResponse"}) == 1.0
     auto = {"autoReward": True, "rewarded": True, "outcome": "correct"}
-    assert rate({**auto, "choice": "noResponse"}, {"outcome": "correct", "choice": "left"}) == 0.5  # no choice: not one
+    assert rate({**auto, "choice": "noResponse"}, {"outcome": "noResponse", "choice": "noResponse"}) == 0.0  # no choice: auto, left out
     assert rate({**auto, "choice": "left"}, {"outcome": "correct", "choice": "left"}) == 1.0  # chose a side: one
     assert rate({"outcome": "incorrect", "choice": "noResponse"}) == 0.0  # the choice rules, not the outcome
 
 
-def test_without_a_choice_column_an_auto_reward_is_not_a_response():
+def test_without_a_choice_column_an_old_auto_reward_is_not_asked():
     auto = {"autoReward": True, "rewarded": True, "outcome": "correct"}
-    assert trials_module.performance([auto, {"outcome": "correct"}, {"outcome": "noResponse"}])[1] == 1 / 3
+    assert trials_module.performance([auto, {"outcome": "correct"}, {"outcome": "noResponse"}])[1] == 1 / 2
 
 
 def test_a_folder_that_does_not_exist_is_a_problem(tmp_path):

@@ -6,7 +6,7 @@ It is one of the two experiment files every rig writes besides its hardware logs
 
 | File | Rows | Holds |
 |---|---|---|
-| `WorkflowData_Trials` | one per trial | the trial's settings, its outcome (`correct`, `incorrect`, `noResponse`, `probe`), the choice, the reward delivered, licks during the trial and the trial's times. Only the trial number matters, not the time. |
+| `WorkflowData_Trials` | one per trial | the trial's settings, its outcome (`correct`, `incorrect`, `noResponse`, `probe`, `auto`), the choice, the reward delivered, licks during the trial and the trial's times. Only the trial number matters, not the time. |
 | `WorkflowData_Events` ([LogEvents](log-events.md)) | one per event | everything that is not a trial: manual rewards, flushes, spout moves, GUI events |
 
 Camera trigger files and Harp register logs are hardware, not either of these.

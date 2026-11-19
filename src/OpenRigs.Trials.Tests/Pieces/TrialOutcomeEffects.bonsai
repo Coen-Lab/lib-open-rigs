@@ -6,8 +6,9 @@
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:cv="clr-namespace:OpenCV.Net;assembly=OpenCV.Net"
                  xmlns:test="clr-namespace:OpenRigs.Trials.Tests;assembly=OpenRigs.Trials.Tests"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>TrialOutcomeEffects: the task file (penalty level -30) and the speakers of RIG_FILE at Start, then three outcomes (PieceOutcomes: rewarded, penalty sound, neither). The output describes the include's output, TrialRow, RewardRequests and PenaltySounds.</Description>
+  <Description>TrialOutcomeEffects: the task file (penalty level -30) and the speakers of RIG_FILE at Start, then three outcomes (PieceOutcomes: rewarded, penalty sound, neither). A valve (PieceValve, VALVE_PRESENT) plans each reward request into RewardDelivered, or none, as at a stop. The output describes the include's output, TrialRow, RewardRequests and PenaltySounds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="Combinator">
@@ -32,6 +33,20 @@
       </Expression>
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="cv:Mat">
         <rx:Name>PenaltySounds</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="core:RewardPlan">
+        <rx:Name>RewardDelivered</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RewardRequests</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceValve">
+          <test:Present>VALVE_PRESENT</test:Present>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>RewardDelivered</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="test:PieceOutcomes" />
@@ -66,16 +81,18 @@
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
-      <Edge From="7" To="8" Label="Source1" />
       <Edge From="8" To="9" Label="Source1" />
-      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
       <Edge From="12" To="13" Label="Source1" />
       <Edge From="14" To="15" Label="Source1" />
-      <Edge From="9" To="16" Label="Source1" />
-      <Edge From="11" To="16" Label="Source2" />
-      <Edge From="13" To="16" Label="Source3" />
-      <Edge From="15" To="16" Label="Source4" />
       <Edge From="16" To="17" Label="Source1" />
+      <Edge From="18" To="19" Label="Source1" />
+      <Edge From="13" To="20" Label="Source1" />
+      <Edge From="15" To="20" Label="Source2" />
+      <Edge From="17" To="20" Label="Source3" />
+      <Edge From="19" To="20" Label="Source4" />
+      <Edge From="20" To="21" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

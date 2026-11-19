@@ -34,6 +34,19 @@ namespace OpenRigs.Trials.Tests
         public PieceOutcome(PieceRow row, double penaltyLevelDbfs = double.NaN) : base(row, "Left", penaltyLevelDbfs) { }
     }
 
+    /// <summary>A valve that plans each reward request (Present), or none, as when the stop has ended the valve's path.</summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class PieceValve
+    {
+        public bool Present { get; set; }
+
+        public IObservable<OpenRigs.Core.RewardPlan> Process(IObservable<Tuple<string, double>> source)
+        {
+            return source.Where(_ => Present).Select(r => new OpenRigs.Core.RewardPlan { RewardLine = new OpenRigs.Core.RewardLine { Instance = r.Item1 }, RequestedUl = r.Item2 });
+        }
+    }
+
     /// <summary>A trial with a laser condition.</summary>
     public class PieceTrial : IZapitTrial
     {
@@ -175,7 +188,7 @@ namespace OpenRigs.Trials.Tests
     {
         public IObservable<string> Process(IObservable<PieceOutcome> source) { return source.Select(o => "out " + o.Row.Value.trialNumber); }
 
-        public IObservable<string> Process(IObservable<Timestamped<PieceRow>> source) { return source.Select(r => "row " + r.Value.trialNumber); }
+        public IObservable<string> Process(IObservable<Timestamped<PieceRow>> source) { return source.Select(r => "row " + r.Value.trialNumber + (r.Value.rewarded ? " rewarded" : "")); }
 
         public IObservable<string> Process(IObservable<Tuple<string, double>> source) { return source.Select(r => "reward " + r.Item1 + " " + r.Item2.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
 
@@ -232,16 +245,31 @@ namespace OpenRigs.Trials.Tests
             return result.Item1;
         }
 
-        // Each outcome's row goes into TrialRow; trial 1's reward into RewardRequests; trial 2's penalty sound into
-        // PenaltySounds (the mixer's four channels); every outcome is passed on.
-        [TestMethod]
-        public void TrialOutcomeEffectsSendsTheRowTheRewardAndThePenaltySoundAndPassesTheOutcomeOn()
+        static List<string> RunEffects(bool valve)
         {
             var rig = Rig();
-            var outputs = Run("TrialOutcomeEffects.bonsai", 2, xml => xml.Replace("RIG_FILE", SecurityElement.Escape(rig)));
+            var outputs = Run("TrialOutcomeEffects.bonsai", 2, xml => xml.Replace("RIG_FILE", SecurityElement.Escape(rig)).Replace("VALVE_PRESENT", valve ? "true" : "false"));
             Directory.Delete(Path.GetDirectoryName(rig), true);
-            CollectionAssert.AreEquivalent(new[] { "row 1", "reward Left 2.5", "out 1", "row 2", "penalty 4", "out 2", "row 3", "out 3" }, outputs, string.Join(", ", outputs));
+            return outputs;
+        }
+
+        // Trial 1's reward goes into RewardRequests before its row goes into TrialRow, rewarded since the valve planned it;
+        // trial 2's penalty sound into PenaltySounds (the mixer's four channels); every outcome is passed on.
+        [TestMethod]
+        public void TrialOutcomeEffectsSendsTheRewardThenTheRowAndThePenaltySoundAndPassesTheOutcomeOn()
+        {
+            var outputs = RunEffects(true);
+            CollectionAssert.AreEquivalent(new[] { "reward Left 2.5", "row 1 rewarded", "out 1", "row 2", "penalty 4", "out 2", "row 3", "out 3" }, outputs, string.Join(", ", outputs));
+            Assert.IsTrue(outputs.IndexOf("reward Left 2.5") < outputs.IndexOf("row 1 rewarded"), "The row went before the reward: " + string.Join(", ", outputs));
             Assert.IsTrue(outputs.IndexOf("penalty 4") > outputs.IndexOf("row 2"), "The penalty sound played before trial 2: " + string.Join(", ", outputs));
+        }
+
+        // F12: a rewarded outcome whose valve planned nothing (the stop ended the valve's path) logs rewarded false.
+        [TestMethod]
+        public void TrialOutcomeEffectsLogsARewardNoValvePlannedAsNotRewarded()
+        {
+            var outputs = RunEffects(false);
+            CollectionAssert.AreEquivalent(new[] { "reward Left 2.5", "row 1", "out 1", "row 2", "penalty 4", "out 2", "row 3", "out 3" }, outputs, string.Join(", ", outputs));
         }
 
         static List<string> RunZapit(string stop, bool hardwareTriggered, double laserCapSeconds, double outcomeAt)

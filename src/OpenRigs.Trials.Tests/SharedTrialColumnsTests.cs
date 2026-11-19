@@ -146,7 +146,7 @@ namespace OpenRigs.Trials.Tests
             }
             catch (InvalidOperationException e)
             {
-                StringAssert.Contains(e.Message, "outcome is Hit, not one of correct, incorrect, noResponse, probe");
+                StringAssert.Contains(e.Message, "outcome is Hit, not one of correct, incorrect, noResponse, probe, auto");
             }
         }
     }
