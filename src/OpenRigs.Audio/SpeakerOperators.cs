@@ -47,10 +47,10 @@ namespace OpenRigs.Audio
         [Description("Whether each buffer also carries the sound's sync copy: rig.yml's syncGain on its syncChannel for the sound's length, for alignment with acquisition (a stimulus). Stops the workflow on a rig.yml with no syncChannel.")]
         public bool SyncCopy { get; set; }
 
-        /// <summary>One sound's buffer.</summary>
+        /// <summary>One sound's buffer; at a NaN level (mute) an empty one.</summary>
         public IObservable<Mat> Process(IObservable<Tuple<SpeakerSet, Mat>> source)
         {
-            return source.Select(input => input.Item1.Buffer(input.Item2, Channels, LevelDbfs, Equalise, SyncCopy));
+            return source.Select(input => double.IsNaN(LevelDbfs) ? new Mat(input.Item1.ChannelCount, 1, Depth.F32, 1) : input.Item1.Buffer(input.Item2, Channels, LevelDbfs, Equalise, SyncCopy));
         }
 
         /// <summary>Each sound's buffer, in order.</summary>
@@ -64,18 +64,48 @@ namespace OpenRigs.Audio
 
     /// <summary>The lab's penalty sound as the mixer's buffer (<see cref="PenaltySound.Buffer"/>).</summary>
     [Combinator]
-    [Description("The lab's penalty sound (rig.yml's speakerArray.penaltySound, relative to rig.yml's folder: ../shared/sounds/penalty_tone.wav, the server's copy, kept on the rig by its upkeep; the same in every task) as the mixer's buffer: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at LevelDbfs (the task's penalty.sound.levelDbfs). Stops the workflow, naming the file, when rig.yml names none, the file is missing or not at the audio device's rate, and when its peak reaches -1 dBFS after equalisation. Input: the speakers.")]
+    [Description("The lab's penalty sound (rig.yml's speakerArray.penaltySound, relative to rig.yml's folder: ../shared/sounds/penalty_tone.wav, the server's copy, kept on the rig by its upkeep; the same in every task) as the mixer's buffer: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at LevelDbfs (the loudest penalty level any trial draws; SoundAtLevel plays each trial's). Stops the workflow, naming the file, when rig.yml names none, the file is missing or not at the audio device's rate, and when its peak reaches -1 dBFS after equalisation. A NaN level (every trial mute) gives an empty buffer that never plays. Input: the speakers.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PenaltySoundBuffer
     {
-        /// <summary>The penalty sound's level in dBFS RMS: map it from the task file.</summary>
-        [Description("The penalty sound's level in dBFS RMS: map it from the task's penalty.sound.levelDbfs.")]
+        /// <summary>The penalty sound's level in dBFS RMS: the loudest any trial draws; NaN when every trial is mute.</summary>
+        [Description("The penalty sound's level in dBFS RMS: map it from the loudest penalty.sound.levelDbfs any trial draws (NaN: every trial mute).")]
         public double LevelDbfs { get; set; } = SoundLevel.PenaltyDbfs;
 
         /// <summary>The buffer for each input.</summary>
         public IObservable<Mat> Process(IObservable<SpeakerSet> source)
         {
-            return source.Select(speakers => PenaltySound.Buffer(speakers, LevelDbfs));
+            return source.Select(speakers => double.IsNaN(LevelDbfs) ? new Mat(speakers.ChannelCount, 1, Depth.F32, 1) : PenaltySound.Buffer(speakers, LevelDbfs));
+        }
+    }
+
+    /// <summary>Plays a buffer laid out at one level at each trial's own level, a gain per play (<see cref="Scale"/>).</summary>
+    [Combinator]
+    [Description("Each trial's copy of a buffer laid out at BufferLevelDbfs (the loudest level any trial draws, its peak checked when it was laid out), scaled to the trial's level: input (the trial's level in dBFS RMS, the buffer). A NaN level (mute) plays nothing; a level above BufferLevelDbfs stops the workflow, as its peak was never checked.")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class SoundAtLevel
+    {
+        /// <summary>The level the buffer was laid out at, in dBFS RMS: map it from the same loudest level.</summary>
+        [Description("The level the buffer was laid out at, in dBFS RMS: map it from the loudest level any trial draws.")]
+        public double BufferLevelDbfs { get; set; } = double.NaN;
+
+        /// <summary>Each trial's buffer; none for a mute trial.</summary>
+        public IObservable<Mat> Process(IObservable<Tuple<double, Mat>> source)
+        {
+            return source.Where(input => !double.IsNaN(input.Item1)).Select(input => Scale(input.Item2, BufferLevelDbfs, input.Item1));
+        }
+
+        /// <summary>A copy of a buffer laid out at bufferLevelDbfs, played at levelDbfs; throws on a level louder than the buffer's.</summary>
+        public static Mat Scale(Mat buffer, double bufferLevelDbfs, double levelDbfs)
+        {
+            if (!(levelDbfs <= bufferLevelDbfs + 1e-9))
+            {
+                throw new InvalidOperationException(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "A trial's sound at {0:0.##} dBFS RMS is louder than the {1:0.##} dBFS its buffer was laid out and peak-checked at, the loudest any trial was to draw.", levelDbfs, bufferLevelDbfs));
+            }
+            var scaled = new Mat(buffer.Rows, buffer.Cols, buffer.Depth, buffer.Channels);
+            CV.ConvertScale(buffer, scaled, Math.Pow(10, (levelDbfs - bufferLevelDbfs) / 20), 0);
+            return scaled;
         }
     }
 

@@ -24,14 +24,14 @@ namespace OpenRigs.Trials.Tests
         public double outcomeTime;
         public bool rewarded;
         public double rewardOfferedUl;
-        public bool penaltySoundOn;
+        public bool penalised;
         public double penaltyTimeoutSeconds;
     }
 
-    /// <summary>A task's outcome type derived from the lib's, as each dome's is: its members are inherited.</summary>
+    /// <summary>A task's outcome type derived from the lib's, as each task's is: its members are inherited.</summary>
     public class PieceOutcome : TrialOutcome<PieceRow>
     {
-        public PieceOutcome(PieceRow row) : base(row, "Left") { }
+        public PieceOutcome(PieceRow row, double penaltyLevelDbfs = double.NaN) : base(row, "Left", penaltyLevelDbfs) { }
     }
 
     /// <summary>A trial with a laser condition.</summary>
@@ -49,40 +49,20 @@ namespace OpenRigs.Trials.Tests
         public LaserTiming Laser { get; set; }
     }
 
-    /// <summary>A task file as PlayPenaltySound reads it.</summary>
-    public class PieceTaskConfig
+    /// <summary>A task's trial rules as PlayPenaltySound reads them: the loudest penalty level any trial draws.</summary>
+    public class PieceSoundRules
     {
-        public PieceTaskConfig() { TaskParameters = new PieceParameters(); }
-        public PieceParameters TaskParameters { get; set; }
+        public double LoudestPenaltyLevelDbfs { get; set; }
     }
 
-    public class PieceParameters
-    {
-        public PieceParameters() { Penalty = new PiecePenalty(); }
-        public PiecePenalty Penalty { get; set; }
-    }
-
-    public class PiecePenalty
-    {
-        public PiecePenalty() { Sound = new PieceSound(); }
-        public PieceSound Sound { get; set; }
-    }
-
-    public class PieceSound
-    {
-        public double LevelDbfs { get; set; }
-    }
-
-    /// <summary>The task file at Go: a penalty level of -30 dBFS.</summary>
+    /// <summary>The rules at Go: the loudest penalty level -30 dBFS.</summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
-    public class PieceTaskConfigSource
+    public class PieceSoundRulesSource
     {
-        public IObservable<PieceTaskConfig> Process()
+        public IObservable<PieceSoundRules> Process()
         {
-            var config = new PieceTaskConfig();
-            config.TaskParameters.Penalty.Sound.LevelDbfs = -30;
-            return Observable.Return(config);
+            return Observable.Return(new PieceSoundRules { LoudestPenaltyLevelDbfs = -30 });
         }
     }
 
@@ -99,7 +79,7 @@ namespace OpenRigs.Trials.Tests
         }
     }
 
-    /// <summary>Three outcomes 0.2 s apart from 0.5 s: trial 1 rewarded, 2 with the penalty sound, 3 with neither.</summary>
+    /// <summary>Three outcomes 0.2 s apart from 0.5 s: trial 1 rewarded, 2 penalised at -36 dBFS, 3 penalised with the sound mute.</summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
     public class PieceOutcomes
@@ -109,11 +89,12 @@ namespace OpenRigs.Trials.Tests
             var rows = new[]
             {
                 new PieceRow { trialNumber = 1, outcome = TrialOutcomes.Correct, rewarded = true, rewardOfferedUl = 2.5 },
-                new PieceRow { trialNumber = 2, outcome = TrialOutcomes.Incorrect, penaltySoundOn = true },
-                new PieceRow { trialNumber = 3, outcome = TrialOutcomes.NoResponse },
+                new PieceRow { trialNumber = 2, outcome = TrialOutcomes.Incorrect, penalised = true },
+                new PieceRow { trialNumber = 3, outcome = TrialOutcomes.NoResponse, penalised = true },
             };
+            var levels = new[] { -36, -36, double.NaN };
             return Observable.Timer(TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(0.2)).Take(rows.Length)
-                .Select(i => new PieceOutcome(rows[i]));
+                .Select(i => new PieceOutcome(rows[i], levels[i]));
         }
     }
 
@@ -133,11 +114,17 @@ namespace OpenRigs.Trials.Tests
         {
             return Observable.Defer(() =>
             {
-                var laser = Stop == "Duration" ? LaserTiming.ForDuration(HardwareTriggered, 0.5, 0.5)
+                var laser = Stop == "Duration" ? LaserTiming.ForDuration(HardwareTriggered, 0.5)
                     : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(HardwareTriggered, 0, LaserMaxSeconds) : null;
                 return Observable.Timer(TimeSpan.FromSeconds(0.1)).Select(_ => new PieceRules { Laser = laser });
             });
         }
+    }
+
+    /// <summary>A laser trial with its own laser duration, 0.5 s (LaserTiming.ForDuration).</summary>
+    public class PieceTimedTrial : PieceTrial, ILaserDurationTrial
+    {
+        public double LaserDurationSeconds { get { return 0.5; } }
     }
 
     /// <summary>Trial 1's events for PieceZapitRun's timeline.</summary>
@@ -147,11 +134,15 @@ namespace OpenRigs.Trials.Tests
     {
         public double OutcomeAt { get; set; }
 
+        /// <summary>Whether trial 1 has its own laser duration (a ForDuration task's trial).</summary>
+        public bool Timed { get; set; }
+
         public IObservable<TrialEvent<PieceTrial, string, PieceOutcome>> Process()
         {
             return Observable.Defer(() =>
             {
-                var trial = new PieceTrial { TrialNumber = 1, LaserCondition = 3, LaserOn = true, LaserPowerMw = 2 };
+                var trial = Timed ? new PieceTimedTrial() : new PieceTrial();
+                trial.TrialNumber = 1; trial.LaserCondition = 3; trial.LaserOn = true; trial.LaserPowerMw = 2;
                 var outcome = new PieceOutcome(new PieceRow { trialNumber = 1, outcome = TrialOutcomes.Correct });
                 var events = new List<Tuple<double, TrialEventKind>>
                 {
@@ -255,7 +246,7 @@ namespace OpenRigs.Trials.Tests
 
         static List<string> RunZapit(string stop, bool hardwareTriggered, double laserMaxSeconds, double outcomeAt)
         {
-            return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("STOP", stop).Replace("HARDWARE", hardwareTriggered ? "true" : "false")
+            return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop == "Duration" ? "true" : "false").Replace("STOP", stop).Replace("HARDWARE", hardwareTriggered ? "true" : "false")
                 .Replace("LASER_MAX", laserMaxSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("OUTCOME_AT", outcomeAt.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         }

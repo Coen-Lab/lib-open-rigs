@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, WithJsonSchema, model_validator
 
 from swc.aeon.schema import BaseSchema
 
@@ -52,17 +52,11 @@ class WheelQuietWait(TaskBlock):
         default=0.0,
         ge=0,
         le=10,
-        description="Quiet wait: a trial's start needs this long with the wheel still, in seconds, counted from the interval's start: the wheel's distance (forward and back added) over the last wheelQuietSeconds must stay within wheelQuietCm; 0: off (with wheelQuietCm 0); at most 10 s",
+        description="Quiet wait: a trial's start needs this long with the wheel still, in seconds, counted from the interval's start: the wheel's distance (forward and back added) over the last wheelQuietSeconds must stay within wheelQuietCm; 0: off (the only off); at most 10 s",
     )
     wheel_quiet_cm: float = Field(
-        default=0.0, ge=0, le=20, description="The most the wheel may move, forward and back added, within the last wheelQuietSeconds before the trial's start, in cm; 0: off (with wheelQuietSeconds 0); at most 20 cm"
+        default=0.0, ge=0, le=20, description="The most the wheel may move, forward and back added, within the last wheelQuietSeconds before the trial's start, in cm; 0: no movement at all; at most 20 cm"
     )
-
-    @model_validator(mode="after")
-    def _wheel_quiet_pair(self):
-        if (self.wheel_quiet_seconds > 0) != (self.wheel_quiet_cm > 0):
-            raise ValueError("wheel_quiet_seconds and wheel_quiet_cm must both be above 0 (the wheel's quiet wait) or both 0 (off)")
-        return self
 
 
 class Iti(TaskBlock):
@@ -178,35 +172,17 @@ class Optogenetics(TaskBlock):
             )
 
     def check_zapit_free_in_time(
-        self,
-        iti_min_seconds: float,
-        *,
-        trigger_hold_seconds: float | None = None,
-        laser_duration_seconds: float | None = None,
-        ramp_down_seconds: float = 0.0,
-        response_delay_seconds: float = 0.0,
+        self, iti_min_seconds: float, *, laser_duration_seconds: float, ramp_down_seconds: float = 0.0, response_delay_seconds: float = 0.0
     ) -> None:
-        """Refuses laser timing that leaves Zapit busy at the next trial's trigger, less its reply margin (OpenRigs.Trials
-        TrialLoop stops there naming the last laser: the same rule). Off unless enabled. A task gives its laser's end,
-        one of: trigger_hold_seconds (the laser until the outcome, the line held this long past it: LaserTiming.UntilOutcome),
-        or laser_duration_seconds with ramp_down_seconds (LaserTiming.ForDuration) and response_delay_seconds, the soonest
-        an outcome follows the stimulus. The next trigger comes at the soonest iti_min_seconds - laser_to_stimulus_seconds
-        after an outcome, so (lead + response delay + iti_min - lead) after a trigger."""
-        if (trigger_hold_seconds is None) == (laser_duration_seconds is None):
-            raise TypeError("check_zapit_free_in_time takes one of trigger_hold_seconds and laser_duration_seconds")
+        """Refuses a laser duration (LaserTiming.ForDuration, each trial's own: call it on every combination) that leaves Zapit
+        busy at the next trial's trigger, less its reply margin (OpenRigs.Trials TrialLoop stops there naming the last laser: the
+        same rule). Off unless enabled. response_delay_seconds is the soonest an outcome follows the stimulus; the next trigger
+        comes at the soonest iti_min_seconds - laser_to_stimulus_seconds after an outcome. A laser until the outcome holds the
+        line for the conditions file's longest ramp-down (ZapitConditions.Check), read at connect, so the workflow checks it."""
         if not self.enabled:
             return
-        iti, lead, margin = iti_min_seconds, self.laser_to_stimulus_seconds, ZAPIT_REPLY_MARGIN_SECONDS
-        if trigger_hold_seconds is not None:
-            longest = iti - lead - margin
-            if trigger_hold_seconds > longest + 1e-9:
-                raise ValueError(
-                    f"optogenetics.trigger_hold_seconds ({trigger_hold_seconds} s) must be at most {longest:g} s (trial_structure.iti_min_seconds - "
-                    f"laser_to_stimulus_seconds - Zapit's {margin} s reply margin): the next trial's StartStimulus goes once the line falls"
-                )
-            return
-        assert laser_duration_seconds is not None  # the other of the two, checked above
-        longest = response_delay_seconds + iti - ramp_down_seconds - margin
+        margin = ZAPIT_REPLY_MARGIN_SECONDS
+        longest = response_delay_seconds + iti_min_seconds - ramp_down_seconds - margin
         if laser_duration_seconds > longest + 1e-9:
             raise ValueError(
                 f"optogenetics.laser_duration_seconds ({laser_duration_seconds} s) must be at most {longest:g} s (response_delay_seconds + "
@@ -215,60 +191,52 @@ class Optogenetics(TaskBlock):
             )
 
 
-# The lab's sound levels, in dBFS RMS: the RMS of a sound over its whole length as the task gives it (before the
-# speaker's equalisation), against full scale (OpenRigs.Audio SoundLevel, the same numbers). Defaults only: each
-# task file states its own; they become dB SPL once the speakers are calibrated for loudness.
+# The lab's sound levels, in dBFS RMS: the RMS of a sound over its samples outside silent stretches (a silent stretch a
+# run of exactly-zero samples at least 1 ms long), as the task gives it (before the speaker's equalisation), against full
+# scale (OpenRigs.Audio SoundLevel, the same numbers and rule). Defaults only: each task file states its own; they become
+# dB SPL once the speakers are calibrated for loudness. The background noise has no task setting: BACKGROUND_LEVEL_DBFS.
 STIMULUS_LEVEL_DBFS = -30.0
 PENALTY_LEVEL_DBFS = -30.0
-REWARD_TONE_LEVEL_DBFS = -36.0
-BACKGROUND_LEVEL_DBFS = -50.0
+REWARD_TONE_LEVEL_DBFS = -35.0
+BACKGROUND_LEVEL_DBFS = -60.0
 PEAK_LIMIT_DBFS = -1.0  # every buffer's peak stays under this after equalisation, checked as the buffer is built
 QUIETEST_LEVEL_DBFS = -120.0
+MUTE = "mute"  # a level that plays nothing (OpenRigs.Trials SoundLevels.Mute); not `off`, which YAML 1.1 reads as false
+
+# A sound level: dBFS RMS, or "mute". oneOf, not pydantic's anyOf: Bonsai.Sgen makes an empty class of an anyOf item.
+SoundLevelDbfs = Annotated[
+    Annotated[float, Field(ge=QUIETEST_LEVEL_DBFS, le=PEAK_LIMIT_DBFS)] | Literal["mute"],
+    WithJsonSchema({"oneOf": [{"type": "number", "minimum": QUIETEST_LEVEL_DBFS, "maximum": PEAK_LIMIT_DBFS}, {"const": MUTE, "type": "string"}]}),
+]
 
 
 def level_dbfs(default: float, sound: str):
     """A sound's levelDbfs field, with its lab default."""
     return Field(
         default=default,
-        ge=QUIETEST_LEVEL_DBFS,
-        le=PEAK_LIMIT_DBFS,
-        description=f"{sound}'s level in dBFS RMS: the RMS of the sound over its whole length as the task gives it, before the speaker's "
-        f"equalisation, against full scale (a full-scale sine is -3). The lab's default {default:g}. The workflow stops as the sound's buffer is "
-        f"built (at Go for a sound built once, at its trial for one built each trial) if any peak would reach {PEAK_LIMIT_DBFS:g} dBFS after "
-        f"equalisation. Sounds overlapping on a speaker share its headroom: each buffer's peak is checked, not their mix",
+        description=f"{sound}'s level in dBFS RMS: the RMS of the sound over its samples outside silent stretches (runs of exactly-zero samples "
+        f"at least 1 ms long), as the task gives it, before the speaker's equalisation, against full scale (a full-scale sine is -3); "
+        f"{MUTE}: no sound. The lab's default {default:g}. The workflow stops at Go if any peak at the loudest level a trial can draw would reach "
+        f"{PEAK_LIMIT_DBFS:g} dBFS after equalisation. Sounds overlapping on a speaker share its headroom: each buffer's peak is checked, not their mix",
     )
 
 
-class StimulusSound(TaskBlock):
-    """A task's stimulus sounds, each played at levelDbfs (OpenRigs.Audio SpeakerBuffer or SpeakerSet.Buffer)."""
-
-    level_dbfs: float = level_dbfs(STIMULUS_LEVEL_DBFS, "Each stimulus sound")
-
-
 class RewardTone(TaskBlock):
-    """A task's reward tone, played at levelDbfs."""
+    """A task's reward tone, played at each trial's levelDbfs (OpenRigs.Audio PlayRewardTone)."""
 
-    level_dbfs: float = level_dbfs(REWARD_TONE_LEVEL_DBFS, "The reward tone")
-
-
-class BackgroundNoise(TaskBlock):
-    """The background noise, one level for the experiment: looped on every speaker unequalised, faded in over 2 s once
-    the task file is read at Go (OpenRigs.Audio SpeakerMixer)."""
-
-    enabled: bool = Field(default=True, description="Whether the background noise plays")
-    level_dbfs: float = level_dbfs(BACKGROUND_LEVEL_DBFS, "The background noise")
+    level_dbfs: SoundLevelDbfs = level_dbfs(REWARD_TONE_LEVEL_DBFS, "The reward tone")
 
 
 class PenaltySound(TaskBlock):
-    """The lab's penalty sound (OpenRigs.Audio PenaltySoundBuffer, the same in every task), on rig.yml's speakerArray.penaltySoundChannel alone, equalised for that speaker."""
+    """The lab's penalty sound (OpenRigs.Audio PlayPenaltySound, the same in every task), on rig.yml's speakerArray.penaltySoundChannel alone,
+    equalised for that speaker, at each penalised trial's levelDbfs."""
 
-    enabled: bool = Field(default=True, description="Whether the penalty sound plays with every timeout")
-    level_dbfs: float = level_dbfs(PENALTY_LEVEL_DBFS, "The penalty sound")
+    level_dbfs: SoundLevelDbfs = level_dbfs(PENALTY_LEVEL_DBFS, "The penalty sound")
 
 
 class Penalty(TaskBlock):
-    """What a wrong or missed trial costs: a timeout, and the penalty sound with it (the trial log's penaltySoundOn and
-    penaltyTimeoutSeconds). Each task says which trials are penalised; timeoutSeconds has no lab default: each task file gives it."""
+    """What a wrong or missed trial costs: a timeout (the trial log's penaltyTimeoutSeconds), and the penalty sound with it
+    unless its level is mute. Each task says which trials are penalised; timeoutSeconds has no lab default: each task file gives it."""
 
     timeout_seconds: float = Field(ge=0, description="Timeout after a penalised trial, in seconds; the next interval starts after it")
     sound: PenaltySound = Field(default=PenaltySound(), description="The penalty sound, with every timeout")

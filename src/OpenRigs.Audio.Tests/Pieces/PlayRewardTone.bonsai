@@ -9,12 +9,12 @@
   <Workflow>
     <Nodes>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="test:ToneTaskConfigSource">
-          <test:LevelDbfs>-20</test:LevelDbfs>
+        <Combinator xsi:type="test:ToneRulesSource">
+          <test:LoudestRewardToneLevelDbfs>-20</test:LoudestRewardToneLevelDbfs>
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
-        <Name>TaskConfig</Name>
+        <Name>TrialRules</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="test:ToneSpeakers">
@@ -28,14 +28,11 @@
         <rx:Name>RewardToneSounds</rx:Name>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:Timer">
-          <rx:DueTime>PT0.5S</rx:DueTime>
-          <rx:Period>PT0.2S</rx:Period>
-        </Combinator>
+        <Combinator xsi:type="test:ToneTrialLevels" />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:Take">
-          <rx:Count>2</rx:Count>
+          <rx:Count>3</rx:Count>
         </Combinator>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:PlayRewardTone.bonsai">

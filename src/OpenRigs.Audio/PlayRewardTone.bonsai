@@ -5,14 +5,14 @@
                  xmlns:dsp="clr-namespace:Bonsai.Dsp;assembly=Bonsai.Dsp"
                  xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>A task's reward tone, in PlayPenaltySound's shape: the tone (RewardToneFile, the task's own mono 32-bit float file, read at Start) laid out once the task file is read at Go on every rig.yml speaker, each copy equalised for its speaker, at the task's rewardTone.levelDbfs, into the AsyncSubject RewardToneBuffer (SpeakerBuffer stops the workflow if a copy would peak at -1 dBFS); each input then plays it, sent into SpeakerMixer's RewardToneSounds. Give it the rewarded trials. Needs TaskConfig (with TaskParameters.RewardTone.LevelDbfs) and Speakers from the workflow.</Description>
+  <Description>A task's reward tone, in PlayPenaltySound's shape: the tone (RewardToneFile, the task's own mono 32-bit float file, read at Start) laid out once the trials' rules are made at Go on every rig.yml speaker, each copy equalised for its speaker, at the loudest reward tone level any trial draws (TrialRules' LoudestRewardToneLevelDbfs), into the AsyncSubject RewardToneBuffer (SpeakerBuffer stops the workflow if a copy would peak at -1 dBFS); each input, a rewarded trial's rewardTone.levelDbfs (NaN when mute: nothing plays), then plays it at that level (SoundAtLevel), sent into SpeakerMixer's RewardToneSounds. Needs TrialRules (with LoudestRewardToneLevelDbfs) and Speakers from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
-        <Name>TaskConfig</Name>
+        <Name>TrialRules</Name>
       </Expression>
       <Expression xsi:type="MemberSelector">
-        <Selector>TaskParameters.RewardTone.LevelDbfs</Selector>
+        <Selector>LoudestRewardToneLevelDbfs</Selector>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>Speakers</Name>
@@ -50,7 +50,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="aud:SpeakerBuffer">
-          <aud:LevelDbfs>-36</aud:LevelDbfs>
+          <aud:LevelDbfs>-35</aud:LevelDbfs>
           <aud:Equalise>true</aud:Equalise>
           <aud:SyncCopy>false</aud:SyncCopy>
         </Combinator>
@@ -67,13 +67,26 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:WithLatestFrom" />
       </Expression>
-      <Expression xsi:type="MemberSelector">
-        <Selector>Item2</Selector>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="aud:SoundAtLevel">
+          <aud:BufferLevelDbfs>NaN</aud:BufferLevelDbfs>
+        </Combinator>
       </Expression>
       <Expression xsi:type="MulticastSubject">
         <Name>RewardToneSounds</Name>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="BufferLevelDbfs" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TrialRules</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>LoudestRewardToneLevelDbfs</Selector>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -91,6 +104,9 @@
       <Edge From="13" To="14" Label="Source1" />
       <Edge From="14" To="15" Label="Source1" />
       <Edge From="15" To="16" Label="Source1" />
+      <Edge From="18" To="19" Label="Source1" />
+      <Edge From="19" To="17" Label="Source1" />
+      <Edge From="17" To="14" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

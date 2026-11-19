@@ -4,20 +4,20 @@ using System.Reflection;
 
 namespace OpenRigs.Trials
 {
-    /// <summary>The trial log's outcome values, every task's (open_rigs.rigs.trials OUTCOMES).</summary>
+    /// <summary>The trial log's outcome values, every task's (open_rigs.rigs.trials OUTCOMES), in the task's camelCase as its targets and trialType.</summary>
     public static class TrialOutcomes
     {
         /// <summary>The trial was answered as the task asks.</summary>
-        public const string Correct = "Correct";
+        public const string Correct = "correct";
 
         /// <summary>The trial was answered otherwise.</summary>
-        public const string Incorrect = "Incorrect";
+        public const string Incorrect = "incorrect";
 
         /// <summary>The trial ended with no answer.</summary>
-        public const string NoResponse = "NoResponse";
+        public const string NoResponse = "noResponse";
 
         /// <summary>The trial has no right answer, whatever the response: left out of performance.</summary>
-        public const string Probe = "Probe";
+        public const string Probe = "probe";
 
         /// <summary>Every outcome, in OUTCOMES' order.</summary>
         public static readonly string[] All = { Correct, Incorrect, NoResponse, Probe };
@@ -25,18 +25,19 @@ namespace OpenRigs.Trials
 
     /// <summary>
     /// A trial's outcome, built the same way in every task from its filled row (<see cref="SharedTrialColumns.Fill"/>): the
-    /// row stamped with its outcomeTime, the reward, the penalty sound and the timeout. A task that sets off more at the
-    /// outcome (its spouts) derives from it.
+    /// row stamped with its outcomeTime, the reward, whether it was penalised with the trial's penalty level, and the timeout
+    /// (TrialOutcomeEffects reads them). A task that sets off more at the outcome (its spouts) derives from it.
     /// </summary>
     /// <typeparam name="TRow">The task's trial row.</typeparam>
     public class TrialOutcome<TRow> : ITrialOutcome where TRow : class
     {
         /// <summary>
         /// The outcome of <paramref name="row"/>, whose shared block is filled: the reward, when the row is rewarded,
-        /// is its rewardOfferedUl at <paramref name="valveInstance"/> (as rig.yml's wiring names the reward valve), else null.
-        /// Throws when the row's outcome is not one of <see cref="TrialOutcomes.All"/>.
+        /// is its rewardOfferedUl at <paramref name="valveInstance"/> (as rig.yml's wiring names the reward valve), else null;
+        /// <paramref name="penaltyLevelDbfs"/> the trial's penalty.sound.levelDbfs (<see cref="SoundLevels.Parse"/>: NaN when
+        /// mute). Throws when the row's outcome is not one of <see cref="TrialOutcomes.All"/>.
         /// </summary>
-        public TrialOutcome(TRow row, string valveInstance)
+        public TrialOutcome(TRow row, string valveInstance, double penaltyLevelDbfs)
         {
             if (row == null) throw new ArgumentNullException("row");
             var outcome = Get<string>(row, "outcome");
@@ -47,7 +48,8 @@ namespace OpenRigs.Trials
             Row = Timestamped.Create(row, Get<double>(row, "outcomeTime"));
             Rewarded = Get<bool>(row, "rewarded");
             Reward = Rewarded ? Tuple.Create(valveInstance, Get<double>(row, "rewardOfferedUl")) : null;
-            PenaltySoundOn = Get<bool>(row, "penaltySoundOn");
+            Penalised = Get<bool>(row, "penalised");
+            PenaltyLevelDbfs = penaltyLevelDbfs;
             PenaltyTimeoutSeconds = Get<double>(row, "penaltyTimeoutSeconds");
         }
 
@@ -60,8 +62,11 @@ namespace OpenRigs.Trials
         /// <summary>Gets the reward request (valve, microlitres) for RewardRequests; null without a reward.</summary>
         public Tuple<string, double> Reward { get; private set; }
 
-        /// <summary>Gets whether the penalty sound plays (the row's penaltySoundOn).</summary>
-        public bool PenaltySoundOn { get; private set; }
+        /// <summary>Gets whether the trial is penalised (the row's penalised): the penalty sound plays at PenaltyLevelDbfs.</summary>
+        public bool Penalised { get; private set; }
+
+        /// <summary>Gets the trial's penalty sound level in dBFS RMS, NaN when mute (the sound then never plays).</summary>
+        public double PenaltyLevelDbfs { get; private set; }
 
         /// <summary>Gets the timeout after the trial, in seconds (the row's penaltyTimeoutSeconds).</summary>
         public double PenaltyTimeoutSeconds { get; private set; }

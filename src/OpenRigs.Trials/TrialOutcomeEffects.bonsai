@@ -3,7 +3,7 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>What every trial's outcome sets off, the same in every task: give it each trial's outcome (a TrialOutcome or a type derived from it, as the trial loop's Outcome event carries it). Its Row is sent into TrialRow; on a rewarded outcome (Rewarded) its Reward into RewardRequests (OpenRigs.Devices Rewards); with the penalty sound (PenaltySoundOn) it plays the lab's penalty sound (OpenRigs.Audio PlayPenaltySound). Each outcome is passed on, for what a task sets off at the outcome itself (its spouts, a reward tone). Needs TrialRow and RewardRequests declared, and what PlayPenaltySound needs (TaskConfig, Speakers).</Description>
+  <Description>What every trial's outcome sets off, the same in every task: give it each trial's outcome (a TrialOutcome or a type derived from it, as the trial loop's Outcome event carries it). Its Row is sent into TrialRow; on a rewarded outcome (Rewarded) its Reward into RewardRequests (OpenRigs.Devices Rewards); on a penalised outcome (Penalised) it plays the lab's penalty sound at the trial's PenaltyLevelDbfs (OpenRigs.Audio PlayPenaltySound; nothing when mute). Each outcome is passed on, for what a task sets off at the outcome itself (its spouts, a reward tone). Needs TrialRow and RewardRequests declared, and what PlayPenaltySound needs (TrialRules, Speakers).</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -40,14 +40,14 @@
         <Name>RewardRequests</Name>
       </Expression>
       <Expression xsi:type="rx:Condition">
-        <Name>PenaltySoundOn?</Name>
+        <Name>Penalised?</Name>
         <Workflow>
           <Nodes>
             <Expression xsi:type="WorkflowInput">
               <Name>Source1</Name>
             </Expression>
             <Expression xsi:type="MemberSelector">
-              <Selector>PenaltySoundOn</Selector>
+              <Selector>Penalised</Selector>
             </Expression>
             <Expression xsi:type="WorkflowOutput" />
           </Nodes>
@@ -56,6 +56,9 @@
             <Edge From="1" To="2" Label="Source1" />
           </Edges>
         </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>PenaltyLevelDbfs</Selector>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:PlayPenaltySound.bonsai" />
       <Expression xsi:type="WorkflowOutput" />
@@ -68,7 +71,8 @@
       <Edge From="4" To="5" Label="Source1" />
       <Edge From="0" To="6" Label="Source1" />
       <Edge From="6" To="7" Label="Source1" />
-      <Edge From="0" To="8" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="0" To="9" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

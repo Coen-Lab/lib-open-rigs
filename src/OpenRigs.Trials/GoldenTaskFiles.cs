@@ -7,14 +7,14 @@ using System.Linq;
 namespace OpenRigs.Trials
 {
     /// <summary>
-    /// The golden task files a conditioned task's tests draw from (its tests\fixtures\handover, the files app-rig-control
+    /// The golden task files a conditioned task's tests draw from (its tests\fixtures\handover, the files the experiment launcher
     /// writes at launch), and the check that each combination is drawn at its share: one copy for every task's tests.
     /// </summary>
     public static class GoldenTaskFiles
     {
         /// <summary>
         /// Each *.yml in <paramref name="folder"/> (or in the folder HANDOVER_DIR names, as a mutation check sets it) by
-        /// name in ordinal order, its text with its one "rngSeed: null" (app-rig-control leaves the seed for the workflow
+        /// name in ordinal order, its text with its one "rngSeed: null" (the launcher leaves the seed for the workflow
         /// to draw) set to 1. Throws on a folder with no file or a file without exactly one "rngSeed: null".
         /// </summary>
         public static List<KeyValuePair<string, string>> Read(string folder)

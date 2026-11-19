@@ -10,7 +10,7 @@ name (`values`, such as a task's trialType). Columns the workflow's file does no
 written, as text. Nothing on disk is changed: recorded data is never rewritten.
 
 A trial's task values come from the experiment's combinations table, Settings/Settings_Combinations_<time>.json
-({"rows": [{"trialCombinationId", "trialCondition", "trialType", "conditionWeight", "values": {dotted path: value}}]},
+({"rows": [{"trialCombinationId", "trialConditionId", "trialType", "conditionWeight", "values": {dotted path: value}}]},
 written at Go), joined on the log's trialCombinationId; `check` holds the recorded columns to it.
 
 What each column means comes from the experiment itself: `manifest.json`'s `trial_columns`, which
@@ -39,7 +39,8 @@ MANIFEST_VERSIONS = (1, 2, 3, 4)  # 4 is what OpenRigs.Manifest writes (Manifest
 REPO_FILE = "schemas/trial-columns.yml"
 TASK_FILE = ("Settings", "Settings_Task", ".json")  # written beside the trial log at Go
 COMBINATIONS_FILE = ("Settings", "Settings_Combinations", ".json")  # every combination built at Go, one row each
-ID, OLD_ID = "trialCombinationId", "trialCombination"  # a trial's row in it; the retired within-condition index
+ID = "trialCombinationId"  # a trial's row in it
+HELD = ("trialConditionId", "trialType")  # columns every row has, held to its combination's
 PREFIX = "task."  # a combination's value as a column, by its dotted path
 
 
@@ -153,9 +154,7 @@ def _is_nan(value: Any) -> bool:
 
 
 def _combination_rows(experiment: Path, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Each trial's row of the experiment's combinations table, by its trialCombinationId; refuses the old trialCombination."""
-    if any(OLD_ID in row for row in rows):
-        raise ValueError(f"{experiment}: the log has {OLD_ID}, logged before the combinations table ({COMBINATIONS_FILE[1]}); it cannot be decoded")
+    """Each trial's row of the experiment's combinations table, by its trialCombinationId."""
     table = json.loads(_one(experiment, COMBINATIONS_FILE).read_text(encoding="utf-8-sig"))["rows"]
     by_id = {entry[ID]: entry for entry in table}
     found = []
@@ -167,12 +166,15 @@ def _combination_rows(experiment: Path, rows: List[Dict[str, Any]]) -> List[Dict
 
 
 def _problems(experiment: Path, rows: List[Dict[str, Any]], combos: List[Dict[str, Any]]) -> List[str]:
-    """Where the recorded columns disagree with their trials' combinations (`check`)."""
-    problems = []
+    """Where the recorded columns disagree with their trials' combinations (`check`): a held column or key missing is one too."""
+    problems = [f"{name}: not in the log" for name in HELD if rows and name not in rows[0]]
+    problems += [f"{COMBINATIONS_FILE[1]} row {combo[ID]} has no {name}" for combo in {c[ID]: c for c in combos}.values() for name in HELD if name not in combo]
+    if problems:
+        return problems
     for number, (row, combo) in enumerate(zip(rows, combos), 1):
-        for name in ("trialCondition", "trialType"):
-            if name in row and row[name] != combo[name]:
-                problems.append(f"trial {number}: {name} {row[name]!r}, its combination {combo[ID]}'s is {combo[name]!r}")
+        for name in HELD:
+            if row.get(name) != combo[name]:
+                problems.append(f"trial {number}: {name} {row.get(name)!r}, its combination {combo[ID]}'s is {combo[name]!r}")
     manifest_path = experiment / MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig")) if manifest_path.is_file() else {}
     listed = (manifest.get("trial_columns") or {}).get("columns") or {}
@@ -225,12 +227,13 @@ def _typed(experiment: Path, repo: Union[str, Path, None], decode: bool) -> List
 
 def check(experiment: Union[str, Path]) -> None:
     """Raises ValueError listing every trial whose recorded columns disagree with its row of the experiment's combinations
-    table (Settings/Settings_Combinations_<time>.json): its trialCondition and trialType, and each column whose entry in
+    table (Settings/Settings_Combinations_<time>.json): its trialConditionId and trialType, and each column whose entry in
     the manifest's own trial_columns has copyOf, a task path: the row's value, else Settings_Task's (a one-entry list its
-    entry), or NaN on the trials nanWhen {column, equals} names. A log without trialCombinationId has nothing to check."""
+    entry), or NaN on the trials nanWhen {column, equals} names. A column or table key it holds that is missing is a problem,
+    never skipped. A log without trialCombinationId has nothing to check."""
     experiment = Path(experiment)
     rows = _typed(experiment, None, True)
-    if any(ID in row or OLD_ID in row for row in rows):
+    if any(ID in row for row in rows):
         _raise(experiment, _problems(experiment, rows, _combination_rows(experiment, rows)))
 
 
@@ -243,10 +246,10 @@ def read(experiment: Union[str, Path], repo: Union[str, Path, None] = None, deco
     A log with trialCombinationId also gets its combination's values from the combinations table
     (Settings/Settings_Combinations_<time>.json), each as a column `task.<dotted path>`, once `check` passes. Raises
     ValueError for no or several tables, an id not in it, a recorded value that disagrees (check), a recorded column of a
-    `task.` name, or the old trialCombination column. A log with neither is read as written."""
+    `task.` name. A log without trialCombinationId is read as written."""
     experiment = Path(experiment)
     rows = _typed(experiment, repo, decode)
-    if not any(ID in row or OLD_ID in row for row in rows):
+    if not any(ID in row for row in rows):
         return rows
     combos = _combination_rows(experiment, rows)
     _raise(experiment, _problems(experiment, rows, combos))

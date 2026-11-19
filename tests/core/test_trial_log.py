@@ -15,10 +15,10 @@ COLUMNS = {
     "Seconds": {"type": "double", "unit": "s"},
     "trialNumber": {"type": "int"},
     "trialType": {"type": "int", "values": {"0": "Visual", "2": "AVCoherent", "4": "Neutral"}},
-    "outcome": {"type": "string", "values": ["Correct", "Incorrect", "NoResponse"]},
+    "outcome": {"type": "string", "values": ["correct", "incorrect", "noResponse"]},
     "stimulusOnsetTime": {"type": "double", "unit": "s"},
     "choiceTime": {"type": "double", "unit": "s"},
-    "bothSpoutsOffered": {"type": "bool"},
+    "singleSpoutOffered": {"type": "bool"},
 }
 
 YAML_TEXT = "trialNumber:\n  type: int\ntrialType:\n  type: int\n  values: {0: Visual, 1: Audio}\n"
@@ -37,16 +37,16 @@ def test_the_file_reads_typed_with_codes(tmp_path):
     manifest(tmp_path, trial_columns={"path": "x", "sha256": "0", "columns": COLUMNS})
     # One file for the experiment, over an hour; its last row is still being written (no newline).
     write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-14-17.csv",
-          "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,bothSpoutsOffered,extra\n"
-          "12.5,1,2,Correct,10.1,11.0,True,x\n"
+          "Seconds,trialNumber,trialType,outcome,stimulusOnsetTime,choiceTime,singleSpoutOffered,extra\n"
+          "12.5,1,2,correct,10.1,11.0,True,x\n"
           "3600.2,2,4,NoResponse,3598.0,NaN,False,y\n"
           "3610.0,3,0,Inco")
     rows = trial_log.read(tmp_path)
     assert len(rows) == 2
     first, second = rows
-    assert first == {"Seconds": 12.5, "trialNumber": 1, "trialType": "AVCoherent", "outcome": "Correct",
-                     "stimulusOnsetTime": 10.1, "choiceTime": 11.0, "bothSpoutsOffered": True, "extra": "x"}
-    assert second["trialType"] == "Neutral" and second["bothSpoutsOffered"] is False
+    assert first == {"Seconds": 12.5, "trialNumber": 1, "trialType": "AVCoherent", "outcome": "correct",
+                     "stimulusOnsetTime": 10.1, "choiceTime": 11.0, "singleSpoutOffered": True, "extra": "x"}
+    assert second["trialType"] == "Neutral" and second["singleSpoutOffered"] is False
     assert math.isnan(second["choiceTime"])
     assert trial_log.read(tmp_path, decode=False)[0]["trialType"] == 2
 
@@ -54,8 +54,8 @@ def test_the_file_reads_typed_with_codes(tmp_path):
 def test_a_cell_of_the_wrong_type_is_named(tmp_path):
     manifest(tmp_path, trial_columns={"columns": COLUMNS})
     write(tmp_path / "WorkflowData", "WorkflowData_Trials_2026-11-05T10-00-00.csv",
-          "Seconds,trialNumber,bothSpoutsOffered\n1.0,1,maybe\n")
-    with pytest.raises(ValueError, match="line 2, bothSpoutsOffered"):
+          "Seconds,trialNumber,singleSpoutOffered\n1.0,1,maybe\n")
+    with pytest.raises(ValueError, match="line 2, singleSpoutOffered"):
         trial_log.read(tmp_path)
 
 
@@ -128,7 +128,7 @@ def test_only_chunk_names_are_read(tmp_path):
 # A run with a combinations table. The manifest carries every scalar as text, as the writer copies it ("0"); the task
 # file's NaN is text, the table's bare. contrasts and reward.sizeUl vary; stim.azimuth is constant, a one-entry list.
 TABLE_COLUMNS = {
-    "trialCondition": {"type": "int"}, "trialCombinationId": {"type": "int"}, "trialType": {"type": "string"},
+    "trialConditionId": {"type": "int"}, "trialCombinationId": {"type": "int"}, "trialType": {"type": "string"},
     "target": {"type": "string"}, "visualContrast": {"type": "double", "copyOf": "contrasts"},
     "visualAzimuthDeg": {"type": "double", "copyOf": "stim.azimuth", "nanWhen": {"column": "visualContrast", "equals": "0"}},
     "rewardUl": {"type": "double", "copyOf": "reward.sizeUl"}, "delay": {"type": "double", "copyOf": "delaySeconds"},
@@ -136,14 +136,14 @@ TABLE_COLUMNS = {
 TABLE_TASK = {"taskParameters": {"contrasts": [0, 1], "target": "left", "stim": {"azimuth": [-60]}, "reward": {"sizeUl": 3},
                                  "delaySeconds": "NaN", "trialConditions": [{"trialType": "visual"}, {"trialType": "auditory"}]}}
 TABLE = {"rows": [
-    {"trialCombinationId": 0, "trialCondition": 0, "trialType": "visual", "conditionWeight": 1, "values": {"contrasts": 0, "reward.sizeUl": 3, "target": "left"}},
-    {"trialCombinationId": 1, "trialCondition": 0, "trialType": "visual", "conditionWeight": 1, "values": {"contrasts": 1, "reward.sizeUl": float("nan"), "target": "left"}},
-    {"trialCombinationId": 2, "trialCondition": 1, "trialType": "auditory", "conditionWeight": 1, "values": {"contrasts": 0, "reward.sizeUl": 2, "target": "right"}},
+    {"trialCombinationId": 0, "trialConditionId": 0, "trialType": "visual", "conditionWeight": 1, "values": {"contrasts": 0, "reward.sizeUl": 3, "target": "left"}},
+    {"trialCombinationId": 1, "trialConditionId": 0, "trialType": "visual", "conditionWeight": 1, "values": {"contrasts": 1, "reward.sizeUl": float("nan"), "target": "left"}},
+    {"trialCombinationId": 2, "trialConditionId": 1, "trialType": "auditory", "conditionWeight": 1, "values": {"contrasts": 0, "reward.sizeUl": 2, "target": "right"}},
 ]}
 TABLE_LOG = [  # target is resolved, not a copy: the third trial's centre stays as recorded
-    {"trialCondition": "0", "trialCombinationId": "0", "trialType": "visual", "target": "left", "visualContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "3", "delay": "NaN"},
-    {"trialCondition": "0", "trialCombinationId": "1", "trialType": "visual", "target": "left", "visualContrast": "1", "visualAzimuthDeg": "-60", "rewardUl": "NaN", "delay": "NaN"},
-    {"trialCondition": "1", "trialCombinationId": "2", "trialType": "auditory", "target": "centre", "visualContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "2", "delay": "NaN"},
+    {"trialConditionId": "0", "trialCombinationId": "0", "trialType": "visual", "target": "left", "visualContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "3", "delay": "NaN"},
+    {"trialConditionId": "0", "trialCombinationId": "1", "trialType": "visual", "target": "left", "visualContrast": "1", "visualAzimuthDeg": "-60", "rewardUl": "NaN", "delay": "NaN"},
+    {"trialConditionId": "1", "trialCombinationId": "2", "trialType": "auditory", "target": "centre", "visualContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "2", "delay": "NaN"},
 ]
 
 
@@ -167,16 +167,22 @@ def test_a_combination_s_values_join_as_task_columns_and_never_overwrite(tmp_pat
         trial_log.read(table_run(tmp_path / "clash", log=clash))
 
 
-def test_an_id_needs_exactly_one_table_and_the_old_index_is_refused(tmp_path):
+def test_an_id_needs_exactly_one_table(tmp_path):
     with pytest.raises(ValueError, match="0 files Settings/Settings_Combinations"):
         trial_log.read(table_run(tmp_path / "none", tables=0))
     with pytest.raises(ValueError, match="2 files Settings/Settings_Combinations"):
         trial_log.read(table_run(tmp_path / "two", tables=2))
     with pytest.raises(ValueError, match="trialCombinationId 7 is not a row"):
         trial_log.read(table_run(tmp_path / "out", log=[{**TABLE_LOG[0], "trialCombinationId": "7"}]))
-    old = [{"trialCondition": "0", "trialCombination": "0"}]
-    with pytest.raises(ValueError, match="trialCombination, logged before the combinations table"):
-        trial_log.read(table_run(tmp_path / "old", log=old, tables=0))
+
+
+def test_check_fails_on_a_missing_column_or_key_never_skips_it(tmp_path):
+    no_column = [{k: v for k, v in row.items() if k != "trialType"} for row in TABLE_LOG]
+    with pytest.raises(ValueError, match="trialType: not in the log"):
+        trial_log.check(table_run(tmp_path / "column", log=no_column))
+    no_key = {"rows": [{k: v for k, v in row.items() if k != "trialConditionId"} for row in TABLE["rows"]]}
+    with pytest.raises(ValueError, match="Settings_Combinations row 0 has no trialConditionId"):
+        trial_log.check(table_run(tmp_path / "key", table=no_key))
 
 
 def test_a_log_with_neither_reads_as_written_without_a_table(tmp_path):
@@ -187,7 +193,7 @@ def test_a_log_with_neither_reads_as_written_without_a_table(tmp_path):
 
 
 @pytest.mark.parametrize("trial, column, value, words", [
-    (2, "trialCondition", "0", "trial 3: trialCondition 0, its combination 2's is 1"),
+    (2, "trialConditionId", "0", "trial 3: trialConditionId 0, its combination 2's is 1"),
     (2, "trialType", "visual", "trial 3: trialType 'visual'"),
     (1, "visualContrast", "0.5", "trial 2: visualContrast 0.5, its combination 1's contrasts is 1"),  # the row's value
     (1, "visualAzimuthDeg", "60", "trial 2: visualAzimuthDeg 60.0, its combination 1's stim.azimuth is -60"),  # Settings_Task's, unwrapped
@@ -207,7 +213,7 @@ def test_check_catches_a_planted_mismatch(tmp_path, trial, column, value, words)
 
 
 def test_copy_of_comes_from_the_manifest_only(tmp_path):
-    # Without copyOf in the manifest's columns, only trialCondition and trialType are held to the table.
+    # Without copyOf in the manifest's columns, only trialConditionId and trialType are held to the table.
     run = table_run(tmp_path, log=[{**TABLE_LOG[1], "visualContrast": "0.5"}])
     manifest(run, trial_columns={"columns": {k: {"type": v["type"]} for k, v in TABLE_COLUMNS.items()}})
     assert trial_log.read(run)[0]["visualContrast"] == 0.5

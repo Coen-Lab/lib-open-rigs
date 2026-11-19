@@ -73,15 +73,13 @@
             <Expression xsi:type="PropertyMapping">
               <PropertyMappings>
                 <Property Name="HardwareTriggered" Selector="HardwareTriggered" />
-                <Property Name="DurationSeconds" Selector="LaserDurationSeconds" />
               </PropertyMappings>
             </Expression>
             <Expression xsi:type="Combinator">
               <Name>ArmZapit</Name>
-              <Description>Each trial's StartStimulus (its condition, laser on with the trial's power or off at 0 mW, for the laser's laserDurationSeconds, or until StopZapit with none). On a hardware-triggered rig sent at Arm, during the interval; without, Zapit starts the laser on receipt, so it is sent at the Trigger.</Description>
+              <Description>Each trial's StartStimulus (its condition, laser on with the trial's power or off at 0 mW, for the trial's own laser duration (an ILaserDurationTrial), or until StopZapit). On a hardware-triggered rig sent at Arm, during the interval; without, Zapit starts the laser on receipt, so it is sent at the Trigger.</Description>
               <Combinator xsi:type="trl:ZapitTrialCommand">
                 <trl:HardwareTriggered>false</trl:HardwareTriggered>
-                <trl:DurationSeconds>0</trl:DurationSeconds>
               </Combinator>
             </Expression>
             <Expression xsi:type="MulticastSubject">
@@ -96,14 +94,14 @@
             </Expression>
             <Expression xsi:type="rx:Condition">
               <Name>UntilOutcome?</Name>
-              <Description>A laser with no duration (LaserTiming.UntilOutcome) plays until stopped.</Description>
+              <Description>A laser until the outcome (LaserTiming.UntilOutcome) plays until stopped.</Description>
               <Workflow>
                 <Nodes>
                   <Expression xsi:type="WorkflowInput">
                     <Name>Source1</Name>
                   </Expression>
                   <Expression xsi:type="scr:ExpressionTransform">
-                    <scr:Expression>Item2.LaserDurationSeconds == 0</scr:Expression>
+                    <scr:Expression>Item2.End == "AtOutcome"</scr:Expression>
                   </Expression>
                   <Expression xsi:type="WorkflowOutput" />
                 </Nodes>

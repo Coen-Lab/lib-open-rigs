@@ -24,6 +24,7 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="test:PieceZapitEvents">
           <test:OutcomeAt>OUTCOME_AT</test:OutcomeAt>
+          <test:Timed>TIMED</test:Timed>
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:PublishSubject">

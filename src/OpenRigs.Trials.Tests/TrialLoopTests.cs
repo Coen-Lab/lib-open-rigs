@@ -8,12 +8,13 @@ using OpenRigs.Devices.Zapit;
 
 namespace OpenRigs.Trials.Tests
 {
-    class StubTrial : IZapitTrial
+    class StubTrial : ILaserDurationTrial
     {
         public int TrialNumber { get; set; }
         public int LaserCondition { get; set; }
         public bool LaserOn { get; set; }
         public double LaserPowerMw { get; set; }
+        public double LaserDurationSeconds { get { return 2.5; } }
         public TrialTiming Timing;
     }
 
@@ -319,7 +320,7 @@ namespace OpenRigs.Trials.Tests
             var rules = new StubRules
             {
                 Plan = n => new TrialTiming { ItiSeconds = 5, LaserToStimulusSeconds = 0.5, Laser = true, ResponseWindowSeconds = 1.5 },
-                Laser = LaserTiming.ForDuration(true, 2.5, 0.5),
+                Laser = LaserTiming.ForDuration(true, 0.5),
             };
             var rig = new LoopRig(rules);
             rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
@@ -330,7 +331,7 @@ namespace OpenRigs.Trials.Tests
             var outcome = rig.Of(TrialEventKind.Outcome).Single();
             Assert.AreEqual(outcome.Seconds, rig.Of(TrialEventKind.Iti).Last().Seconds, 1e-12, "the next interval at the outcome");
             var off = rig.RunTo(TrialEventKind.TriggerOff);
-            Assert.AreEqual(trigger.Seconds + 2.5, off.Seconds, 1e-9, "the line up laserDurationSeconds, outcome or not");
+            Assert.AreEqual(trigger.Seconds + 2.5, off.Seconds, 1e-9, "the line up the trial's laserDurationSeconds, outcome or not");
             var next = rig.RunTo(TrialEventKind.Arm);
             Assert.AreEqual(trigger.Seconds + 3.0, next.Seconds, 1e-9, "the next armed once the ramp-down has played");
             Assert.IsFalse(rig.Of(TrialEventKind.LaserCap).Any());
@@ -342,7 +343,7 @@ namespace OpenRigs.Trials.Tests
             var rules = new StubRules
             {
                 Plan = n => new TrialTiming { ItiSeconds = 0.4, LaserToStimulusSeconds = -0.5, Laser = true, ResponseWindowSeconds = 1.5 },
-                Laser = LaserTiming.ForDuration(true, 2.5, 0.5),
+                Laser = LaserTiming.ForDuration(true, 0.5),
             };
             var rig = new LoopRig(rules);
             rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
@@ -493,9 +494,10 @@ namespace OpenRigs.Trials.Tests
             StringAssert.Contains(refused(new TrialTiming { ItiSeconds = double.NaN }), "its interval is NaN");
             StringAssert.Contains(refused(new TrialTiming { ItiSeconds = 2, Laser = true }), "no LaserTiming");
             StringAssert.Contains(refused(new TrialTiming { ItiSeconds = 2, ResponseWindowSeconds = 0 }), "response window");
-            StringAssert.Contains(refused(new TrialTiming { ItiSeconds = 2, WheelQuietSeconds = 1 }), "wheelQuietSeconds");
+            StringAssert.Contains(refused(new TrialTiming { ItiSeconds = 2, WheelQuietSeconds = 11 }), "wheelQuietSeconds");
             StringAssert.Contains(Refusal(() => LaserTiming.UntilOutcome(true, -1, 10)), "triggerHoldSeconds");
-            StringAssert.Contains(Refusal(() => LaserTiming.ForDuration(true, 0, 0.5)), "laserDurationSeconds");
+            StringAssert.Contains(Refusal(() => LaserTiming.ForDuration(true, -1)), "rampDownSeconds");
+            StringAssert.Contains(Refusal(() => LaserTiming.DurationOf(new PlainTrial { TrialNumber = 4 })), "Trial 4 is a laser trial of a LaserTiming.ForDuration task");
             StringAssert.Contains(Refusal(() => new TrialCue("Drink", CueAnchor.NextIti, double.NaN)), "Drink");
 
             var forever = new LoopRig(new StubRules { OnLick = (t, s, x, u) => StubRules.Outcome("Left", double.PositiveInfinity, x) });

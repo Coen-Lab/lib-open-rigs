@@ -54,6 +54,8 @@ LOG_RNG_SEED = "OpenRigs.Logging:LogRngSeed.bonsai"
 TASK_LOGS = "OpenRigs.Logging:TaskLogs.bonsai"
 # TaskLogs with Settings_Combinations, its one writer: a conditioned task includes it in place of TaskLogs.
 CONDITIONED_TASK_LOGS = "OpenRigs.Logging:ConditionedTaskLogs.bonsai"
+TRIAL_OUTCOME_EFFECTS = "OpenRigs.Trials:TrialOutcomeEffects.bonsai"  # includes PlayPenaltySound, sends into RewardRequests
+ZAPIT_TRIALS = "OpenRigs.Trials:ZapitTrials.bonsai"  # includes SetZapitTriggerLine
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
 DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
@@ -143,7 +145,8 @@ BLOCK_SUBJECTS = {
     CLOCK_FROM_BOARD: {"Timestamp": "rx:BehaviorSubject"},
 }
 # Lab includes that include a BLOCK_SUBJECTS block, so a workflow including one has that block's subjects.
-CARRIED_BLOCKS = {ZAPIT_FOR_TASK: ZAPIT_INCLUDE}
+# Each lab include that includes others, with those: a check counting an include counts it inside these too (includes).
+CARRIED_BLOCKS = {ZAPIT_FOR_TASK: (ZAPIT_INCLUDE,), TRIAL_OUTCOME_EFFECTS: (PLAY_PENALTY_SOUND,), ZAPIT_TRIALS: (SET_ZAPIT_TRIGGER_LINE,)}
 # A piece's command subject is a BehaviorSubject, its data subject a PublishSubject (named by its properties).
 PIECE_SUBJECTS = {"CommandsSubjectName": "rx:BehaviorSubject", "DataSubjectName": "rx:PublishSubject"}
 # The lab's Bonsai setup, one copy that each workflow's .bonsai\Setup.ps1 runs from the open-rigs it pins.
@@ -313,7 +316,7 @@ def subjects_closed_by_a_nested_multicast(wf: Workflow) -> list[str]:
     PublishSubject or ReplaySubject, so the first trial's graph closes it for good (seen on a rig)."""
     declared: dict[str, str] = {}
     pieces = hardware(wf)
-    carried = {inner for outer, inner in CARRIED_BLOCKS.items() if f'Path="{outer}"' in wf.text}
+    carried = {inner for outer, inners in CARRIED_BLOCKS.items() if f'Path="{outer}"' in wf.text for inner in inners}
     for path, subjects in BLOCK_SUBJECTS.items():
         if f'Path="{path}"' in wf.text or path in carried or any(p == path for p, _ in pieces):
             declared.update(subjects)
@@ -715,10 +718,9 @@ def spout_step_size_problems(wf: Workflow) -> list[str]:
 
 
 def background_noise_problems(wf: Workflow) -> list[str]:
-    """Every task with sound has background noise: OpenRigs.Audio's BackgroundNoise, included once, after the task
-    declares LaunchTaskConfig and TaskConfig, which it reads; the workflow sends nothing into BackgroundNoise and reads
-    no backgroundNoise itself. The noise is the lab's one file, rig.yml's speakerArray.backgroundNoise, so
-    the include takes no file and the task keeps no noise WAV."""
+    """Every task with sound has background noise: OpenRigs.Audio's BackgroundNoise, included once; the workflow sends
+    nothing into BackgroundNoise itself. The noise is the lab's one file, rig.yml's speakerArray.backgroundNoise, at the
+    lab's one level (no task setting), so the include takes no file and the task keeps no noise WAV."""
     count = wf.text.count(f'Path="{BACKGROUND_NOISE}"')
     mixer = any(p == SPEAKER_MIXER for p, _ in hardware(wf))
     if count != (1 if mixer else 0):
@@ -730,14 +732,6 @@ def background_noise_problems(wf: Workflow) -> list[str]:
         problems.append(f"{wav.relative_to(wf.repo).as_posix()} is a noise of the task's own (BackgroundNoise plays rig.yml's speakerArray.backgroundNoise)")
     if any(n.get(XSI) == "MulticastSubject" and _name(n) == "BackgroundNoise" for n in wf.root.iter(W + "Expression")):
         problems.append("the workflow sends BackgroundNoise itself (the BackgroundNoise include does)")
-    if "TaskParameters.BackgroundNoise" in wf.text:
-        problems.append("the workflow reads the task file's backgroundNoise itself (BackgroundNoise does)")
-    if count:
-        at = _order(wf.root, lambda n: n.get("Path") == BACKGROUND_NOISE)
-        for name in ("LaunchTaskConfig", "TaskConfig"):
-            declared = _order(wf.root, _declares(name))
-            if declared is None or at is None or declared > at:
-                problems.append(f"BackgroundNoise comes before {name} is declared")
     return problems
 
 
@@ -825,14 +819,15 @@ def reward_problems(wf: Workflow) -> list[str]:
     """Every reward is OpenRigs.Devices' Rewards' and one RewardValve piece's per valve:
     Rewards declares RewardRequests, RewardValves and RewardDelivered, refuses a reward for a valve no piece fires and
     logs each delivery; each valve's piece loads its calibration, gives its own manual drop (<Name>.Reward) and fires the
-    rewards asked of it. A workflow that sends a reward (a multicast into RewardRequests) or has a valve includes Rewards
+    rewards asked of it. A workflow that sends a reward (a multicast into RewardRequests, or OpenRigs.Trials'
+    TrialOutcomeEffects, which sends each rewarded outcome's) or has a valve includes Rewards
     once, before it sends any, before every valve and before ExperimentRecords (rewards are not records), and has at
     least one valve. No workflow declares or reads RewardRequests itself, or sends into RewardValves or RewardDelivered:
     RewardRequests is a BehaviorSubject (a per-trial sender's completion would close a PublishSubject), so a reader
     subscribed per trial would be handed the last reward again. A rig without reward valves (the behaviour box) includes
     none."""
     count = wf.text.count(f'Path="{REWARDS}"')
-    sent = _order(wf.root, lambda n: n.get(XSI) == "MulticastSubject" and _name(n) == "RewardRequests")
+    sent = _order(wf.root, lambda n: (n.get(XSI) == "MulticastSubject" and _name(n) == "RewardRequests") or n.get("Path") == TRIAL_OUTCOME_EFFECTS)
     valves = _order(wf.root, lambda n: n.get("Path") == REWARD_VALVE)
     problems = [f"the workflow includes Rewards {count} times, not once"] if count > 1 or ((sent, valves) != (None, None) and count != 1) else []
     if count and valves is None:
@@ -937,10 +932,16 @@ def preflight_tap_problems(wf: Workflow) -> list[str]:
     return problems
 
 
+def include_count(wf: Workflow, path: str) -> int:
+    """How many times the workflow includes a lab include: itself, and inside each include that carries it (CARRIED_BLOCKS)."""
+    return wf.text.count(f'Path="{path}"') + sum(wf.text.count(f'Path="{outer}"') for outer, inners in CARRIED_BLOCKS.items() if path in inners)
+
+
 def penalty_sound_problems(wf: Workflow) -> list[str]:
-    """The penalty sound is OpenRigs.Audio's PlayPenaltySound, included once: the workflow makes no PenaltySoundBuffer,
-    sends nothing into PenaltySounds and reads no penalty sound file itself."""
-    count = wf.text.count(f'Path="{PLAY_PENALTY_SOUND}"')
+    """The penalty sound is OpenRigs.Audio's PlayPenaltySound, included once (itself or through OpenRigs.Trials'
+    TrialOutcomeEffects): the workflow makes no PenaltySoundBuffer, sends nothing into PenaltySounds and reads no penalty
+    sound file itself."""
+    count = include_count(wf, PLAY_PENALTY_SOUND)
     problems = [] if count == 1 else [f"the workflow includes PlayPenaltySound {count} times, not once"]
     nodes = list(wf.root.iter(W + "Expression"))
     if any(kind(n) == "aud:PenaltySoundBuffer" for n in nodes):

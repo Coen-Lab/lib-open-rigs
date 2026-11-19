@@ -13,21 +13,21 @@ from open_rigs.rigs import trials as trials_module
 from open_rigs.rigs.trials import CORE_COLUMNS, OUTCOMES, shared_block_problems, shared_columns, summarise
 
 COLUMNS = ["harpTime", "trialNumber", "trialType", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds",
-           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySoundOn", "penaltyTimeoutSeconds",
-           "penalised", "autoRewarded"]
+           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds",
+           "penalised", "autoReward"]
 
 
-def _trial(n, start, iti, response, outcome="Correct", timeout=0.0, quiet=0.0, reward=2.0, auto=False, rewarded=None):
+def _trial(n, start, iti, response, outcome="correct", timeout=0.0, quiet=0.0, reward=2.0, auto=False, rewarded=None):
     onset = start + iti + quiet
     end = onset + response
     return {"harpTime": end, "trialNumber": n, "trialType": "auditory", "outcome": outcome, "itiStartTime": start,
             "itiSeconds": iti, "quietWaitSeconds": quiet, "trialStartTime": onset - 0.1, "stimulusOnsetTime": onset,
             "outcomeTime": end, "rewardOfferedUl": reward,
-            "rewarded": outcome == "Correct" or auto if rewarded is None else rewarded, "penaltySoundOn": timeout > 0,
-            "penaltyTimeoutSeconds": timeout, "penalised": timeout > 0, "autoRewarded": auto}
+            "rewarded": outcome == "correct" or auto if rewarded is None else rewarded,
+            "penaltyTimeoutSeconds": timeout, "penalised": timeout > 0, "autoReward": auto}
 
 
-TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "penalty": {"timeoutSeconds": 4.0, "sound": {"enabled": True}}}
+TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "penalty": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -45}}}
 
 
 def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, columns=COLUMNS, task=TASK):
@@ -52,7 +52,7 @@ def _chain(n):
     """n consistent trials: each interval starts at the last outcome plus its timeout."""
     trials, start = [], 1000.0
     for i in range(1, n + 1):
-        t = _trial(i, start, 2.5, 3.0, outcome="Correct" if i % 2 else "Incorrect", timeout=0.0 if i % 2 else 4.0)
+        t = _trial(i, start, 2.5, 3.0, outcome="correct" if i % 2 else "incorrect", timeout=0.0 if i % 2 else 4.0)
         trials.append(t)
         start = t["outcomeTime"] + t["penaltyTimeoutSeconds"]
     return trials
@@ -60,7 +60,7 @@ def _chain(n):
 
 def test_a_consistent_experiment_has_no_problems(tmp_path):
     trials = _chain(4)
-    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     s = summarise(_experiment(tmp_path, trials, rewards))
     assert (s.outcome, s.trials, s.correct, s.performance, s.responded) == ("completed", 4, 2, 0.5, 1.0)
     assert s.problems == []
@@ -71,7 +71,7 @@ def test_a_consistent_experiment_has_no_problems(tmp_path):
 
 def test_a_task_without_quiet_waits_or_optogenetics_is_checked_by_the_core(tmp_path):
     trials = [{**t, "trialStartTime": t["stimulusOnsetTime"]} for t in _chain(4)]  # no lead without optogenetics
-    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     task = {"penalty": TASK["penalty"]}
     s = summarise(_experiment(tmp_path, trials, rewards, columns=[c for c in COLUMNS if c != "quietWaitSeconds"], task=task))
     assert s.problems == [] and s.trials == 4
@@ -85,7 +85,7 @@ def test_a_file_without_outcomeTime_is_one_problem_not_a_crash(tmp_path):
 
 
 def test_an_auto_rewarded_miss_is_a_rewarded_trial(tmp_path):
-    trials = [_trial(1, 1000.0, 2.5, 3.0, outcome="NoResponse", auto=True)]
+    trials = [_trial(1, 1000.0, 2.5, 3.0, outcome="noResponse", auto=True)]
     s = summarise(_experiment(tmp_path, trials, []))
     assert s.requested_ul == 2.0
     assert s.problems == ["trial 1: rewarded with rewardOfferedUl 2.0 but no RewardDelivered at its outcome"]
@@ -115,7 +115,7 @@ def test_a_trial_without_a_stimulus_is_a_note_and_left_out_of_the_times(tmp_path
     # stimulusOnsetTime is NaN when the stimulus was never commanded; NaN would pass every tolerance and poison the median.
     trials = _chain(4)
     trials[1]["stimulusOnsetTime"] = float("nan")
-    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     s = summarise(_experiment(tmp_path, trials, rewards))
     assert s.problems == []
     assert s.notes == ["trial 2: stimulusOnsetTime NaN, the stimulus never commanded: left out of the response and interval times"]
@@ -127,7 +127,7 @@ def test_a_nan_or_empty_number_is_a_problem_not_a_pass_or_a_crash(tmp_path, monk
     trials = _chain(4)
     trials[1]["outcomeTime"] = ""  # float("") raised and stopped the command
     trials[2]["itiStartTime"] = float("nan")  # abs(nan - due) > tolerance is False, so it passed
-    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     folder = _experiment(tmp_path, trials, rewards)
     s = summarise(folder)
     assert s.problems == ["row 2: outcomeTime '' not a number, so the trial is not checked",
@@ -142,7 +142,7 @@ def test_a_nan_or_empty_number_is_a_problem_not_a_pass_or_a_crash(tmp_path, monk
 def test_an_infinite_number_or_a_reward_value_that_is_not_one_is_a_problem_not_a_crash(tmp_path):
     trials = _chain(3)
     trials[0]["trialNumber"] = "inf"  # int(inf) raised OverflowError and stopped the command
-    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"] + [(5.0, "2,5")]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"] + [(5.0, "2,5")]
     s = summarise(_experiment(tmp_path, trials, rewards))  # float("2,5") raised ValueError and stopped it
     assert s.problems == ["WorkflowData_Events: a RewardDelivered row's Value '2,5' is not a number",
                           "row 1: trialNumber 'inf' not a number, so the trial is not checked"]
@@ -178,21 +178,28 @@ def test_each_block_sits_in_its_place_in_the_core():
     core = [name for name, _, _, _ in CORE_COLUMNS]
     assert [name for name, _, _, _ in shared_columns(())] == core
     both = [name for name, _, _, _ in shared_columns(BOTH)]
-    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-8:] == [
-        "rewardOfferedUl", "rewarded", "penaltySoundOn", "penaltyTimeoutSeconds", "penalised", "laserCondition",
+    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-7:] == [
+        "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds", "penalised", "laserCondition",
         "laserPowerMw", "laserTriggerTime"]
-    assert len(both) == 18 and len(core) == 14
+    assert len(both) == 17 and len(core) == 13
+
+
+def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
+    names = [name for name, _, _, _ in shared_columns(("conditions", "autoReward", "stimulus", "optogenetics", "quietWait"))]
+    assert names[names.index("penalised"):] == ["penalised", "laserCondition", "laserPowerMw", "laserTriggerTime", "trialConditionId",
+                                                "trialCombinationId", "visualContrast", "visualPhaseRad", "auditoryLevelDbfs",
+                                                "auditoryInitialAzimuthDeg", "auditoryElevationDeg", "autoReward"]
 
 
 def test_a_task_without_a_block_is_held_to_the_core_alone():
     assert shared_block_problems(_block(()), ()) == []
     # A task naming a block its file lacks, or lacking one it names, is told.
-    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 17 columns are")
-    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 14 columns are")
+    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 16 columns are")
+    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 13 columns are")
 
 
 def test_an_unknown_block_is_refused():
-    with pytest.raises(ValueError, match="no shared block laser; the blocks are quietWait, optogenetics"):
+    with pytest.raises(ValueError, match="no shared block laser; the blocks are quietWait, optogenetics, conditions, stimulus, autoReward"):
         shared_columns(("laser",))
 
 
@@ -204,40 +211,31 @@ def test_a_change_to_the_shared_block_is_named():
         "itiSeconds's description is not the shared block's (open_rigs.rigs.trials)",
         "laserCondition is double, not int",
     ]
-    # penaltySoundOn was each task's own words, and two tasks' differed.
-    sound = _block()
-    sound["penaltySoundOn"]["description"] = "True when the penalty sound played."
-    assert shared_block_problems(sound, BOTH) == ["penaltySoundOn's description is not the shared block's (open_rigs.rigs.trials)"]
     reordered = dict(reversed(list(_block().items())))
-    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 18 columns are")
+    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 17 columns are")
 
 
 def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):
-    # A trial start 5 s off, an outcome that is no outcome, a timeout without the sound and a sound without a timeout were
-    # all passed before; the penalty is held exactly to penalised.
+    # A trial start 5 s off and an outcome that is no outcome were passed before; the timeout is held exactly to penalised.
     trials = _chain(4)
     trials[0]["trialStartTime"] -= 5
-    trials[1]["penaltySoundOn"] = False  # penalised, the task's sound on
     trials[2]["outcome"] = "Banana"
-    trials[2]["penaltySoundOn"] = True  # not penalised
     trials[3]["penaltyTimeoutSeconds"] = 3.0  # penalised, the task's timeout 4 s
     text = "\n".join(summarise(_experiment(tmp_path, trials, [])).problems)
     assert "trial 1: trial start (trialStartTime) -5.0000 s from its interval's end less the lead (0.1 s) plus quietWaitSeconds" in text
-    assert "trial 2: penaltySoundOn False on a trial penalised, with the task's penalty.sound on" in text
-    assert "trial 3: outcome 'Banana' is not one of Correct, Incorrect, NoResponse" in text
-    assert "trial 3: penaltySoundOn True on a trial not penalised, with the task's penalty.sound on" in text
+    assert "trial 3: outcome 'Banana' is not one of correct, incorrect, noResponse, probe" in text
+    assert not any("penaltySound" in line for line in text.splitlines())
     assert "trial 4: penaltyTimeoutSeconds 3 on a trial penalised, not 4" in text
 
 
-def test_a_timeout_on_an_unpenalised_trial_and_the_sound_off_are_named(tmp_path):
+def test_a_timeout_on_an_unpenalised_trial_is_named(tmp_path):
     trials = _chain(2)
     trials[0]["penaltyTimeoutSeconds"] = 0.5  # not penalised
-    trials[1]["penaltySoundOn"] = True  # penalised, but the task's sound off
-    task = {**TASK, "penalty": {"timeoutSeconds": 4.0, "sound": {"enabled": False}}}
+    task = {**TASK, "penalty": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": "mute"}}}
     rewards = [(trials[0]["outcomeTime"], 2.0)]
     text = "\n".join(summarise(_experiment(tmp_path, trials, rewards, task=task)).problems)
     assert "trial 1: penaltyTimeoutSeconds 0.5 on a trial not penalised, not 0" in text
-    assert "trial 2: penaltySoundOn True on a trial penalised, with the task's penalty.sound off" in text
+    assert len(text.splitlines()) == 2  # and the next interval, timed from that timeout; a mute penalty asks nothing of the log
 
 
 def test_a_reward_is_checked_both_ways_and_by_its_request(tmp_path):
@@ -257,8 +255,8 @@ def test_a_reward_is_checked_both_ways_and_by_its_request(tmp_path):
 def test_a_paid_probe_counts_as_asked_and_an_unpaid_one_offers_without_a_reward(tmp_path):
     trials = _chain(2)
     start = trials[-1]["outcomeTime"] + trials[-1]["penaltyTimeoutSeconds"]
-    heads = _trial(3, start, 2.5, 3.0, outcome="Probe", rewarded=True)
-    tails = _trial(4, heads["outcomeTime"], 2.5, 3.0, outcome="Probe", timeout=4.0)
+    heads = _trial(3, start, 2.5, 3.0, outcome="probe", rewarded=True)
+    tails = _trial(4, heads["outcomeTime"], 2.5, 3.0, outcome="probe", timeout=4.0)
     trials += [heads, tails]
     rewards = [(trials[0]["outcomeTime"], 2.0), (heads["outcomeTime"], 2.0)]
     s = summarise(_experiment(tmp_path, trials, rewards))
@@ -276,41 +274,41 @@ def test_the_laser_trigger_is_checked_when_there_was_one(tmp_path):
     trials[0]["laserTriggerTime"] = trials[0]["stimulusOnsetTime"] - 0.1  # on time
     trials[1]["laserTriggerTime"] = float("nan")  # none: no optogenetics, or answered first
     trials[2]["laserTriggerTime"] = trials[2]["stimulusOnsetTime"] - 0.1 + 0.01  # 10 ms late
-    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     s = summarise(_experiment(tmp_path, trials, rewards, columns=COLUMNS + ["laserTriggerTime"]))
     assert s.problems == ["trial 3: laser trigger +0.0100 s from laserToStimulusSeconds (0.1 s) before the stimulus was due"]
 
 
 def test_without_the_task_file_its_checks_are_one_problem(tmp_path):
     trials = _chain(2)
-    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     s = summarise(_experiment(tmp_path, trials, rewards, task=None))
-    assert s.problems == ["no readable Settings/Settings_Task_*.json: Go, the laser trigger and the penalty sound not checked"]
+    assert s.problems == ["no readable Settings/Settings_Task_*.json: Go, the laser trigger and the timeout not checked"]
 
 
 def test_performance_is_rig_controls(tmp_path):
-    # Correct / (Correct + Incorrect) over two-spout trials; the share answered apart.
-    trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="NoResponse")]
-    for t, both in zip(trials, [True, True, False, True, True]):
-        t["bothSpoutsOffered"] = both
-    s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["bothSpoutsOffered"]))
+    # correct / (correct + incorrect) over trials not offered a single spout; the share answered apart.
+    trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="noResponse")]
+    for t, single in zip(trials, [False, False, True, False, False]):
+        t["singleSpoutOffered"] = single
+    s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["singleSpoutOffered"]))
     assert (s.correct, round(s.performance, 4), s.responded) == (2, round(1 / 3, 4), 0.8)  # trial 3, one spout, left out
 
 
 def test_go_no_go_counts_its_one_spout_a_go_miss_as_incorrect_and_responds_on_go_trials(tmp_path):
-    # Go/no-go rows are all bothSpoutsOffered False, so performance was NaN, and a withheld NoGo counted as responded.
+    # Go/no-go rows are all singleSpoutOffered True: still counted, and a withheld noGo is not a response.
     trials = _chain(5)
-    for t, (outcome, target) in zip(trials, [("Correct", "Go"), ("Correct", "NoGo"), ("Incorrect", "NoGo"),
-                                             ("NoResponse", "Go"), ("Probe", "NoReward")]):
-        t.update(outcome=outcome, target=target, bothSpoutsOffered=False)
-    s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["target", "bothSpoutsOffered"]))
+    for t, (outcome, target) in zip(trials, [("correct", "go"), ("correct", "noGo"), ("incorrect", "noGo"),
+                                             ("noResponse", "go"), ("probe", "noReward")]):
+        t.update(outcome=outcome, target=target, singleSpoutOffered=True)
+    s = summarise(_experiment(tmp_path, trials, [], columns=COLUMNS + ["target", "singleSpoutOffered"]))
     assert (s.performance, s.responded) == (0.5, 0.5)  # 2 of 4 Go/NoGo right; 1 of 2 Go trials licked
-    typed = [{"outcome": t["outcome"], "target": t["target"], "bothSpoutsOffered": False} for t in trials]
+    typed = [{"outcome": t["outcome"], "target": t["target"], "singleSpoutOffered": True} for t in trials]
     assert trials_module.performance(typed) == (0.5, 0.5)  # typed rows (open_rigs.trial_log.read) read the same
 
 
 def test_a_probe_trial_is_accepted_and_left_out_of_performance_and_the_response_rate(tmp_path):
-    trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="Probe")]
+    trials = _chain(4) + [_trial(5, 0, 0, 0, outcome="probe")]
     s = summarise(_experiment(tmp_path, trials, []))
     assert not any("not one of" in p for p in s.problems)
     assert (s.trials, s.correct, s.performance, s.responded) == (5, 2, 0.5, 1.0)
@@ -318,7 +316,7 @@ def test_a_probe_trial_is_accepted_and_left_out_of_performance_and_the_response_
 
 def test_videos_are_checked_when_asked(tmp_path):
     trials = _chain(2)
-    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])
+    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"])
     (folder / "Camera-Pupil").mkdir()
     (folder / "Camera-Pupil" / "Camera-Pupil_2026-11-14T01-00-00.avi").write_bytes(b"RIFF" + (4).to_bytes(4, "little") + b"AVI ")
     (folder / "Camera-Pupil" / "Camera-Pupil_2026-11-14T01-00-00.csv").write_text("harpTime,frameId\n1000,0\n")
@@ -329,7 +327,7 @@ def test_videos_are_checked_when_asked(tmp_path):
                           "(1 missing from the video)"]
 
 
-def _stimulus_state(folder, rows, columns=("harpTime", "trialNumber", "positionCm", "auditoryAmplitude", "visualContrast")):
+def _stimulus_state(folder, rows, columns=("harpTime", "trialNumber", "positionCm", "auditoryLevelDbfs", "visualContrast")):
     with open(folder / "WorkflowData" / "WorkflowData_StimulusState_2026-11-14T01-00-00.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(columns)
@@ -341,7 +339,7 @@ def test_a_run_stopped_mid_trial_reports_the_unfinished_trial_and_its_interval(t
     end = trials[0]["outcomeTime"]
     folder = _experiment(tmp_path, trials, [(end, 2.0)], outcome="stopped")
     # visual alone on at 2.19 is the onset: either stimulus on counts
-    _stimulus_state(folder, [[end - 1, 1, 0, 1, 1], [end + 1.0, 2, 0, 0, 0], [end + 2.19, 2, 0, 0, 0.5], [end + 2.24, 2, 1, 1, 0.5]])
+    _stimulus_state(folder, [[end - 1, 1, 0, -40, 1], [end + 1.0, 2, 0, "NaN", 0], [end + 2.19, 2, 0, "NaN", 0.5], [end + 2.24, 2, 1, -40, 0.5]])
     s = summarise(folder)
     assert s.unfinished == 2 and s.problems == [] and s.notes == []
     assert [round(x, 6) for x in s.interval_seconds] == [2.19]
@@ -354,13 +352,13 @@ def test_stimulus_state_without_a_stimulus_column_is_a_problem(tmp_path):
     folder = _experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)], outcome="stopped")
     _stimulus_state(folder, [[trials[0]["outcomeTime"] + 1, 2, 0]], ("harpTime", "trialNumber", "positionCm"))
     assert summarise(folder).problems == ["WorkflowData_StimulusState lacks harpTime, trialNumber, or a stimulus column "
-                                          "(auditoryAmplitude, visualContrast): the unfinished trial not looked for"]
+                                          "(auditoryLevelDbfs, visualContrast): the unfinished trial not looked for"]
 
 
 def test_stimulus_state_of_finished_trials_only_is_no_unfinished_trial(tmp_path):
     trials = _chain(2)
     folder = _experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)])
-    _stimulus_state(folder, [[t["stimulusOnsetTime"], t["trialNumber"], 0, 1, 1] for t in trials])
+    _stimulus_state(folder, [[t["stimulusOnsetTime"], t["trialNumber"], 0, -40, 1] for t in trials])
     s = summarise(folder)
     assert s.unfinished is None and s.problems == []
     assert [round(x, 6) for x in s.interval_seconds] == [2.5]
@@ -370,7 +368,7 @@ def test_stimulus_state_of_finished_trials_only_is_no_unfinished_trial(tmp_path)
 def test_an_unfinished_trial_without_a_stimulus_yet_has_no_interval(tmp_path):
     trials = _chain(1)
     folder = _experiment(tmp_path, trials, [(trials[0]["outcomeTime"], 2.0)], outcome="stopped")
-    _stimulus_state(folder, [[trials[0]["outcomeTime"] + 1, 2, 0, 0, 0]])
+    _stimulus_state(folder, [[trials[0]["outcomeTime"] + 1, 2, 0, "NaN", 0]])
     s = summarise(folder)
     assert s.unfinished == 2 and s.interval_seconds == []
 
@@ -401,7 +399,7 @@ def test_summarise_reads_the_trial_log_as_open_rigs_trial_log_does(tmp_path):
     # summarise had its own reader, whose WorkflowData_Trials*.csv also took WorkflowData_TrialsState files and
     # a last line still being written.
     trials = _chain(2)
-    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])
+    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"])
     (folder / "WorkflowData" / "WorkflowData_TrialsState_2026-11-14T01-00-00.csv").write_text("harpTime,state\n1,x\n")
     with open(folder / "WorkflowData" / "WorkflowData_Trials_2026-11-14T01-00-00.csv", "a") as f:
         f.write("1,3,auditory")  # no newline: still being written
@@ -412,12 +410,12 @@ def test_summarise_reads_the_trial_log_as_open_rigs_trial_log_does(tmp_path):
 def test_the_csharp_outcomes_are_outcomes():
     source = (Path(__file__).parents[2] / "src/OpenRigs.Trials/TrialOutcome.cs").read_text(encoding="utf-8")
     constants = re.findall(r'public const string (\w+) = "(\w+)";', source)
-    assert constants == [(o, o) for o in OUTCOMES]
+    assert constants == [(o[0].upper() + o[1:], o) for o in OUTCOMES]
 
 
 def test_summarise_reads_only_chunk_names_and_notes_the_rest(tmp_path):
     trials = _chain(2)
-    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "Correct"])
+    folder = _experiment(tmp_path, trials, [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"])
     (folder / "WorkflowData" / "WorkflowData_Trials_2026-11-14T01-00-00_copy.csv").write_text("harpTime\nnot a number\n")
     (folder / "Settings" / "Settings_Task_x.json").write_text("{}")
     s = summarise(folder)

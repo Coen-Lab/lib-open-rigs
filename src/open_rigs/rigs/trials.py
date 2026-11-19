@@ -4,31 +4,31 @@ Every task's schemas/trial-columns.yml starts with the shared block, in order, w
 word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
 (QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPowerMw,
-laserTriggerTime) after penalised. trialType and outcome are in the core by name, type and place, each described by its
-task. A task's own columns follow the block.
+laserTriggerTime) after penalised, then a conditioned task's conditions (CONDITIONS_COLUMNS), stimulus (STIMULUS_COLUMNS)
+and autoReward (AUTO_REWARD_COLUMNS) blocks, in that order. trialType and outcome are in the core by name, type and place,
+each described by its task. A task's own columns follow the block.
 
 summarise reads one experiment's WorkflowData/WorkflowData_Trials_<time>.csv, WorkflowData/WorkflowData_Events_<time>.csv (each
 RewardDelivered row, Value the microlitres delivered and Detail the microlitres requested=), Settings/Settings_Task_<time>.json
 (the lead and the penalty) and manifest.json (how the run ended), and checks the rows against each other and the task. It reads only files named <Name>_<time><suffix>
 (open_rigs.chunks); any other file named like one it reads is a NOTE, not read:
 
-- trial numbers run 1, 2, 3 ... with none missing, and each outcome is Correct, Incorrect, NoResponse or Probe;
+- trial numbers run 1, 2, 3 ... with none missing, and each outcome is correct, incorrect, noResponse or probe;
 - each trial's start (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
   quietWaitSeconds (never negative), within 2 ms;
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
 - each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
   within 2 ms;
 - each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds, within 2 ms;
-- each penalised trial (penalised) had the penalty sound (penaltySoundOn) exactly when the task's penalty.sound is enabled
-  and the task's penalty.timeoutSeconds as its penaltyTimeoutSeconds; an unpenalised one neither;
+- each penalised trial (penalised) had the task's penalty.timeoutSeconds as its penaltyTimeoutSeconds, an unpenalised one 0;
 - each rewarded trial (rewarded) has a RewardDelivered row at its outcome requesting its rewardOfferedUl, and no
   RewardDelivered comes at the outcome of a trial not rewarded.
 
 These checks run on finished trials, the rows of WorkflowData_Trials. A run stopped mid-trial has no row for that trial, but
-a task that logs WorkflowData/WorkflowData_StimulusState_*.csv (harpTime, trialNumber, and auditoryAmplitude,
+a task that logs WorkflowData/WorkflowData_StimulusState_*.csv (harpTime, trialNumber, and auditoryLevelDbfs,
 visualContrast or both) shows it: rows for the trial after the last finished one are an
-unfinished trial, reported in the summary (never a problem), and the first of them with a stimulus on (auditoryAmplitude
-or visualContrast above 0) is its stimulus onset, which gives the last outcome's interval
+unfinished trial, reported in the summary (never a problem), and the first of them with a stimulus on (auditoryLevelDbfs
+not NaN, or visualContrast above 0) is its stimulus onset, which gives the last outcome's interval
 to the next stimulus. A task without that log has no unfinished trial.
 
 A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
@@ -92,18 +92,17 @@ CORE_COLUMNS: List[Column] = [
      "detectors' logs."),
     ("rewardOfferedUl", "double", "ul",
      "Microlitres a reward on this trial gives, on every trial whether or not it was rewarded: the size the task drew "
-     "for it (the task file's rewardSizeUl, or a larger reward where the task has one); 0 on a trial that offers none. "
+     "for it (the task file's reward size, or a larger reward where the task has one); 0 on a trial that offers none. "
      "rewarded says whether it was given; what was delivered is RewardDelivered in WorkflowData_Events."),
     ("rewarded", "bool", None,
      "True when the trial's outcome delivered its reward (rewardOfferedUl, at outcomeTime): the value the workflow's "
      "reward command is made from. Which outcomes are rewarded is the task's (its note)."),
-    ("penaltySoundOn", "bool", None, "True when the trial was penalised and the task's penalty sound is enabled."),
     ("penaltyTimeoutSeconds", "double", "s",
      "The timeout after this trial: the task's penalty.timeoutSeconds when the trial was penalised, else 0. The next "
      "interval starts after it (itiStartTime)."),
     ("penalised", "bool", None,
-     "True when the trial was penalised: the task's penalty timeout (penaltyTimeoutSeconds) and, with its penalty.sound "
-     "enabled, the penalty sound (penaltySoundOn) followed its outcome. Which outcomes are penalised is the task's (its note)."),
+     "True when the trial was penalised: the task's penalty timeout (penaltyTimeoutSeconds) and the penalty sound at the "
+     "trial's penalty.sound.levelDbfs (none when mute) followed its outcome. Which outcomes are penalised is the task's (its note)."),
 ]
 
 QUIET_WAIT_COLUMNS: List[Column] = [
@@ -127,10 +126,43 @@ OPTOGENETICS_COLUMNS: List[Column] = [
      "answered first (NaN) differ."),
 ]
 
-# Each opt-in block by the name a task gives it, with the core column it follows.
+CONDITIONS_COLUMNS: List[Column] = [
+    ("trialConditionId", "int", None,
+     "The 0-based index of the trial's condition in trialConditions of the task file as run (Settings_Task), which gives its "
+     "trialType, weight, pairs and condition-level values (set). A repeat keeps the condition of the trial it repeats."),
+    ("trialCombinationId", "int", None,
+     "The trial's row in the experiment's Settings_Combinations (0-based, session-wide): the combination it was drawn from, one "
+     "pick of every list (pairs zipped), whose values that differ between combinations or from Settings_Task are the row's "
+     "values; the row's trialConditionId and trialType are this trial's. A repeat keeps the combination of the trial it repeats."),
+]
+
+STIMULUS_COLUMNS: List[Column] = [
+    ("visualContrast", "double", None, "Grating contrast as BonVision's Contrast, 1 full contrast; 0 when no grating was shown."),
+    ("visualPhaseRad", "double", "rad",
+     "The grating's phase, drawn uniformly from 0 to 2 pi for every trial from the seeded stream (OpenRigs.Trials ConditionedTrial)."),
+    ("auditoryLevelDbfs", "double", "dBFS",
+     "The sound's level in dBFS RMS, the trial's auditoryStimulus.levelDbfs; NaN when no sound played (mute)."),
+    ("auditoryInitialAzimuthDeg", "double", "deg",
+     "Azimuth of the speaker that played, rig.yml's nearest to the initial azimuth drawn; NaN when none played "
+     "(auditoryLevelDbfs NaN) or when every speaker played (auditoryStimulus.initialAzimuthsDeg all)."),
+    ("auditoryElevationDeg", "double", "deg",
+     "Elevation of the speaker that played; NaN when none or every speaker played, as auditoryInitialAzimuthDeg."),
+]
+
+AUTO_REWARD_COLUMNS: List[Column] = [
+    ("autoReward", "bool", None,
+     "True on an auto-reward trial (drawn with the task's autoRewardProbability): one rewarded without a correct response; "
+     "how, and so whether its reward came from the auto-reward, is the task's (its note)."),
+]
+
+# Each opt-in block by the name a task gives it, with the core column it follows; blocks after the same column follow it in
+# this order.
 BLOCKS: Dict[str, Tuple[str, List[Column]]] = {
     "quietWait": ("itiSeconds", QUIET_WAIT_COLUMNS),
     "optogenetics": ("penalised", OPTOGENETICS_COLUMNS),
+    "conditions": ("penalised", CONDITIONS_COLUMNS),
+    "stimulus": ("penalised", STIMULUS_COLUMNS),
+    "autoReward": ("penalised", AUTO_REWARD_COLUMNS),
 }
 
 TIME_COLUMN = "harpTime"
@@ -175,30 +207,30 @@ def shared_block_problems(columns: Dict[str, Any], blocks: Iterable[str]) -> Lis
     return problems
 
 
-OUTCOMES = ("Correct", "Incorrect", "NoResponse", "Probe")
-GO_NO_GO = ("Go", "NoGo", "NoReward")  # a go/no-go task's targets: one spout by design, NoReward its probe
+OUTCOMES = ("correct", "incorrect", "noResponse", "probe")  # in the task's camelCase, as its targets and trialType
+GO_NO_GO = ("go", "noGo", "noReward")  # a go/no-go task's targets: one spout by design, noReward its probe
 
 
 def performance(rows: Iterable[Dict[str, Any]]) -> Tuple[float, float]:
     """Performance and the response rate of trial rows (text or typed cells), each NaN with no trial to count.
 
-    Performance is Correct / (Correct + Incorrect) over the trials both spouts were offered (bothSpoutsOffered, True where the
-    task does not record it) and every go/no-go trial (target Go or NoGo; one spout by design), a Go trial with no lick
-    (NoResponse) counted Incorrect. The response rate is the share of trials the mouse responded to: in a go/no-go task
-    (a target Go, NoGo or NoReward) the Go trials it licked on, as withholding is a NoGo's answer; else the trials not
-    NoResponse, of those not Probe. A Probe (no right answer) counts in neither, though rewarded and penalised say what
-    it got."""
+    Performance is correct / (correct + incorrect) over the trials not offered a single spout as a guide (singleSpoutOffered
+    False, as where the task does not record it) and every go/no-go trial (target go or noGo; one spout by design), a go
+    trial with no lick (noResponse) counted incorrect. The response rate is the share of trials the mouse responded to: in
+    a go/no-go task (a target go, noGo or noReward) the go trials it licked on, as withholding is a noGo's answer; else the
+    trials not noResponse, of those not probe. A probe (no right answer) counts in neither, though rewarded and penalised
+    say what it got."""
     rows = list(rows)
     go_no_go = any(str(r.get("target")) in GO_NO_GO for r in rows)
     correct = counted = 0
     for r in rows:
         target, outcome = str(r.get("target")), r["outcome"]
-        go_miss = target == "Go" and outcome == "NoResponse"
-        if (_true(r.get("bothSpoutsOffered", True)) or target in ("Go", "NoGo")) and (outcome in ("Correct", "Incorrect") or go_miss):
+        go_miss = target == "go" and outcome == "noResponse"
+        if (not _true(r.get("singleSpoutOffered", False)) or target in ("go", "noGo")) and (outcome in ("correct", "incorrect") or go_miss):
             counted += 1
-            correct += outcome == "Correct"
-    asked = [r for r in rows if (str(r.get("target")) == "Go" if go_no_go else r["outcome"] != "Probe")]
-    answered = sum(r["outcome"] != "NoResponse" for r in asked)
+            correct += outcome == "correct"
+    asked = [r for r in rows if (str(r.get("target")) == "go" if go_no_go else r["outcome"] != "probe")]
+    answered = sum(r["outcome"] != "noResponse" for r in asked)
     return (correct / counted if counted else float("nan"), answered / len(asked) if asked else float("nan"))
 
 
@@ -208,7 +240,7 @@ class Summary:
     outcome: str  # the manifest's run outcome (completed, stopped, ...), "not final" when it never closed; or unknown
     trials: int
     correct: int
-    performance: float  # performance()'s first: Correct / (Correct + Incorrect), two-spout and go/no-go trials; NaN with none
+    performance: float  # performance()'s first: correct / (correct + incorrect), two-spout and go/no-go trials; NaN with none
     responded: float = float("nan")  # performance()'s second: the share responded to; NaN with none
     response_seconds: List[float] = field(default_factory=list)  # each trial's outcome less its stimulus onset
     interval_seconds: List[float] = field(default_factory=list)  # each outcome to the next stimulus onset
@@ -261,7 +293,7 @@ def _true(text: Any) -> bool:
 
 
 # The columns summarise reads: of a trial row, and of an Events row.
-TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltySoundOn", "penaltyTimeoutSeconds", "penalised")
+TRIAL_NEEDS = ("trialNumber", "outcome", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds", "penalised")
 EVENT_NEEDS = (TIME_COLUMN, "Event", "Value")
 # A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an infinity, an
 # empty cell or text is a problem and the row's checks are skipped.
@@ -305,7 +337,6 @@ def _requested(detail: str) -> Optional[float]:
 class _Task:
     laser_to_stimulus: float  # optogenetics.laserToStimulusSeconds: signed, the trigger before the stimulus
     timeout_seconds: float  # penalty.timeoutSeconds
-    sound: bool  # penalty.sound.enabled
 
     @property
     def lead(self) -> float:
@@ -317,8 +348,7 @@ def _task(folder: Path) -> Optional[_Task]:
     for path in _chunks(folder, TASK_FILES):
         try:
             p = json.loads(path.read_text(encoding="utf-8-sig"))["taskParameters"]
-            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), float(p["penalty"]["timeoutSeconds"]),
-                         bool(p["penalty"]["sound"]["enabled"]))
+            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), float(p["penalty"]["timeoutSeconds"]))
         except (OSError, ValueError, KeyError, TypeError):
             return None
     return None
@@ -349,11 +379,11 @@ def _summarise(folder: Path) -> Summary:
     missing += [f"WorkflowData_Events has no {c} column" for c in EVENT_NEEDS if events and c not in events[0]]
     if missing:
         return Summary(folder.name, outcome, len(trials), 0, float("nan"), problems=missing)
-    correct = sum(r["outcome"] == "Correct" for r in trials)
+    correct = sum(r["outcome"] == "correct" for r in trials)
     s = Summary(folder.name, outcome, len(trials), correct, *performance(trials))
     task = _task(folder)
     if trials and task is None:
-        s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the penalty sound not checked")
+        s.problems.append("no readable Settings/Settings_Task_*.json: Go, the laser trigger and the timeout not checked")
     rewards = [e for e in events if e["Event"] == "RewardDelivered"]
     reward_times: List[Tuple[float, Optional[float]]] = []  # each RewardDelivered's time and requested microlitres
     for e in rewards:
@@ -400,10 +430,7 @@ def _summarise(folder: Path) -> Summary:
             if not math.isnan(trigger) and abs(trigger - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: laser trigger {trigger - due:+.4f} s from laserToStimulusSeconds "
                                   f"({task.laser_to_stimulus:g} s) before the stimulus was due")
-            penalised, sounded, timeout = _true(row["penalised"]), _true(row["penaltySoundOn"]), _f(row, "penaltyTimeoutSeconds")
-            if sounded != (penalised and task.sound):
-                s.problems.append(f"trial {number}: penaltySoundOn {sounded} on a trial {'penalised' if penalised else 'not penalised'}, "
-                                  f"with the task's penalty.sound {'on' if task.sound else 'off'}")
+            penalised, timeout = _true(row["penalised"]), _f(row, "penaltyTimeoutSeconds")
             want = task.timeout_seconds if penalised else 0.0
             if abs(timeout - want) > 1e-9:
                 s.problems.append(f"trial {number}: penaltyTimeoutSeconds {timeout:g} on a trial "
@@ -435,21 +462,21 @@ def _summarise(folder: Path) -> Summary:
 
 # StimulusState's stimulus columns, each with when its value says the stimulus is on.
 STIMULUS_ON_COLUMNS = {
-    "auditoryAmplitude": lambda v: float(v) > 0,
+    "auditoryLevelDbfs": lambda v: not math.isnan(float(v)),
     "visualContrast": lambda v: float(v) > 0,
 }
 
 
 def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Optional[Dict[str, str]]) -> None:
     """The trial after the last finished one, when StimulusState has rows for it: the run stopped in it. Its first
-    row with a stimulus on (auditoryAmplitude or visualContrast above 0, whichever columns the log has) is the stimulus the last outcome's interval ran to."""
+    row with a stimulus on (auditoryLevelDbfs not NaN or visualContrast above 0, whichever columns the log has) is the stimulus the last outcome's interval ran to."""
     rows = _rows(folder, STIMULUS_FILES)
     if not rows or not trials:
         return
     onsets = [c for c in STIMULUS_ON_COLUMNS if c in rows[0]]
     if any(c not in rows[0] for c in ("harpTime", "trialNumber")) or not onsets:
         s.problems.append("WorkflowData_StimulusState lacks harpTime, trialNumber, or a stimulus column "
-                          "(auditoryAmplitude, visualContrast): the unfinished trial not looked for")
+                          "(auditoryLevelDbfs, visualContrast): the unfinished trial not looked for")
         return
     try:
         cut = int(_f(trials[-1], "trialNumber")) + 1
@@ -486,7 +513,7 @@ def describe(s: Summary) -> str:
 
     cut = f", and trial {s.unfinished} unfinished at the stop" if s.unfinished is not None else ""
     lines = [f"{s.folder}: {s.outcome}, {s.trials} trials, {s.correct} correct{cut}",
-             f"  performance {percent(s.performance)} (Correct / (Correct + Incorrect), two-spout and go/no-go trials),"
+             f"  performance {percent(s.performance)} (correct / (correct + incorrect), two-spout and go/no-go trials),"
              f" responded {percent(s.responded)}",
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",
              f"  outcome to next stimulus: {spread(s.interval_seconds)}",

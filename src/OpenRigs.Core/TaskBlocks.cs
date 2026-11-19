@@ -41,23 +41,25 @@ namespace OpenRigs.Core
             return problems;
         }
 
-        /// <summary>The RewardSize block: rewardSizeUl above 0 and at most maxRewardUl (LoadRewardLine.DefaultMaxRewardUl).</summary>
-        public static List<string> RewardSizeProblems(double rewardSizeUl, double maxRewardUl)
+        /// <summary>A reward block's size (open_rigs.rigs.conditioned_task Reward): sizeUl above 0 and at most maxRewardUl (LoadRewardLine.DefaultMaxRewardUl).</summary>
+        public static List<string> RewardSizeProblems(double sizeUl, double maxRewardUl)
         {
             var problems = new List<string>();
-            if (!(rewardSizeUl > 0 && rewardSizeUl <= maxRewardUl)) problems.Add(string.Format("rewardSizeUl must be above 0 and at most {0} ul", maxRewardUl));
+            if (!(sizeUl > 0 && sizeUl <= maxRewardUl)) problems.Add(string.Format("sizeUl must be above 0 and at most {0} ul", maxRewardUl));
             return problems;
         }
 
-        /// <summary>The large-reward fields of a reward block (open_rigs.rigs.conditioned_task Reward): with largeRewardProbability
-        /// above 0 and largeRewardMultiplier above 1, a large reward at most maxRewardUl, the most one reward may ask for.</summary>
-        public static List<string> LargeRewardProblems(double rewardSizeUl, double largeRewardMultiplier, double largeRewardProbability, double maxRewardUl)
+        /// <summary>The large-reward fields of a reward block (open_rigs.rigs.conditioned_task Reward): largeMultiplier above 1,
+        /// largeProbability from 0 (the only off) to 1, and with largeProbability above 0 a large reward at most maxRewardUl, the
+        /// most one reward may ask for.</summary>
+        public static List<string> LargeRewardProblems(double sizeUl, double largeMultiplier, double largeProbability, double maxRewardUl)
         {
             var problems = new List<string>();
-            if (!(largeRewardProbability >= 0 && largeRewardProbability <= 1)) problems.Add("largeRewardProbability must be in [0, 1]");
-            if (largeRewardProbability > 0 && largeRewardMultiplier > 1 && rewardSizeUl * largeRewardMultiplier > maxRewardUl + 1e-9)
+            if (!(largeMultiplier > 1) || double.IsInfinity(largeMultiplier)) problems.Add(string.Format("largeMultiplier is {0}, not above 1", largeMultiplier));
+            if (!(largeProbability >= 0 && largeProbability <= 1)) problems.Add("largeProbability must be in [0, 1]");
+            if (largeProbability > 0 && sizeUl * largeMultiplier > maxRewardUl + 1e-9)
             {
-                problems.Add(string.Format("rewardSizeUl ({0} ul) x largeRewardMultiplier ({1}) is {2} ul, more than {3} ul, the most one reward may ask for", rewardSizeUl, largeRewardMultiplier, rewardSizeUl * largeRewardMultiplier, maxRewardUl));
+                problems.Add(string.Format("sizeUl ({0} ul) x largeMultiplier ({1}) is {2} ul, more than {3} ul, the most one reward may ask for", sizeUl, largeMultiplier, sizeUl * largeMultiplier, maxRewardUl));
             }
             return problems;
         }

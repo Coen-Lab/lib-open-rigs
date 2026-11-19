@@ -253,8 +253,9 @@ namespace OpenRigs.Trials
             events.Add(Event(TrialEventKind.Trigger, now, trial, null));
             if (laser.End == LaserEnd.AfterDuration)
             {
-                Schedule(now + laser.LaserDurationSeconds, TrialEventKind.TriggerOff, trial, null);
-                laserFreeAt = now + laser.LaserDurationSeconds + laser.RampDownSeconds;
+                var duration = LaserTiming.DurationOf(trial);
+                Schedule(now + duration, TrialEventKind.TriggerOff, trial, null);
+                laserFreeAt = now + duration + laser.RampDownSeconds;
             }
             else
             {

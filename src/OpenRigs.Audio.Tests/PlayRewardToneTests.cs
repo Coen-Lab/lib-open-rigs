@@ -11,32 +11,34 @@ using OpenRigs.Tests;
 
 namespace OpenRigs.Audio.Tests
 {
-    /// <summary>A task file as PlayRewardTone reads it: rewardTone.levelDbfs.</summary>
-    public class ToneTaskConfig
+    /// <summary>A task's trial rules as PlayRewardTone reads them: the loudest reward tone level any trial draws.</summary>
+    public class ToneRules
     {
-        public ToneParameters TaskParameters { get; set; }
+        public double LoudestRewardToneLevelDbfs { get; set; }
     }
 
-    public class ToneParameters
-    {
-        public ToneLevel RewardTone { get; set; }
-    }
-
-    public class ToneLevel
-    {
-        public double LevelDbfs { get; set; }
-    }
-
-    /// <summary>The task file at Go, its reward tone at LevelDbfs.</summary>
+    /// <summary>The rules at Go, the loudest reward tone at LoudestRewardToneLevelDbfs.</summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
-    public class ToneTaskConfigSource
+    public class ToneRulesSource
     {
-        public double LevelDbfs { get; set; }
+        public double LoudestRewardToneLevelDbfs { get; set; }
 
-        public IObservable<ToneTaskConfig> Process()
+        public IObservable<ToneRules> Process()
         {
-            return Observable.Defer(() => Observable.Return(new ToneTaskConfig { TaskParameters = new ToneParameters { RewardTone = new ToneLevel { LevelDbfs = LevelDbfs } } }));
+            return Observable.Defer(() => Observable.Return(new ToneRules { LoudestRewardToneLevelDbfs = LoudestRewardToneLevelDbfs }));
+        }
+    }
+
+    /// <summary>Three rewarded trials' reward tone levels, 0.2 s apart from 0.5 s: -20, mute (NaN) and -26 dBFS.</summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Source)]
+    public class ToneTrialLevels
+    {
+        public IObservable<double> Process()
+        {
+            var levels = new[] { -20, double.NaN, -26 };
+            return Observable.Timer(TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(0.2)).Take(levels.Length).Select(i => levels[i]);
         }
     }
 
@@ -81,9 +83,10 @@ namespace OpenRigs.Audio.Tests
     {
         static readonly string Folder = Path.Combine(Path.GetDirectoryName(typeof(PlayRewardToneTests).Assembly.Location), "Pieces");
 
-        // Two rewarded trials each play the tone, laid out on both speakers of a four-channel mixer at the task's -20 dBFS.
+        // The tone is laid out on both speakers of a four-channel mixer at the loudest level, -20 dBFS; each rewarded trial
+        // plays it at its own level, a mute trial not at all.
         [TestMethod]
-        public void EachInputPlaysTheToneOnEverySpeakerAtTheTasksLevel()
+        public void EachInputPlaysTheToneOnEverySpeakerAtItsTrialsLevel()
         {
             var folder = Path.Combine(Path.GetTempPath(), "tone-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path.Combine(folder, "calibration"));
@@ -105,7 +108,7 @@ namespace OpenRigs.Audio.Tests
             var result = InProcessWorkflow.Run(xml, 3, count: 2);
             Directory.Delete(folder, true);
             Assert.IsNull(result.Item2, InProcessWorkflow.Innermost(result.Item2));
-            CollectionAssert.AreEqual(new[] { "tone 4x2400, channel 0 at -20 dBFS RMS", "tone 4x2400, channel 0 at -20 dBFS RMS" }, result.Item1);
+            CollectionAssert.AreEqual(new[] { "tone 4x2400, channel 0 at -20 dBFS RMS", "tone 4x2400, channel 0 at -26 dBFS RMS" }, result.Item1);
         }
     }
 }

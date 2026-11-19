@@ -33,15 +33,13 @@ namespace OpenRigs.Core
 
         /// <summary>
         /// What is wrong with the wheel quiet wait, empty when nothing is: each a finite number from 0, the seconds at most
-        /// MaxQuietSeconds and the cm at most MaxWheelQuietCm, and both above 0 (its wait) or both 0 (off).
+        /// MaxQuietSeconds and the cm at most MaxWheelQuietCm. wheelQuietSeconds 0 is the only off; wheelQuietCm 0 allows no movement.
         /// </summary>
         public static List<string> WheelProblems(double wheelQuietSeconds, double wheelQuietCm)
         {
             var problems = new List<string>();
             Check(problems, "wheelQuietSeconds", wheelQuietSeconds, MaxQuietSeconds, "s");
             Check(problems, "wheelQuietCm", wheelQuietCm, MaxWheelQuietCm, "cm");
-            if ((wheelQuietSeconds > 0) != (wheelQuietCm > 0))
-                problems.Add(string.Format("wheelQuietSeconds {0} and wheelQuietCm {1} are both above 0 (the wheel's quiet wait) or both 0 (off), not one of each", wheelQuietSeconds, wheelQuietCm));
             return problems;
         }
 
@@ -61,7 +59,7 @@ namespace OpenRigs.Core
         /// <param name="earliest">The soonest the trial may start: the interval's end less the lead.</param>
         /// <param name="lickQuietSeconds">How long every spout must be released before the trial starts; 0 for no lick wait.</param>
         /// <param name="wheelQuietSeconds">The window the wheel's travel is counted over; 0 for no wheel wait.</param>
-        /// <param name="wheelQuietCm">The most travel, in cm, the window may hold.</param>
+        /// <param name="wheelQuietCm">The most travel, in cm, the window may hold; 0 for none.</param>
         /// <param name="wheelAtStart">The wheel's distance in cm at the interval's start, NaN if none has been read.</param>
         /// <param name="lickHeld">Whether a spout is touched at the interval's start.</param>
         public QuietWait(double intervalStart, double earliest, double lickQuietSeconds, double wheelQuietSeconds, double wheelQuietCm, double wheelAtStart, bool lickHeld)
@@ -99,12 +97,13 @@ namespace OpenRigs.Core
             if (moved == 0) return;
             moves.Enqueue(new KeyValuePair<double, double>(now, moved));
             recentCm += moved;
-            while (recentCm > wheelQuietCm)
+            while (moves.Count > 0 && recentCm > wheelQuietCm)
             {
                 var oldest = moves.Dequeue();
                 recentCm -= oldest.Value;
                 wheelSince = Math.Max(wheelSince, oldest.Key);
             }
+            if (moves.Count == 0) recentCm = 0;   // no rounding left over from the moves dropped
         }
 
         /// <summary>When the trial starts if nothing more restarts a wait (infinity while a spout is held): exact, not rounded to a clock tick.</summary>

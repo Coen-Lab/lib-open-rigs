@@ -67,7 +67,7 @@ namespace OpenRigs.Devices.Zapit
             {
                 throw new InvalidOperationException(string.Format("CheckZapitConditionCount takes Zapit's GetNumConditions reply, not {0}.", reply));
             }
-            var count = ZapitConditions.Check(path);
+            var count = ZapitConditions.Check(path).Count;
             if (reply.IsError)
             {
                 throw new InvalidOperationException(string.Format(

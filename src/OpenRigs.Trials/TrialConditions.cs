@@ -79,24 +79,28 @@ namespace OpenRigs.Trials
         public int Id;
     }
 
-    /// <summary>The largest stimulus amplitude a task's weighted conditions can draw, and where (a condition and its picks).</summary>
+    /// <summary>The loudest level a sound plays at in a task's weighted conditions, and where (a condition and its picks): what
+    /// a sound's buffer is peak-checked at, at Go, so no trial's level can clip.</summary>
     public class LoudestSound
     {
-        /// <summary>The amplitude: 1 the waveform as stored.</summary>
-        public double Amplitude;
+        /// <summary>The level in dBFS RMS; NaN when every combination is mute.</summary>
+        public double LevelDbfs;
         /// <summary>The condition that draws it, for a message.</summary>
         public string Where;
 
-        /// <summary>The loudest of the weighted conditions' combinations, by the task's amplitude.</summary>
-        public static LoudestSound Of<TTask>(IEnumerable<TrialConditionDraw<TTask>> conditions, Func<TTask, double> amplitude)
+        /// <summary>The loudest of the weighted conditions' combinations, by the task's level (a number or mute, SoundLevels.Parse).</summary>
+        public static LoudestSound Of<TTask>(IEnumerable<TrialConditionDraw<TTask>> conditions, Func<TTask, object> levelDbfs)
         {
-            var loudest = new LoudestSound { Amplitude = 0, Where = "no condition" };
+            var loudest = new LoudestSound { LevelDbfs = double.NaN, Where = "no condition" };
             foreach (var condition in conditions.Where(c => c.Weight > 0))
             {
                 foreach (var combination in condition.Combinations)
                 {
-                    var value = amplitude(combination.Task);
-                    if (value > loudest.Amplitude) loudest = new LoudestSound { Amplitude = value, Where = condition.Where + (combination.Picks.Length == 0 ? "" : " with " + combination.Picks) };
+                    var value = SoundLevels.Parse(levelDbfs(combination.Task));
+                    if (value > loudest.LevelDbfs || (double.IsNaN(loudest.LevelDbfs) && !double.IsNaN(value)))
+                    {
+                        loudest = new LoudestSound { LevelDbfs = value, Where = condition.Where + (combination.Picks.Length == 0 ? "" : " with " + combination.Picks) };
+                    }
                 }
             }
             return loudest;
@@ -233,7 +237,7 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>Settings_Combinations: one row per combination of every condition, in build order (its Id, the trial log's
-        /// trialCombinationId), with its trialCondition, trialType, conditionWeight and values. Each task is serialised as
+        /// trialCombinationId), with its trialConditionId, trialType, conditionWeight and values. Each task is serialised as
         /// SerializeToJson serialises Settings_Task and flattened to dotted paths, a one-entry list unwrapped only at a list
         /// field (an x-whole list stays a list); a path is in values when it differs between rows or from the task's own, so a
         /// set every condition shares is kept; session fields are left out. NaN is written as JSON NaN.</summary>
@@ -255,7 +259,7 @@ namespace OpenRigs.Trials
                     foreach (var path in kept) values[path] = all[n][path];
                     rows.Add(new Newtonsoft.Json.Linq.JObject(
                         new Newtonsoft.Json.Linq.JProperty("trialCombinationId", combination.Id),
-                        new Newtonsoft.Json.Linq.JProperty("trialCondition", i),
+                        new Newtonsoft.Json.Linq.JProperty("trialConditionId", i),
                         new Newtonsoft.Json.Linq.JProperty("trialType", conditions[i].TrialType),
                         new Newtonsoft.Json.Linq.JProperty("conditionWeight", conditions[i].Weight),
                         new Newtonsoft.Json.Linq.JProperty("values", values)));

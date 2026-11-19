@@ -15,11 +15,11 @@ def session(root, mouse, name, repo, task=None):
 
 
 def test_sessions_are_found_by_repository_name_whatever_the_owner(tmp_path):
-    a = session(tmp_path, "AB001", "ses-001_20261101T090000", "https://github.com/ucl-open/coen-dome-navigation.git")
-    session(tmp_path, "AB001", "ses-002_20261102T090000", "https://github.com/ucl-open/coen-bbox-wheel")
-    b = session(tmp_path, "CD002", "ses-001_20261103T090000", "https://github.com/someone/Coen-Dome-Navigation/")
-    assert sessions.find_sessions(tmp_path, "coen-dome-navigation") == [a, b]
-    assert sessions.find_sessions(tmp_path, "coen-dome-navigation", subjects=["CD002"]) == [b]
+    a = session(tmp_path, "AB001", "ses-001_20261101T090000", "https://github.com/example/task-a.git")
+    session(tmp_path, "AB001", "ses-002_20261102T090000", "https://github.com/example/task-b")
+    b = session(tmp_path, "CD002", "ses-001_20261103T090000", "https://github.com/someone/Task-A/")
+    assert sessions.find_sessions(tmp_path, "task-a") == [a, b]
+    assert sessions.find_sessions(tmp_path, "task-a", subjects=["CD002"]) == [b]
     assert sessions.load_sessions(tmp_path, "nothing").empty
 
 

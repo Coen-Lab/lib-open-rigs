@@ -2,6 +2,8 @@
 
 import xml.etree.ElementTree as ET
 
+from open_rigs.core.task import BACKGROUND_LEVEL_DBFS
+
 from open_rigs.rigs.workflow_lint import (
     AUDIO,
     RX,
@@ -112,32 +114,31 @@ def manual_rewards_drop_problems(root: ET.Element) -> list[str]:
 
 def background_noise_include_problems(root: ET.Element) -> list[str]:
     """BackgroundNoise sends into BackgroundNoise only at Ready, rig.yml's noise read with the speakers (ReadBackgroundNoise), laid out
-    unequalised at LaunchTaskConfig's backgroundNoise.levelDbfs; and stops at Go on a TaskConfig whose backgroundNoise
-    differs from LaunchTaskConfig's. `root` is OpenRigs.Audio's BackgroundNoise.bonsai."""
+    unequalised at the lab's BACKGROUND_LEVEL_DBFS, reading no task file. `root` is OpenRigs.Audio's BackgroundNoise.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     sends = [i for i, n in enumerate(nodes) if n.get(XSI) == "MulticastSubject" and _name(n) == "BackgroundNoise"]
     if len(sends) != 1:
         return ["BackgroundNoise does not send into BackgroundNoise once"]
     up = [nodes[a] for a in upstream(edges, sends[0])]
     subjects = {_name(n) for n in up if n.get(XSI) == "SubscribeSubject"}
-    problems = [f"the noise sent does not wait for {s}" for s in ("Ready", "LaunchTaskConfig", "Speakers") if s not in subjects]
+    problems = [f"the noise sent does not wait for {s}" for s in ("Ready", "Speakers") if s not in subjects]
     buffers = [n for n in up if kind(n) == "aud:SpeakerBuffer"]
     if len(buffers) != 1 or child(buffers[0], W + "Combinator").findtext(AUDIO + "Equalise") != "false":
         problems.append("the noise is not one SpeakerBuffer, unequalised")
-    if "TaskParameters.BackgroundNoise.LevelDbfs" not in {n.findtext(W + "Selector") for n in up}:
-        problems.append("the noise's level is not the launched task file's backgroundNoise.levelDbfs")
+    elif float(child(buffers[0], W + "Combinator").findtext(AUDIO + "LevelDbfs")) != BACKGROUND_LEVEL_DBFS:
+        problems.append(f"the noise's level is not the lab's {BACKGROUND_LEVEL_DBFS:g} dBFS")
+    if subjects & {"TaskConfig", "LaunchTaskConfig"}:
+        problems.append("the noise reads the task file, which has no background setting")
     if not any(kind(n) == "aud:ReadBackgroundNoise" for n in up):
         problems.append("the noise is not rig.yml's backgroundNoise (ReadBackgroundNoise)")
-    stops = [i for i, n in enumerate(nodes) if kind(n) == "core:ThrowError"]
-    if not any({"TaskConfig", "LaunchTaskConfig"} <= {_name(nodes[a]) for a in upstream(edges, s)} for s in stops):
-        problems.append("Go does not stop on a backgroundNoise changed after launch")
     return problems
 
 
 def play_penalty_sound_problems(root: ET.Element) -> list[str]:
-    """PlayPenaltySound makes the PenaltySoundBuffer once the task file's penalty.sound.levelDbfs is in (Zip with
-    Speakers, InputMapping LevelDbfs from Item1), never at the default level from the speakers alone, and sends it into
-    PenaltySounds on each input. `root` is OpenRigs.Audio's PlayPenaltySound.bonsai."""
+    """PlayPenaltySound makes the PenaltySoundBuffer once the rules' loudest penalty level is in (TrialRules'
+    LoudestPenaltyLevelDbfs, Zip with Speakers, InputMapping LevelDbfs from Item1), never at the default level from the
+    speakers alone, and sends it into PenaltySounds at each input's level (SoundAtLevel, its BufferLevelDbfs mapped from
+    the same loudest level). `root` is OpenRigs.Audio's PlayPenaltySound.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     buffers = [i for i, n in enumerate(nodes) if kind(n) == "aud:PenaltySoundBuffer"]
     if len(buffers) != 1:
@@ -149,11 +150,16 @@ def play_penalty_sound_problems(root: ET.Element) -> list[str]:
     zips = [a for a, b, _ in edges if b == mapping[0]]
     inputs = [nodes[a] for a in upstream(edges, zips[0])] if zips and kind(nodes[zips[0]]) == "rx:Zip" else []
     problems = []
-    if not any("TaskParameters.Penalty.Sound.LevelDbfs" in (n.findtext(W + "Selector") or "") for n in inputs):
-        problems.append("the penalty sound's level is not the task file's penalty.sound.levelDbfs")
+    if not any(n.findtext(W + "Selector") == "LoudestPenaltyLevelDbfs" for n in inputs) or \
+            not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "TrialRules" for n in inputs):
+        problems.append("the penalty sound is not laid out at TrialRules' LoudestPenaltyLevelDbfs")
     if not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "Speakers" for n in inputs):
         problems.append("the penalty sound is not made from Speakers")
     sends = [i for i, n in enumerate(nodes) if n.get(XSI) == "MulticastSubject" and _name(n) == "PenaltySounds"]
-    if len(sends) != 1 or "WorkflowInput" not in {nodes[a].get(XSI) for a in upstream(edges, sends[0])}:
+    up = upstream(edges, sends[0]) if len(sends) == 1 else []
+    if "WorkflowInput" not in {nodes[a].get(XSI) for a in up}:
         problems.append("PlayPenaltySound does not send the buffer into PenaltySounds on each input")
+    scale = [a for a in up if kind(nodes[a]) == "aud:SoundAtLevel"]
+    if len(scale) != 1 or not any(n.findtext(W + "Selector") == "LoudestPenaltyLevelDbfs" for n in (nodes[a] for a in upstream(edges, scale[0]))):
+        problems.append("PlayPenaltySound does not play each input at its level from the buffer's (SoundAtLevel, BufferLevelDbfs from LoudestPenaltyLevelDbfs)")
     return problems

@@ -7,8 +7,9 @@ namespace OpenRigs.Trials.Tests
     [TestClass]
     public class ZapitTrialCommandTests
     {
-        class Trial : IZapitTrial
+        class Trial : ILaserDurationTrial
         {
+            public double LaserDurationSeconds { get { return 1.5; } }
             public int TrialNumber { get; set; }
             public int LaserCondition { get; set; }
             public bool LaserOn { get; set; }
@@ -23,7 +24,7 @@ namespace OpenRigs.Trials.Tests
                 var arm = new System.Reactive.Subjects.Subject<Trial>();
                 var trigger = new System.Reactive.Subjects.Subject<Trial>();
                 var sent = new List<string>();
-                var operatorUnderTest = new ZapitTrialCommand { HardwareTriggered = hardwareTriggered, DurationSeconds = 1.5 };
+                var operatorUnderTest = new ZapitTrialCommand { HardwareTriggered = hardwareTriggered };
                 using (operatorUnderTest.Process(arm, trigger).Subscribe(c => sent.Add(c.ToString())))
                 {
                     arm.OnNext(new Trial { TrialNumber = 1, LaserCondition = 3, LaserOn = true, LaserPowerMw = 4.5 });

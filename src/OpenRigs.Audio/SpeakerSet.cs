@@ -93,7 +93,7 @@ namespace OpenRigs.Audio
         /// </summary>
         public Mat Buffer(Mat sound, IEnumerable<int> channels, double levelDbfs, bool equalise = true, bool syncCopy = false, string what = null)
         {
-            var buffer = Layout(sound, channels, SoundLevel.Gain(sound, levelDbfs), equalise, syncCopy);
+            var buffer = Layout(sound, channels, SoundLevel.Gain(sound, levelDbfs, SampleRate), equalise, syncCopy);
             SoundLevel.CheckPeak(buffer, what ?? "A sound at " + levelDbfs.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " dBFS RMS");
             return buffer;
         }

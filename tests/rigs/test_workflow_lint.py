@@ -35,10 +35,10 @@ def test_the_block_subjects_are_what_each_block_declares():
         text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
         declared = dict((name, f"rx:{kind}") for kind, name in re.findall(r'xsi:type="rx:(\w+Subject)"[^>]*>\s*<(?:rx:)?Name>([\w.-]+)<', text))
         assert {name: declared.get(name) for name in subjects} == subjects
-    for outer, inner in lint.CARRIED_BLOCKS.items():
+    for outer, inners in lint.CARRIED_BLOCKS.items():
         package, resource = outer.split(":")
         text = (ROOT / "src" / package / resource.replace(".", "/", resource.count(".") - 1)).read_text(encoding="utf-8-sig")
-        assert f'Path="{inner}"' in text
+        assert all(f'Path="{inner}"' in text for inner in inners), outer
 
 
 def test_the_speaker_mixer_starts_no_sooner_than_3_s_after_start():
@@ -123,7 +123,7 @@ def sound_workflow(tmp_path: Path, nodes: str, edges: str) -> lint.Workflow:
 def test_a_sound_needs_its_level_from_the_task_file_and_the_shared_mixer(tmp_path):
     nodes = ('<Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:SpeakerMixer.bonsai" />'
              '<Expression xsi:type="SubscribeSubject"><Name>TaskConfig</Name></Expression>'
-             '<Expression xsi:type="MemberSelector"><Selector>TaskParameters.BackgroundNoise.LevelDbfs</Selector></Expression>'
+             '<Expression xsi:type="MemberSelector"><Selector>TaskParameters.RewardTone.LevelDbfs</Selector></Expression>'
              '<Expression xsi:type="InputMapping"><PropertyMappings><Property Name="LevelDbfs" Selector="Item1" /></PropertyMappings></Expression>'
              '<Expression xsi:type="Combinator"><Combinator xsi:type="aud:SpeakerBuffer" /></Expression>')
     wf = sound_workflow(tmp_path, nodes, '<Edge From="1" To="2" Label="Source1" /><Edge From="2" To="3" Label="Source1" /><Edge From="3" To="4" Label="Source1" />')
@@ -601,6 +601,17 @@ def test_no_include_ends_its_logs_when_a_one_shot_write_completes():
 def test_the_penalty_sound_is_the_lab_s_include(tmp_path):
     assert rules.play_penalty_sound_problems(lint.ET.fromstring(block_text(lint.PLAY_PENALTY_SOUND).encode("utf-8"))) == []
     assert lint.penalty_sound_problems(workflow(tmp_path, include(lint.PLAY_PENALTY_SOUND))) == []
+    # TrialOutcomeEffects includes it: counted, and a second of either is one too many.
+    assert lint.penalty_sound_problems(workflow(tmp_path / "effects", include(lint.TRIAL_OUTCOME_EFFECTS))) == []
+    assert lint.penalty_sound_problems(workflow(tmp_path / "both", include(lint.TRIAL_OUTCOME_EFFECTS) + include(lint.PLAY_PENALTY_SOUND))) == [
+        "the workflow includes PlayPenaltySound 2 times, not once"]
+    text = block_text(lint.PLAY_PENALTY_SOUND)
+    unscaled = text.replace('xsi:type="aud:SoundAtLevel"', 'xsi:type="aud:SpeakerBuffer"')
+    assert rules.play_penalty_sound_problems(lint.ET.fromstring(unscaled.encode("utf-8"))) == [
+        "PlayPenaltySound does not play each input at its level from the buffer's (SoundAtLevel, BufferLevelDbfs from LoudestPenaltyLevelDbfs)"]
+    at_go = text.replace("<Name>TrialRules</Name>", "<Name>TaskConfig</Name>")
+    assert rules.play_penalty_sound_problems(lint.ET.fromstring(at_go.encode("utf-8"))) == [
+        "the penalty sound is not laid out at TrialRules' LoudestPenaltyLevelDbfs"]
     # A task's own chain, refused.
     own = ('<Expression xsi:type="Combinator"><Combinator xsi:type="aud:PenaltySoundBuffer" xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio" /></Expression>'
            '<Expression xsi:type="MulticastSubject"><Name>PenaltySounds</Name></Expression>')
@@ -760,25 +771,23 @@ def test_every_task_with_sound_has_the_lab_s_background_noise_once_after_its_tas
         "the workflow gives BackgroundNoise a FileName (the noise is rig.yml's speakerArray.backgroundNoise)",
         "src/waveforms/Background_Noise.wav is a noise of the task's own (BackgroundNoise plays rig.yml's speakerArray.backgroundNoise)"]
     assert lint.background_noise_problems(workflow(tmp_path / "b", rig + task_files())) == ["the workflow includes BackgroundNoise 0 times, not once"]
-    assert lint.background_noise_problems(workflow(tmp_path / "c", rig + noise + task_files())) == [
-        "BackgroundNoise comes before LaunchTaskConfig is declared", "BackgroundNoise comes before TaskConfig is declared"]
-    own = ('<Expression xsi:type="MemberSelector"><Selector>TaskParameters.BackgroundNoise.LevelDbfs</Selector></Expression>'
-           '<Expression xsi:type="MulticastSubject"><Name>BackgroundNoise</Name></Expression>')
+    assert lint.background_noise_problems(workflow(tmp_path / "c", rig + noise + task_files())) == []  # it reads no task file
+    own = '<Expression xsi:type="MulticastSubject"><Name>BackgroundNoise</Name></Expression>'
     assert lint.background_noise_problems(workflow(tmp_path / "d", rig + task_files(own) + noise)) == [
-        "the workflow sends BackgroundNoise itself (the BackgroundNoise include does)",
-        "the workflow reads the task file's backgroundNoise itself (BackgroundNoise does)"]
+        "the workflow sends BackgroundNoise itself (the BackgroundNoise include does)"]
     assert lint.background_noise_problems(workflow(tmp_path / "e", include(lint.READ_LAB_RIG) + noise)) == [
         "the workflow includes BackgroundNoise 1 times, and has no SpeakerMixer"]
 
 
-def test_the_background_noise_plays_from_ready_at_the_launch_s_level_and_go_refuses_a_change():
+def test_the_background_noise_plays_from_ready_at_the_lab_s_level_reading_no_task_file():
     text = (ROOT / "src" / "OpenRigs.Audio" / "BackgroundNoise.bonsai").read_text(encoding="utf-8-sig")
     assert rules.background_noise_include_problems(lint.ET.fromstring(text.encode("utf-8"))) == []
     early = text.replace("<Name>Ready</Name>", "<Name>Speakers</Name>")
     assert rules.background_noise_include_problems(lint.ET.fromstring(early.encode("utf-8"))) == ["the noise sent does not wait for Ready"]
-    at_go = text.replace("<Name>LaunchTaskConfig</Name>", "<Name>TaskConfig</Name>")
-    assert rules.background_noise_include_problems(lint.ET.fromstring(at_go.encode("utf-8"))) == [
-        "the noise sent does not wait for LaunchTaskConfig", "Go does not stop on a backgroundNoise changed after launch"]
+    louder = text.replace("<aud:LevelDbfs>-60</aud:LevelDbfs>", "<aud:LevelDbfs>-50</aud:LevelDbfs>")
+    assert rules.background_noise_include_problems(lint.ET.fromstring(louder.encode("utf-8"))) == ["the noise's level is not the lab's -60 dBFS"]
+    read = text.replace("<Name>Ready</Name>", "<Name>TaskConfig</Name>", 1)
+    assert "the noise reads the task file, which has no background setting" in rules.background_noise_include_problems(lint.ET.fromstring(read.encode("utf-8")))
     a_file = text.replace('<Combinator xsi:type="aud:ReadBackgroundNoise" />', '<Combinator xsi:type="aud:CheckWaveRate" />')
     assert rules.background_noise_include_problems(lint.ET.fromstring(a_file.encode("utf-8"))) == [
         "the noise is not rig.yml's backgroundNoise (ReadBackgroundNoise)"]
@@ -800,6 +809,12 @@ def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_pat
     rewards = workflow(tmp_path / "e", logs + include(lint.REWARDS) + VALVES + sends + RECORDS + LIVE)
     assert lint.experiment_records_problems(rewards) == [] and lint.reward_problems(rewards) == []
     assert lint.reward_problems(workflow(tmp_path / "g", logs + sends + RECORDS + LIVE)) == ["the workflow includes Rewards 0 times, not once"]
+    # TrialOutcomeEffects sends each rewarded outcome's reward: a sender, held to the same rules.
+    effects = include(lint.TRIAL_OUTCOME_EFFECTS)
+    assert lint.reward_problems(workflow(tmp_path / "te", logs + include(lint.REWARDS) + VALVES + effects + RECORDS + LIVE)) == []
+    assert lint.reward_problems(workflow(tmp_path / "tn", logs + effects + RECORDS + LIVE)) == ["the workflow includes Rewards 0 times, not once"]
+    assert lint.reward_problems(workflow(tmp_path / "tl", logs + effects + include(lint.REWARDS) + VALVES + RECORDS + LIVE)) == [
+        "Rewards comes after a reward is sent into RewardRequests"]
     assert lint.reward_problems(workflow(tmp_path / "h", logs + sends + include(lint.REWARDS) + VALVES + RECORDS + LIVE)) == [
         "Rewards comes after a reward is sent into RewardRequests"]
     # Every valve after Rewards, which declares what they send into; Rewards with no valve gives no reward.

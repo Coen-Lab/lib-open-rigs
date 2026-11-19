@@ -182,7 +182,7 @@ namespace OpenRigs.Audio.Tests
             using (var row = buffer.GetRow(2))
             {
                 Assert.AreEqual(48000, buffer.Cols);  // one second at 48 kHz
-                Assert.AreEqual(-44.6, SoundLevel.RmsDbfs(row), 1e-4);
+                Assert.AreEqual(-44.6, SoundLevel.RmsDbfs(row, 48000), 1e-4);
             }
             Assert.AreEqual(0f, Values(buffer, 0).Max(Math.Abs));
             Assert.AreEqual(0f, Values(buffer, 31).Max(Math.Abs));
@@ -194,10 +194,27 @@ namespace OpenRigs.Audio.Tests
             var set = SpeakerSet.Load(Rig(), "TEST-RIG");
             // A square wave of amplitude 0.5 is -6.02 dBFS RMS; at -20 it plays 10^(-1) / 0.5 = 0.2 times as loud.
             var sound = Row(0.5f, -0.5f, 0.5f, -0.5f);
-            Assert.AreEqual(-6.0206, SoundLevel.RmsDbfs(sound), 1e-4);
+            Assert.AreEqual(-6.0206, SoundLevel.RmsDbfs(sound, 48000), 1e-4);
             var buffer = set.Buffer(sound, new[] { 1 }, -20, equalise: false);
             CollectionAssert.AreEqual(new[] { 0.1f, -0.1f, 0.1f, -0.1f }, Values(buffer, 1).Select(v => (float)Math.Round(v, 6)).ToArray());
-            Assert.AreEqual(Math.Pow(10, -1) / 0.5, SoundLevel.Gain(sound, -20), 1e-12);
+            Assert.AreEqual(Math.Pow(10, -1) / 0.5, SoundLevel.Gain(sound, -20, 48000), 1e-12);
+        }
+
+        [TestMethod]
+        public void ALevelLeavesOutSilentStretchesOnlyAndCountsLoneZeros()
+        {
+            // A pulse train, 47.6 ms on and 77.4 ms of exact zeros, measures 4.19 dB above its whole-length RMS.
+            var rate = 48000;
+            var on = (int)(0.0476 * rate);
+            var samples = Enumerable.Range(0, 8 * 6000).Select(i => i % 6000 < on ? (i % 2 == 0 ? 0.5f : -0.5f) : 0f).ToArray();
+            var train = Row(samples);
+            var whole = 10 * Math.Log10(samples.Sum(s => (double)s * s) / samples.Length);
+            Assert.AreEqual(4.19, SoundLevel.RmsDbfs(train, rate) - whole, 0.01);
+            Assert.AreEqual(-6.0206, SoundLevel.RmsDbfs(train, rate), 1e-4);
+            // A gapless sound is unchanged, and zeros shorter than 1 ms (47 samples at 48 kHz) count as samples.
+            var lone = Row(Enumerable.Range(0, 4800).Select(i => i % 100 < 47 ? 0f : 0.5f).ToArray());
+            Assert.AreEqual(20 * Math.Log10(0.5 * Math.Sqrt(53.0 / 100)), SoundLevel.RmsDbfs(lone, rate), 1e-4);
+            Assert.IsTrue(double.IsNegativeInfinity(SoundLevel.RmsDbfs(Row(new float[480]), rate)));
         }
 
         [TestMethod]

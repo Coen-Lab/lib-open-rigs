@@ -136,8 +136,20 @@ namespace OpenRigs.Trials.Tests
             var problems = new List<string>();
             var built = Build(Text("  - {trialType: visual, weight: 1, set: {delaySeconds: [1, 3]}}\n  - {trialType: visual, weight: 0, set: {delaySeconds: 9}}\n"), problems);
             var loudest = LoudestSound.Of(built, t => t.DelaySeconds);
-            Assert.AreEqual(3, loudest.Amplitude);
+            Assert.AreEqual(3, loudest.LevelDbfs);
             Assert.AreEqual("trialConditions[0] (visual) with contrasts [0.5], delaySeconds 3", loudest.Where);
+            Assert.AreEqual(1, LoudestSound.Of(built, t => t.DelaySeconds < 2 ? (object)t.DelaySeconds : SoundLevels.Mute).LevelDbfs);   // mute plays nothing
+            Assert.IsTrue(double.IsNaN(LoudestSound.Of(built, t => SoundLevels.Mute).LevelDbfs));
+        }
+
+        [TestMethod]
+        public void SoundLevelsReadNumbersOrMute()
+        {
+            Assert.AreEqual(-45.0, SoundLevels.Parse(-45));
+            Assert.AreEqual(-45.0, SoundLevels.Parse("-45"));
+            Assert.IsTrue(double.IsNaN(SoundLevels.Parse("mute")));
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => SoundLevels.Parse("off")).Message, "number of dBFS RMS or mute, not off");
+            Assert.ThrowsException<InvalidOperationException>(() => SoundLevels.Parse(false));
         }
 
         [TestMethod]
@@ -165,8 +177,9 @@ namespace OpenRigs.Trials.Tests
             Assert.IsNull(CurriculumCheck.Problem(new Stage { Id = 1, Code = "S03A", Version = "k7f2", Path = "A", Label = "x", Sha256 = "y" }));
             StringAssert.StartsWith(CurriculumCheck.Problem(new Stage { Id = -1 }), "is malformed (id -1 is below 0; code '' is not like S03A");
             Assert.AreEqual("visual", EnumNames.Name(Kind.Visual));
-            CollectionAssert.AreEqual(new[] { "rewardSizeUl must be above 0 and at most 20 ul" }, TaskBlocks.RewardSizeProblems(0, 20));
-            CollectionAssert.AreEqual(new[] { "rewardSizeUl (8 ul) x largeRewardMultiplier (3) is 24 ul, more than 20 ul, the most one reward may ask for" }, TaskBlocks.LargeRewardProblems(8, 3, 0.1, 20));
+            CollectionAssert.AreEqual(new[] { "sizeUl must be above 0 and at most 20 ul" }, TaskBlocks.RewardSizeProblems(0, 20));
+            CollectionAssert.AreEqual(new[] { "sizeUl (8 ul) x largeMultiplier (3) is 24 ul, more than 20 ul, the most one reward may ask for" }, TaskBlocks.LargeRewardProblems(8, 3, 0.1, 20));
+            CollectionAssert.AreEqual(new[] { "largeMultiplier is 1, not above 1" }, TaskBlocks.LargeRewardProblems(2, 1, 0, 20));
             Assert.AreEqual(0, TaskBlocks.LargeRewardProblems(8, 3, 0, 20).Count);
             CollectionAssert.AreEqual(new[] { "laserOnProbability must be in [0, 1]" }, TaskBlocks.LaserOnProbabilityProblems(1.5));
             Assert.AreEqual(2, TaskBlocks.StimulusProblems(new List<double>(), double.NaN).Count);

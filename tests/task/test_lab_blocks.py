@@ -8,7 +8,6 @@ from open_rigs.core import task
 from open_rigs.core.task import (
     MAX_REWARD_UL,
     AutoReward,
-    BackgroundNoise,
     Iti,
     Optogenetics,
     Penalty,
@@ -16,7 +15,6 @@ from open_rigs.core.task import (
     ResponseWindow,
     RewardSize,
     RewardTone,
-    StimulusSound,
     WheelQuietWait,
 )
 
@@ -40,9 +38,9 @@ def test_each_quiet_wait_keeps_its_keys_where_the_task_puts_it():
 
 
 @pytest.mark.parametrize(("seconds", "cm"), [(1, 0), (0, 1)])
-def test_quiet_wait_refuses_half_a_wheel_wait(seconds, cm):
-    with pytest.raises(ValidationError, match="must both be above 0"):
-        Structure(label="a", wheel_quiet_seconds=seconds, wheel_quiet_cm=cm)
+def test_wheel_quiet_seconds_0_is_the_only_off_and_cm_0_is_no_movement(seconds, cm):
+    # P5: no pair rule; wheelQuietCm 0 with a wait asks for a still wheel.
+    Structure(label="a", wheel_quiet_seconds=seconds, wheel_quiet_cm=cm)
 
 
 # A wait of inf never reaches a trial's start and the run waits silently; a NaN lead passed check_lead_fits (every comparison false).
@@ -127,33 +125,34 @@ def test_optogenetics_schema_holds_the_same_rule():
     assert schema["then"]["properties"]["zapitConditionsPath"] == {"minLength": 1}
 
 
-def test_penalty_sound_is_on_by_default_and_the_timeout_has_no_lab_default():
+def test_penalty_sound_has_only_a_level_mute_its_off_and_the_timeout_has_no_lab_default():
     penalty = Penalty.model_validate({"timeoutSeconds": 2})
-    assert penalty.sound.enabled and penalty.sound.level_dbfs == -30
+    assert penalty.sound.level_dbfs == -30
+    assert set(Penalty.model_json_schema(by_alias=True)["$defs"]["PenaltySound"]["properties"]) == {"levelDbfs"}
+    assert Penalty.model_validate({"timeoutSeconds": 2, "sound": {"levelDbfs": "mute"}}).sound.level_dbfs == "mute"
+    for refused in ("off", False, -0.5):
+        with pytest.raises(ValidationError):
+            Penalty.model_validate({"timeoutSeconds": 2, "sound": {"levelDbfs": refused}})
     with pytest.raises(ValidationError, match="timeoutSeconds"):
         Penalty.model_validate({})
 
 
 def test_sound_levels_have_the_lab_defaults_in_dbfs_rms():
-    # The lab's defaults: stimuli -30, penalty -30, reward tone -36, background -50; each task file states its own.
-    assert (StimulusSound().level_dbfs, RewardTone().level_dbfs, BackgroundNoise().level_dbfs) == (-30, -36, -50)
-    assert BackgroundNoise().enabled
-    assert set(BackgroundNoise.model_json_schema(by_alias=True)["properties"]) == {"enabled", "levelDbfs"}
-    with pytest.raises(ValidationError, match="less than or equal to -1"):
-        StimulusSound(level_dbfs=-0.5)
+    # The lab's defaults: stimuli -30, penalty -30, reward tone -35; the background a lab constant, -60 (P15).
+    assert (task.STIMULUS_LEVEL_DBFS, Penalty(timeout_seconds=1).sound.level_dbfs, RewardTone().level_dbfs, task.BACKGROUND_LEVEL_DBFS) == (-30, -30, -35, -60)
+    assert not hasattr(task, "BackgroundNoise") and not hasattr(task, "StimulusSound")
 
 
-def test_a_level_s_help_says_its_peak_is_checked_as_its_buffer_is_built():
-    # A buffer built each trial is checked at that trial, not when the task file is read at Go.
-    help_text = StimulusSound.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]
-    assert "at its trial for one built each trial" in help_text
-    assert "when the task file is read" not in help_text
+def test_a_level_s_schema_is_a_number_or_mute():
+    level = RewardTone.model_json_schema(by_alias=True)["properties"]["levelDbfs"]
+    assert level["oneOf"] == [{"type": "number", "minimum": -120.0, "maximum": -1.0}, {"const": "mute", "type": "string"}]
+    assert "silent stretches" in level["description"] and "mute: no sound" in level["description"]
 
 
 def test_the_levels_are_open_rigs_audio_s():
     # OpenRigs.Audio SoundLevel plays every sound; one set of numbers.
     source = (Path(__file__).parents[2] / "src" / "OpenRigs.Audio" / "SoundLevel.cs").read_text(encoding="utf-8")
-    consts = {name: float(value) for name, value in re.findall(r"public const double (\w+) = (-?[\d.]+);", source)}
+    consts = {name: float(value) for name, value in re.findall(r"public const double (\w+Dbfs) = (-?[\d.]+);", source)}
     assert consts == {
         "StimulusDbfs": task.STIMULUS_LEVEL_DBFS,
         "PenaltyDbfs": task.PENALTY_LEVEL_DBFS,
@@ -176,20 +175,17 @@ def test_optogenetics_lead_and_reply_margin_fit_in_the_shortest_interval(lead, f
 def test_zapit_must_be_free_before_the_next_trigger_less_the_reply_margin():
     # A 3 s hold, a 2 s shortest interval and a 0.5 s lead passed every task check and stopped at trial 2.
     on = Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5, "enabled": True, "zapitConditionsPath": "z.yml", "laserPowerMw": 2})
-    with pytest.raises(ValueError, match=r"trigger_hold_seconds \(3.0 s\) must be at most 1.3 s"):
-        on.check_zapit_free_in_time(2.0, trigger_hold_seconds=3.0)
-    on.check_zapit_free_in_time(2.0, trigger_hold_seconds=1.3)
     with pytest.raises(ValueError, match=r"laser_duration_seconds \(2.0 s\) must be at most 1.8 s"):
         on.check_zapit_free_in_time(2.0, laser_duration_seconds=2.0, ramp_down_seconds=0.5, response_delay_seconds=0.5)
     on.check_zapit_free_in_time(2.0, laser_duration_seconds=1.8, ramp_down_seconds=0.5, response_delay_seconds=0.5)
-    Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5}).check_zapit_free_in_time(2.0, trigger_hold_seconds=30)  # Zapit off
+    Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5}).check_zapit_free_in_time(2.0, laser_duration_seconds=30)  # Zapit off
     with pytest.raises(TypeError):
-        on.check_zapit_free_in_time(2.0)
+        on.check_zapit_free_in_time(2.0, trigger_hold_seconds=1.0)
 
 
 def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
     # Each buffer's peak is checked as it is built; two sounds playing at once on one speaker add up.
-    help_text = StimulusSound.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]
+    help_text = RewardTone.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]
     assert "Sounds overlapping on a speaker share its headroom: each buffer's peak is checked, not their mix" in help_text
 
 

@@ -45,18 +45,31 @@ namespace OpenRigs.Core.Tests
         }
 
         [TestMethod]
-        public void SettingsOutOfRangeOrAHalfSetWheelPairAreRefusedByName()
+        public void SettingsOutOfRangeAreRefusedByName()
         {
             CollectionAssert.AreEqual(new string[0], QuietWait.LickProblems(10));
             CollectionAssert.AreEqual(new string[0], QuietWait.WheelProblems(10, 20));
             CollectionAssert.AreEqual(new[] { "lickQuietSeconds is -1, not from 0 to 10 s" }, QuietWait.LickProblems(-1));
             CollectionAssert.AreEqual(new[] { "wheelQuietCm is 25, not from 0 to 20 cm" }, QuietWait.WheelProblems(1, 25));
-            CollectionAssert.AreEqual(new[] { "wheelQuietSeconds 1 and wheelQuietCm 0 are both above 0 (the wheel's quiet wait) or both 0 (off), not one of each" },
-                QuietWait.WheelProblems(1, 0));
+            CollectionAssert.AreEqual(new string[0], QuietWait.WheelProblems(1, 0));   // a still wheel: no movement at all
+            CollectionAssert.AreEqual(new string[0], QuietWait.WheelProblems(0, 2));   // seconds 0, the only off
             Assert.AreEqual(1, QuietWait.LickProblems(double.NaN).Count);
             var error = Assert.ThrowsException<System.ArgumentException>(() => new QuietWait(0, double.PositiveInfinity, 11, 0, 0, double.NaN, false));
             StringAssert.Contains(error.Message, "lickQuietSeconds is 11");
             StringAssert.Contains(error.Message, "the earliest start is");
+        }
+
+        [TestMethod]
+        public void AWheelWaitOf0CmRestartsOnAnyMovement()
+        {
+            var wait = new QuietWait(0, 1, 0, 1, 0, 0, false);
+            Assert.AreEqual(1, wait.TrialStartTime, 1e-12);
+            wait.Wheel(0.1, 0.6);   // the least move restarts it
+            Assert.AreEqual(1.6, wait.TrialStartTime, 1e-12);
+            wait.Wheel(0.3, 0.9);
+            Assert.AreEqual(1.9, wait.TrialStartTime, 1e-12);
+            wait.Wheel(0.3, 1.5);   // still
+            Assert.AreEqual(1.9, wait.TrialStartTime, 1e-12);
         }
 
         [TestMethod]

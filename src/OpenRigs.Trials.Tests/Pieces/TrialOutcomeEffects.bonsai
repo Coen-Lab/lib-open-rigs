@@ -11,10 +11,10 @@
   <Workflow>
     <Nodes>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="test:PieceTaskConfigSource" />
+        <Combinator xsi:type="test:PieceSoundRulesSource" />
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
-        <Name>TaskConfig</Name>
+        <Name>TrialRules</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="test:PieceSpeakers">

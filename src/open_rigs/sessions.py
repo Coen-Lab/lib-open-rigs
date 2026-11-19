@@ -68,7 +68,7 @@ def curriculum_stage(session: Path) -> dict[str, Any] | None:
 
 
 def trial_conditions(session: Path) -> list[dict[str, Any]] | None:
-    """The trialConditions a session ran with, from its Settings_Task: the list the trialCondition column indexes, each
+    """The trialConditions a session ran with, from its Settings_Task: the list the trialConditionId column indexes, each
     {trialType, weight, pairs, set} (a missing set as {}). None without a task file."""
     task = _task(session)
     return None if task is None else [{**c, "set": c.get("set") or {}} for c in task["trialConditions"]]

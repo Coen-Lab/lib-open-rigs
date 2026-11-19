@@ -37,7 +37,7 @@ class Params(TaskParameters, ct.ConditionedTask):
     contrasts: list[float] = [1.0]
     azimuths_deg: list[float] = [-60.0, 60.0]
     auditory_stimulus: ct.AuditoryStimulus = ct.AuditoryStimulus()
-    reward: ct.Reward = ct.Reward(reward_size_ul=2)
+    reward: ct.Reward = ct.Reward(size_ul=2)
     optogenetics: Opto = Opto()
     task_type: str = "go"
     delay_seconds: float = 0.0
@@ -89,7 +89,7 @@ def test_expected_rows_keep_only_paths_that_differ(tmp_path):
     values = task(set={"contrasts": [0.5, 1.0]})
     rows = ct.expected_combination_rows(Params, values)
     assert [row["values"] for row in rows] == [{"azimuthsDeg": a, "contrasts": c} for c in (0.5, 1.0) for a in (-60.0, 60.0)]
-    assert rows[0]["trialCondition"] == 0 and [row["trialCombinationId"] for row in rows] == [0, 1, 2, 3]
+    assert rows[0]["trialConditionId"] == 0 and [row["trialCombinationId"] for row in rows] == [0, 1, 2, 3]
     (tmp_path / "handover").mkdir()
     (tmp_path / "combinations").mkdir()
     (tmp_path / "handover" / "a.yml").write_text(yaml.safe_dump({"taskParameters": values}), encoding="utf-8")
@@ -101,11 +101,14 @@ def test_expected_rows_keep_only_paths_that_differ(tmp_path):
 
 
 def test_block_order_problems():
-    assert ct.block_order_problems(Params) == [
-        "the lab's blocks are in the order rngSeed, curriculum, trialConditions, contrasts, auditoryStimulus, reward, optogenetics, "
-        "not rngSeed, curriculum, trialConditions, auditoryStimulus, contrasts, reward, optogenetics",
-        "azimuthsDeg comes before optogenetics: a task's own fields follow the lab's blocks",
-    ]
+    assert ct.block_order_problems(Params) == ["contrasts comes before optogenetics: a task's own fields follow the lab's blocks"]
+
+    class Disordered(TaskParameters):
+        reward: ct.Reward
+        curriculum: ct.Curriculum | None = None
+
+    assert ct.block_order_problems(Disordered) == [
+        "the lab's blocks are in the order rngSeed, reward, curriculum, not rngSeed, curriculum, reward"]
 
     class Ordered(TaskParameters):
         curriculum: ct.Curriculum | None = None

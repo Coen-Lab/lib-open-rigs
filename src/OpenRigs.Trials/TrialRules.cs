@@ -34,7 +34,7 @@ namespace OpenRigs.Trials
     {
         /// <summary>The laser runs until the outcome (or LaserCap); the trigger line falls TriggerHoldSeconds after the outcome.</summary>
         AtOutcome,
-        /// <summary>The laser runs LaserDurationSeconds from the trigger, outcome or not; the line falls then.</summary>
+        /// <summary>The laser runs the trial's LaserDurationSeconds (ILaserDurationTrial) from the trigger, outcome or not; the line falls then.</summary>
         AfterDuration
     }
 
@@ -57,16 +57,13 @@ namespace OpenRigs.Trials
         /// <summary>Gets how long the trigger line stays up past the outcome, in seconds (AtOutcome).</summary>
         public double TriggerHoldSeconds { get; private set; }
 
-        /// <summary>Gets how long the line stays up from the trigger, in seconds (AfterDuration).</summary>
-        public double LaserDurationSeconds { get; private set; }
-
         /// <summary>Gets how long after the line falls Zapit takes the next StartStimulus, in seconds (AfterDuration).</summary>
         public double RampDownSeconds { get; private set; }
 
         /// <summary>Gets how long after the trigger LaserCap comes with no outcome yet, in seconds (AtOutcome); infinity for none.</summary>
         public double LaserMaxSeconds { get; private set; }
 
-        /// <summary>The laser on until the outcome, stopped by LaserCap laserMaxSeconds after the trigger; the line held triggerHoldSeconds past the outcome.</summary>
+        /// <summary>The laser on until the outcome, stopped by LaserCap laserMaxSeconds after the trigger; the line held triggerHoldSeconds past the outcome (the conditions file's longest ramp-down, ZapitConditions.Check).</summary>
         public static LaserTiming UntilOutcome(bool hardwareTriggered, double triggerHoldSeconds, double laserMaxSeconds)
         {
             Check("triggerHoldSeconds", triggerHoldSeconds, false);
@@ -80,19 +77,26 @@ namespace OpenRigs.Trials
             };
         }
 
-        /// <summary>The laser on for laserDurationSeconds from the trigger; the next trial armed rampDownSeconds after the line falls.</summary>
-        public static LaserTiming ForDuration(bool hardwareTriggered, double laserDurationSeconds, double rampDownSeconds)
+        /// <summary>The laser on for each trial's own duration from the trigger (every laser trial an ILaserDurationTrial); the next trial armed rampDownSeconds after the line falls.</summary>
+        public static LaserTiming ForDuration(bool hardwareTriggered, double rampDownSeconds)
         {
-            Check("laserDurationSeconds", laserDurationSeconds, true);
             Check("rampDownSeconds", rampDownSeconds, false);
             return new LaserTiming
             {
                 HardwareTriggered = hardwareTriggered,
                 End = LaserEnd.AfterDuration,
-                LaserDurationSeconds = laserDurationSeconds,
                 RampDownSeconds = rampDownSeconds,
                 LaserMaxSeconds = double.PositiveInfinity,
             };
+        }
+
+        /// <summary>A trial's laser duration under ForDuration: its ILaserDurationTrial's, a finite number above 0; throws, naming the trial, otherwise.</summary>
+        public static double DurationOf(ITrial trial)
+        {
+            var timed = trial as ILaserDurationTrial;
+            if (timed == null) throw new InvalidOperationException(string.Format("Trial {0} is a laser trial of a LaserTiming.ForDuration task, but has no laser duration of its own (ILaserDurationTrial).", trial.TrialNumber));
+            Check("trial " + trial.TrialNumber + "'s laserDurationSeconds", timed.LaserDurationSeconds, true);
+            return timed.LaserDurationSeconds;
         }
 
         static void Check(string name, double value, bool aboveZero)

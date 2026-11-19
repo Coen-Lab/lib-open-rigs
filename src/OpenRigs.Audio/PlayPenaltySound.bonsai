@@ -4,14 +4,14 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The penalty sound, the same in every task: the lab's one penalty sound (PenaltySoundBuffer, on rig.yml's penaltySoundChannel alone) made once the task file is read at Go, at its penalty.sound.levelDbfs, into the AsyncSubject PenaltySoundBuffer; each input then plays it, sent into SpeakerMixer's PenaltySounds. Give it the trials whose outcome has the penalty sound. Needs TaskConfig (with TaskParameters.Penalty.Sound.LevelDbfs) and Speakers from the workflow.</Description>
+  <Description>The penalty sound, the same in every task: the lab's one penalty sound (PenaltySoundBuffer, on rig.yml's penaltySoundChannel alone) laid out once the trials' rules are made at Go, at the loudest penalty level any trial draws (TrialRules' LoudestPenaltyLevelDbfs, its peak checked then), into the AsyncSubject PenaltySoundBuffer; each input, a penalised trial's penalty.sound.levelDbfs (NaN when mute: nothing plays), then plays it at that level (SoundAtLevel), sent into SpeakerMixer's PenaltySounds. Needs TrialRules (with LoudestPenaltyLevelDbfs) and Speakers from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
-        <Name>TaskConfig</Name>
+        <Name>TrialRules</Name>
       </Expression>
       <Expression xsi:type="MemberSelector">
-        <Selector>TaskParameters.Penalty.Sound.LevelDbfs</Selector>
+        <Selector>LoudestPenaltyLevelDbfs</Selector>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>Speakers</Name>
@@ -47,13 +47,26 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:WithLatestFrom" />
       </Expression>
-      <Expression xsi:type="MemberSelector">
-        <Selector>Item2</Selector>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="aud:SoundAtLevel">
+          <aud:BufferLevelDbfs>NaN</aud:BufferLevelDbfs>
+        </Combinator>
       </Expression>
       <Expression xsi:type="MulticastSubject">
         <Name>PenaltySounds</Name>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="BufferLevelDbfs" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TrialRules</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>LoudestPenaltyLevelDbfs</Selector>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -68,6 +81,9 @@
       <Edge From="10" To="11" Label="Source1" />
       <Edge From="11" To="12" Label="Source1" />
       <Edge From="12" To="13" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="14" Label="Source1" />
+      <Edge From="14" To="11" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

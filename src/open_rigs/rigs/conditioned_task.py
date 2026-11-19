@@ -21,7 +21,7 @@ import pydantic
 from pydantic import ConfigDict, Field, ValidationError, ValidationInfo, WithJsonSchema, field_validator, model_validator
 
 from open_rigs.core.base import Double, String
-from open_rigs.core.task import RewardSize, TaskBlock
+from open_rigs.core.task import MAX_REWARD_UL, STIMULUS_LEVEL_DBFS, SoundLevelDbfs, TaskBlock, level_dbfs
 from open_rigs.rigs import conditions
 
 ALL_SPEAKERS = "all"  # an auditoryStimulus.initialAzimuthsDeg item: every rig.yml speaker plays (OpenRigs.Audio SoundAzimuths.AllSpeakers)
@@ -31,21 +31,20 @@ SIDELESS = [0, ALL_SPEAKERS]  # sound azimuths with no side
 MAX_WEIGHT = 1_000_000  # the most one condition's weight may be (OpenRigs.Trials TrialConditions.MaxWeight)
 MAX_WEIGHT_SUM = 2147483647  # the most the weights may add to: the draw sums them as an int (int.MaxValue)
 
-# The session fields every conditioned task has (x-session-fields; a task adds its own): what cannot change per trial, so a
-# condition may not set it (the path or any path under it).
+# The session fields every conditioned task has (x-session-fields; a task adds its own): only what really cannot change per
+# trial, so a condition may not set it (the path or any path under it). Everything else is condition-level, logged per trial
+# through trialCombinationId and Settings_Combinations.
 COMMON_SESSION_FIELDS = {
     "rngSeed": "seeds the one random stream every trial is drawn from, at Go",
     "curriculum": "the stage these values are: one per task file",
     "trialConditions": "the mix the conditions are",
-    "backgroundNoise": "plays without a break from Ready, before the first trial",
-    "penalty.sound.levelDbfs": "the penalty sound's buffer is laid out once at Go (OpenRigs.Audio PlayPenaltySound)",
     "optogenetics.enabled": "Zapit is connected and its conditions file loaded at Go",
     "optogenetics.zapitConditionsPath": "the conditions file loaded in Zapit and counted at Go",
 }
 # One block order for every conditioned task's model (top-level fields by alias): identity, the mix, timing, stimuli,
 # reward, penalty, sounds, optogenetics, then the task's own (block_order_problems).
-BLOCK_ORDER = ("rngSeed", "curriculum", "trialConditions", "trialStructure", "visualStimulus", "auditoryStimulus", "contrasts",
-               "reward", "autoRewardProbability", "penalty", "backgroundNoise", "rewardTone", "optogenetics")
+BLOCK_ORDER = ("rngSeed", "curriculum", "trialConditions", "trialStructure", "visualStimulus", "auditoryStimulus",
+               "reward", "autoRewardProbability", "penalty", "rewardTone", "optogenetics")
 
 
 def props(schemas: dict) -> dict:
@@ -58,6 +57,7 @@ def if_(schemas: dict) -> dict:
 
 
 ABOVE_0 = {"contains": {"exclusiveMinimum": 0}}
+SOUNDING = {"contains": {"type": "number"}}  # a level list holding a number: a sound plays (mute is the only text)
 
 
 def schema_extra(session_fields: dict, rules, trial_types, required=()) -> dict:
@@ -161,10 +161,11 @@ class Curriculum(TaskBlock):
 
 
 class AuditoryStimulus(TaskBlock):
-    """A sound stimulus: its waveform's amplitude and the azimuths it plays at (a number, or "all" for every rig.yml
-    speaker). A task subclasses it to give its own defaults and descriptions."""
+    """A sound stimulus: its level (mute for none), the azimuths it plays at (a number, or "all" for every rig.yml speaker)
+    and the elevation the nearest speaker is found at. A task subclasses it to give its own defaults and descriptions."""
 
-    amplitude: Double = Field(default=1.0, ge=0, description="Scale of the waveform's samples as stored: 0 no sound, 1 the waveform as stored")
+    level_dbfs: SoundLevelDbfs = level_dbfs(STIMULUS_LEVEL_DBFS, "The stimulus sound")
+    elevation_deg: Double = Field(default=0.0, ge=-90, le=90, description="Elevation the sound plays at, in degrees: with the azimuth drawn, it picks rig.yml's nearest speaker")
     initial_azimuths_deg: list[SoundAzimuth] = Field(
         default=[ALL_SPEAKERS], min_length=1, description="Signed azimuths the sound plays at, in degrees, one picked per trial, on rig.yml's speaker nearest it; \"all\" on every speaker"
     )
@@ -179,11 +180,14 @@ class AuditoryStimulus(TaskBlock):
         return value
 
 
-class Reward(RewardSize):
-    """Reward delivery: the reward size (the lab's RewardSize block) and the large-reward trials."""
+class Reward(TaskBlock):
+    """Reward delivery: the reward size and the large-reward trials."""
 
-    large_reward_multiplier: Double = Field(default=1.0, ge=0, description="Reward size multiplier applied on large-reward trials")
-    large_reward_probability: Double = Field(default=0.0, ge=0, le=1, description="Probability that a trial is a large-reward trial")
+    size_ul: Double = Field(
+        gt=0, le=MAX_REWARD_UL, description=f"Reward size, in microlitres, planned into valve pulses from the valve's calibration; at most {MAX_REWARD_UL}, the most one reward may ask for"
+    )
+    large_multiplier: Double = Field(default=2.0, gt=1, description="Reward size multiplier on large-reward trials, above 1")
+    large_probability: Double = Field(default=0.0, ge=0, le=1, description="Probability that a trial is a large-reward trial; 0: none (the only off)")
 
 
 @cache
@@ -302,7 +306,7 @@ def _normal(path: str, value: Any, list_fields) -> Any:
     return value[0] if path in list_fields and isinstance(value, list) and len(value) == 1 else value
 
 
-def expected_combination_rows(model: type[pydantic.BaseModel], task: dict, condition_key: str = "trialCondition") -> list[dict]:
+def expected_combination_rows(model: type[pydantic.BaseModel], task: dict) -> list[dict]:
     """Settings_Combinations' rows as the Python build makes them from a task's values (as the task file has them): every
     condition's combinations in turn, a list field's one-entry pick unwrapped (an x-whole list stays a list), a path kept
     where it differs between rows or from the task's own value. The agreement test holds the C#'s file to it."""
@@ -311,7 +315,7 @@ def expected_combination_rows(model: type[pydantic.BaseModel], task: dict, condi
     rows = []
     for i, condition in enumerate(task["trialConditions"]):
         for combo in condition_combinations(base, condition.get("set") or {}, condition.get("pairs") or [], list_fields):
-            rows.append({"trialCombinationId": len(rows), condition_key: i, "trialType": condition["trialType"],
+            rows.append({"trialCombinationId": len(rows), "trialConditionId": i, "trialType": condition["trialType"],
                          "conditionWeight": condition["weight"], "values": {path: _normal(path, value, list_fields) for path, value in combo.items()}})
     paths = {path for row in rows for path in row["values"]}
     own = {path: _normal(path, get_path(base, path), list_fields) for path in paths}
