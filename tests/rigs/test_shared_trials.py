@@ -77,6 +77,13 @@ def test_a_task_without_quiet_waits_or_optogenetics_is_checked_by_the_core(tmp_p
     assert s.problems == [] and s.trials == 4
 
 
+def test_a_negative_spouts_lead_larger_than_the_laser_s_is_the_lead(tmp_path):
+    trials = [{**t, "trialStartTime": t["stimulusOnsetTime"] - 0.3} for t in _chain(4)]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
+    task = {**TASK, "spouts": {"stimulusToSpoutsInSeconds": -0.3}}
+    assert summarise(_experiment(tmp_path, trials, rewards, task=task)).problems == []
+
+
 def test_a_file_without_outcomeTime_is_one_problem_not_a_crash(tmp_path):
     # Files with no outcomeTime are restructured, not read as they are.
     trials = _chain(4)

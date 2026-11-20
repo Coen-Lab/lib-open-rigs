@@ -14,7 +14,7 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
 (open_rigs.chunks); any other file named like one it reads is a NOTE, not read:
 
 - trial numbers run 1, 2, 3 ... with none missing, and each outcome is correct, incorrect, noResponse, probe or auto;
-- each trial's start (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, 0), plus
+- each trial's start (trialStartTime) came at its interval's end less the lead, max(laserToStimulusSeconds, -spouts.stimulusToSpoutsInSeconds, 0), plus
   quietWaitSeconds (never negative), within 2 ms;
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
 - each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
@@ -81,8 +81,8 @@ CORE_COLUMNS: List[Column] = [
      "the time to drink included. A task's quiet waits add quietWaitSeconds, so the stimulus was due at "
      "itiStartTime + itiSeconds + quietWaitSeconds (stimulusOnsetTime)."),
     ("trialStartTime", "double", "s",
-     "Harp time the trial started: the end of its interval less the lead, max(laserToStimulusSeconds, 0) in the "
-     "task file (Settings_Task) and 0 for a task file with no optogenetics block, plus quietWaitSeconds where the task has quiet waits."),
+     "Harp time the trial started: the end of its interval less the lead, max(laserToStimulusSeconds, "
+     "-spouts.stimulusToSpoutsInSeconds, 0) in the task file (Settings_Task), each 0 for a task file without its block, plus quietWaitSeconds where the task has quiet waits."),
     ("stimulusOnsetTime", "double", "s",
      "Harp time the workflow commanded the stimulus on, NaN if it never was: the first tick of the 1 ms Harp clock at "
      "or after trialStartTime plus the lead, in every experiment. The physical onset is in the hardware logs."),
@@ -393,12 +393,13 @@ MISS_TIMEOUT_PATH = "penalty.noResponse.timeoutSeconds"  # a penalised miss's, n
 @dataclass
 class _Task:
     laser_to_stimulus: float  # optogenetics.laserToStimulusSeconds: signed, the trigger before the stimulus
+    spouts_to_stimulus: float  # -spouts.stimulusToSpoutsInSeconds: the spouts' lead before the stimulus when positive
     timeouts: Dict[str, Any]  # TIMEOUT_PATH and MISS_TIMEOUT_PATH as the task file has them
     combinations: Optional[Dict[int, Dict[str, Any]]]  # Settings_Combinations' values by trialCombinationId; None without it
 
     @property
     def lead(self) -> float:
-        return max(self.laser_to_stimulus, 0.0)
+        return max(self.laser_to_stimulus, self.spouts_to_stimulus, 0.0)
 
     def timeout(self, row: Dict[str, str]) -> float:
         """A penalised trial's timeout: its combination's (else the task file's) penalty.timeoutSeconds, or on a miss (no
@@ -428,7 +429,8 @@ def _task(folder: Path) -> Optional[_Task]:
             if tables:
                 rows = json.loads(tables[0].read_text(encoding="utf-8-sig"))["rows"]
                 combinations = {int(r[trial_log.ID]): r["values"] for r in rows}
-            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)), timeouts, combinations)
+            return _Task(float((p.get("optogenetics") or {}).get("laserToStimulusSeconds", 0.0)),
+                         -float((p.get("spouts") or {}).get("stimulusToSpoutsInSeconds", 0.0)), timeouts, combinations)
         except (OSError, ValueError, KeyError, TypeError):
             return None
     return None

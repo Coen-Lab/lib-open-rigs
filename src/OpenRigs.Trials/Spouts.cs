@@ -31,7 +31,7 @@ namespace OpenRigs.Trials
     /// </summary>
     public static class Spouts
     {
-        /// <summary>The cue that brings the spouts in, spouts.stimulusToSpoutsInSeconds after the stimulus.</summary>
+        /// <summary>The cue that brings the spouts in, spouts.stimulusToSpoutsInSeconds after the stimulus (before it when negative).</summary>
         public const string InCue = "SpoutsIn";
 
         /// <summary>The cue that draws the spouts out, spouts.rewardConsumptionSeconds into the next interval, unless the coming trial's spouts are always in.</summary>
@@ -64,28 +64,36 @@ namespace OpenRigs.Trials
             return reward == null ? LickSpoutCommand.SpoutsOut : Only(reward.Item1);
         }
 
-        /// <summary>One combination's spouts block against its trial structure: stimulusToSpoutsInSeconds and rewardConsumptionSeconds
-        /// each a finite number, 0 or more; rewardConsumptionSeconds at most itiMinSeconds (the spouts go out inside the
-        /// interval, before the stimulus); the response window (stimulusToResponseWindowSeconds) not before the spouts are in.</summary>
+        /// <summary>One combination's spouts block against its trial structure: stimulusToSpoutsInSeconds a finite number,
+        /// signed (negative: the spouts in that long before the stimulus, which leads the trial start, TrialLoop.Lead);
+        /// rewardConsumptionSeconds a finite number, 0 or more; rewardConsumptionSeconds plus the spouts' lead (0 unless
+        /// stimulusToSpoutsInSeconds is negative) at most itiMinSeconds (the spouts go out inside the interval before they come
+        /// back in); with a positive stimulusToSpoutsInSeconds, the response window (stimulusToResponseWindowSeconds) not before the spouts are in.</summary>
         public static List<string> Problems(double stimulusToSpoutsInSeconds, double rewardConsumptionSeconds, double itiMinSeconds, double stimulusToResponseWindowSeconds)
         {
             var problems = new List<string>();
-            Finite(problems, "spouts.stimulusToSpoutsInSeconds", stimulusToSpoutsInSeconds);
+            if (double.IsNaN(stimulusToSpoutsInSeconds) || double.IsInfinity(stimulusToSpoutsInSeconds)) problems.Add("spouts.stimulusToSpoutsInSeconds must be a finite number");
             Finite(problems, "spouts.rewardConsumptionSeconds", rewardConsumptionSeconds);
+            var lead = Math.Max(-stimulusToSpoutsInSeconds, 0);
             if (rewardConsumptionSeconds > itiMinSeconds + 1e-9) problems.Add(string.Format("spouts.rewardConsumptionSeconds ({0} s) is above itiMinSeconds ({1} s): the spouts are drawn out rewardConsumptionSeconds into the interval, before the stimulus", rewardConsumptionSeconds, itiMinSeconds));
-            if (stimulusToResponseWindowSeconds < stimulusToSpoutsInSeconds - 1e-9) problems.Add(string.Format("stimulusToResponseWindowSeconds ({0} s) is below spouts.stimulusToSpoutsInSeconds ({1} s): the response window would open before the spouts arrive", stimulusToResponseWindowSeconds, stimulusToSpoutsInSeconds));
+            else if (rewardConsumptionSeconds + lead > itiMinSeconds + 1e-9) problems.Add(string.Format("spouts.rewardConsumptionSeconds ({0} s) plus the {1} s the spouts come in before the stimulus (spouts.stimulusToSpoutsInSeconds {2} s) is above itiMinSeconds ({3} s): the spouts would come in before they are drawn out", rewardConsumptionSeconds, lead, stimulusToSpoutsInSeconds, itiMinSeconds));
+            if (stimulusToSpoutsInSeconds > 0 && stimulusToResponseWindowSeconds < stimulusToSpoutsInSeconds - 1e-9) problems.Add(string.Format("stimulusToResponseWindowSeconds ({0} s) is below spouts.stimulusToSpoutsInSeconds ({1} s): the response window would open before the spouts arrive", stimulusToResponseWindowSeconds, stimulusToSpoutsInSeconds));
             return problems;
         }
 
         /// <summary>Between a trial and the next, each drawn from any weighted combination: the longest
-        /// spouts.rewardConsumptionSeconds at most the shortest itiMinSeconds.</summary>
-        public static List<string> BetweenTrialsProblems(IEnumerable<double> rewardConsumptionSeconds, IEnumerable<double> itiMinSeconds)
+        /// spouts.rewardConsumptionSeconds plus the longest lead of the spouts before the stimulus (a negative
+        /// stimulusToSpoutsInSeconds) at most the shortest itiMinSeconds.</summary>
+        public static List<string> BetweenTrialsProblems(IEnumerable<double> stimulusToSpoutsInSeconds, IEnumerable<double> rewardConsumptionSeconds, IEnumerable<double> itiMinSeconds)
         {
             var problems = new List<string>();
             var consumption = rewardConsumptionSeconds.ToList();
             var iti = itiMinSeconds.ToList();
             if (consumption.Count == 0 || iti.Count == 0) return problems;
-            if (consumption.Max() > iti.Min() + 1e-9) problems.Add(string.Format("spouts.rewardConsumptionSeconds {0} s exceeds itiMinSeconds {1} s of a combination that may come next", consumption.Max(), iti.Min()));
+            var lead = Math.Max(stimulusToSpoutsInSeconds.Select(v => -v).DefaultIfEmpty(0).Max(), 0);
+            if (consumption.Max() + lead <= iti.Min() + 1e-9) return problems;
+            if (lead == 0) problems.Add(string.Format("spouts.rewardConsumptionSeconds {0} s exceeds itiMinSeconds {1} s of a combination that may come next", consumption.Max(), iti.Min()));
+            else problems.Add(string.Format("spouts.rewardConsumptionSeconds {0} s plus the spouts' longest lead before the stimulus {1} s exceeds itiMinSeconds {2} s of a combination that may come next", consumption.Max(), lead, iti.Min()));
             return problems;
         }
 

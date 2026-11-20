@@ -12,7 +12,8 @@ namespace OpenRigs.Trials
     /// <summary>
     /// A task's trials on the Harp clock, the same for every task: each trial drawn at its interval's start (the last
     /// outcome plus its timeout; trial 1 the first tick), a hardware-triggered Zapit armed during the interval once the
-    /// last laser is done, the trial start at the interval's end less the lead (max(laserToStimulusSeconds, 0)) or later
+    /// last laser is done, the trial start at the interval's end less the lead (TrialLoop.Lead: max(laserToStimulusSeconds,
+    /// the earliest Stimulus cue's lead, 0)) or later
     /// until the quiet waits hold (QuietWait), the trigger laserToStimulusSeconds before the stimulus (the workflow stops
     /// if Zapit has not armed the trial by then, naming the last laser when it held Zapit too long, and a trial answered
     /// first gets no laser), the stimulus the lead after the start, the response window, the outcome and its timeout
@@ -166,7 +167,7 @@ namespace OpenRigs.Trials
             timing = nextTiming;
             phase = Phase.Iti;
             itiStart = nextItiStart;
-            var lead = Math.Max(timing.LaserToStimulusSeconds, 0);
+            var lead = TrialLoop.Lead(timing);
             wait = new QuietWait(itiStart, itiStart + timing.ItiSeconds - lead, timing.LickQuietSeconds, timing.WheelQuietSeconds, timing.WheelQuietCm, wheel, AnyTouched());
             armAt = Math.Max(itiStart, laserFreeAt);
             armSent = triggered = stimulated = capped = false;
@@ -181,7 +182,7 @@ namespace OpenRigs.Trials
             if (t == null) throw new InvalidOperationException(string.Format("The task's rules gave trial {0} no timing.", next.TrialNumber));
             if (!(t.ItiSeconds >= 0) || double.IsInfinity(t.ItiSeconds)) problems.Add(string.Format("its interval is {0} s, not a finite number from 0", t.ItiSeconds));
             if (double.IsNaN(t.LaserToStimulusSeconds) || double.IsInfinity(t.LaserToStimulusSeconds)) problems.Add(string.Format("its laserToStimulusSeconds is {0}", t.LaserToStimulusSeconds));
-            else if (t.LaserToStimulusSeconds > t.ItiSeconds + TrialLoop.Tolerance) problems.Add(string.Format("its lead ({0} s) is longer than its interval ({1} s), so it would start before its interval", t.LaserToStimulusSeconds, t.ItiSeconds));
+            else if (TrialLoop.Lead(t) > t.ItiSeconds + TrialLoop.Tolerance) problems.Add(string.Format("its lead ({0} s) is longer than its interval ({1} s), so it would start before its interval", TrialLoop.Lead(t), t.ItiSeconds));
             if (!(t.ResponseDelaySeconds >= 0) || double.IsInfinity(t.ResponseDelaySeconds)) problems.Add(string.Format("its response delay is {0} s, not a finite number from 0", t.ResponseDelaySeconds));
             if (!(t.ResponseWindowSeconds > 0)) problems.Add(string.Format("its response window is {0} s, not above 0 (infinity for no limit)", t.ResponseWindowSeconds));
             if (t.Laser && laser == null) problems.Add("it is a laser trial, but the rules give no LaserTiming");
@@ -190,8 +191,7 @@ namespace OpenRigs.Trials
             problems.AddRange(QuietWait.WheelProblems(t.WheelQuietSeconds, t.WheelQuietCm));
             if (!hasWheel && t.WheelQuietSeconds > 0) problems.Add(string.Format("it waits {0} s for the wheel to be quiet, but the loop has no wheel", t.WheelQuietSeconds));
             if (!double.IsNaN(t.StimulusDurationSeconds) && (!(t.StimulusDurationSeconds > 0) || double.IsInfinity(t.StimulusDurationSeconds))) problems.Add(string.Format("its stimulus duration is {0} s, not a finite number above 0 (NaN for none)", t.StimulusDurationSeconds));
-            if (t.ResponseToStimulusOffSeconds.HasValue && double.IsNaN(t.StimulusDurationSeconds)) problems.Add("it has a responseToStimulusOffSeconds but no stimulus duration");
-            else if (t.ResponseToStimulusOffSeconds.HasValue && (!(t.ResponseToStimulusOffSeconds.Value >= 0) || double.IsInfinity(t.ResponseToStimulusOffSeconds.Value))) problems.Add(string.Format("its responseToStimulusOffSeconds is {0} s, not null or a finite number from 0", t.ResponseToStimulusOffSeconds.Value));
+            if (t.ResponseToStimulusOffSeconds.HasValue && (!(t.ResponseToStimulusOffSeconds.Value >= 0) || double.IsInfinity(t.ResponseToStimulusOffSeconds.Value))) problems.Add(string.Format("its responseToStimulusOffSeconds is {0} s, not null or a finite number from 0", t.ResponseToStimulusOffSeconds.Value));
             if (problems.Count > 0) throw new InvalidOperationException(string.Format("Trial {0} cannot be run: {1}.", next.TrialNumber, string.Join("; ", problems)));
         }
 
@@ -200,12 +200,22 @@ namespace OpenRigs.Trials
             phase = Phase.Running;
             start = wait.TrialStartTime;
             quietWait = start - wait.Earliest;
-            stimulusTime = start + Math.Max(timing.LaserToStimulusSeconds, 0);
-            triggerDue = start + Math.Max(-timing.LaserToStimulusSeconds, 0);
+            stimulusTime = start + TrialLoop.Lead(timing);
+            triggerDue = stimulusTime - timing.LaserToStimulusSeconds;
             responseStart = stimulusTime + timing.ResponseDelaySeconds;
             responseEnd = responseStart + timing.ResponseWindowSeconds;
             rules.Start(trial, Times(), wheel);
             events.Add(Event(TrialEventKind.Start, start, trial, null));
+            if (timing.Cues != null)
+            {
+                // A cue before the stimulus (negative seconds, within the lead): at the start's tick if due by then.
+                foreach (var cue in timing.Cues)
+                {
+                    if (cue.Anchor != CueAnchor.Stimulus || cue.Seconds >= 0) continue;
+                    if (now >= stimulusTime + cue.Seconds - TrialLoop.Tolerance) events.Add(Event(TrialEventKind.Cue, now, trial, cue.Name));
+                    else Schedule(stimulusTime + cue.Seconds, TrialEventKind.Cue, trial, cue.Name, cue.DroppedAtOutcome);
+                }
+            }
             Run(events);
         }
 
@@ -218,10 +228,10 @@ namespace OpenRigs.Trials
                 stimulated = true;
                 onset = now;
                 if (onTrial != null) throw new InvalidOperationException(string.Format("Trial {0}'s stimulus came at {1} s while trial {2}'s was still on until {3} s: the task's stimulus.durationSeconds must be at most its shortest itiMinSeconds (StimulusTiming.Problems).", trial.TrialNumber, now, onTrial.TrialNumber, offDue));
-                if (!double.IsNaN(timing.StimulusDurationSeconds))
+                if (!double.IsNaN(timing.StimulusDurationSeconds) || timing.ResponseToStimulusOffSeconds.HasValue)
                 {
                     onTrial = trial;
-                    offDue = onset + timing.StimulusDurationSeconds;
+                    offDue = double.IsNaN(timing.StimulusDurationSeconds) ? double.PositiveInfinity : onset + timing.StimulusDurationSeconds;
                     afterOutcome = false;
                     hookOpen = true;
                 }
@@ -230,7 +240,7 @@ namespace OpenRigs.Trials
                 {
                     foreach (var cue in timing.Cues)
                     {
-                        if (cue.Anchor == CueAnchor.Stimulus) Schedule(stimulusTime + cue.Seconds, TrialEventKind.Cue, trial, cue.Name, cue.DroppedAtOutcome);
+                        if (cue.Anchor == CueAnchor.Stimulus && cue.Seconds >= 0) Schedule(stimulusTime + cue.Seconds, TrialEventKind.Cue, trial, cue.Name, cue.DroppedAtOutcome);
                     }
                 }
                 rules.Stimulus(trial, Times(), updates);
@@ -369,7 +379,7 @@ namespace OpenRigs.Trials
                 ResponseStartTime = responseStart,
                 ResponseEndTime = responseEnd,
                 LaserTriggerTime = triggerTime,
-                StimulusOffTime = double.IsNaN(timing.StimulusDurationSeconds) ? double.NaN : StimulusTiming.Time(onset, timing.StimulusDurationSeconds, now, timing.ResponseToStimulusOffSeconds),
+                StimulusOffTime = StimulusTiming.Time(onset, timing.StimulusDurationSeconds, now, timing.ResponseToStimulusOffSeconds),
                 Now = now,
             };
         }
@@ -413,6 +423,18 @@ namespace OpenRigs.Trials
     /// <summary>Runs a <see cref="TrialLoop{TTrial, TUpdate, TOutcome}"/> on a workflow's streams.</summary>
     public static class TrialLoop
     {
+        /// <summary>A trial's lead, the trial start to the stimulus: the larger of its laserToStimulusSeconds, the most any of its
+        /// Stimulus cues comes before the stimulus (a negative Seconds, such as a negative spouts.stimulusToSpoutsInSeconds) and 0.</summary>
+        public static double Lead(TrialTiming timing)
+        {
+            var lead = Math.Max(timing.LaserToStimulusSeconds, 0);
+            if (timing.Cues != null)
+            {
+                foreach (var cue in timing.Cues) if (cue.Anchor == CueAnchor.Stimulus) lead = Math.Max(lead, -cue.Seconds);
+            }
+            return lead;
+        }
+
         /// <summary>How close to a due time, in seconds, a tick counts as reaching it: sums of seconds are not exact doubles.</summary>
         public const double Tolerance = 1e-6;
 

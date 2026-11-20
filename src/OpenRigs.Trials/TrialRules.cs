@@ -28,7 +28,7 @@ namespace OpenRigs.Trials
         /// <summary>The trigger line falls.</summary>
         TriggerOff,
         /// <summary>The trial's stimulus goes off (StimulusTiming): once per trial whose stimulus came on and whose timing has a
-        /// StimulusDurationSeconds, at the first tick at or after StimulusTiming.Time, or at the outcome itself when that is the time.</summary>
+        /// StimulusDurationSeconds or ResponseToStimulusOffSeconds, at the first tick at or after StimulusTiming.Time, or at the outcome itself when that is the time.</summary>
         StimulusOff
     }
 
@@ -114,7 +114,8 @@ namespace OpenRigs.Trials
     /// <summary>What a task's cue is timed from.</summary>
     public enum CueAnchor
     {
-        /// <summary>The stimulus as it was due (the trial start plus the lead); a trial whose stimulus never came has none of these.</summary>
+        /// <summary>The stimulus as it was due (the trial start plus the lead); a trial whose stimulus never came has none of these after
+        /// it. Negative seconds come before the stimulus, within the trial's lead, which grows to hold them (TrialLoop.Lead).</summary>
         Stimulus,
         /// <summary>The start of the interval after the trial's outcome (the outcome plus its timeout).</summary>
         NextIti
@@ -138,7 +139,7 @@ namespace OpenRigs.Trials
         public TrialCue(string name, CueAnchor anchor, double seconds, bool droppedAtOutcome)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("TrialCue: a cue needs a name.");
-            if (!(seconds >= 0) || double.IsInfinity(seconds)) throw new ArgumentException(string.Format("TrialCue: cue {0} is {1} s after its anchor; it must be a finite number from 0.", name, seconds));
+            if (double.IsNaN(seconds) || double.IsInfinity(seconds) || (seconds < 0 && anchor != CueAnchor.Stimulus)) throw new ArgumentException(string.Format("TrialCue: cue {0} is {1} s after its anchor; it must be a finite number, from 0 unless timed from the stimulus.", name, seconds));
             if (droppedAtOutcome && anchor != CueAnchor.Stimulus) throw new ArgumentException(string.Format("TrialCue: cue {0} is timed from the next interval, which starts after the outcome, so it cannot be dropped at the outcome.", name));
             Name = name;
             Anchor = anchor;
@@ -169,18 +170,18 @@ namespace OpenRigs.Trials
             StimulusDurationSeconds = double.NaN;
         }
 
-        /// <summary>Gets or sets the longest the stimulus lasts from its onset (stimulus.durationSeconds); NaN (the default): the
-        /// loop does not time the stimulus off, and no StimulusOff event comes.</summary>
+        /// <summary>Gets or sets the longest the stimulus lasts from its onset (stimulus.durationSeconds); NaN (the default): no
+        /// cap, the off then only ResponseToStimulusOffSeconds after the outcome; both unset, no off is timed and no StimulusOff comes.</summary>
         public double StimulusDurationSeconds { get; set; }
 
         /// <summary>Gets or sets the outcome to the stimulus off (stimulus.responseToStimulusOffSeconds): null, the response does not end
-        /// it; 0, off at the outcome; X, off X s after it, whichever of that and the duration comes first. Needs a StimulusDurationSeconds.</summary>
+        /// it; 0, off at the outcome; X, off X s after it, whichever of that and the duration comes first.</summary>
         public double? ResponseToStimulusOffSeconds { get; set; }
 
         /// <summary>Gets or sets the inter-trial interval drawn for the trial (itiSeconds): its start to the stimulus with a quiet mouse.</summary>
         public double ItiSeconds { get; set; }
 
-        /// <summary>Gets or sets the signed lead (laserToStimulusSeconds): the trigger this long before the stimulus, after it if negative. The trial starts max(lead, 0) before the stimulus in every experiment.</summary>
+        /// <summary>Gets or sets the signed lead (laserToStimulusSeconds): the trigger this long before the stimulus, after it if negative. The trial starts TrialLoop.Lead (max of this, the earliest Stimulus cue's lead and 0) before the stimulus in every experiment.</summary>
         public double LaserToStimulusSeconds { get; set; }
 
         /// <summary>Gets or sets how long every spout must be released before the trial starts; 0 for none (QuietWait).</summary>
@@ -236,7 +237,7 @@ namespace OpenRigs.Trials
         public double ResponseEndTime { get; set; }
 
         /// <summary>Gets or sets when the stimulus goes off were the outcome at Now (stimulusOffTime, StimulusTiming.Time): at the
-        /// outcome, the trial's off time. NaN with no onset or no StimulusDurationSeconds.</summary>
+        /// outcome, the trial's off time. NaN with no onset, or neither StimulusDurationSeconds nor ResponseToStimulusOffSeconds.</summary>
         public double StimulusOffTime { get; set; }
 
         /// <summary>Gets or sets the tick the trigger line rose (laserTriggerTime); NaN if it has not.</summary>

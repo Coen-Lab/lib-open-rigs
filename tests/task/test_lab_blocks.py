@@ -215,6 +215,10 @@ def test_spouts_keys_default_and_rules():
         spouts.check_fits(3, 0.4)
     with pytest.raises(ValidationError, match="finite number"):
         Spouts.model_validate({"stimulusToSpoutsInSeconds": float("inf")})
+    early = Spouts.model_validate({"stimulusToSpoutsInSeconds": -0.5, "rewardConsumptionSeconds": 1})
+    early.check_fits(1.5, 0)  # signed: no response window rule before the stimulus
+    with pytest.raises(ValueError, match=r"plus the 0.5 s the spouts come in before the stimulus is above iti_min_seconds \(1.4 s\)"):
+        early.check_fits(1.4, 0)
 
 
 def test_stimulus_timing_keys_default_and_rules():
@@ -230,6 +234,9 @@ def test_stimulus_timing_keys_default_and_rules():
     late.check_fits(2, min_timeout_seconds=0.5)
     with pytest.raises(ValueError, match=r"response_to_stimulus_off_seconds \(2.5 s\) is longer than the shortest timeout \(0.0 s\) plus iti_min_seconds \(2 s\)"):
         late.check_fits(2)
+    StimulusTiming.model_validate({"responseToStimulusOffSeconds": 0.5}).check_fits(1)  # no duration: no cap, its checks skipped
+    with pytest.raises(ValueError, match="both null: the stimulus would never end"):
+        StimulusTiming.model_validate({}).check_fits(1)
     for bad in ({"durationSeconds": 0}, {"durationSeconds": float("inf")}, {"durationSeconds": 1, "responseToStimulusOffSeconds": -1}):
         with pytest.raises(ValidationError):
             StimulusTiming.model_validate(bad)

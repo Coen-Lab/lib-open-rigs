@@ -210,9 +210,84 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(0, Spouts.Problems(0.5, 1.5, 1.5, 0.5).Count);
             CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds (2 s) is above itiMinSeconds (1.5 s): the spouts are drawn out rewardConsumptionSeconds into the interval, before the stimulus" }, Spouts.Problems(0.5, 2, 1.5, 0.5));
             CollectionAssert.AreEqual(new[] { "stimulusToResponseWindowSeconds (0.4 s) is below spouts.stimulusToSpoutsInSeconds (0.5 s): the response window would open before the spouts arrive" }, Spouts.Problems(0.5, 1.5, 3, 0.4));
-            CollectionAssert.AreEqual(new[] { "spouts.stimulusToSpoutsInSeconds must be a finite number, 0 or more", "spouts.rewardConsumptionSeconds must be a finite number, 0 or more" }, Spouts.Problems(double.NaN, double.PositiveInfinity, 3, 1).Take(2).ToArray());
-            Assert.AreEqual(0, Spouts.BetweenTrialsProblems(new[] { 1.0, 1.5 }, new[] { 1.5, 3.0 }).Count);
-            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds 2 s exceeds itiMinSeconds 1.5 s of a combination that may come next" }, Spouts.BetweenTrialsProblems(new[] { 1.0, 2.0 }, new[] { 1.5, 3.0 }));
+            CollectionAssert.AreEqual(new[] { "spouts.stimulusToSpoutsInSeconds must be a finite number", "spouts.rewardConsumptionSeconds must be a finite number, 0 or more" }, Spouts.Problems(double.NaN, double.PositiveInfinity, 3, 1).Take(2).ToArray());
+            Assert.AreEqual(0, Spouts.BetweenTrialsProblems(new[] { 0.5 }, new[] { 1.0, 1.5 }, new[] { 1.5, 3.0 }).Count);
+            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds 2 s exceeds itiMinSeconds 1.5 s of a combination that may come next" }, Spouts.BetweenTrialsProblems(new[] { 0.5 }, new[] { 1.0, 2.0 }, new[] { 1.5, 3.0 }));
+            // Signed: before the stimulus the spouts must still come in after the last trial's withdrawal; no response window rule.
+            Assert.AreEqual(0, Spouts.Problems(-0.5, 1, 1.5, 0).Count);
+            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds (1.5 s) plus the 0.5 s the spouts come in before the stimulus (spouts.stimulusToSpoutsInSeconds -0.5 s) is above itiMinSeconds (1.5 s): the spouts would come in before they are drawn out" }, Spouts.Problems(-0.5, 1.5, 1.5, 0));
+            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds 1.5 s plus the spouts' longest lead before the stimulus 0.5 s exceeds itiMinSeconds 1.5 s of a combination that may come next" }, Spouts.BetweenTrialsProblems(new[] { 0.5, -0.5 }, new[] { 1.0, 1.5 }, new[] { 1.5, 3.0 }));
+        }
+    }
+
+    [TestClass]
+    public class SpoutsLeadTests
+    {
+        // 2 s intervals from 100.001 s: the stimulus due at 102.001 s; the spouts in 0.3 s before it.
+        static LoopRig Rig(double laserLead, bool laser, double lickQuiet = 0)
+        {
+            var rules = new StubRules
+            {
+                Laser = laser ? LaserTiming.UntilOutcome(false, 0, double.PositiveInfinity) : null,
+                Plan = n => new TrialTiming { ItiSeconds = 2, LaserToStimulusSeconds = laserLead, Laser = laser, LickQuietSeconds = lickQuiet, ResponseWindowSeconds = 1.5, Cues = Spouts.Cues(-0.3, 1.5) },
+            };
+            return new LoopRig(rules);
+        }
+
+        static double At(LoopRig rig, TrialEventKind kind, string cue = null)
+        {
+            return rig.Events.Single(e => e.Kind == kind && e.Trial.TrialNumber == 1 && (cue == null || e.Cue == cue)).Seconds;
+        }
+
+        [TestMethod]
+        public void ANegativeSpoutsLeadStartsTheTrialThatMuchBeforeTheStimulus()
+        {
+            var rig = Rig(0, false);
+            rig.Until(102.2);
+            Assert.AreEqual(101.701, At(rig, TrialEventKind.Start), 1e-9);
+            var start = rig.Events.FindIndex(e => e.Kind == TrialEventKind.Start);
+            Assert.AreEqual(Spouts.InCue, rig.Events[start + 1].Cue, "the spouts in at the start's own tick");
+            Assert.AreEqual(101.701, At(rig, TrialEventKind.Cue, Spouts.InCue), 1e-9);
+            Assert.AreEqual(102.001, At(rig, TrialEventKind.Stimulus), 1e-9);
+            Assert.AreEqual(0.3, TrialLoop.Lead(new TrialTiming { Cues = Spouts.Cues(-0.3, 1.5) }), 1e-12);
+            Assert.AreEqual(0, TrialLoop.Lead(new TrialTiming { Cues = Spouts.Cues(0.3, 1.5) }), "a positive one leaves the lead alone");
+        }
+
+        [TestMethod]
+        public void ALargerLaserLeadKeepsTheTrialStartAndTheSpoutsComeInAtTheirOwnTime()
+        {
+            var rig = Rig(0.5, true);
+            rig.Until(102.2);
+            Assert.AreEqual(101.501, At(rig, TrialEventKind.Start), 1e-9);
+            Assert.AreEqual(101.501, At(rig, TrialEventKind.Trigger), 1e-9);
+            Assert.AreEqual(101.701, At(rig, TrialEventKind.Cue, Spouts.InCue), 1e-9);
+            Assert.AreEqual(102.001, At(rig, TrialEventKind.Stimulus), 1e-9);
+        }
+
+        [TestMethod]
+        public void ASmallerLaserLeadTriggersItsOwnLeadBeforeTheStimulus()
+        {
+            var rig = Rig(0.1, true);
+            rig.Until(102.2);
+            Assert.AreEqual(101.701, At(rig, TrialEventKind.Start), 1e-9);
+            Assert.AreEqual(101.701, At(rig, TrialEventKind.Cue, Spouts.InCue), 1e-9);
+            Assert.AreEqual(101.901, At(rig, TrialEventKind.Trigger), 1e-9);
+            Assert.AreEqual(102.001, At(rig, TrialEventKind.Stimulus), 1e-9);
+        }
+
+        [TestMethod]
+        public void TheQuietWaitsHoldTheStartAndTheSpoutsWithIt()
+        {
+            // A touch held to 101.5 s with a 1 s lick quiet wait: the start at 102.5 s, the spouts in then, the stimulus 0.3 s later.
+            var rig = Rig(0, false, 1);
+            rig.Until(101);
+            rig.Touch(0, true);
+            rig.Until(101.5);
+            rig.Touch(0, false);
+            rig.Until(103);
+            Assert.AreEqual(102.5, At(rig, TrialEventKind.Start), 1e-9);
+            Assert.AreEqual(102.5, At(rig, TrialEventKind.Cue, Spouts.InCue), 1e-9);
+            Assert.AreEqual(102.8, At(rig, TrialEventKind.Stimulus), 1e-9);
         }
     }
 }
