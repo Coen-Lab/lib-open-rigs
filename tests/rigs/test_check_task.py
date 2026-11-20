@@ -48,3 +48,15 @@ def test_no_model_says_why(monkeypatch, capsys):
     with pytest.raises(SystemExit):
         check_task.main()
     assert "open_rigs.task entry points" in json.loads(capsys.readouterr().out)["error"]
+
+
+def test_the_zapit_file_s_largest_ramp_down_is_the_context_where_the_file_is(tmp_path):
+    # ZapitTests.cs's CheckReturnsTheCountAndTheMaxRampDown file: 0.4 s.
+    path = tmp_path / "conditions.yml"
+    path.write_text("stimLocations01:\n  offRampDownDuration_ms: 250\nstimLocations02:\n  offRampDownDuration_ms: 400\n", encoding="utf-8")
+    on = {"optogenetics": {"enabled": True, "zapitConditionsPath": str(path)}}
+    assert check_task.context(on) == {"zapit_ramp_down_seconds": 0.4}
+    assert check_task.context({"optogenetics": {**on["optogenetics"], "enabled": False}}) == {}
+    assert check_task.context({"optogenetics": {"enabled": True, "zapitConditionsPath": str(tmp_path / "gone.yml")}}) == {}
+    path.write_text("stimLocations01:\n  laserPowerInMW: 2\n", encoding="utf-8")  # the workflow refuses it at Go
+    assert check_task.context(on) == {}

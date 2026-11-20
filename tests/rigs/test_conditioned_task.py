@@ -155,3 +155,25 @@ def test_a_condition_sets_a_penalised_miss_s_sound_level_by_its_three_level_path
     assert [row["values"][path] for row in rows] == ["mute", "mute", -40, -40]  # azimuthsDeg picks fastest
     with pytest.raises(ValidationError, match="levelDbfs"):
         Penalised.model_validate(task(set={path: "off"}))
+
+
+def test_the_validation_s_context_reaches_each_combination_and_between_trials():
+    # check_task's Zapit ramp-down (RAMP_DOWN_CONTEXT): a combination is a task validated with it, as is the hook.
+    from pydantic import ValidationInfo, model_validator
+
+    seen = []
+
+    class Timed(Params):
+        @model_validator(mode="after")
+        def _ramp(self, info: ValidationInfo):
+            if (info.context or {}).get("condition"):
+                seen.append(info.context.get("ramp"))
+            return self
+
+        @classmethod
+        def between_trials(cls, tasks, context=None):
+            seen.append(("between", context))
+
+    Timed.model_validate(task(set={"contrasts": [0.5, 1.0]}), context={"ramp": 0.4})
+    assert set(seen[:-1]) == {0.4} and seen[-1] == ("between", {"ramp": 0.4})
+    Params.model_validate(task(), context={})  # a hook with no context argument, validated with none

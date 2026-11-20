@@ -21,6 +21,8 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ValidationError
 
+from open_rigs.components.zapit import RAMP_DOWN_CONTEXT, max_ramp_down_seconds
+
 GROUP = "open_rigs.task"
 
 
@@ -32,10 +34,23 @@ def model() -> type[BaseModel]:
     return found[0].load()
 
 
+def context(parameters: dict) -> dict:
+    """The validation context from files the task names, where they are (the rig): with optogenetics on, its Zapit
+    conditions file's largest ramp-down (RAMP_DOWN_CONTEXT). None readable: {}, and the workflow checks the file at Go."""
+    opto = parameters.get("optogenetics") or {}
+    path = str(opto.get("zapitConditionsPath") or "")
+    if not opto.get("enabled") or not path or not Path(path).is_file():
+        return {}
+    try:
+        return {RAMP_DOWN_CONTEXT: max_ramp_down_seconds(path)}
+    except (OSError, ValueError, yaml.YAMLError):
+        return {}
+
+
 def problems(parameters_model: type[BaseModel], parameters: dict) -> list[str]:
     """What the model refuses in a task's taskParameters, each in its words, its field's path before it when it has one."""
     try:
-        parameters_model.model_validate(parameters)
+        parameters_model.model_validate(parameters, context=context(parameters))
     except ValidationError as error:
         said = []
         for e in error.errors():

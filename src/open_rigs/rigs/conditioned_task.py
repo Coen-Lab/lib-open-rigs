@@ -203,9 +203,10 @@ class ConditionedTask(TaskBlock):
         return _list_fields(cast(type, cls))
 
     @classmethod
-    def between_trials(cls, tasks: list[dict]) -> None:
+    def between_trials(cls, tasks: list[dict], context: dict | None = None) -> None:
         """The timing rules between a trial and the next, on every weighted combination's values (by alias, as JSON); raise
-        ValueError on a break. None by default."""
+        ValueError on a break. None by default. `context`, the validation's (a Zapit file's ramp-down, RAMP_DOWN_CONTEXT),
+        is passed only when there is one."""
 
     def derive_trial_type(self, condition: TrialCondition) -> str:
         """A condition's trialType from its settings (its set over the task's), by TRIAL_TYPES (x-trial-types)."""
@@ -252,14 +253,14 @@ class ConditionedTask(TaskBlock):
                 raise ValueError(f"{where}: each pairs group needs two paths or more, each path in one group")
             key = json.dumps([condition.set, condition.pairs], sort_keys=True)
             if key not in built:
-                built[key] = self._combinations(base, condition, where)
+                built[key] = self._combinations(base, condition, where, info.context or {})
             drawn += built[key] * (condition.weight > 0)
         if problems := conditions.required_problems(list(self.REQUIRED_CONDITIONS), base, drawn):
             raise ValueError("; ".join(f"{problem} (x-required-conditions)" for problem in problems))
-        self.between_trials(drawn)
+        self.between_trials(drawn, **({"context": info.context} if info.context else {}))  # a hook without one still works
         return self
 
-    def _combinations(self, base: dict, condition: TrialCondition, where: str) -> list[dict]:
+    def _combinations(self, base: dict, condition: TrialCondition, where: str, context: dict) -> list[dict]:
         """A condition's combinations as tasks' values (by alias, as JSON), each checked as a task."""
         try:
             found = cells(base, condition.set, condition.pairs, self.list_fields())
@@ -276,7 +277,7 @@ class ConditionedTask(TaskBlock):
                 put_path(data, path, value)
             data["trialConditions"] = [{"weight": 1}]
             try:
-                type(self).model_validate(data, context={"condition": True})  # type: ignore[attr-defined]
+                type(self).model_validate(data, context={**context, "condition": True})  # type: ignore[attr-defined]
             except ValidationError as e:
                 raise ValueError(f"{where} with {combo}: {e}") from None
             tasks.append(data)
