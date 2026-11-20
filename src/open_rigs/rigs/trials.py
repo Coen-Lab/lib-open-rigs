@@ -79,8 +79,8 @@ CORE_COLUMNS: List[Column] = [
     ("trialType", "string", None, None),
     ("outcome", "string", None, None),
     ("itiStartTime", "double", "s",
-     "Harp time the inter-trial interval before this trial began: the last trial's outcomeTime plus its "
-     "penaltyTimeoutSeconds, exactly; on trial 1 the first Harp clock tick once the trials started."),
+     "Harp time the inter-trial interval before this trial began: the last trial's trialEndTime (its "
+     "outcomeTime in a log without trialEndTime) plus its penaltyTimeoutSeconds, exactly; on trial 1 the first Harp clock tick once the trials started."),
     ("itiSeconds", "double", "s",
      "The inter-trial interval drawn for this trial (every trial draws its own), uniformly between "
      "trialStructure.itiMinSeconds and itiMaxSeconds: from itiStartTime to this trial's stimulus with a quiet mouse, "
