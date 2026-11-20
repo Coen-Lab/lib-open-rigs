@@ -23,7 +23,7 @@ namespace OpenRigs.Trials.Tests
         public Func<int, LickSpoutCommand> InCommand = n => LickSpoutCommand.SpoutsIn;
         public double RewardConsumptionSeconds = 1.5;
         public double Timeout;
-        public bool RunsOut;                                 // TrialTiming.ResponseWindowRunsOut
+        public bool AlwaysFull;                                 // TrialTiming.ResponseWindowAlwaysFull
         public string LickOutcome = TrialOutcomes.Correct;   // correct rewarded, incorrect penalised with Timeout, probe neither
         public int Licks;                                    // the licks the rules were given
         int drawn;
@@ -34,7 +34,7 @@ namespace OpenRigs.Trials.Tests
         {
             return new TrialTiming
             {
-                ItiSeconds = 2, ResponseDelaySeconds = 0.5, ResponseWindowSeconds = 1.5, ResponseWindowRunsOut = RunsOut,
+                ItiSeconds = 2, ResponseDelaySeconds = 0.5, ResponseWindowSeconds = 1.5, ResponseWindowAlwaysFull = AlwaysFull,
                 Cues = Spouts.Cues(0.5, trial.SpoutsAlwaysIn, RewardConsumptionSeconds),
             };
         }
@@ -254,11 +254,11 @@ namespace OpenRigs.Trials.Tests
         }
 
         [TestMethod]
-        public void WhenTheWindowRunsOutAChoiceWaitsForTheWindowsEndAndTheDrinkStaysInTheNextInterval()
+        public void WhenTheWindowIsAlwaysFullAChoiceWaitsForTheWindowsEndAndTheDrinkStaysInTheNextInterval()
         {
             // The choice at 102.7 s rewards and moves the spouts then; a lick at 103 s is not the rules'; the window closes at
             // 104.001 s and the next interval starts then, the spouts drawn out 1.5 s into it, at 105.501 s.
-            var rules = new SpoutRules { RunsOut = true };
+            var rules = new SpoutRules { AlwaysFull = true };
             Run(rules, 106.2, 102.7, 103.0);
             var outcome = events.Single(e => e.Kind == TrialEventKind.Outcome && e.Trial.TrialNumber == 1);
             Assert.AreEqual(102.7, outcome.Seconds, 1e-9, "the outcome at the choice, as without the option");
@@ -269,27 +269,27 @@ namespace OpenRigs.Trials.Tests
         }
 
         [TestMethod]
-        public void WhenTheWindowRunsOutAPenaltyTimeoutStartsAtItsEndAndANeitherTrialsIntervalThen()
+        public void WhenTheWindowIsAlwaysFullAPenaltyTimeoutStartsAtItsEndAndANeitherTrialsIntervalThen()
         {
-            Run(new SpoutRules { RunsOut = true, LickOutcome = TrialOutcomes.Incorrect, Timeout = 4 }, 110, 102.7);
+            Run(new SpoutRules { AlwaysFull = true, LickOutcome = TrialOutcomes.Incorrect, Timeout = 4 }, 110, 102.7);
             Assert.AreEqual(102.7, events.Single(e => e.Kind == TrialEventKind.Outcome && e.Trial.TrialNumber == 1).Seconds, 1e-9);
             Assert.AreEqual(104.001 + 4, NextIti(), 1e-9, "the timeout from the window's end");
             Assert.AreEqual(NextIti() + 1.5, OutCue(), 1.5e-3);
             Assert.AreEqual(LickSpoutCommand.SpoutsOut, Moves().Single(m => m.Item1.Kind == TrialEventKind.Outcome && m.Item1.Trial.TrialNumber == 1).Item2.Single(), "both out at the choice");
 
             loop = null; events.Clear(); now = 100;
-            Run(new SpoutRules { RunsOut = true, LickOutcome = TrialOutcomes.Probe, Timeout = 4 }, 106, 102.7);
+            Run(new SpoutRules { AlwaysFull = true, LickOutcome = TrialOutcomes.Probe, Timeout = 4 }, 106, 102.7);
             Assert.AreEqual(104.001, NextIti(), 1e-9, "neither rewarded nor penalised: the window's end");
             Assert.AreEqual(NextIti() + 1.5, OutCue(), 1.5e-3);
         }
 
         [TestMethod]
-        public void WhenTheWindowRunsOutAMissIsTimedAsWithoutIt()
+        public void WhenTheWindowIsAlwaysFullAMissIsTimedAsWithoutIt()
         {
             Run(new SpoutRules { Timeout = 4 }, 110);
             var plain = NextIti();
             loop = null; events.Clear(); now = 100;
-            Run(new SpoutRules { Timeout = 4, RunsOut = true }, 110);
+            Run(new SpoutRules { Timeout = 4, AlwaysFull = true }, 110);
             var outcome = events.Single(e => e.Kind == TrialEventKind.Outcome && e.Trial.TrialNumber == 1).Seconds;
             Assert.AreEqual(outcome + 4, NextIti(), 1e-9, "the outcome plus the timeout");
             Assert.AreEqual(plain, NextIti(), 1e-9);

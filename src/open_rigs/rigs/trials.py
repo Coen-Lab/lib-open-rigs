@@ -4,7 +4,7 @@ Every task's schemas/trial-columns.yml starts with the shared block, in order, w
 word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
 (QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, trialEnd (TRIAL_END_COLUMNS: trialEndTime, for a task whose
-response window runs out) after outcomeTime, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPowerMw,
+response window always runs in full) after outcomeTime, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPowerMw,
 laserTriggerTime) after penalised, then a conditioned task's conditions (CONDITIONS_COLUMNS), stimulus (STIMULUS_COLUMNS)
 and autoReward (AUTO_REWARD_COLUMNS) blocks, in that order. trialType and outcome are in the core by name, type and place,
 each described by its task. A task's own columns follow the block.
@@ -134,8 +134,8 @@ QUIET_WAIT_COLUMNS: List[Column] = [
 
 TRIAL_END_COLUMNS: List[Column] = [
     ("trialEndTime", "double", "s",
-     "Harp time the trial ended and its timeout began: its outcomeTime; in a task whose response window runs out after a "
-     "choice (responseWindowRunsOut; OpenRigs.Trials TrialTiming.ResponseWindowRunsOut), the response window's end, rewarded "
+     "Harp time the trial ended and its timeout began: its outcomeTime; in a task whose response window always runs in full after a "
+     "choice (responseWindowAlwaysFull; OpenRigs.Trials TrialTiming.ResponseWindowAlwaysFull), the response window's end, rewarded "
      "or not (outcomeTime on a miss). The next interval starts at it plus penaltyTimeoutSeconds (itiStartTime). Known at "
      "the outcome, so logged in the row although it may come later."),
 ]

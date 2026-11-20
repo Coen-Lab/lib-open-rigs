@@ -148,13 +148,13 @@ namespace OpenRigs.Trials.Tests
         }
 
         [TestMethod]
-        public void AWindowThatRunsOutNeedsALimit()
+        public void AnAlwaysFullWindowNeedsALimit()
         {
-            StringAssert.Contains(Refusal(() => new LoopRig(new StubRules { Plan = n => new TrialTiming { ItiSeconds = 2, ResponseWindowRunsOut = true } }).Tick()), "its response window runs out after a choice, but has no limit");
+            StringAssert.Contains(Refusal(() => new LoopRig(new StubRules { Plan = n => new TrialTiming { ItiSeconds = 2, ResponseWindowAlwaysFull = true } }).Tick()), "its response window always runs in full, but has no limit");
         }
 
         [TestMethod]
-        public void WhenTheWindowRunsOutTheChoiceStillEndsTheLaserTheStimulusAndTheResponsesCues()
+        public void WhenTheWindowIsAlwaysFullTheChoiceStillEndsTheLaserTheStimulusAndTheResponsesCues()
         {
             // The trial starts at 101.501 s with its trigger, the stimulus at 102.001 s and the window open to 103.501 s. The choice
             // at 102.3 s is the outcome: the line falls 0.25 s after it, the stimulus goes off at it, the cue it drops never
@@ -167,7 +167,7 @@ namespace OpenRigs.Trials.Tests
                 Plan = n =>
                 {
                     var timing = Timing(0.5, true);
-                    timing.ResponseWindowRunsOut = true;
+                    timing.ResponseWindowAlwaysFull = true;
                     timing.ResponseToStimulusOffSeconds = 0;
                     timing.Cues = new[] { new TrialCue("late", CueAnchor.Stimulus, 1.0, true) };
                     return timing;

@@ -574,8 +574,8 @@ def test_the_trial_end_block_follows_outcome_time():
     assert names[names.index("outcomeTime"):names.index("outcomeTime") + 3] == ["outcomeTime", "trialEndTime", "rewardOfferedUl"]
 
 
-def _runs_out(n):
-    """n trials whose response window runs out 3.5 s after the stimulus: each ends there, an incorrect one then waiting its
+def _always_full(n):
+    """n trials whose response window always runs in full 3.5 s after the stimulus: each ends there, an incorrect one then waiting its
     4 s timeout."""
     trials, start = [], 1000.0
     for i in range(1, n + 1):
@@ -587,7 +587,7 @@ def _runs_out(n):
 
 
 def test_with_the_trial_end_block_each_interval_starts_at_the_last_trial_s_end_plus_its_timeout(tmp_path):
-    trials = _runs_out(4)
+    trials = _always_full(4)
     rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     columns = COLUMNS + ["trialEndTime"]
     assert summarise(_experiment(tmp_path / "ok", trials, rewards, columns=columns)).problems == []

@@ -8,7 +8,7 @@
 
 | Phase | When | Event |
 |---|---|---|
-| Iti | the last outcome plus its timeout (penalised; a reward adds nothing), exactly; with `TrialTiming.ResponseWindowRunsOut`, the last window's end plus the timeout, rewarded or not (`TrialTimes.TrialEndTime`); trial 1 the first tick | `Iti` (the trial just drawn) |
+| Iti | the last outcome plus its timeout (penalised; a reward adds nothing), exactly; with `TrialTiming.ResponseWindowAlwaysFull`, the last window's end plus the timeout, rewarded or not (`TrialTimes.TrialEndTime`); trial 1 the first tick | `Iti` (the trial just drawn) |
 | Arm | a laser trial on a hardware-triggered rig: the interval's start, or once the last laser is done (`LaserTiming`) | `Arm`: send the trial's StartStimulus |
 | Start | the interval's end less the lead, `max(laserToStimulusSeconds, 0)`, or later until the quiet waits hold (`QuietWait`) | `Start` (exact time) |
 | Trigger | `laserToStimulusSeconds` before the stimulus, if no outcome yet; the workflow stops if Zapit has not armed the trial, naming the last laser when it held Zapit past the trigger or freed it less than the reply margin before it | `Trigger`: raise the trigger line (and, without hardware triggering, send the StartStimulus) |
