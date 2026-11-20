@@ -13,7 +13,7 @@ stepperDriver:
 lickSpoutDefaultPosition: { baseTransverse: 0, radialLeft: 0, radialRight: 0, elevationLeft: 0, elevationRight: 0 }
 ```
 
-The rig's spout positions are one list, `LickSpoutPositions.csv` beside `rig.yml`: a header, `mouse,baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight`, then one row per mouse. The operator saves the mouse's row with `SaveSpoutPositions`, through a temporary file that then takes the list's place, so the other rows are kept and the list is never half written; a mouse without a row gets `lickSpoutDefaultPosition`. The positions the stage starts from and each save are rows of the experiment's events (`SpoutPositionsLoaded`, `SpoutPositionsDefault`, `SpoutPositionsSaved`; `Detail` the mouse and each axis's steps), and the manifest records the starting five numbers (`spout_positions`).
+The rig's spout positions are one list, `LickSpoutPositions.csv` beside `rig.yml`: a header, `mouse,baseTransverse,radialLeft,radialRight,elevationLeft,elevationRight`, then one row per mouse. `SaveSpoutPositions` saves the mouse's row: app-rig-control sends it before every Go (20 Nov 2026), and the operator can send it at any time, such as after a move during the run. It writes a temporary file that then takes the list's place, so the other rows are kept and the list is never half written; a mouse without a row gets `lickSpoutDefaultPosition`. The positions the stage starts from and each save are rows of the experiment's events (`SpoutPositionsLoaded`, `SpoutPositionsDefault`, `SpoutPositionsSaved`; `Detail` the mouse and each axis's steps), and the manifest records the starting five numbers (`spout_positions`).
 
 ---
 
