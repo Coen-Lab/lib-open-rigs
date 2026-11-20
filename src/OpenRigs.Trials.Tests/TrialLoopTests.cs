@@ -148,6 +148,51 @@ namespace OpenRigs.Trials.Tests
         }
 
         [TestMethod]
+        public void AWindowThatRunsOutNeedsALimit()
+        {
+            StringAssert.Contains(Refusal(() => new LoopRig(new StubRules { Plan = n => new TrialTiming { ItiSeconds = 2, ResponseWindowRunsOut = true } }).Tick()), "its response window runs out after a choice, but has no limit");
+        }
+
+        [TestMethod]
+        public void WhenTheWindowRunsOutTheChoiceStillEndsTheLaserTheStimulusAndTheResponsesCues()
+        {
+            // The trial starts at 101.501 s with its trigger, the stimulus at 102.001 s and the window open to 103.501 s. The choice
+            // at 102.3 s is the outcome: the line falls 0.25 s after it, the stimulus goes off at it, the cue it drops never
+            // comes, and a lick after it is not the rules'; the next interval waits for the window's end.
+            var licks = 0;
+            var rules = new StubRules
+            {
+                Laser = LaserTiming.UntilOutcome(false, 0.25, double.PositiveInfinity),
+                OnLick = (t, s, x, u) => { licks++; return StubRules.Outcome("Lick" + s, 0, x); },
+                Plan = n =>
+                {
+                    var timing = Timing(0.5, true);
+                    timing.ResponseWindowRunsOut = true;
+                    timing.ResponseToStimulusOffSeconds = 0;
+                    timing.Cues = new[] { new TrialCue("late", CueAnchor.Stimulus, 1.0, true) };
+                    return timing;
+                },
+            };
+            var rig = new LoopRig(rules);
+            rig.Reply(rig.RunTo(TrialEventKind.Trigger).Trial);
+            rig.Until(102.3);
+            rig.Lick(0);
+            rig.Until(102.8);
+            rig.Lick(1);
+            rig.Until(104);
+            Assert.AreEqual(102.3, rig.Of(TrialEventKind.Outcome).Single().Seconds, 1e-9);
+            Assert.AreEqual(1, licks, "a lick after the choice changes nothing");
+            Assert.AreEqual(102.55, rig.Of(TrialEventKind.TriggerOff).Single().Seconds, 1e-9, "the hold from the choice");
+            Assert.AreEqual(102.3, rig.Of(TrialEventKind.StimulusOff).Single().Seconds, 1e-9, "off at the choice");
+            Assert.IsFalse(rig.Of(TrialEventKind.Cue).Any(), "dropped at the choice");
+            var next = rig.Of(TrialEventKind.Iti).Last();
+            Assert.AreEqual(2, next.Trial.TrialNumber);
+            Assert.AreEqual(103.501, next.Seconds, 1e-9, "the window's end, no timeout");
+            Assert.AreEqual(103.501, rules.Previous[1].Times.TrialEndTime, 1e-9, "the times given at the choice say when it ends");
+            Assert.AreEqual(102.3, rules.Previous[1].Times.Now, 1e-9);
+        }
+
+        [TestMethod]
         public void TheSignedLeadPutsTheTriggerBeforeAtOrAfterTheStimulusAndAddsNoTime()
         {
             var plain = new LoopRig(new StubRules { Plan = n => Timing(0.5) }).RunTo(TrialEventKind.Start);

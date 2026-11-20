@@ -48,6 +48,8 @@ namespace OpenRigs.Trials.Tests
 
         class HalfOptogenetics : CoreRow { public int laserCondition; }
 
+        class TrialEndRow : CoreRow { public double trialEndTime; }
+
         class NoTimeout { public int trialNumber; }
 
         class FloatTimes
@@ -110,6 +112,28 @@ namespace OpenRigs.Trials.Tests
 
             var core = SharedTrialColumns.Fill(new CoreRow(), Laser(), Times(1), 3, false, true, 6, 0.75);
             Assert.AreEqual(7, core.trialNumber, "a row without the opt-in blocks");
+        }
+
+        [TestMethod]
+        public void TheTrialEndIsTheOutcomeOrWhenTheWindowRunsOutItsEnd()
+        {
+            Assert.AreEqual(13.5, SharedTrialColumns.Fill(new TrialEndRow(), Laser(), Times(1), 3, true, false, 6, 0.75).trialEndTime, "the outcome");
+            var times = Times(1);
+            times.ResponseEndTime = 14.25;
+            times.ResponseWindowRunsOut = true;
+            Assert.AreEqual(14.25, SharedTrialColumns.Fill(new TrialEndRow(), Laser(), times, 3, true, false, 6, 0.75).trialEndTime, "rewarded: the window's end, the drink in the next interval");
+            Assert.AreEqual(14.25, SharedTrialColumns.Fill(new TrialEndRow(), Laser(), times, 3, false, true, 6, 0.75).trialEndTime, "penalised: the window's end");
+            times.Now = 14.251;
+            Assert.AreEqual(14.251, times.TrialEndTime, "a miss: its outcome, the tick at the window's end");
+            try
+            {
+                SharedTrialColumns.Fill(new CoreRow(), Laser(), times, 3, false, false, 0, 0);
+                Assert.Fail("no refusal");
+            }
+            catch (InvalidOperationException e)
+            {
+                StringAssert.Contains(e.Message, "The trial row CoreRow has no trialEndTime, but trial 7's response window runs out");
+            }
         }
 
         [TestMethod]

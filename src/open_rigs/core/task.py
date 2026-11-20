@@ -88,6 +88,25 @@ class ResponseWindow(TaskBlock):
     )
 
 
+class ResponseWindowRunsOut(TaskBlock):
+    """Whether a choice ends the response window (OpenRigs.Trials TrialTiming.ResponseWindowRunsOut), a block a task
+    adds beside ResponseWindow; in a task that has it the window runs out by default (true): with it, the outcome still comes at the choice with everything it sets off (the reward, the
+    spouts, the penalty sound and flash), but the trial runs to the window's end, rewarded or not; the next interval
+    starts there, after a penalised trial's timeout, and the drink stays in it (spouts.rewardConsumptionSeconds). Its
+    trial log has the trialEnd block (open_rigs.rigs.trials TRIAL_END_COLUMNS)."""
+
+    response_window_runs_out: bool = Field(
+        default=True,
+        description="The response window runs out (the default): a choice gives the outcome (reward, spouts, penalty sound and flash) at once, but the trial lasts to the end of the response window, rewarded or not; the next interval starts then, after a penalised trial's timeout, the drink inside it as without this. False: the choice ends the trial. True needs responseWindowSeconds",
+    )
+
+    @model_validator(mode="after")
+    def _runs_out_of_a_window(self):
+        if self.response_window_runs_out and getattr(self, "response_window_seconds", 0) is None:
+            raise ValueError("response_window_runs_out needs a response_window_seconds: a window with no limit never runs out")
+        return self
+
+
 SPOUTS_REWARD_CONSUMPTION_SECONDS = 1.5  # OpenRigs.Trials Spouts.DefaultRewardConsumptionSeconds
 
 

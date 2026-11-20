@@ -17,7 +17,7 @@ namespace OpenRigs.Trials
     /// until the quiet waits hold (QuietWait), the trigger laserToStimulusSeconds before the stimulus (the workflow stops
     /// if Zapit has not armed the trial by then, naming the last laser when it held Zapit too long, and a trial answered
     /// first gets no laser), the stimulus the lead after the start, the response window, the outcome and its timeout
-    /// (cues still to come that are DroppedAtOutcome never come), and with a timed stimulus (TrialTiming.StimulusDurationSeconds)
+    /// (from the window's end when the window runs out, TrialTiming.ResponseWindowRunsOut; cues still to come that are DroppedAtOutcome never come), and with a timed stimulus (TrialTiming.StimulusDurationSeconds)
     /// its StimulusOff, once, at StimulusTiming.Time (rules that are an IStimulusAfterOutcome update it after the outcome until then). What is the task's own (the draw, the stimulus, the
     /// response rule, the outcome) is its <see cref="ITrialRules{TTrial, TUpdate, TOutcome}"/>. Every time is on the Harp
     /// clock: inputs between ticks are timed at the latest tick. Not thread-safe: <see cref="TrialLoop.Observe"/> runs it
@@ -192,6 +192,7 @@ namespace OpenRigs.Trials
             if (!hasWheel && t.WheelQuietSeconds > 0) problems.Add(string.Format("it waits {0} s for the wheel to be quiet, but the loop has no wheel", t.WheelQuietSeconds));
             if (!double.IsNaN(t.StimulusDurationSeconds) && (!(t.StimulusDurationSeconds > 0) || double.IsInfinity(t.StimulusDurationSeconds))) problems.Add(string.Format("its stimulus duration is {0} s, not a finite number above 0 (NaN for none)", t.StimulusDurationSeconds));
             if (t.ResponseToStimulusOffSeconds.HasValue && (!(t.ResponseToStimulusOffSeconds.Value >= 0) || double.IsInfinity(t.ResponseToStimulusOffSeconds.Value))) problems.Add(string.Format("its responseToStimulusOffSeconds is {0} s, not null or a finite number from 0", t.ResponseToStimulusOffSeconds.Value));
+            if (t.ResponseWindowRunsOut && double.IsInfinity(t.ResponseWindowSeconds)) problems.Add("its response window runs out after a choice, but has no limit");
             if (problems.Count > 0) throw new InvalidOperationException(string.Format("Trial {0} cannot be run: {1}.", next.TrialNumber, string.Join("; ", problems)));
         }
 
@@ -318,7 +319,7 @@ namespace OpenRigs.Trials
                     laserFreeAt = Math.Max(laserFreeAt, triggerDue);   // never triggered: Zapit is free once its trigger would have come
                 }
             }
-            nextItiStart = now + timeout;
+            nextItiStart = timing.ResponseWindowRunsOut ? Times().TrialEndTime + timeout : now + timeout;
             timers.RemoveAll(t => t.Kind == TrialEventKind.Cue && t.Trial == trial && t.DroppedAtOutcome);
             events.Add(new TrialEvent<TTrial, TUpdate, TOutcome>(TrialEventKind.Outcome, now, trial, null, default(TUpdate), outcome));
             if (onTrial == trial)
@@ -335,7 +336,7 @@ namespace OpenRigs.Trials
                     if (cue.Anchor == CueAnchor.NextIti) Schedule(nextItiStart + cue.Seconds, TrialEventKind.Cue, trial, cue.Name);
                 }
             }
-            if (timeout <= 0) NextTrial(events);
+            if (timing.ResponseWindowRunsOut ? now >= nextItiStart - TrialLoop.Tolerance : timeout <= 0) NextTrial(events);
         }
 
         void Off(List<TrialEvent<TTrial, TUpdate, TOutcome>> events)
@@ -381,6 +382,7 @@ namespace OpenRigs.Trials
                 LaserTriggerTime = triggerTime,
                 StimulusOffTime = StimulusTiming.Time(onset, timing.StimulusDurationSeconds, now, timing.ResponseToStimulusOffSeconds),
                 Now = now,
+                ResponseWindowRunsOut = timing.ResponseWindowRunsOut,
             };
         }
 

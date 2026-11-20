@@ -212,7 +212,7 @@ def test_a_task_without_a_block_is_held_to_the_core_alone():
 
 
 def test_an_unknown_block_is_refused():
-    with pytest.raises(ValueError, match="no shared block laser; the blocks are quietWait, optogenetics, conditions, stimulus, autoReward"):
+    with pytest.raises(ValueError, match="no shared block laser; the blocks are quietWait, trialEnd, optogenetics, conditions, stimulus, autoReward"):
         shared_columns(("laser",))
 
 
@@ -489,13 +489,14 @@ def test_the_c_sharp_helper_fills_the_shared_block_these_name():
     from pathlib import Path
 
     source = (Path(__file__).parents[2] / "src" / "OpenRigs.Trials" / "SharedTrialColumns.cs").read_text(encoding="utf-8")
-    blocks = {block: re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source) for block in ("Core", "QuietWait", "Optogenetics")}
+    blocks = {block: re.search(rf"string\[\] {block} = \{{([^}}]*)\}}", source) for block in ("Core", "QuietWait", "TrialEnd", "Optogenetics")}
     assert all(blocks.values()), blocks
     named = {block: re.findall(r'"(\w+)"', found.group(1)) for block, found in blocks.items() if found}
     task_s_own = {"harpTime", "trialType", "outcome"}
     assert named["Core"] == [c[0] for c in CORE_COLUMNS if c[0] not in task_s_own]
     assert named["QuietWait"] == [c[0] for c in trials_module.QUIET_WAIT_COLUMNS]
     assert named["Optogenetics"] == [c[0] for c in trials_module.OPTOGENETICS_COLUMNS]
+    assert named["TrialEnd"] == [c[0] for c in trials_module.TRIAL_END_COLUMNS]
 
 
 def test_summarise_reads_the_trial_log_as_open_rigs_trial_log_does(tmp_path):
@@ -566,3 +567,36 @@ def test_an_always_in_trial_has_no_spouts_lead(tmp_path):
     combinations = {"rows": [{"trialCombinationId": 0, "values": {}}, {"trialCombinationId": 1, "values": {"spouts.alwaysIn": True}}]}
     (folder / "Settings" / "Settings_Combinations_2026-11-14T01-00-00.json").write_text(json.dumps(combinations))
     assert summarise(folder).problems == []
+
+
+def test_the_trial_end_block_follows_outcome_time():
+    names = [name for name, _, _, _ in shared_columns(("trialEnd", "quietWait"))]
+    assert names[names.index("outcomeTime"):names.index("outcomeTime") + 3] == ["outcomeTime", "trialEndTime", "rewardOfferedUl"]
+
+
+def _runs_out(n):
+    """n trials whose response window runs out 3.5 s after the stimulus: each ends there, an incorrect one then waiting its
+    4 s timeout."""
+    trials, start = [], 1000.0
+    for i in range(1, n + 1):
+        t = _trial(i, start, 2.5, 1.0, outcome="correct" if i % 2 else "incorrect", timeout=0.0 if i % 2 else 4.0)
+        t["trialEndTime"] = t["stimulusOnsetTime"] + 3.5
+        trials.append(t)
+        start = t["trialEndTime"] + t["penaltyTimeoutSeconds"]
+    return trials
+
+
+def test_with_the_trial_end_block_each_interval_starts_at_the_last_trial_s_end_plus_its_timeout(tmp_path):
+    trials = _runs_out(4)
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
+    columns = COLUMNS + ["trialEndTime"]
+    assert summarise(_experiment(tmp_path / "ok", trials, rewards, columns=columns)).problems == []
+    # the same rows read without the column: each interval is late on its outcome
+    text = "\n".join(summarise(_experiment(tmp_path / "plain", trials, rewards)).problems)
+    assert "trial 2: interval started +2.5000 s from the last outcome plus its timeout" in text
+    wrong = [dict(t) for t in trials]
+    wrong[1]["trialEndTime"] -= 0.5
+    wrong[2]["trialEndTime"] = wrong[2]["outcomeTime"] - 0.5
+    problems = summarise(_experiment(tmp_path / "wrong", wrong, rewards, columns=columns)).problems
+    assert "trial 3: interval started +0.5000 s from the last trial's end (trialEndTime) plus its timeout" in problems
+    assert "trial 3: trialEndTime -0.5000 s from its outcome, before it" in problems

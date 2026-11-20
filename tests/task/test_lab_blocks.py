@@ -293,3 +293,17 @@ def test_max_reward_ul_is_the_csharp_default():
     match = re.search(r"public const double DefaultMaxRewardUl = ([0-9.]+);", source)
     assert match, "RewardLine.cs has no DefaultMaxRewardUl"
     assert float(match.group(1)) == MAX_REWARD_UL
+
+
+class RunsOutRow(Iti, ResponseWindow, task.ResponseWindowRunsOut):
+    label: str
+
+
+def test_a_window_that_runs_out_is_on_by_default_in_a_task_with_the_block_and_needs_a_limit():
+    row = {"label": "a", "itiMinSeconds": 2, "itiMaxSeconds": 3}
+    assert RunsOutRow.model_validate({**row, "responseWindowSeconds": 1.5}).response_window_runs_out is True
+    assert RunsOutRow.model_validate({**row, "responseWindowRunsOut": False}).response_window_runs_out is False
+    with pytest.raises(ValidationError, match="response_window_runs_out needs a response_window_seconds"):
+        RunsOutRow.model_validate(row)
+    with pytest.raises(ValidationError, match="response_window_runs_out needs a response_window_seconds"):
+        RunsOutRow.model_validate({**row, "responseWindowRunsOut": True})
