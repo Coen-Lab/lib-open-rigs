@@ -117,7 +117,7 @@ namespace OpenRigs.Trials
         /// <summary>The stimulus as it was due (the trial start plus the lead); a trial whose stimulus never came has none of these after
         /// it. Negative seconds come before the stimulus, within the trial's lead, which grows to hold them (TrialLoop.Lead).</summary>
         Stimulus,
-        /// <summary>The start of the interval after the trial's outcome (the outcome plus its timeout and reward consumption, ITrialOutcome).</summary>
+        /// <summary>The start of the interval after the trial's outcome (the outcome plus its timeout).</summary>
         NextIti
     }
 
@@ -260,15 +260,11 @@ namespace OpenRigs.Trials
         int TrialNumber { get; }
     }
 
-    /// <summary>A trial's outcome as a task's rules give it: the loop needs only what comes before the next interval, which
-    /// starts at the outcome plus PenaltyTimeoutSeconds plus RewardConsumptionSeconds (one of them 0 on any trial the lab runs).</summary>
+    /// <summary>A trial's outcome as a task's rules give it: the loop needs only its timeout.</summary>
     public interface ITrialOutcome
     {
-        /// <summary>Gets the timeout after the trial, in seconds (penaltyTimeoutSeconds): 0 unless penalised.</summary>
+        /// <summary>Gets the timeout after the trial, in seconds (penaltyTimeoutSeconds, 0 unless penalised): the next interval starts at the outcome plus this.</summary>
         double PenaltyTimeoutSeconds { get; }
-
-        /// <summary>Gets the time to drink the reward after the trial, in seconds (rewardConsumptionSeconds): 0 unless rewarded.</summary>
-        double RewardConsumptionSeconds { get; }
     }
 
     /// <summary>

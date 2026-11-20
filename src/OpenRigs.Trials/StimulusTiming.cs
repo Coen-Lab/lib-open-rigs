@@ -32,7 +32,7 @@ namespace OpenRigs.Trials
         /// window's opening, 0 when unknown) plus minOutcomeToItiSeconds plus itiMinSeconds after this one: the interval runs from
         /// its start to the next stimulus itself, so the next trial's lead (laser or spouts) moves its start, never its stimulus.
         /// minOutcomeToItiSeconds is the shortest outcome to next interval over the outcomes a trial can have (ITrialOutcome): a
-        /// penalised one's timeout, a rewarded one's reward.consumptionSeconds, 0 for one neither (a probe). So durationSeconds
+        /// penalised one's timeout, 0 for one rewarded or neither (a probe); so 0 wherever a reward can come. So durationSeconds
         /// is at most stimulusToEarliestOutcomeSeconds + minOutcomeToItiSeconds + itiMinSeconds, and responseToStimulusOffSeconds
         /// at most minOutcomeToItiSeconds + itiMinSeconds.</summary>
         public static List<string> Problems(double? durationSeconds, double? responseToStimulusOffSeconds, double itiMinSeconds, double stimulusToResponseEndSeconds, double stimulusToEarliestOutcomeSeconds, double minOutcomeToItiSeconds)
@@ -69,7 +69,7 @@ namespace OpenRigs.Trials
         {
             if (pastOutcome.HasValue && pastOutcome.Value > minOutcomeToItiSeconds + itiMinSeconds + 1e-9)
             {
-                yield return string.Format("stimulus.durationSeconds ({0} s) runs {1} s past the soonest outcome, longer than the shortest outcome to next interval ({2} s: timeout or reward consumption) plus itiMinSeconds ({3} s){4}: the stimulus could still be on at the next trial's", durationSeconds.Value, pastOutcome.Value, minOutcomeToItiSeconds, itiMinSeconds, where);
+                yield return string.Format("stimulus.durationSeconds ({0} s) runs {1} s past the soonest outcome, longer than the shortest outcome to next interval ({2} s: the shortest penalty timeout, 0 after a reward) plus itiMinSeconds ({3} s){4}: the stimulus could still be on at the next trial's", durationSeconds.Value, pastOutcome.Value, minOutcomeToItiSeconds, itiMinSeconds, where);
             }
         }
 
@@ -77,7 +77,7 @@ namespace OpenRigs.Trials
         {
             if (after.HasValue && after.Value > minOutcomeToItiSeconds + itiMinSeconds + 1e-9)
             {
-                yield return string.Format("stimulus.responseToStimulusOffSeconds ({0} s) is longer than the shortest outcome to next interval ({1} s: timeout or reward consumption) plus itiMinSeconds ({2} s){3}: the stimulus could still be on at the next trial's", after.Value, minOutcomeToItiSeconds, itiMinSeconds, where);
+                yield return string.Format("stimulus.responseToStimulusOffSeconds ({0} s) is longer than the shortest outcome to next interval ({1} s: the shortest penalty timeout, 0 after a reward) plus itiMinSeconds ({2} s){3}: the stimulus could still be on at the next trial's", after.Value, minOutcomeToItiSeconds, itiMinSeconds, where);
             }
         }
     }

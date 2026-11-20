@@ -56,16 +56,16 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(0, StimulusTiming.Problems(1, 1, 1, 1.5, 0, 0).Count, "off by the next stimulus even with no timeout");
             CollectionAssert.AreEqual(new[] { "stimulus.durationSeconds must be null or a finite number above 0", "stimulus.responseToStimulusOffSeconds must be null or a finite number, 0 or more" }, StimulusTiming.Problems(0, -1, 3, 3, 0, 0));
             CollectionAssert.AreEqual(new[] { "stimulus.durationSeconds must be null or a finite number above 0", "stimulus.responseToStimulusOffSeconds must be null or a finite number, 0 or more" }, StimulusTiming.Problems(double.NaN, double.PositiveInfinity, 3, 3, 0, 0).Take(2).ToArray());
-            CollectionAssert.AreEqual(new[] { "stimulus.durationSeconds (2 s) runs 2 s past the soonest outcome, longer than the shortest outcome to next interval (0 s: timeout or reward consumption) plus itiMinSeconds (1.5 s): the stimulus could still be on at the next trial's" }, StimulusTiming.Problems(2, 0, 1.5, 3, 0, 0));
+            CollectionAssert.AreEqual(new[] { "stimulus.durationSeconds (2 s) runs 2 s past the soonest outcome, longer than the shortest outcome to next interval (0 s: the shortest penalty timeout, 0 after a reward) plus itiMinSeconds (1.5 s): the stimulus could still be on at the next trial's" }, StimulusTiming.Problems(2, 0, 1.5, 3, 0, 0));
             Assert.AreEqual(0, StimulusTiming.Problems(null, 0, 1, double.PositiveInfinity, 0, 0).Count, "no duration: its checks skipped");
             Assert.AreEqual(1, StimulusTiming.Problems(null, 2.5, 2, double.PositiveInfinity, 0, 0).Count, "the response's checks still apply");
             CollectionAssert.AreEqual(new[] { "stimulus.durationSeconds and stimulus.responseToStimulusOffSeconds are both null: the stimulus would never end" }, StimulusTiming.Problems(null, null, 2, double.PositiveInfinity, 0, 0));
             CollectionAssert.AreEqual(new[] { "stimulus.durationSeconds (2 s) is longer than the stimulus to the response window's close (1.5 s)" }, StimulusTiming.Problems(2, null, 3, 1.5, 0, 0));
-            CollectionAssert.AreEqual(new[] { "stimulus.responseToStimulusOffSeconds (2.5 s) is longer than the shortest outcome to next interval (0 s: timeout or reward consumption) plus itiMinSeconds (2 s): the stimulus could still be on at the next trial's" }, StimulusTiming.Problems(1, 2.5, 2, 3, 0, 0));
-            Assert.AreEqual(0, StimulusTiming.Problems(1, 2.5, 2, 3, 0, 1).Count, "a timeout or consumption on every outcome leaves room");
+            CollectionAssert.AreEqual(new[] { "stimulus.responseToStimulusOffSeconds (2.5 s) is longer than the shortest outcome to next interval (0 s: the shortest penalty timeout, 0 after a reward) plus itiMinSeconds (2 s): the stimulus could still be on at the next trial's" }, StimulusTiming.Problems(1, 2.5, 2, 3, 0, 0));
+            Assert.AreEqual(0, StimulusTiming.Problems(1, 2.5, 2, 3, 0, 1).Count, "a timeout on every outcome (no reward) leaves room");
             Assert.AreEqual(0, StimulusTiming.BetweenTrialsProblems(new double?[] { 1.0, 1.5, null }, new[] { 0.0, 0, 0 }, new double?[] { null, 1.5 }, new[] { 1.5, 3.0 }, 0).Count);
-            CollectionAssert.AreEqual(new[] { "stimulus.durationSeconds (2 s) runs 2 s past the soonest outcome, longer than the shortest outcome to next interval (0 s: timeout or reward consumption) plus itiMinSeconds (1.5 s) of a combination that may come next: the stimulus could still be on at the next trial's" }, StimulusTiming.BetweenTrialsProblems(new double?[] { 1.0, 2.0 }, new[] { 0.0, 0 }, new double?[] { null }, new[] { 1.5, 3.0 }, 0));
-            CollectionAssert.AreEqual(new[] { "stimulus.responseToStimulusOffSeconds (2 s) is longer than the shortest outcome to next interval (0 s: timeout or reward consumption) plus itiMinSeconds (1.5 s) of a combination that may come next: the stimulus could still be on at the next trial's" }, StimulusTiming.BetweenTrialsProblems(new double?[] { 1.0 }, new[] { 0.0 }, new double?[] { 0, 2 }, new[] { 1.5, 3.0 }, 0));
+            CollectionAssert.AreEqual(new[] { "stimulus.durationSeconds (2 s) runs 2 s past the soonest outcome, longer than the shortest outcome to next interval (0 s: the shortest penalty timeout, 0 after a reward) plus itiMinSeconds (1.5 s) of a combination that may come next: the stimulus could still be on at the next trial's" }, StimulusTiming.BetweenTrialsProblems(new double?[] { 1.0, 2.0 }, new[] { 0.0, 0 }, new double?[] { null }, new[] { 1.5, 3.0 }, 0));
+            CollectionAssert.AreEqual(new[] { "stimulus.responseToStimulusOffSeconds (2 s) is longer than the shortest outcome to next interval (0 s: the shortest penalty timeout, 0 after a reward) plus itiMinSeconds (1.5 s) of a combination that may come next: the stimulus could still be on at the next trial's" }, StimulusTiming.BetweenTrialsProblems(new double?[] { 1.0 }, new[] { 0.0 }, new double?[] { 0, 2 }, new[] { 1.5, 3.0 }, 0));
         }
 
         [TestMethod]
@@ -75,7 +75,7 @@ namespace OpenRigs.Trials.Tests
             // the next stimulus at the soonest 0.5 + 0 + 1 = 1.5 s after this one. The next trial's lead moves its start, not its stimulus.
             Assert.AreEqual(0, StimulusTiming.Problems(1.5, null, 1, 3, 0.5, 0).Count);
             Assert.AreEqual(1, StimulusTiming.Problems(1.6, null, 1, 3, 0.5, 0).Count);
-            Assert.AreEqual(0, StimulusTiming.Problems(2.5, null, 1, 3, 0.5, 1).Count, "a 1 s consumption or timeout on every outcome");
+            Assert.AreEqual(0, StimulusTiming.Problems(2.5, null, 1, 3, 0.5, 1).Count, "a 1 s timeout on every outcome");
             Assert.AreEqual(0, StimulusTiming.BetweenTrialsProblems(new double?[] { 1.5, 2.0 }, new[] { 0.5, 1.0 }, new double?[] { null }, new[] { 1.0, 2.0 }, 0).Count, "each duration against its own soonest outcome");
             Assert.AreEqual(1, StimulusTiming.BetweenTrialsProblems(new double?[] { 1.5, 2.0 }, new[] { 0.5, 0.5 }, new double?[] { null }, new[] { 1.0, 2.0 }, 0).Count);
         }

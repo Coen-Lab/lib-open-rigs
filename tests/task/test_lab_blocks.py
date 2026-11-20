@@ -69,7 +69,7 @@ ROW = {"label": "a", "itiMinSeconds": 2, "itiMaxSeconds": 3, "autoRewardProbabil
 
 
 def test_trial_blocks_keep_their_keys_where_the_task_puts_them():
-    assert Row.model_validate(ROW).model_dump(by_alias=True) == {**ROW, "responseWindowSeconds": None, "reward": {"sizeUl": 3, "largeMultiplier": 2.0, "largeProbability": 0.0, "consumptionSeconds": 1.5, "tone": {"levelDbfs": "mute"}}}
+    assert Row.model_validate(ROW).model_dump(by_alias=True) == {**ROW, "responseWindowSeconds": None, "reward": {"sizeUl": 3, "largeMultiplier": 2.0, "largeProbability": 0.0, "tone": {"levelDbfs": "mute"}}}
 
 
 def test_trial_blocks_have_no_lab_default_but_the_window():
@@ -169,12 +169,13 @@ def test_a_penalty_flash_is_off_by_default_and_held_to_its_rules():
     assert task.PENALTY_FLASH_MAX_RATE_HZ == 30 and task.PENALTY_FLASH_RATE_HZ == 10  # OpenRigs.Trials PenaltyFlash.MaxRateHz, DefaultRateHz
 
 
-def test_reward_holds_its_consumption_and_tone():
+def test_reward_holds_its_tone_and_no_consumption():
     reward = Reward.model_validate({"sizeUl": 3})
     assert reward.model_dump(by_alias=True) == {
-        "sizeUl": 3.0, "largeMultiplier": 2.0, "largeProbability": 0.0, "consumptionSeconds": 1.5, "tone": {"levelDbfs": "mute"}}
+        "sizeUl": 3.0, "largeMultiplier": 2.0, "largeProbability": 0.0, "tone": {"levelDbfs": "mute"}}
     assert Reward.model_validate({"sizeUl": 3, "tone": {"levelDbfs": -20}}).tone.level_dbfs == -20
-    for refused in ({"consumptionSeconds": -1}, {"consumptionSeconds": float("inf")}, {"tone": {"levelDbfs": "off"}}):
+    assert "consumption_seconds" not in Reward.model_fields  # spouts.rewardConsumptionSeconds
+    for refused in ({"tone": {"levelDbfs": "off"}},):
         with pytest.raises(ValidationError):
             Reward.model_validate({"sizeUl": 3, **refused})
 
@@ -231,18 +232,21 @@ def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
 
 def test_spouts_keys_default_and_rules():
     spouts = Spouts.model_validate({"stimulusToSpoutsInSeconds": 0.5})
-    assert spouts.model_dump(by_alias=True) == {"alwaysIn": False, "stimulusToSpoutsInSeconds": 0.5}
-    spouts.check_fits(0.1, 0.5)  # no reward consumption rule: it comes before the interval
+    assert spouts.model_dump(by_alias=True) == {"alwaysIn": False, "stimulusToSpoutsInSeconds": 0.5, "rewardConsumptionSeconds": 1.5}
+    spouts.check_fits(1.5, 0.5)
+    with pytest.raises(ValueError, match=r"reward_consumption_seconds \(1.5 s\) is above iti_min_seconds \(1.4 s\)"):
+        spouts.check_fits(1.4, 0.5)
     with pytest.raises(ValueError, match="response window would open before the spouts arrive"):
         spouts.check_fits(3, 0.4)
-    with pytest.raises(ValidationError, match="finite number"):
-        Spouts.model_validate({"stimulusToSpoutsInSeconds": float("inf")})
-    assert set(Spouts.model_fields) == {"always_in", "stimulus_to_spouts_in_seconds"}  # rewardConsumptionSeconds is reward.consumptionSeconds
-    early = Spouts.model_validate({"stimulusToSpoutsInSeconds": -1.5})
-    early.check_fits(1.5, 0)  # signed: no response window rule before the stimulus
-    with pytest.raises(ValueError, match=r"the spouts come in 1.5 s before the stimulus .* more than iti_min_seconds \(1.4 s\)"):
-        early.check_fits(1.4, 0)
-    Spouts.model_validate({"stimulusToSpoutsInSeconds": -1.5, "alwaysIn": True}).check_fits(1.4, 0)  # always in: no lead
+    for refused in ({"stimulusToSpoutsInSeconds": float("inf")}, {"stimulusToSpoutsInSeconds": 0.5, "rewardConsumptionSeconds": -1}):
+        with pytest.raises(ValidationError):
+            Spouts.model_validate(refused)
+    early = Spouts.model_validate({"stimulusToSpoutsInSeconds": -1.0})
+    early.check_fits(2.5, 0)  # signed: no response window rule before the stimulus; 1.5 + 1 fits 2.5
+    with pytest.raises(ValueError, match=r"reward_consumption_seconds \(1.5 s\) plus the 1.0 s the spouts come in before the stimulus is above iti_min_seconds \(2.4 s\)"):
+        early.check_fits(2.4, 0)
+    Spouts.model_validate({"stimulusToSpoutsInSeconds": -1.0, "alwaysIn": True}).check_fits(2.4, 0)  # always in: no lead
+    assert task.SPOUTS_REWARD_CONSUMPTION_SECONDS == 1.5  # OpenRigs.Trials Spouts.DefaultRewardConsumptionSeconds
 
 def test_stimulus_timing_keys_default_and_rules():
     timing = StimulusTiming.model_validate({"durationSeconds": 1.5})

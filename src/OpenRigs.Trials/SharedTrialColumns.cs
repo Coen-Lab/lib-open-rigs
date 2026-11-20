@@ -14,7 +14,7 @@ namespace OpenRigs.Trials
     public static class SharedTrialColumns
     {
         /// <summary>The core columns this fills; every row has them (harpTime is the row's timestamp, and trialType and outcome the task's).</summary>
-        public static readonly string[] Core = { "trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "stimulusOffTime", "outcomeTime", "rewardOfferedUl", "rewarded", "rewardConsumptionSeconds", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "penalised" };
+        public static readonly string[] Core = { "trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "stimulusOffTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "penalised" };
 
         /// <summary>The quietWait block: filled when the row has it.</summary>
         public static readonly string[] QuietWait = { "quietWaitSeconds" };
@@ -25,14 +25,13 @@ namespace OpenRigs.Trials
         /// <summary>
         /// Fills <paramref name="row"/>'s shared block at the trial's outcome (times.Now): its number; the loop's times (stimulusOffTime its StimulusOffTime, StimulusTiming.Time: NaN without a StimulusDurationSeconds);
         /// rewardOfferedUl, the microlitres a reward on this trial gives, on every trial; rewarded, whether the outcome
-        /// delivers it (the same value the task's valve command is made from); rewardConsumptionSeconds the task's
-        /// reward.consumptionSeconds when rewarded, else 0; penaltyTimeoutSeconds the trial's resolved
+        /// delivers it (the same value the task's valve command is made from); penaltyTimeoutSeconds the trial's resolved
         /// timeout (<see cref="Penalties.For"/>: its kind's, penalty.incorrect or penalty.noResponse) when penalised, else 0; penaltyFlashBrightness its kind's
         /// flash.brightness (ResolvedPenalty.Flash) when penalised, else 0 (0: no flash played); penalised itself; with the optogenetics block, the trial's laser condition, its power only if the
         /// laser was triggered (else 0 mW) and the trigger's time (NaN if none), or 0, 0 and NaN for a trial that is not an
-        /// IZapitTrial. The next interval starts at the outcome plus the two (TrialOutcome). Throws naming a missing or mistyped column. Returns the row.
+        /// IZapitTrial. Throws naming a missing or mistyped column. Returns the row.
         /// </summary>
-        public static T Fill<T>(T row, ITrial trial, TrialTimes times, double rewardOfferedUl, bool rewarded, double rewardConsumptionSeconds, bool penalised, double penaltyTimeoutSeconds, double penaltyFlashBrightness) where T : class
+        public static T Fill<T>(T row, ITrial trial, TrialTimes times, double rewardOfferedUl, bool rewarded, bool penalised, double penaltyTimeoutSeconds, double penaltyFlashBrightness) where T : class
         {
             if (row == null) throw new ArgumentNullException("row");
             if (trial == null) throw new ArgumentNullException("trial");
@@ -49,7 +48,6 @@ namespace OpenRigs.Trials
                 { "outcomeTime", times.Now },
                 { "rewardOfferedUl", rewardOfferedUl },
                 { "rewarded", rewarded },
-                { "rewardConsumptionSeconds", rewarded ? rewardConsumptionSeconds : 0.0 },
                 { "penaltyTimeoutSeconds", penalised ? penaltyTimeoutSeconds : 0.0 },
                 { "penaltyFlashBrightness", penalised ? penaltyFlashBrightness : 0.0 },
                 { "penalised", penalised },

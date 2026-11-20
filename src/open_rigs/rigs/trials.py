@@ -10,7 +10,7 @@ each described by its task. A task's own columns follow the block.
 
 summarise reads one experiment's WorkflowData/WorkflowData_Trials_<time>.csv, WorkflowData/WorkflowData_Events_<time>.csv (each
 RewardDelivered row, Value the microlitres delivered and Detail the microlitres requested=), Settings/Settings_Task_<time>.json
-(the lead, the penalty and the reward's consumption) and manifest.json (how the run ended), and checks the rows against each other and the task. It reads only files named <Name>_<time><suffix>
+(the lead and the penalty) and manifest.json (how the run ended), and checks the rows against each other and the task. It reads only files named <Name>_<time><suffix>
 (open_rigs.chunks); any other file named like one it reads is a NOTE, not read:
 
 - trial numbers run 1, 2, 3 ... with none missing, and each outcome is correct, incorrect, noResponse, probe or auto;
@@ -19,12 +19,10 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
 - each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
   within 2 ms;
-- each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds and rewardConsumptionSeconds, within 2 ms;
+- each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds, within 2 ms;
 - each penalised trial (penalised) had its kind's timeout as its penaltyTimeoutSeconds (penalty.incorrect.timeoutSeconds, or on a miss
   penalty.noResponse.timeoutSeconds), an unpenalised one 0, and, in a log with penaltyFlashBrightness, its kind's
   flash.brightness as that (0 unpenalised);
-- each rewarded trial had reward.consumptionSeconds as its rewardConsumptionSeconds, and any other 0 or that (a reward the
-  board never answered keeps the consumption the loop waited);
 - each rewarded trial (rewarded) has a RewardDelivered row at its outcome (from 2 ms before it to REWARD_ANSWER_S after:
   the row is the board's answer to the valve's write) requesting its rewardOfferedUl, and no RewardDelivered comes at the
   outcome of a trial not rewarded.
@@ -36,7 +34,7 @@ unfinished trial, reported in the summary (never a problem), and the first of th
 not NaN, or visualContrast above 0) is its stimulus onset, which gives the last outcome's interval
 to the next stimulus. A task without that log has no unfinished trial.
 
-A log without quietWaitSeconds or rewardConsumptionSeconds has none (0), and a task file without optogenetics a lead of 0.
+A log without quietWaitSeconds has none (0), and a task file without optogenetics a lead of 0.
 Performance and the response rate are performance()'s, which says what each counts.
 
 A file without a column the checks read (harpTime, outcomeTime and the rest of the core) is one problem,
@@ -64,7 +62,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from open_rigs import chunks, trial_log
-from open_rigs.core.task import PENALTY_TIMEOUT_SECONDS, REWARD_CONSUMPTION_SECONDS
+from open_rigs.core.task import PENALTY_TIMEOUT_SECONDS
 from open_rigs.rigs import video_frames
 
 # (name, type, unit or None, description or None: None where each task describes it)
@@ -79,8 +77,7 @@ CORE_COLUMNS: List[Column] = [
     ("outcome", "string", None, None),
     ("itiStartTime", "double", "s",
      "Harp time the inter-trial interval before this trial began: the last trial's outcomeTime plus its "
-     "penaltyTimeoutSeconds (penalised) or rewardConsumptionSeconds (rewarded), exactly, 0 added on a trial neither (a probe); "
-     "on trial 1 the first Harp clock tick once the trials started."),
+     "penaltyTimeoutSeconds, exactly; on trial 1 the first Harp clock tick once the trials started."),
     ("itiSeconds", "double", "s",
      "The inter-trial interval drawn for this trial (every trial draws its own), uniformly between "
      "trialStructure.itiMinSeconds and itiMaxSeconds: from itiStartTime to this trial's stimulus with a quiet mouse, "
@@ -111,10 +108,6 @@ CORE_COLUMNS: List[Column] = [
      "RewardDelivered row in WorkflowData_Events, a few ms after outcomeTime); false on an outcome that earned it when the "
      "board had not answered by the next outcome. A stop before the board answered leaves the trial with no row. Which "
      "outcomes are rewarded is the task's (its note)."),
-    ("rewardConsumptionSeconds", "double", "s",
-     "The time to drink the reward after this trial when its outcome rewarded it, else 0: the trial's "
-     "reward.consumptionSeconds. The next interval starts after it (itiStartTime). Set at the outcome, so it stays when "
-     "rewarded turns false for a reward the board never answered."),
     ("penaltyTimeoutSeconds", "double", "s",
      "The timeout after this trial when it was penalised, else 0: the trial's penalty.incorrect.timeoutSeconds, or on a "
      "miss its penalty.noResponse.timeoutSeconds. The next interval starts after it (itiStartTime)."),
@@ -357,11 +350,6 @@ def _quiet(row: Dict[str, str]) -> float:
     return _f(row, "quietWaitSeconds") if "quietWaitSeconds" in row else 0.0
 
 
-def _consumption(row: Dict[str, str]) -> float:
-    """rewardConsumptionSeconds, 0 in a log from before it."""
-    return _f(row, "rewardConsumptionSeconds") if "rewardConsumptionSeconds" in row else 0.0
-
-
 def _true(text: Any) -> bool:
     return str(text).strip().lower() == "true"
 
@@ -372,7 +360,7 @@ EVENT_NEEDS = (TIME_COLUMN, "Event", "Value")
 # A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an infinity, an
 # empty cell or text is a problem and the row's checks are skipped.
 TRIAL_NUMBERS = ("trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime",
-                 "rewardOfferedUl", "rewardConsumptionSeconds", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "quietWaitSeconds", "laserTriggerTime")
+                 "rewardOfferedUl", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "quietWaitSeconds", "laserTriggerTime")
 NAN_ALLOWED = ("stimulusOnsetTime", "laserTriggerTime")
 
 
@@ -409,7 +397,6 @@ def _requested(detail: str) -> Optional[float]:
 
 INCORRECT_TIMEOUT_PATH = "penalty.incorrect.timeoutSeconds"  # a penalised choice's timeout
 MISS_TIMEOUT_PATH = "penalty.noResponse.timeoutSeconds"  # a penalised miss's; penalty.noResponse null: misses never penalised
-CONSUMPTION_PATH = "reward.consumptionSeconds"
 _MISSING = object()
 
 
@@ -468,9 +455,6 @@ class _Task:
         """A penalised trial's flash brightness: its kind's flash.brightness (as timeout() picks the kind), 0 by default."""
         kind = "penalty.incorrect" if _responded(row) else "penalty.noResponse"
         return float(self.value(row, kind + ".flash.brightness", 0.0) or 0.0)
-
-    def consumption(self, row: Dict[str, str]) -> float:
-        return float(self.value(row, CONSUMPTION_PATH, REWARD_CONSUMPTION_SECONDS))
 
 
 def _task(folder: Path) -> Optional[_Task]:
@@ -596,22 +580,11 @@ def _summarise(folder: Path) -> Summary:
                 if abs(flash - want) > 1e-9:
                     s.problems.append(f"trial {number}: penaltyFlashBrightness {flash:g} on a trial "
                                       f"{'penalised' if penalised else 'not penalised'}, not {want:g}")
-            if "rewardConsumptionSeconds" in row:
-                drink = _f(row, "rewardConsumptionSeconds")
-                try:
-                    value = task.consumption(row)
-                except (ValueError, TypeError) as e:
-                    s.problems.append(f"trial {number}: {e}, so its reward consumption is not checked")
-                    value = drink
-                allowed = (value,) if _rewarded(row) else (0.0, value)
-                if all(abs(drink - a) > 1e-9 for a in allowed):
-                    s.problems.append(f"trial {number}: rewardConsumptionSeconds {drink:g} on a trial "
-                                      f"{'rewarded' if _rewarded(row) else 'not rewarded'}, not {' or '.join(f'{a:g}' for a in allowed)}")
         if last is not None:
-            due = _f(last, "outcomeTime") + _f(last, "penaltyTimeoutSeconds") + _consumption(last)
+            due = _f(last, "outcomeTime") + _f(last, "penaltyTimeoutSeconds")
             if abs(_f(row, "itiStartTime") - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: interval started {_f(row, 'itiStartTime') - due:+.4f} s from the last "
-                                  "outcome plus its timeout and reward consumption")
+                                  "outcome plus its timeout")
             if shown:
                 s.interval_seconds.append(onset - _f(last, "outcomeTime"))
         last = row

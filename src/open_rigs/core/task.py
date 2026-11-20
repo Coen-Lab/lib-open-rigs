@@ -87,29 +87,42 @@ class ResponseWindow(TaskBlock):
     )
 
 
+SPOUTS_REWARD_CONSUMPTION_SECONDS = 1.5  # OpenRigs.Trials Spouts.DefaultRewardConsumptionSeconds
+
+
 class Spouts(TaskBlock):
     """The spouts block of a task whose spouts move (OpenRigs.Trials Spouts and SpoutCommands): both out at trial 1's
     interval start, in at the SpoutsIn cue, the rewarded spout alone at the outcome (else both out), both out at the
-    SpoutsOut cue, the next interval's start (after a reward's reward.consumptionSeconds). Which spouts come in is the
-    task's. A task holds it as its spouts field."""
+    SpoutsOut cue, rewardConsumptionSeconds into the next interval. Which spouts come in is the task's. A task holds it
+    as its spouts field."""
 
     always_in: bool = Field(
         default=False, description="Always in: every spout the task uses is in for the whole trial and interval; they move only at the SpoutsIn cue, never drawn out, and lead nothing (a negative stimulusToSpoutsInSeconds counts as 0)"
     )
     stimulus_to_spouts_in_seconds: float = Field(
-        description="From stimulus onset to moving the spouts in (the SpoutsIn cue), in seconds, signed like laserToStimulusSeconds: negative, the spouts in that long before the stimulus (the trial starts that much earlier; at most itiMinSeconds, as they go out at the interval's start); positive, at most the stimulus to the response window's opening"
+        description="From stimulus onset to moving the spouts in (the SpoutsIn cue), in seconds, signed like laserToStimulusSeconds: negative, the spouts in that long before the stimulus (the trial starts that much earlier; with rewardConsumptionSeconds at most itiMinSeconds); positive, at most the stimulus to the response window's opening"
+    )
+    reward_consumption_seconds: float = Field(
+        default=SPOUTS_REWARD_CONSUMPTION_SECONDS,
+        ge=0,
+        description="From the next interval's start (the outcome plus any timeout) to drawing the spouts out (the SpoutsOut cue), in seconds: time to drink a reward, inside the interval, which it never delays; with any lead of the spouts before the stimulus, at most itiMinSeconds",
     )
 
     def check_fits(self, iti_min_seconds: float, stimulus_to_response_window_seconds: float) -> None:
-        """Refuses spouts that would come in before they go out at the interval's start (unless always in, a lead before
-        the stimulus above iti_min_seconds), or, with a positive stimulusToSpoutsInSeconds, a response window opening
-        before the spouts are in (OpenRigs.Trials Spouts.Problems, the same rules). Each task's model calls it with its
-        own values."""
-        lead = 0.0 if self.always_in else max(-self.stimulus_to_spouts_in_seconds, 0.0)
-        if lead > iti_min_seconds + 1e-9:
+        """Refuses spouts drawn out after the shortest interval's stimulus (rewardConsumptionSeconds above iti_min_seconds)
+        or after they come back in for it (plus any lead before the stimulus, unless always in), or, with a positive
+        stimulusToSpoutsInSeconds, a response window opening before the spouts are in (OpenRigs.Trials Spouts.Problems,
+        the same rules). Each task's model calls it with its own values."""
+        if self.reward_consumption_seconds > iti_min_seconds + 1e-9:
             raise ValueError(
-                f"the spouts come in {lead} s before the stimulus (spouts.stimulus_to_spouts_in_seconds {self.stimulus_to_spouts_in_seconds} s), "
-                f"more than iti_min_seconds ({iti_min_seconds} s): they would come in before they are drawn out at the interval's start"
+                f"spouts.reward_consumption_seconds ({self.reward_consumption_seconds} s) is above iti_min_seconds ({iti_min_seconds} s): "
+                "the spouts are drawn out reward_consumption_seconds into the interval, before the stimulus"
+            )
+        lead = 0.0 if self.always_in else max(-self.stimulus_to_spouts_in_seconds, 0.0)
+        if self.reward_consumption_seconds + lead > iti_min_seconds + 1e-9:
+            raise ValueError(
+                f"spouts.reward_consumption_seconds ({self.reward_consumption_seconds} s) plus the {lead} s the spouts come in before "
+                f"the stimulus is above iti_min_seconds ({iti_min_seconds} s): the spouts would come in before they are drawn out"
             )
         if self.stimulus_to_spouts_in_seconds > 0 and stimulus_to_response_window_seconds < self.stimulus_to_spouts_in_seconds - 1e-9:
             raise ValueError(
@@ -124,12 +137,12 @@ class StimulusTiming(TaskBlock):
     stimulusOffTime. A task's own stimulus model takes it by inheritance, keeping its keys in the stimulus block."""
 
     duration_seconds: float | None = Field(
-        default=None, gt=0, description="The longest the stimulus lasts from its onset, in seconds; off before the next trial's stimulus can come (the soonest outcome plus the shortest timeout or reward consumption plus itiMinSeconds). Null: no cap, the stimulus ends only responseToStimulusOffSeconds after the response (both null is refused)"
+        default=None, gt=0, description="The longest the stimulus lasts from its onset, in seconds; off before the next trial's stimulus can come (the soonest outcome plus the shortest penalty timeout, 0 where a reward can come, plus itiMinSeconds). Null: no cap, the stimulus ends only responseToStimulusOffSeconds after the response (both null is refused)"
     )
     response_to_stimulus_off_seconds: float | None = Field(
         default=None,
         ge=0,
-        description="From the response (the outcome; on a miss, the response window's end) to the stimulus off, in seconds, unless the duration ends it first: 0, off at the response; null, the response does not end it (it runs durationSeconds); at most the shortest timeout or reward consumption plus itiMinSeconds",
+        description="From the response (the outcome; on a miss, the response window's end) to the stimulus off, in seconds, unless the duration ends it first: 0, off at the response; null, the response does not end it (it runs durationSeconds); at most the shortest penalty timeout (0 where a reward can come) plus itiMinSeconds",
     )
 
     def check_fits(
@@ -139,8 +152,8 @@ class StimulusTiming(TaskBlock):
         window's close (OpenRigs.Trials StimulusTiming.Problems, the same rules). The next stimulus comes at the soonest
         stimulus_to_earliest_outcome_seconds (the stimulus to the soonest outcome, the response window's opening; 0 when
         unknown) + min_outcome_to_iti_seconds + iti_min_seconds after this one: min_outcome_to_iti_seconds is the shortest
-        outcome to next interval over the outcomes a trial can have (a penalised one's timeout, a rewarded one's
-        reward.consumptionSeconds, 0 for one neither, such as a probe). The next trial's lead moves its start, never its
+        outcome to next interval over the outcomes a trial can have (a penalised one's timeout, 0 for one rewarded or
+        neither, such as a probe). The next trial's lead moves its start, never its
         stimulus. Each task's model calls it with its own values."""
         after = self.response_to_stimulus_off_seconds
         if self.duration_seconds is None and after is None:
@@ -148,7 +161,7 @@ class StimulusTiming(TaskBlock):
         if after is not None and after > min_outcome_to_iti_seconds + iti_min_seconds + 1e-9:
             raise ValueError(
                 f"stimulus.response_to_stimulus_off_seconds ({after} s) is longer than the shortest outcome to next interval "
-                f"({min_outcome_to_iti_seconds} s: timeout or reward consumption) plus iti_min_seconds ({iti_min_seconds} s): the stimulus could still be on at the next trial's"
+                f"({min_outcome_to_iti_seconds} s: the shortest penalty timeout, 0 after a reward) plus iti_min_seconds ({iti_min_seconds} s): the stimulus could still be on at the next trial's"
             )
         if self.duration_seconds is None:
             return
@@ -156,7 +169,7 @@ class StimulusTiming(TaskBlock):
         if past > min_outcome_to_iti_seconds + iti_min_seconds + 1e-9:
             raise ValueError(
                 f"stimulus.duration_seconds ({self.duration_seconds} s) runs {past:g} s past the soonest outcome, longer than the shortest outcome "
-                f"to next interval ({min_outcome_to_iti_seconds} s: timeout or reward consumption) plus iti_min_seconds ({iti_min_seconds} s): "
+                f"to next interval ({min_outcome_to_iti_seconds} s: the shortest penalty timeout, 0 after a reward) plus iti_min_seconds ({iti_min_seconds} s): "
                 "the stimulus could still be on at the next trial's"
             )
         if self.duration_seconds > stimulus_to_response_end_seconds + 1e-9:
@@ -270,7 +283,6 @@ PENALTY_LEVEL_DBFS = -35.0
 PENALTY_TIMEOUT_SECONDS = 4.0  # penalty.incorrect and penalty.noResponse's timeoutSeconds
 PENALTY_FLASH_RATE_HZ = 10.0  # penalty.<kind>.flash.rateHz (OpenRigs.Trials PenaltyFlash.DefaultRateHz)
 PENALTY_FLASH_MAX_RATE_HZ = 30.0  # half ProjectorDisplay's 60 Hz render loop (PenaltyFlash.MaxRateHz)
-REWARD_CONSUMPTION_SECONDS = 1.5  # reward.consumptionSeconds
 BACKGROUND_LEVEL_DBFS = -60.0
 PEAK_LIMIT_DBFS = -1.0  # every buffer's peak stays under this after equalisation, checked as the buffer is built
 QUIETEST_LEVEL_DBFS = -120.0
@@ -301,19 +313,14 @@ class RewardTone(TaskBlock):
 
 
 class Reward(TaskBlock):
-    """Reward delivery: the reward size, the large-reward trials, the time to drink it and its tone. Every rewarded
-    trial's next interval starts consumptionSeconds after its outcome (the trial log's rewardConsumptionSeconds)."""
+    """Reward delivery: the reward size, the large-reward trials and its tone. A rewarded trial's next interval starts
+    at its outcome; moving spouts go out spouts.rewardConsumptionSeconds into it."""
 
     size_ul: Double = Field(
         gt=0, le=MAX_REWARD_UL, description=f"Reward size, in microlitres, planned into valve pulses from the valve's calibration; at most {MAX_REWARD_UL}, the most one reward may ask for"
     )
     large_multiplier: Double = Field(default=2.0, gt=1, description="Reward size multiplier on large-reward trials, above 1")
     large_probability: Double = Field(default=0.0, ge=0, le=1, description="Probability that a trial is a large-reward trial; 0: none (the only off)")
-    consumption_seconds: float = Field(
-        default=REWARD_CONSUMPTION_SECONDS,
-        ge=0,
-        description="Time to drink a reward, in seconds: on every rewarded trial the next interval starts this long after the outcome (spouts that move go out then)",
-    )
     tone: RewardTone = Field(default=RewardTone(), description="The reward tone, with every reward")
 
 

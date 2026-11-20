@@ -16,7 +16,7 @@ namespace OpenRigs.Trials.Tests
     }
 
     /// <summary>A two-spout task's rules: 2 s intervals, the window 0.5 s after the stimulus for 1.5 s, the spouts in 0.5 s
-    /// after it; a lick in the window rewarded at its spout with RewardConsumptionSeconds to drink, else noResponse after Timeout.</summary>
+    /// after it; a lick in the window rewarded at its spout, the spouts out RewardConsumptionSeconds into the next interval, else noResponse after Timeout.</summary>
     class SpoutRules : ITrialRules<SpoutTrial, string, TrialOutcome<PieceRow>>
     {
         public Func<int, bool> AlwaysIn = n => false;
@@ -29,7 +29,7 @@ namespace OpenRigs.Trials.Tests
         public SpoutTrial Draw(TrialOutcome<PieceRow> previous) { var n = ++drawn; return new SpoutTrial { TrialNumber = n, SpoutsAlwaysIn = AlwaysIn(n), SpoutsInCommand = InCommand(n) }; }
         public TrialTiming Timing(SpoutTrial trial)
         {
-            return new TrialTiming { ItiSeconds = 2, ResponseDelaySeconds = 0.5, ResponseWindowSeconds = 1.5, Cues = Spouts.Cues(0.5, trial.SpoutsAlwaysIn) };
+            return new TrialTiming { ItiSeconds = 2, ResponseDelaySeconds = 0.5, ResponseWindowSeconds = 1.5, Cues = Spouts.Cues(0.5, trial.SpoutsAlwaysIn, RewardConsumptionSeconds) };
         }
         public void Start(SpoutTrial trial, TrialTimes times, double wheelCm) { }
         public void Stimulus(SpoutTrial trial, TrialTimes times, ICollection<string> updates) { }
@@ -38,7 +38,7 @@ namespace OpenRigs.Trials.Tests
         public TrialOutcome<PieceRow> Lick(SpoutTrial trial, int spout, TrialTimes times, ICollection<string> updates)
         {
             if (!times.Responding) return null;
-            var row = new PieceRow { trialNumber = trial.TrialNumber, outcome = TrialOutcomes.Correct, outcomeTime = times.Now, rewarded = true, rewardOfferedUl = 3, rewardConsumptionSeconds = RewardConsumptionSeconds };
+            var row = new PieceRow { trialNumber = trial.TrialNumber, outcome = TrialOutcomes.Correct, outcomeTime = times.Now, rewarded = true, rewardOfferedUl = 3 };
             return new TrialOutcome<PieceRow>(row, spout == 0 ? "left" : "right", double.NaN, 10);
         }
         public TrialOutcome<PieceRow> ResponseEnd(SpoutTrial trial, TrialTimes times)
@@ -99,12 +99,13 @@ namespace OpenRigs.Trials.Tests
         public void MovingSpoutsStartOutAndEachOutcomeAndSpoutsOutMoveThem()
         {
             // Trial 1's interval from 100.001 s: the spouts out; SpoutsIn at 102.501 s; a left lick at 102.7 s leaves the left
-            // spout alone in; after the 1.5 s to drink, SpoutsOut draws it out at trial 2's interval start, which moves nothing itself.
+            // spout alone in; trial 2's interval starts at the outcome, and SpoutsOut draws the spout out 1.5 s into it.
             Run(new SpoutRules(), 104.5, 102.7);
             CollectionAssert.AreEqual(new[] { LickSpoutCommand.SpoutsOut, LickSpoutCommand.SpoutsIn, LickSpoutCommand.LeftOnly, LickSpoutCommand.SpoutsOut }, Commands().ToArray());
             var outCue = events.Single(e => e.Kind == TrialEventKind.Cue && e.Cue == Spouts.OutCue);
-            Assert.AreEqual(102.7 + 1.5, outCue.Seconds, 1.5e-3);
-            Assert.AreEqual(events.Single(e => e.Kind == TrialEventKind.Iti && e.Trial.TrialNumber == 2).Seconds, outCue.Seconds, 1.5e-3, "at the interval's start");
+            var iti = events.Single(e => e.Kind == TrialEventKind.Iti && e.Trial.TrialNumber == 2).Seconds;
+            Assert.AreEqual(102.7, iti, 1.5e-3, "the interval starts at the outcome: consumption delays nothing");
+            Assert.AreEqual(iti + 1.5, outCue.Seconds, 1.5e-3, "rewardConsumptionSeconds into the interval");
         }
 
         [TestMethod]
@@ -116,12 +117,13 @@ namespace OpenRigs.Trials.Tests
         }
 
         [TestMethod]
-        public void AfterATimeoutSpoutsOutComesAtTheNextIntervalsStart()
+        public void AfterATimeoutSpoutsOutComesRewardConsumptionIntoTheNextInterval()
         {
-            // A miss at 104.001 s, a 4 s timeout and no reward to drink: the next interval and SpoutsOut at 108.001 s.
+            // A miss at 104.001 s and a 4 s timeout: the next interval at 108.001 s, SpoutsOut 1.5 s into it.
             Run(new SpoutRules { Timeout = 4 }, 110);
             var outcome = events.Single(e => e.Kind == TrialEventKind.Outcome);
-            Assert.AreEqual(outcome.Seconds + 4, events.Single(e => e.Kind == TrialEventKind.Cue && e.Cue == Spouts.OutCue).Seconds, 1.5e-3);
+            Assert.AreEqual(outcome.Seconds + 4, events.Single(e => e.Kind == TrialEventKind.Iti && e.Trial.TrialNumber == 2).Seconds, 1.5e-3);
+            Assert.AreEqual(outcome.Seconds + 4 + 1.5, events.Single(e => e.Kind == TrialEventKind.Cue && e.Cue == Spouts.OutCue).Seconds, 1.5e-3);
         }
 
         [TestMethod]
@@ -199,26 +201,37 @@ namespace OpenRigs.Trials.Tests
         [TestMethod]
         public void TheCuesAreSpoutsInFromTheStimulusAndSpoutsOutFromTheNextInterval()
         {
-            var cues = Spouts.Cues(0.5, false);
+            var cues = Spouts.Cues(0.5, false, 1.5);
             CollectionAssert.AreEqual(new[] { "SpoutsIn", "SpoutsOut" }, cues.Select(c => c.Name).ToArray());
             CollectionAssert.AreEqual(new[] { CueAnchor.Stimulus, CueAnchor.NextIti }, cues.Select(c => c.Anchor).ToArray());
-            CollectionAssert.AreEqual(new[] { 0.5, 0.0 }, cues.Select(c => c.Seconds).ToArray(), "out at the interval's start");
+            CollectionAssert.AreEqual(new[] { 0.5, 1.5 }, cues.Select(c => c.Seconds).ToArray(), "out rewardConsumptionSeconds into the interval");
             Assert.IsFalse(cues.Any(c => c.DroppedAtOutcome));
-            CollectionAssert.AreEqual(new[] { -0.3, 0.0 }, Spouts.Cues(-0.3, false).Select(c => c.Seconds).ToArray());
-            CollectionAssert.AreEqual(new[] { 0.0, 0.0 }, Spouts.Cues(-0.3, true).Select(c => c.Seconds).ToArray(), "always in: no lead");
-            CollectionAssert.AreEqual(new[] { 0.5, 0.0 }, Spouts.Cues(0.5, true).Select(c => c.Seconds).ToArray());
+            CollectionAssert.AreEqual(new[] { -0.3, 1.5 }, Spouts.Cues(-0.3, false, 1.5).Select(c => c.Seconds).ToArray());
+            CollectionAssert.AreEqual(new[] { 0.0, 1.5 }, Spouts.Cues(-0.3, true, 1.5).Select(c => c.Seconds).ToArray(), "always in: no lead");
+            CollectionAssert.AreEqual(new[] { 0.5, 0.0 }, Spouts.Cues(0.5, true, 0).Select(c => c.Seconds).ToArray());
         }
 
         [TestMethod]
         public void TheChecksNameTheSpoutsKeys()
         {
-            Assert.AreEqual(0, Spouts.Problems(0.5, false, 1.5, 0.5).Count);
-            CollectionAssert.AreEqual(new[] { "stimulusToResponseWindowSeconds (0.4 s) is below spouts.stimulusToSpoutsInSeconds (0.5 s): the response window would open before the spouts arrive" }, Spouts.Problems(0.5, false, 3, 0.4));
-            CollectionAssert.AreEqual(new[] { "spouts.stimulusToSpoutsInSeconds must be a finite number" }, Spouts.Problems(double.NaN, false, 3, 1));
-            // Signed: before the stimulus, in after they go out at the interval's start, so the lead is at most itiMinSeconds.
-            Assert.AreEqual(0, Spouts.Problems(-1.5, false, 1.5, 0).Count, "no reward consumption rule: it comes before the interval");
-            CollectionAssert.AreEqual(new[] { "the spouts come in 1.6 s before the stimulus (spouts.stimulusToSpoutsInSeconds -1.6 s), more than itiMinSeconds (1.5 s): they would come in before they are drawn out at the interval's start" }, Spouts.Problems(-1.6, false, 1.5, 0));
-            Assert.AreEqual(0, Spouts.Problems(-1.6, true, 1.5, 0).Count, "always in: no lead");
+            Assert.AreEqual(0, Spouts.Problems(0.5, false, 1.5, 1.5, 0.5).Count);
+            CollectionAssert.AreEqual(new[] { "stimulusToResponseWindowSeconds (0.4 s) is below spouts.stimulusToSpoutsInSeconds (0.5 s): the response window would open before the spouts arrive" }, Spouts.Problems(0.5, false, 1.5, 3, 0.4));
+            CollectionAssert.AreEqual(new[] { "spouts.stimulusToSpoutsInSeconds must be a finite number" }, Spouts.Problems(double.NaN, false, 1.5, 3, 1));
+            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds must be a finite number, 0 or more" }, Spouts.Problems(0.5, false, -1, 3, 1));
+            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds (2 s) is above itiMinSeconds (1.5 s): the spouts are drawn out rewardConsumptionSeconds into the interval, before the stimulus" }, Spouts.Problems(0.5, true, 2, 1.5, 1));
+            // Signed: before the stimulus; the spouts go out rewardConsumptionSeconds into the interval before they come in.
+            Assert.AreEqual(0, Spouts.Problems(-1, false, 1.5, 2.5, 0).Count);
+            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds (1.5 s) plus the 1.1 s the spouts come in before the stimulus (spouts.stimulusToSpoutsInSeconds -1.1 s) is above itiMinSeconds (2.5 s): the spouts would come in before they are drawn out" }, Spouts.Problems(-1.1, false, 1.5, 2.5, 0));
+            Assert.AreEqual(0, Spouts.Problems(-1.1, true, 1.5, 2.5, 0).Count, "always in: no lead");
+        }
+
+        [TestMethod]
+        public void BetweenTrialsTheLongestConsumptionAndLeadFitTheShortestInterval()
+        {
+            Assert.AreEqual(0, Spouts.BetweenTrialsProblems(new[] { -1.0, 0.5 }, new[] { false, false }, new[] { 1.5, 1.0 }, new[] { 2.5, 3.0 }).Count);
+            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds 2 s exceeds itiMinSeconds 1.5 s of a combination that may come next" }, Spouts.BetweenTrialsProblems(new[] { 0.5, 0.5 }, new[] { false, false }, new[] { 1.0, 2.0 }, new[] { 1.5, 3.0 }));
+            CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds 1.5 s plus the spouts' longest lead before the stimulus 1.1 s exceeds itiMinSeconds 2.5 s of a combination that may come next" }, Spouts.BetweenTrialsProblems(new[] { -1.1, 0.5 }, new[] { false, false }, new[] { 1.5, 1.0 }, new[] { 2.5, 3.0 }));
+            Assert.AreEqual(0, Spouts.BetweenTrialsProblems(new[] { -1.1, 0.5 }, new[] { true, false }, new[] { 1.5, 1.0 }, new[] { 2.5, 3.0 }).Count, "an always-in combination leads nothing");
         }
     }
 
@@ -231,7 +244,7 @@ namespace OpenRigs.Trials.Tests
             var rules = new StubRules
             {
                 Laser = laser ? LaserTiming.UntilOutcome(false, 0, double.PositiveInfinity) : null,
-                Plan = n => new TrialTiming { ItiSeconds = 2, LaserToStimulusSeconds = laserLead, Laser = laser, LickQuietSeconds = lickQuiet, ResponseWindowSeconds = 1.5, Cues = Spouts.Cues(-0.3, alwaysIn) },
+                Plan = n => new TrialTiming { ItiSeconds = 2, LaserToStimulusSeconds = laserLead, Laser = laser, LickQuietSeconds = lickQuiet, ResponseWindowSeconds = 1.5, Cues = Spouts.Cues(-0.3, alwaysIn, 1.5) },
             };
             return new LoopRig(rules);
         }
@@ -251,8 +264,8 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(Spouts.InCue, rig.Events[start + 1].Cue, "the spouts in at the start's own tick");
             Assert.AreEqual(101.701, At(rig, TrialEventKind.Cue, Spouts.InCue), 1e-9);
             Assert.AreEqual(102.001, At(rig, TrialEventKind.Stimulus), 1e-9);
-            Assert.AreEqual(0.3, TrialLoop.Lead(new TrialTiming { Cues = Spouts.Cues(-0.3, false) }), 1e-12);
-            Assert.AreEqual(0, TrialLoop.Lead(new TrialTiming { Cues = Spouts.Cues(0.3, false) }), "a positive one leaves the lead alone");
+            Assert.AreEqual(0.3, TrialLoop.Lead(new TrialTiming { Cues = Spouts.Cues(-0.3, false, 1.5) }), 1e-12);
+            Assert.AreEqual(0, TrialLoop.Lead(new TrialTiming { Cues = Spouts.Cues(0.3, false, 1.5) }), "a positive one leaves the lead alone");
         }
 
         [TestMethod]
@@ -263,7 +276,7 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(102.001, At(rig, TrialEventKind.Start), 1e-9);
             Assert.AreEqual(102.002, At(rig, TrialEventKind.Cue, Spouts.InCue), 1e-9, "a cue at the stimulus, on the tick after it");
             Assert.AreEqual(102.001, At(rig, TrialEventKind.Stimulus), 1e-9);
-            Assert.AreEqual(0.1, TrialLoop.Lead(new TrialTiming { LaserToStimulusSeconds = 0.1, Cues = Spouts.Cues(-0.3, true) }), 1e-12, "the laser's lead alone");
+            Assert.AreEqual(0.1, TrialLoop.Lead(new TrialTiming { LaserToStimulusSeconds = 0.1, Cues = Spouts.Cues(-0.3, true, 1.5) }), 1e-12, "the laser's lead alone");
         }
 
         [TestMethod]

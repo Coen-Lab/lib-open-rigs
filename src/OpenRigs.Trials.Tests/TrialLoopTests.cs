@@ -22,7 +22,6 @@ namespace OpenRigs.Trials.Tests
     {
         public string Choice;
         public double PenaltyTimeoutSeconds { get; set; }
-        public double RewardConsumptionSeconds { get; set; }
         public TrialTimes Times;
     }
 
@@ -410,33 +409,6 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(TrialEventKind.Iti, events[1].Kind, "no timeout: drawn at once");
             Assert.AreEqual(events[0].Seconds, events[1].Seconds, 1e-12);
             Assert.AreEqual(2, events[1].Trial.TrialNumber);
-        }
-
-        [TestMethod]
-        public void TheNextIntervalStartsAfterTheRewardConsumptionOnARewardedTrialAndTheTimeoutOnAPenalisedOne()
-        {
-            // Trial 1 rewarded (1.5 s to drink), trial 2 penalised (4 s), trial 3 neither (a probe): its interval at the outcome.
-            var rules = new StubRules
-            {
-                OnLick = (t, s, x, u) => t.TrialNumber == 1 ? new StubOutcome { Choice = "Correct", RewardConsumptionSeconds = 1.5, Times = x }
-                    : StubRules.Outcome(t.TrialNumber == 2 ? "Incorrect" : "Probe", t.TrialNumber == 2 ? 4 : 0, x),
-            };
-            var rig = new LoopRig(rules);
-            var due = new[] { 1.5, 4.0, 0.0 };
-            rig.RunTo(TrialEventKind.Stimulus);
-            for (var n = 0; n < 3; n++)
-            {
-                rig.Lick(0);
-                var outcome = rig.Of(TrialEventKind.Outcome).Last();
-                var interval = n == 2 ? rig.Events.Last() : rig.RunTo(TrialEventKind.Iti);
-                Assert.AreEqual(TrialEventKind.Iti, interval.Kind);
-                Assert.AreEqual(outcome.Seconds + due[n], interval.Seconds, 1e-9, "trial " + (n + 1));
-                var stimulus = rig.RunTo(TrialEventKind.Stimulus);
-                Assert.AreEqual(interval.Seconds + 2, stimulus.Seconds, 1e-9, "the whole interval after it");
-            }
-            var drinks = new LoopRig(new StubRules { OnLick = (t, s, x, u) => new StubOutcome { RewardConsumptionSeconds = -1, Times = x } });
-            drinks.RunTo(TrialEventKind.Stimulus);
-            StringAssert.Contains(Refusal(() => drinks.Lick(0)), "Trial 1's outcome has a reward consumption of -1 s");
         }
 
         [TestMethod]
