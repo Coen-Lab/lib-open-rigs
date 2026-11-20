@@ -69,7 +69,7 @@ namespace OpenRigs.Audio
     public class PenaltySoundBuffer
     {
         /// <summary>The penalty sound's level in dBFS RMS: the highest any trial draws (the rules' MaxPenaltyLevelDbfs); NaN when every trial is mute.</summary>
-        [Description("The penalty sound's level in dBFS RMS: map it from the rules' MaxPenaltyLevelDbfs, the highest penalty.sound.levelDbfs any trial draws (NaN: every trial mute).")]
+        [Description("The penalty sound's level in dBFS RMS: map it from the rules' MaxPenaltyLevelDbfs, the highest penalty level (penalty.incorrect.sound.levelDbfs, penalty.noResponse.sound.levelDbfs) any trial draws (NaN: every trial mute).")]
         public double LevelDbfs { get; set; } = SoundLevel.PenaltyDbfs;
 
         /// <summary>The buffer for each input.</summary>

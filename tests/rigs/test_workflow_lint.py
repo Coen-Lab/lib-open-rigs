@@ -124,7 +124,7 @@ def sound_workflow(tmp_path: Path, nodes: str, edges: str) -> lint.Workflow:
 def test_a_sound_needs_its_level_from_the_task_file_and_the_shared_mixer(tmp_path):
     nodes = ('<Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:SpeakerMixer.bonsai" />'
              '<Expression xsi:type="SubscribeSubject"><Name>TaskConfig</Name></Expression>'
-             '<Expression xsi:type="MemberSelector"><Selector>TaskParameters.RewardTone.LevelDbfs</Selector></Expression>'
+             '<Expression xsi:type="MemberSelector"><Selector>TaskParameters.Reward.Tone.LevelDbfs</Selector></Expression>'
              '<Expression xsi:type="InputMapping"><PropertyMappings><Property Name="LevelDbfs" Selector="Item1" /></PropertyMappings></Expression>'
              '<Expression xsi:type="Combinator"><Combinator xsi:type="aud:SpeakerBuffer" /></Expression>')
     wf = sound_workflow(tmp_path, nodes, '<Edge From="1" To="2" Label="Source1" /><Edge From="2" To="3" Label="Source1" /><Edge From="3" To="4" Label="Source1" />')

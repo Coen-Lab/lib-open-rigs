@@ -53,14 +53,13 @@ namespace OpenRigs.Trials.Tests
 
     public class Cost
     {
-        [YamlDotNet.Serialization.YamlMember(Alias = "timeoutSeconds")][Newtonsoft.Json.JsonProperty("timeoutSeconds")] public double? TimeoutSeconds { get; set; }
-        [YamlDotNet.Serialization.YamlMember(Alias = "sound")][Newtonsoft.Json.JsonProperty("sound")] public CostSound Sound { get; set; } = new CostSound();
+        [YamlDotNet.Serialization.YamlMember(Alias = "timeoutSeconds")][Newtonsoft.Json.JsonProperty("timeoutSeconds")] public double TimeoutSeconds { get; set; } = 3;
+        [YamlDotNet.Serialization.YamlMember(Alias = "sound")][Newtonsoft.Json.JsonProperty("sound")] public CostSound Sound { get; set; } = new CostSound { LevelDbfs = -35.0 };
     }
 
     public class PenaltyBlock
     {
-        [YamlDotNet.Serialization.YamlMember(Alias = "timeoutSeconds")][Newtonsoft.Json.JsonProperty("timeoutSeconds")] public double TimeoutSeconds { get; set; }
-        [YamlDotNet.Serialization.YamlMember(Alias = "sound")][Newtonsoft.Json.JsonProperty("sound")] public CostSound Sound { get; set; } = new CostSound { LevelDbfs = -35.0 };
+        [YamlDotNet.Serialization.YamlMember(Alias = "incorrect")][Newtonsoft.Json.JsonProperty("incorrect")] public Cost Incorrect { get; set; } = new Cost();
         [YamlDotNet.Serialization.YamlMember(Alias = "noResponse")][Newtonsoft.Json.JsonProperty("noResponse")] public Cost NoResponse { get; set; } = new Cost();
     }
 
@@ -213,36 +212,42 @@ namespace OpenRigs.Trials.Tests
             Assert.IsTrue(double.IsNaN(MaxSoundLevel.Of(built, t => SoundLevels.Mute).LevelDbfs));
         }
 
-        // A condition sets a penalised miss's level by its three-level path, though the task file leaves the block out (its leaves null).
+        // A condition sets a penalised miss's level by its three-level path; a task file whose misses are never penalised has no noResponse.
         [TestMethod]
         public void AConditionSetsAPenalisedMisssLevelAndTheMaxCountsIt()
         {
-            var text = "taskParameters:\n  penalty:\n    timeoutSeconds: 4\n  trialConditions:\n  - {weight: 1}\n  - {weight: 1, set: {penalty.noResponse.sound.levelDbfs: -20}}\n";
-            var problems = new List<string>();
             var schema = new ConditionsSchema(new[] { "trialConditions" }, new string[0], 8, @"[{""trialType"":""any""}]");
-            var built = TrialConditions.Build(text, TaskYaml.Read<PenaltyLogic>(text).TaskParameters, t => TaskYaml.Read<PenaltyLogic>(t).TaskParameters, schema, problems);
-            CollectionAssert.AreEqual(new string[0], problems);
-            Assert.IsNull(built[0].Combinations[0].Task.Penalty.NoResponse.Sound.LevelDbfs);
-            var max = MaxSoundLevel.Of(built, t => t.Penalty.Sound.LevelDbfs, t => t.Penalty.NoResponse.Sound.LevelDbfs);
+            Func<string, List<BuiltTrialCondition<PenaltyParams>>> build = text =>
+            {
+                var problems = new List<string>();
+                var built = TrialConditions.Build(text, TaskYaml.Read<PenaltyLogic>(text).TaskParameters, t => TaskYaml.Read<PenaltyLogic>(t).TaskParameters, schema, problems);
+                CollectionAssert.AreEqual(new string[0], problems);
+                return built;
+            };
+            Func<PenaltyParams, object> miss = t => t.Penalty.NoResponse == null ? null : t.Penalty.NoResponse.Sound.LevelDbfs;
+            var set = build("taskParameters:\n  penalty:\n    incorrect: {timeoutSeconds: 4}\n  trialConditions:\n  - {weight: 1}\n  - {weight: 1, set: {penalty.noResponse.sound.levelDbfs: -20}}\n");
+            var max = MaxSoundLevel.Of(set, t => t.Penalty.Incorrect.Sound.LevelDbfs, miss);
             Assert.AreEqual(-20, max.LevelDbfs);
             Assert.AreEqual("trialConditions[1] (any)", max.Where);
-            Assert.AreEqual(-35, MaxSoundLevel.Of(built, t => t.Penalty.Sound.LevelDbfs, t => (object)null).LevelDbfs, "a null level is skipped");
-            Assert.ThrowsException<InvalidOperationException>(() => MaxSoundLevel.Of(built, t => t.Penalty.NoResponse.Sound.LevelDbfs), "one selector refuses a null");
+            var never = build("taskParameters:\n  penalty:\n    incorrect: {timeoutSeconds: 4}\n    noResponse: null\n  trialConditions:\n  - {weight: 1}\n");
+            Assert.IsNull(never[0].Combinations[0].Task.Penalty.NoResponse);
+            Assert.AreEqual(-35, MaxSoundLevel.Of(never, t => t.Penalty.Incorrect.Sound.LevelDbfs, miss).LevelDbfs, "a null level is skipped");
+            Assert.ThrowsException<InvalidOperationException>(() => MaxSoundLevel.Of(never, miss), "one selector refuses a null");
         }
 
         [TestMethod]
-        public void APenalisedMissCostsItsOverrideAndANullFieldTheChoices()
+        public void APenalisedTrialCostsItsKindsOwnBlock()
         {
-            var choice = Penalties.Resolve(4, -35.0, 1, SoundLevels.Mute, false);
-            Assert.AreEqual(4, choice.TimeoutSeconds);
-            Assert.AreEqual(-35, choice.LevelDbfs);
-            var miss = Penalties.Resolve(4, -35.0, 1, SoundLevels.Mute, true);
+            var incorrect = Penalties.For(PenaltyKind.Incorrect, 4, -35.0, 1, SoundLevels.Mute);
+            Assert.AreEqual(4, incorrect.TimeoutSeconds);
+            Assert.AreEqual(-35, incorrect.LevelDbfs);
+            var miss = Penalties.For(PenaltyKind.NoResponse, 4, -35.0, 1, SoundLevels.Mute);
             Assert.AreEqual(1, miss.TimeoutSeconds);
             Assert.IsTrue(double.IsNaN(miss.LevelDbfs), "mute is NaN");
-            var inherited = Penalties.Resolve(4, "mute", null, null, true);
-            Assert.AreEqual(4, inherited.TimeoutSeconds);
-            Assert.IsTrue(double.IsNaN(inherited.LevelDbfs));
-            Assert.AreEqual(-40, Penalties.Resolve(4, -35.0, null, "-40", true).LevelDbfs);
+            Assert.AreEqual(-40, Penalties.For(PenaltyKind.NoResponse, 4, -35.0, 2, "-40").LevelDbfs);
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => Penalties.For(PenaltyKind.NoResponse, 4, -35.0, null, null)).Message, "penalty.noResponse is null");
+            Assert.AreEqual(0, Penalties.Problems(true, true).Count + Penalties.Problems(false, false).Count);
+            CollectionAssert.AreEqual(new[] { "penalty.noResponse is null, but this task penalises a miss: give penalty.noResponse its timeoutSeconds and sound" }, Penalties.Problems(true, false));
         }
 
         [TestMethod]

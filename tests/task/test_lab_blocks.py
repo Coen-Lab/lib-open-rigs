@@ -69,7 +69,7 @@ ROW = {"label": "a", "itiMinSeconds": 2, "itiMaxSeconds": 3, "autoRewardProbabil
 
 
 def test_trial_blocks_keep_their_keys_where_the_task_puts_them():
-    assert Row.model_validate(ROW).model_dump(by_alias=True) == {**ROW, "responseWindowSeconds": None, "reward": {"sizeUl": 3, "largeMultiplier": 2.0, "largeProbability": 0.0}}
+    assert Row.model_validate(ROW).model_dump(by_alias=True) == {**ROW, "responseWindowSeconds": None, "reward": {"sizeUl": 3, "largeMultiplier": 2.0, "largeProbability": 0.0, "consumptionSeconds": 1.5, "tone": {"levelDbfs": "mute"}}}
 
 
 def test_trial_blocks_have_no_lab_default_but_the_window():
@@ -95,7 +95,7 @@ def test_trial_blocks_refuse(change, message):
 
 def test_penalty_refuses_an_endless_timeout():
     with pytest.raises(ValidationError, match="finite number"):
-        Penalty.model_validate({"timeoutSeconds": float("inf")})
+        Penalty.model_validate({"incorrect": {"timeoutSeconds": float("inf")}})
 
 
 @pytest.mark.parametrize("lead", [float("nan"), float("-inf")])
@@ -128,34 +128,48 @@ def test_optogenetics_schema_holds_the_same_rule():
     assert schema["then"]["properties"]["zapitConditionsPath"] == {"minLength": 1}
 
 
-def test_penalty_sound_has_only_a_level_mute_its_off_and_the_timeout_has_no_lab_default():
-    penalty = Penalty.model_validate({"timeoutSeconds": 2})
-    assert penalty.sound.level_dbfs == -35
+def test_penalty_kinds_default_to_4_s_and_minus_35_dbfs_and_mute_is_off():
+    penalty = Penalty.model_validate({})
+    assert penalty.model_dump(by_alias=True) == {
+        "incorrect": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -35.0}},
+        "noResponse": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -35.0}},
+    }
     assert set(Penalty.model_json_schema(by_alias=True)["$defs"]["PenaltySound"]["properties"]) == {"levelDbfs"}
-    assert Penalty.model_validate({"timeoutSeconds": 2, "sound": {"levelDbfs": "mute"}}).sound.level_dbfs == "mute"
+    assert Penalty.model_validate({"incorrect": {"sound": {"levelDbfs": "mute"}}}).incorrect.sound.level_dbfs == "mute"
     for refused in ("off", False, -0.5):
         with pytest.raises(ValidationError):
-            Penalty.model_validate({"timeoutSeconds": 2, "sound": {"levelDbfs": refused}})
-    with pytest.raises(ValidationError, match="timeoutSeconds"):
-        Penalty.model_validate({})
+            Penalty.model_validate({"incorrect": {"sound": {"levelDbfs": refused}}})
+    assert set(Penalty.model_fields) == {"incorrect", "no_response"}  # no old keys kept
 
 
-def test_a_penalised_miss_costs_the_choice_s_values_unless_its_override_sets_its_own():
-    penalty = Penalty.model_validate({"timeoutSeconds": 2})
-    assert penalty.model_dump(by_alias=True)["noResponse"] == {"timeoutSeconds": None, "sound": {"levelDbfs": None}}
-    miss = Penalty.model_validate({"timeoutSeconds": 2, "noResponse": {"timeoutSeconds": 0, "sound": {"levelDbfs": "mute"}}}).no_response
+def test_each_penalty_kind_has_its_own_full_values_and_no_response_may_be_null():
+    miss = Penalty.model_validate({"incorrect": {"timeoutSeconds": 2}, "noResponse": {"timeoutSeconds": 0, "sound": {"levelDbfs": "mute"}}}).no_response
     assert (miss.timeout_seconds, miss.sound.level_dbfs) == (0, "mute")
+    partial = Penalty.model_validate({"noResponse": {"timeoutSeconds": 1}}).no_response
+    assert (partial.timeout_seconds, partial.sound.level_dbfs) == (1, -35), "a left-out field is the lab's default, never the other kind's"
     for refused in ({"timeoutSeconds": -1}, {"sound": {"levelDbfs": "off"}}, {"sound": {"levelDbfs": 0}}):
         with pytest.raises(ValidationError):
-            Penalty.model_validate({"timeoutSeconds": 2, "noResponse": refused})
-    # One oneOf with null, never an anyOf (Bonsai.Sgen makes an empty class of an anyOf item).
-    level = Penalty.model_json_schema(by_alias=True)["$defs"]["PenaltyCostSound"]["properties"]["levelDbfs"]
-    assert "anyOf" not in level and {"type": "null"} in level["oneOf"]
+            Penalty.model_validate({"noResponse": refused})
+    never = Penalty.model_validate({"noResponse": None})
+    assert never.no_response is None
+    never.check_misses(False)
+    with pytest.raises(ValueError, match="penalty.no_response is null, but this task penalises a miss"):
+        never.check_misses(True)
+    Penalty().check_misses(True)
 
+
+def test_reward_holds_its_consumption_and_tone():
+    reward = Reward.model_validate({"sizeUl": 3})
+    assert reward.model_dump(by_alias=True) == {
+        "sizeUl": 3.0, "largeMultiplier": 2.0, "largeProbability": 0.0, "consumptionSeconds": 1.5, "tone": {"levelDbfs": "mute"}}
+    assert Reward.model_validate({"sizeUl": 3, "tone": {"levelDbfs": -20}}).tone.level_dbfs == -20
+    for refused in ({"consumptionSeconds": -1}, {"consumptionSeconds": float("inf")}, {"tone": {"levelDbfs": "off"}}):
+        with pytest.raises(ValidationError):
+            Reward.model_validate({"sizeUl": 3, **refused})
 
 def test_sound_levels_have_the_lab_defaults_in_dbfs_rms():
-    # The lab's defaults: stimuli -30, penalty -35, reward tone -35; the background a lab constant, -60 (P15).
-    assert (task.STIMULUS_LEVEL_DBFS, Penalty(timeout_seconds=1).sound.level_dbfs, RewardTone().level_dbfs, task.BACKGROUND_LEVEL_DBFS) == (-30, -35, -35, -60)
+    # The lab's defaults: stimuli -30, penalty -35, reward tone mute; the background a lab constant, -60 (P15).
+    assert (task.STIMULUS_LEVEL_DBFS, Penalty().incorrect.sound.level_dbfs, RewardTone().level_dbfs, task.BACKGROUND_LEVEL_DBFS) == (-30, -35, "mute", -60)
     assert not hasattr(task, "BackgroundNoise") and not hasattr(task, "StimulusSound")
 
 
@@ -172,7 +186,6 @@ def test_the_levels_are_open_rigs_audio_s():
     assert consts == {
         "StimulusDbfs": task.STIMULUS_LEVEL_DBFS,
         "PenaltyDbfs": task.PENALTY_LEVEL_DBFS,
-        "RewardToneDbfs": task.REWARD_TONE_LEVEL_DBFS,
         "BackgroundDbfs": task.BACKGROUND_LEVEL_DBFS,
         "PeakLimitDbfs": task.PEAK_LIMIT_DBFS,
     }
@@ -207,45 +220,46 @@ def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
 
 def test_spouts_keys_default_and_rules():
     spouts = Spouts.model_validate({"stimulusToSpoutsInSeconds": 0.5})
-    assert spouts.model_dump(by_alias=True) == {"alwaysIn": False, "stimulusToSpoutsInSeconds": 0.5, "rewardConsumptionSeconds": 1.5}
-    spouts.check_fits(1.5, 0.5)
-    with pytest.raises(ValueError, match=r"reward_consumption_seconds \(1.5 s\) is above iti_min_seconds \(1.4 s\)"):
-        spouts.check_fits(1.4, 0.5)
+    assert spouts.model_dump(by_alias=True) == {"alwaysIn": False, "stimulusToSpoutsInSeconds": 0.5}
+    spouts.check_fits(0.1, 0.5)  # no reward consumption rule: it comes before the interval
     with pytest.raises(ValueError, match="response window would open before the spouts arrive"):
         spouts.check_fits(3, 0.4)
     with pytest.raises(ValidationError, match="finite number"):
         Spouts.model_validate({"stimulusToSpoutsInSeconds": float("inf")})
-    early = Spouts.model_validate({"stimulusToSpoutsInSeconds": -0.5, "rewardConsumptionSeconds": 1})
+    assert set(Spouts.model_fields) == {"always_in", "stimulus_to_spouts_in_seconds"}  # rewardConsumptionSeconds is reward.consumptionSeconds
+    early = Spouts.model_validate({"stimulusToSpoutsInSeconds": -1.5})
     early.check_fits(1.5, 0)  # signed: no response window rule before the stimulus
-    with pytest.raises(ValueError, match=r"plus the 0.5 s the spouts come in before the stimulus is above iti_min_seconds \(1.4 s\)"):
+    with pytest.raises(ValueError, match=r"the spouts come in 1.5 s before the stimulus .* more than iti_min_seconds \(1.4 s\)"):
         early.check_fits(1.4, 0)
-
+    Spouts.model_validate({"stimulusToSpoutsInSeconds": -1.5, "alwaysIn": True}).check_fits(1.4, 0)  # always in: no lead
 
 def test_stimulus_timing_keys_default_and_rules():
     timing = StimulusTiming.model_validate({"durationSeconds": 1.5})
     assert timing.model_dump(by_alias=True) == {"durationSeconds": 1.5, "responseToStimulusOffSeconds": None}
     assert StimulusTiming.model_validate({"durationSeconds": 1.5, "responseToStimulusOffSeconds": 0}).response_to_stimulus_off_seconds == 0
-    timing.check_fits(1.5, 1.5)
-    with pytest.raises(ValueError, match=r"duration_seconds \(1.5 s\) is longer than iti_min_seconds \(1.4 s\)"):
-        timing.check_fits(1.4)
+    soonest = {"stimulus_to_earliest_outcome_seconds": 0.0, "min_outcome_to_iti_seconds": 0.0}
+    timing.check_fits(1.5, 1.5, **soonest)
+    with pytest.raises(ValueError, match=r"duration_seconds \(1.5 s\) runs 1.5 s past the soonest outcome, longer than .* plus iti_min_seconds \(1.4 s\)"):
+        timing.check_fits(1.4, **soonest)
+    # The window opening 0.5 s after the stimulus, itiMinSeconds 1, probes possible: the next stimulus at the soonest 1.5 s after.
+    timing.check_fits(1.0, stimulus_to_earliest_outcome_seconds=0.5, min_outcome_to_iti_seconds=0.0)
+    with pytest.raises(ValueError, match="past the soonest outcome"):
+        StimulusTiming.model_validate({"durationSeconds": 1.6}).check_fits(1.0, stimulus_to_earliest_outcome_seconds=0.5, min_outcome_to_iti_seconds=0.0)
     with pytest.raises(ValueError, match="response window's close"):
-        timing.check_fits(3, 1)
+        timing.check_fits(3, 1, **soonest)
+    with pytest.raises(TypeError):
+        timing.check_fits(3, 1, 0.0)  # the soonest outcome and the outcome to the interval are named, never positional
     late = StimulusTiming.model_validate({"durationSeconds": 1, "responseToStimulusOffSeconds": 2.5})
-    late.check_fits(2, min_timeout_seconds=0.5)
-    with pytest.raises(ValueError, match=r"response_to_stimulus_off_seconds \(2.5 s\) is longer than the shortest timeout \(0.0 s\) plus iti_min_seconds \(2 s\)"):
-        late.check_fits(2)
-    StimulusTiming.model_validate({"responseToStimulusOffSeconds": 0.5}).check_fits(1)  # no duration: no cap, its checks skipped
+    late.check_fits(2, stimulus_to_earliest_outcome_seconds=0.0, min_outcome_to_iti_seconds=0.5)
+    with pytest.raises(ValueError, match=r"response_to_stimulus_off_seconds \(2.5 s\) is longer than the shortest outcome to next interval \(0.0 s"):
+        late.check_fits(2, **soonest)
+    StimulusTiming.model_validate({"responseToStimulusOffSeconds": 0.5}).check_fits(1, **soonest)  # no duration: no cap, its checks skipped
     with pytest.raises(ValueError, match="both null: the stimulus would never end"):
-        StimulusTiming.model_validate({}).check_fits(1)
+        StimulusTiming.model_validate({}).check_fits(1, **soonest)
     for bad in ({"durationSeconds": 0}, {"durationSeconds": float("inf")}, {"durationSeconds": 1, "responseToStimulusOffSeconds": -1}):
         with pytest.raises(ValidationError):
             StimulusTiming.model_validate(bad)
 
-
-def test_spouts_default_is_the_csharp_default():
-    source = (Path(__file__).parents[2] / "src" / "OpenRigs.Trials" / "Spouts.cs").read_text(encoding="utf-8")
-    match = re.search(r"public const double DefaultRewardConsumptionSeconds = ([0-9.]+);", source)
-    assert match and float(match.group(1)) == task.SPOUTS_REWARD_CONSUMPTION_SECONDS
 
 
 def test_max_reward_ul_is_the_csharp_default():

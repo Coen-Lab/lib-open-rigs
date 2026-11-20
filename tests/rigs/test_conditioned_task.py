@@ -147,10 +147,10 @@ def test_a_condition_sets_a_penalised_miss_s_sound_level_by_its_three_level_path
     from open_rigs.rigs import conditions
 
     class Penalised(Params):
-        penalty: Penalty = Penalty(timeout_seconds=2)
+        penalty: Penalty = Penalty()
 
     path = "penalty.noResponse.sound.levelDbfs"
-    assert conditions.flatten(Penalised.model_validate(task()).model_dump(by_alias=True, mode="json"))[path] is None
+    assert conditions.flatten(Penalised.model_validate(task()).model_dump(by_alias=True, mode="json"))[path] == -35
     rows = ct.expected_combination_rows(Penalised, task(set={path: ["mute", -40]}))
     assert [row["values"][path] for row in rows] == ["mute", "mute", -40, -40]  # azimuthsDeg picks fastest
     with pytest.raises(ValidationError, match="levelDbfs"):

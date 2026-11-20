@@ -21,9 +21,6 @@ namespace OpenRigs.Audio
         /// <summary>The lab's default level of the penalty sound, in dBFS RMS.</summary>
         public const double PenaltyDbfs = -35;
 
-        /// <summary>The lab's default level of a reward tone, in dBFS RMS.</summary>
-        public const double RewardToneDbfs = -35;
-
         /// <summary>The background noise's level in every task, in dBFS RMS: a lab constant, no task setting.</summary>
         public const double BackgroundDbfs = -60;
 

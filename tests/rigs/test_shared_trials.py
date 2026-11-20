@@ -13,21 +13,27 @@ from open_rigs.rigs import trials as trials_module
 from open_rigs.rigs.trials import CORE_COLUMNS, OUTCOMES, shared_block_problems, shared_columns, summarise
 
 COLUMNS = ["harpTime", "trialNumber", "trialType", "outcome", "itiStartTime", "itiSeconds", "quietWaitSeconds",
-           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds",
-           "penalised", "autoReward"]
+           "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "rewardConsumptionSeconds",
+           "penaltyTimeoutSeconds", "penalised", "autoReward"]
 
 
 def _trial(n, start, iti, response, outcome="correct", timeout=0.0, quiet=0.0, reward=2.0, auto=False, rewarded=None):
     onset = start + iti + quiet
     end = onset + response
+    rewarded = outcome == "correct" or auto if rewarded is None else rewarded
     return {"harpTime": end, "trialNumber": n, "trialType": "auditory", "outcome": outcome, "itiStartTime": start,
             "itiSeconds": iti, "quietWaitSeconds": quiet, "trialStartTime": onset - 0.1, "stimulusOnsetTime": onset,
-            "outcomeTime": end, "rewardOfferedUl": reward,
-            "rewarded": outcome == "correct" or auto if rewarded is None else rewarded,
+            "outcomeTime": end, "rewardOfferedUl": reward, "rewarded": rewarded, "rewardConsumptionSeconds": 1.5 if rewarded else 0.0,
             "penaltyTimeoutSeconds": timeout, "penalised": timeout > 0, "autoReward": auto}
 
 
-TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "penalty": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -45}}}
+def _next(t):
+    """The next interval's start: the outcome plus the timeout or the reward's consumption."""
+    return t["outcomeTime"] + t["penaltyTimeoutSeconds"] + t["rewardConsumptionSeconds"]
+
+
+TASK = {"optogenetics": {"laserToStimulusSeconds": 0.1}, "penalty": {"incorrect": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -45}}},
+        "reward": {"sizeUl": 2.0, "consumptionSeconds": 1.5}}
 
 
 def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, columns=COLUMNS, task=TASK):
@@ -49,12 +55,12 @@ def _experiment(tmp_path, trials, rewards, outcome="completed", final=True, colu
 
 
 def _chain(n):
-    """n consistent trials: each interval starts at the last outcome plus its timeout."""
+    """n consistent trials: each interval starts at the last outcome plus its timeout or reward consumption."""
     trials, start = [], 1000.0
     for i in range(1, n + 1):
         t = _trial(i, start, 2.5, 3.0, outcome="correct" if i % 2 else "incorrect", timeout=0.0 if i % 2 else 4.0)
         trials.append(t)
-        start = t["outcomeTime"] + t["penaltyTimeoutSeconds"]
+        start = _next(t)
     return trials
 
 
@@ -65,7 +71,7 @@ def test_a_consistent_experiment_has_no_problems(tmp_path):
     assert (s.run_outcome, s.trials, s.correct, s.performance, s.responded) == ("completed", 4, 2, 0.5, 1.0)
     assert s.problems == []
     assert s.response_seconds == [3.0] * 4
-    assert [round(x, 6) for x in s.interval_seconds] == [2.5, 6.5, 2.5]
+    assert [round(x, 6) for x in s.interval_seconds] == [4.0, 6.5, 4.0]
     assert (s.requested_ul, s.delivered_ul) == (4.0, 4.0)
 
 
@@ -127,7 +133,7 @@ def test_a_trial_without_a_stimulus_is_a_note_and_left_out_of_the_times(tmp_path
     assert s.problems == []
     assert s.notes == ["trial 2: stimulusOnsetTime NaN, the stimulus never commanded: left out of the response and interval times"]
     assert s.response_seconds == [3.0] * 3
-    assert [round(x, 6) for x in s.interval_seconds] == [6.5, 2.5]
+    assert [round(x, 6) for x in s.interval_seconds] == [6.5, 4.0]
 
 
 def test_a_nan_or_empty_number_is_a_problem_not_a_pass_or_a_crash(tmp_path, monkeypatch, capsys):
@@ -186,9 +192,9 @@ def test_each_block_sits_in_its_place_in_the_core():
     assert [name for name, _, _, _ in shared_columns(())] == core
     both = [name for name, _, _, _ in shared_columns(BOTH)]
     assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-7:] == [
-        "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds", "penalised", "laserCondition",
+        "rewarded", "rewardConsumptionSeconds", "penaltyTimeoutSeconds", "penalised", "laserCondition",
         "laserPowerMw", "laserTriggerTime"]
-    assert len(both) == 18 and len(core) == 14
+    assert len(both) == 19 and len(core) == 15
 
 
 def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
@@ -201,8 +207,8 @@ def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
 def test_a_task_without_a_block_is_held_to_the_core_alone():
     assert shared_block_problems(_block(()), ()) == []
     # A task naming a block its file lacks, or lacking one it names, is told.
-    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 17 columns are")
-    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 14 columns are")
+    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 18 columns are")
+    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 15 columns are")
 
 
 def test_an_unknown_block_is_refused():
@@ -219,7 +225,7 @@ def test_a_change_to_the_shared_block_is_named():
         "laserCondition is double, not int",
     ]
     reordered = dict(reversed(list(_block().items())))
-    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 18 columns are")
+    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 19 columns are")
 
 
 def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):
@@ -238,7 +244,7 @@ def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):
 def test_a_timeout_on_an_unpenalised_trial_is_named(tmp_path):
     trials = _chain(2)
     trials[0]["penaltyTimeoutSeconds"] = 0.5  # not penalised
-    task = {**TASK, "penalty": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": "mute"}}}
+    task = {**TASK, "penalty": {"incorrect": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": "mute"}}}}
     rewards = [(trials[0]["outcomeTime"], 2.0)]
     text = "\n".join(summarise(_experiment(tmp_path, trials, rewards, task=task)).problems)
     assert "trial 1: penaltyTimeoutSeconds 0.5 on a trial not penalised, not 0" in text
@@ -270,9 +276,8 @@ def test_a_reward_is_checked_both_ways_and_by_its_request(tmp_path):
 
 def test_a_paid_probe_counts_as_asked_and_an_unpaid_one_offers_without_a_reward(tmp_path):
     trials = _chain(2)
-    start = trials[-1]["outcomeTime"] + trials[-1]["penaltyTimeoutSeconds"]
-    heads = _trial(3, start, 2.5, 3.0, outcome="probe", rewarded=True)
-    tails = _trial(4, heads["outcomeTime"], 2.5, 3.0, outcome="probe", timeout=4.0)
+    heads = _trial(3, _next(trials[-1]), 2.5, 3.0, outcome="probe", rewarded=True)
+    tails = _trial(4, _next(heads), 2.5, 3.0, outcome="probe", timeout=4.0)
     trials += [heads, tails]
     rewards = [(trials[0]["outcomeTime"], 2.0), (heads["outcomeTime"], 2.0)]
     s = summarise(_experiment(tmp_path, trials, rewards))
@@ -443,7 +448,7 @@ def test_stimulus_state_of_finished_trials_only_is_no_unfinished_trial(tmp_path)
     _stimulus_state(folder, [[t["stimulusOnsetTime"], t["trialNumber"], 0, -40, 1] for t in trials])
     s = summarise(folder)
     assert s.unfinished is None and s.problems == []
-    assert [round(x, 6) for x in s.interval_seconds] == [2.5]
+    assert [round(x, 6) for x in s.interval_seconds] == [4.0]
     assert "unfinished" not in trials_module.describe(s)
 
 
@@ -506,17 +511,48 @@ def test_summarise_reads_only_chunk_names_and_notes_the_rest(tmp_path):
                        "Settings/Settings_Task_x.json: not read, not named Settings_Task_<time>.json"]
 
 
-def test_a_penalised_miss_s_timeout_is_its_override_and_a_combination_s_value_is_its_trial_s(tmp_path):
+def test_a_penalised_trial_costs_its_kind_s_timeout_and_a_combination_s_value_is_its_trial_s(tmp_path):
     trials, start = [], 1000.0
     for i, (outcome, timeout) in enumerate([("incorrect", 4.0), ("noResponse", 1.0), ("incorrect", 6.0), ("noResponse", 4.0)], 1):
         t = _trial(i, start, 2.5, 3.0, outcome=outcome, timeout=timeout)
         t["trialCombinationId"] = 0 if i < 3 else 1
         trials.append(t)
         start = t["outcomeTime"] + timeout
-    task = {**TASK, "penalty": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -45}, "noResponse": {"timeoutSeconds": 1.0, "sound": {"levelDbfs": "mute"}}}}
+    task = {**TASK, "penalty": {"incorrect": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -45}}, "noResponse": {"timeoutSeconds": 1.0, "sound": {"levelDbfs": "mute"}}}}
     folder = _experiment(tmp_path, trials, [], columns=COLUMNS + ["trialCombinationId"], task=task)
     combinations = {"rows": [{"trialCombinationId": 0, "values": {}},
-                             {"trialCombinationId": 1, "values": {"penalty.timeoutSeconds": 6.0, "penalty.noResponse.timeoutSeconds": None}}]}
+                             {"trialCombinationId": 1, "values": {"penalty.incorrect.timeoutSeconds": 6.0, "penalty.noResponse": None}}]}
     (folder / "Settings" / "Settings_Combinations_2026-11-14T01-00-00.json").write_text(json.dumps(combinations))
-    # trial 4, a miss whose combination's override is null, costs its combination's 6 s, not the task file's 4 s
-    assert summarise(folder).problems == ["trial 4: penaltyTimeoutSeconds 4 on a trial penalised, not 6"]
+    # trial 3 costs its combination's 6 s; trial 4, a penalised miss where its combination never penalises one, is named
+    assert summarise(folder).problems == ["trial 4: a penalised miss, but penalty.noResponse is null, so its timeout is not checked"]
+
+
+def test_a_rewarded_trial_s_interval_starts_after_its_reward_consumption(tmp_path):
+    trials = _chain(4)
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
+    assert summarise(_experiment(tmp_path / "ok", trials, rewards)).problems == []
+    wrong = [dict(t) for t in trials]
+    wrong[0]["rewardConsumptionSeconds"] = 1.0  # the task's 1.5 s
+    wrong[1]["rewardConsumptionSeconds"] = 0.5  # not rewarded: 0 or the task's
+    text = "\n".join(summarise(_experiment(tmp_path / "wrong", wrong, rewards)).problems)
+    assert "trial 1: rewardConsumptionSeconds 1 on a trial rewarded, not 1.5" in text
+    assert "trial 2: rewardConsumptionSeconds 0.5 on a trial not rewarded, not 0 or 1.5" in text
+    assert "trial 2: interval started +0.5000 s from the last outcome plus its timeout and reward consumption" in text
+    unanswered = [dict(t) for t in trials]
+    unanswered[0]["rewarded"] = False  # the board never answered: the loop still waited the consumption
+    assert not any("rewardConsumptionSeconds" in p for p in summarise(_experiment(tmp_path / "unanswered", unanswered, [])).problems)
+    old = [{k: v for k, v in t.items() if k != "rewardConsumptionSeconds"} for t in _chain(1)]
+    assert summarise(_experiment(tmp_path / "old", old, rewards[:1], columns=[c for c in COLUMNS if c != "rewardConsumptionSeconds"])).problems == []
+
+
+def test_an_always_in_trial_has_no_spouts_lead(tmp_path):
+    trials = _chain(4)
+    for t in trials:
+        t["trialStartTime"] = t["stimulusOnsetTime"] - (0.1 if t["trialNumber"] > 2 else 0.3)  # the laser's lead on always-in trials
+        t["trialCombinationId"] = 0 if t["trialNumber"] <= 2 else 1
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
+    task = {**TASK, "spouts": {"stimulusToSpoutsInSeconds": -0.3, "alwaysIn": False}}
+    folder = _experiment(tmp_path, trials, rewards, columns=COLUMNS + ["trialCombinationId"], task=task)
+    combinations = {"rows": [{"trialCombinationId": 0, "values": {}}, {"trialCombinationId": 1, "values": {"spouts.alwaysIn": True}}]}
+    (folder / "Settings" / "Settings_Combinations_2026-11-14T01-00-00.json").write_text(json.dumps(combinations))
+    assert summarise(folder).problems == []

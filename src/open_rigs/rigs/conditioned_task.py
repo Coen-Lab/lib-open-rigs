@@ -49,9 +49,9 @@ COMMON_SESSION_FIELDS = {
     "optogenetics.zapitConditionsPath": "the conditions file loaded in Zapit and counted at Go",
 }
 # One block order for every conditioned task's model (top-level fields by alias): identity, the mix, timing, stimuli,
-# reward, penalty, sounds, optogenetics, then the task's own (block_order_problems).
+# reward, penalty, optogenetics, then the task's own (block_order_problems).
 BLOCK_ORDER = ("rngSeed", "curriculum", "trialConditions", "trialStructure", "visualStimulus", "auditoryStimulus",
-               "reward", "autoRewardProbability", "penalty", "rewardTone", "optogenetics")
+               "reward", "autoRewardProbability", "penalty", "optogenetics")
 
 
 def props(schemas: dict) -> dict:

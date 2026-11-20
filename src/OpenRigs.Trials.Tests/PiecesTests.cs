@@ -24,6 +24,7 @@ namespace OpenRigs.Trials.Tests
         public double outcomeTime;
         public bool rewarded;
         public double rewardOfferedUl;
+        public double rewardConsumptionSeconds;
         public bool penalised;
         public double penaltyTimeoutSeconds;
     }

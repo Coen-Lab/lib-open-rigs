@@ -11,12 +11,12 @@ namespace OpenRigs.Trials
 {
     /// <summary>
     /// A task's trials on the Harp clock, the same for every task: each trial drawn at its interval's start (the last
-    /// outcome plus its timeout; trial 1 the first tick), a hardware-triggered Zapit armed during the interval once the
+    /// outcome plus its timeout when penalised, or its reward consumption when rewarded; trial 1 the first tick), a hardware-triggered Zapit armed during the interval once the
     /// last laser is done, the trial start at the interval's end less the lead (TrialLoop.Lead: max(laserToStimulusSeconds,
     /// the earliest Stimulus cue's lead, 0)) or later
     /// until the quiet waits hold (QuietWait), the trigger laserToStimulusSeconds before the stimulus (the workflow stops
     /// if Zapit has not armed the trial by then, naming the last laser when it held Zapit too long, and a trial answered
-    /// first gets no laser), the stimulus the lead after the start, the response window, the outcome and its timeout
+    /// first gets no laser), the stimulus the lead after the start, the response window, the outcome and its timeout or reward consumption
     /// (cues still to come that are DroppedAtOutcome never come), and with a timed stimulus (TrialTiming.StimulusDurationSeconds)
     /// its StimulusOff, once, at StimulusTiming.Time (rules that are an IStimulusAfterOutcome update it after the outcome until then). What is the task's own (the draw, the stimulus, the
     /// response rule, the outcome) is its <see cref="ITrialRules{TTrial, TUpdate, TOutcome}"/>. Every time is on the Harp
@@ -227,7 +227,7 @@ namespace OpenRigs.Trials
             {
                 stimulated = true;
                 onset = now;
-                if (onTrial != null) throw new InvalidOperationException(string.Format("Trial {0}'s stimulus came at {1} s while trial {2}'s was still on until {3} s: the task's stimulus.durationSeconds must be at most its shortest itiMinSeconds (StimulusTiming.Problems).", trial.TrialNumber, now, onTrial.TrialNumber, offDue));
+                if (onTrial != null) throw new InvalidOperationException(string.Format("Trial {0}'s stimulus came at {1} s while trial {2}'s was still on until {3} s: the task's stimulus block must end it before the soonest next stimulus (StimulusTiming.Problems).", trial.TrialNumber, now, onTrial.TrialNumber, offDue));
                 if (!double.IsNaN(timing.StimulusDurationSeconds) || timing.ResponseToStimulusOffSeconds.HasValue)
                 {
                     onTrial = trial;
@@ -304,6 +304,8 @@ namespace OpenRigs.Trials
         {
             var timeout = outcome.PenaltyTimeoutSeconds;
             if (!(timeout >= 0) || double.IsInfinity(timeout)) throw new InvalidOperationException(string.Format("Trial {0}'s outcome has a timeout of {1} s, not a finite number from 0.", trial.TrialNumber, timeout));
+            var consumption = outcome.RewardConsumptionSeconds;
+            if (!(consumption >= 0) || double.IsInfinity(consumption)) throw new InvalidOperationException(string.Format("Trial {0}'s outcome has a reward consumption of {1} s, not a finite number from 0.", trial.TrialNumber, consumption));
             phase = Phase.Timeout;
             lastOutcome = outcome;
             if (timing.Laser)
@@ -318,7 +320,7 @@ namespace OpenRigs.Trials
                     laserFreeAt = Math.Max(laserFreeAt, triggerDue);   // never triggered: Zapit is free once its trigger would have come
                 }
             }
-            nextItiStart = now + timeout;
+            nextItiStart = now + timeout + consumption;
             timers.RemoveAll(t => t.Kind == TrialEventKind.Cue && t.Trial == trial && t.DroppedAtOutcome);
             events.Add(new TrialEvent<TTrial, TUpdate, TOutcome>(TrialEventKind.Outcome, now, trial, null, default(TUpdate), outcome));
             if (onTrial == trial)
@@ -335,7 +337,7 @@ namespace OpenRigs.Trials
                     if (cue.Anchor == CueAnchor.NextIti) Schedule(nextItiStart + cue.Seconds, TrialEventKind.Cue, trial, cue.Name);
                 }
             }
-            if (timeout <= 0) NextTrial(events);
+            if (timeout + consumption <= 0) NextTrial(events);
         }
 
         void Off(List<TrialEvent<TTrial, TUpdate, TOutcome>> events)
@@ -424,7 +426,7 @@ namespace OpenRigs.Trials
     public static class TrialLoop
     {
         /// <summary>A trial's lead, the trial start to the stimulus: the larger of its laserToStimulusSeconds, the most any of its
-        /// Stimulus cues comes before the stimulus (a negative Seconds, such as a negative spouts.stimulusToSpoutsInSeconds) and 0.</summary>
+        /// Stimulus cues comes before the stimulus (a negative Seconds, such as a negative spouts.stimulusToSpoutsInSeconds on a trial whose spouts move, Spouts.Cues) and 0.</summary>
         public static double Lead(TrialTiming timing)
         {
             var lead = Math.Max(timing.LaserToStimulusSeconds, 0);

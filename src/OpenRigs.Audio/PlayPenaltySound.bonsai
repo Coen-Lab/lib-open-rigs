@@ -4,7 +4,7 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The penalty sound, the same in every task: the lab's one penalty sound (PenaltySoundBuffer, on rig.yml's penaltySoundChannel alone) laid out once the trials' rules are made at Go, at the highest penalty level any trial draws (TrialRules' MaxPenaltyLevelDbfs, its peak checked then), into the AsyncSubject PenaltySoundBuffer; each input, a penalised trial's penalty.sound.levelDbfs (NaN when mute: nothing plays), then plays it at that level (SoundAtLevel), sent into SpeakerMixer's PenaltySounds. Needs TrialRules (with MaxPenaltyLevelDbfs) and Speakers from the workflow.</Description>
+  <Description>The penalty sound, the same in every task: the lab's one penalty sound (PenaltySoundBuffer, on rig.yml's penaltySoundChannel alone) laid out once the trials' rules are made at Go, at the highest penalty level any trial draws (TrialRules' MaxPenaltyLevelDbfs, its peak checked then), into the AsyncSubject PenaltySoundBuffer; each input, a penalised trial's penalty level (Penalties.For) (NaN when mute: nothing plays), then plays it at that level (SoundAtLevel), sent into SpeakerMixer's PenaltySounds. Needs TrialRules (with MaxPenaltyLevelDbfs) and Speakers from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">

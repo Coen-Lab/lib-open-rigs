@@ -28,8 +28,8 @@ namespace OpenRigs.Trials
 
     /// <summary>
     /// A trial's outcome, built the same way in every task from its filled row (<see cref="SharedTrialColumns.Fill"/>): the
-    /// row stamped with its outcomeTime, the reward, whether it was penalised with the trial's penalty level, and the timeout
-    /// (TrialOutcomeEffects reads them). A task that sets off more at the outcome (its spouts) derives from it.
+    /// row stamped with its outcomeTime, the reward, whether it was penalised with the trial's penalty level, the timeout
+    /// and the reward consumption (TrialOutcomeEffects and the trial loop read them). A task that sets off more at the outcome (its spouts) derives from it.
     /// </summary>
     /// <typeparam name="TRow">The task's trial row.</typeparam>
     public class TrialOutcome<TRow> : ISpoutOutcome where TRow : class
@@ -37,7 +37,7 @@ namespace OpenRigs.Trials
         /// <summary>
         /// The outcome of <paramref name="row"/>, whose shared block is filled: the reward, when the row is rewarded,
         /// is its rewardOfferedUl at <paramref name="valveInstance"/> (as rig.yml's wiring names the reward valve), else null;
-        /// <paramref name="penaltyLevelDbfs"/> the trial's penalty.sound.levelDbfs (<see cref="SoundLevels.Parse"/>: NaN when
+        /// <paramref name="penaltyLevelDbfs"/> the trial's penalty level (Penalties.For's LevelDbfs, <see cref="SoundLevels.Parse"/>: NaN when
         /// mute). Throws when the row's outcome is not one of <see cref="TrialOutcomes.All"/>.
         /// </summary>
         public TrialOutcome(TRow row, string valveInstance, double penaltyLevelDbfs)
@@ -54,6 +54,7 @@ namespace OpenRigs.Trials
             Penalised = Get<bool>(row, "penalised");
             PenaltyLevelDbfs = penaltyLevelDbfs;
             PenaltyTimeoutSeconds = Get<double>(row, "penaltyTimeoutSeconds");
+            RewardConsumptionSeconds = Get<double>(row, "rewardConsumptionSeconds");
         }
 
         /// <summary>Gets the trial row, stamped with the outcome's Harp time, for LogTrials.</summary>
@@ -73,6 +74,9 @@ namespace OpenRigs.Trials
 
         /// <summary>Gets the timeout after the trial, in seconds (the row's penaltyTimeoutSeconds).</summary>
         public double PenaltyTimeoutSeconds { get; private set; }
+
+        /// <summary>Gets the time to drink the reward after the trial, in seconds (the row's rewardConsumptionSeconds): the next interval starts after it.</summary>
+        public double RewardConsumptionSeconds { get; private set; }
 
         /// <summary>Gets where the spouts go at the outcome in a task whose spouts move (Spouts.AtOutcome): the rewarded valve's spout alone, else both out.</summary>
         public OpenRigs.Devices.LickSpoutCommand SpoutCommand { get { return Spouts.AtOutcome(Reward); } }

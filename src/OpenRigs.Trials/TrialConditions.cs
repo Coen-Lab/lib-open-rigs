@@ -96,9 +96,8 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>The highest of several levels of the weighted conditions' combinations, one sound's buffer for all of them:
-        /// a selector's null is a level another selector gives (penalty.noResponse.sound.levelDbfs, the choice's), skipped.
-        /// A penalty sound's: Of(conditions, t => t.Penalty.Sound.LevelDbfs, t => t.Penalty.NoResponse.Sound.LevelDbfs),
-        /// the second giving null where the task never penalises a miss.</summary>
+        /// a selector's null is a sound that never plays (penalty.noResponse null), skipped. A penalty sound's:
+        /// Of(conditions, t => t.Penalty.Incorrect.Sound.LevelDbfs, t => t.Penalty.NoResponse == null ? null : t.Penalty.NoResponse.Sound.LevelDbfs).</summary>
         public static MaxSoundLevel Of<TTask>(IEnumerable<BuiltTrialCondition<TTask>> conditions, params Func<TTask, object>[] levelsDbfs)
         {
             return Of(conditions, levelsDbfs, true);
