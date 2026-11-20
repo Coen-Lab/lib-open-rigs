@@ -590,7 +590,12 @@ def test_with_the_trial_end_block_each_interval_starts_at_the_last_trial_s_end_p
     trials = _always_full(4)
     rewards = [(t["outcomeTime"], 2.0) for t in trials if t["outcome"] == "correct"]
     columns = COLUMNS + ["trialEndTime"]
-    assert summarise(_experiment(tmp_path / "ok", trials, rewards, columns=columns)).problems == []
+    ok = summarise(_experiment(tmp_path / "ok", trials, rewards, columns=columns))
+    assert ok.problems == []
+    # the interval figure runs from each trial's end, not its outcome
+    ends = [b["stimulusOnsetTime"] - a["trialEndTime"] for a, b in zip(trials, trials[1:])]
+    assert [round(x, 6) for x in ok.interval_seconds] == [round(x, 6) for x in ends]
+    assert all(b["stimulusOnsetTime"] - a["outcomeTime"] > x for a, b, x in zip(trials, trials[1:], ends))
     # the same rows read without the column: each interval is late on its outcome
     text = "\n".join(summarise(_experiment(tmp_path / "plain", trials, rewards)).problems)
     assert "trial 2: interval started +2.5000 s from the last outcome plus its timeout" in text

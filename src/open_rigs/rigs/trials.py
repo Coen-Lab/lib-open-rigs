@@ -318,7 +318,7 @@ class Summary:
     performance: float  # performance()'s first: correct / (correct + incorrect), two-spout and go/no-go trials; NaN with none
     responded: float = float("nan")  # performance()'s second: the share responded to; NaN with none
     response_seconds: List[float] = field(default_factory=list)  # each trial's outcome less its stimulus onset
-    interval_seconds: List[float] = field(default_factory=list)  # each outcome to the next stimulus onset
+    interval_seconds: List[float] = field(default_factory=list)  # each trial's end (trialEndTime, else outcomeTime) to the next stimulus onset
     requested_ul: float = 0.0  # the task's rewards: rewardOfferedUl of each rewarded trial
     delivered_ul: float = 0.0  # every RewardDelivered row's Value (manual rewards included)
     problems: List[str] = field(default_factory=list)
@@ -607,7 +607,7 @@ def _summarise(folder: Path) -> Summary:
                 s.problems.append(f"trial {number}: interval started {_f(row, 'itiStartTime') - due:+.4f} s from the last "
                                   + ("trial's end (trialEndTime)" if "trialEndTime" in last else "outcome") + " plus its timeout")
             if shown:
-                s.interval_seconds.append(onset - _f(last, "outcomeTime"))
+                s.interval_seconds.append(onset - _end(last))
         last = row
         at_outcome = [r for t, r in reward_times if end - TOLERANCE_S <= t <= end + REWARD_ANSWER_S]
         offered = _f(row, "rewardOfferedUl")
@@ -664,7 +664,7 @@ def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Op
     for r in mine:
         try:
             if any(STIMULUS_ON_COLUMNS[c](r[c]) for c in onsets):
-                s.interval_seconds.append(_f(r, TIME_COLUMN) - _f(last, "outcomeTime"))
+                s.interval_seconds.append(_f(r, TIME_COLUMN) - _end(last))
                 return
         except (TypeError, ValueError):
             continue
@@ -683,7 +683,7 @@ def describe(s: Summary) -> str:
              f"  performance {percent(s.performance)} (correct / (correct + incorrect), two-spout and go/no-go trials),"
              f" responded {percent(s.responded)}",
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",
-             f"  outcome to next stimulus: {spread(s.interval_seconds)}",
+             f"  trial end to next stimulus:{spread(s.interval_seconds)}",
              f"  water: {s.requested_ul:g} ul asked by the task, {s.delivered_ul:g} ul delivered (RewardDelivered)"]
     lines += [f"  video {v}" for v in s.videos]
     lines += [f"  NOTE {n}" for n in s.notes]
