@@ -28,6 +28,7 @@ dev = [
   "pytest",
   "pytest-cov",
   "pytest-mock",
+  "pytest-xdist>=3.8.0",
   "ruff",
 ]
 
