@@ -32,7 +32,7 @@ namespace OpenRigs.Trials
     /// (TrialOutcomeEffects reads them). A task that sets off more at the outcome (its spouts) derives from it.
     /// </summary>
     /// <typeparam name="TRow">The task's trial row.</typeparam>
-    public class TrialOutcome<TRow> : ITrialOutcome where TRow : class
+    public class TrialOutcome<TRow> : ISpoutOutcome where TRow : class
     {
         /// <summary>
         /// The outcome of <paramref name="row"/>, whose shared block is filled: the reward, when the row is rewarded,
@@ -73,6 +73,9 @@ namespace OpenRigs.Trials
 
         /// <summary>Gets the timeout after the trial, in seconds (the row's penaltyTimeoutSeconds).</summary>
         public double PenaltyTimeoutSeconds { get; private set; }
+
+        /// <summary>Gets where the spouts go at the outcome in a task whose spouts move (Spouts.AtOutcome): the rewarded valve's spout alone, else both out.</summary>
+        public OpenRigs.Devices.LickSpoutCommand SpoutCommand { get { return Spouts.AtOutcome(Reward); } }
 
         static T Get<T>(TRow row, string name)
         {

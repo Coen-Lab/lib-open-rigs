@@ -87,6 +87,41 @@ class ResponseWindow(TaskBlock):
     )
 
 
+SPOUTS_REWARD_CONSUMPTION_SECONDS = 1.5  # OpenRigs.Trials Spouts.DefaultRewardConsumptionSeconds
+
+
+class Spouts(TaskBlock):
+    """The spouts block of a task whose spouts move (OpenRigs.Trials Spouts and SpoutCommands): both out at trial 1's
+    interval start, in at the SpoutsIn cue, the rewarded spout alone at the outcome (else both out), both out at the
+    SpoutsOut cue. Which spouts come in is the task's. A task holds it as its spouts field."""
+
+    stay_in: bool = Field(
+        default=False, description="Whether the trial's spouts stay in: they move only at the SpoutsIn cue, never drawn out"
+    )
+    stimulus_to_in_seconds: float = Field(
+        ge=0, description="From stimulus onset to moving the spouts in (the SpoutsIn cue), in seconds; at most the stimulus to the response window's opening"
+    )
+    reward_consumption_seconds: float = Field(
+        default=SPOUTS_REWARD_CONSUMPTION_SECONDS,
+        ge=0,
+        description="From the next interval's start (the outcome plus any timeout) to drawing the spouts out (the SpoutsOut cue), in seconds: time to drink a reward; at most itiMinSeconds",
+    )
+
+    def check_fits(self, iti_min_seconds: float, stimulus_to_response_window_seconds: float) -> None:
+        """Refuses spouts drawn out after the shortest interval's stimulus, or a response window opening before the spouts
+        are in (OpenRigs.Trials Spouts.Problems, the same rules). Each task's model calls it with its own values."""
+        if self.reward_consumption_seconds > iti_min_seconds + 1e-9:
+            raise ValueError(
+                f"spouts.reward_consumption_seconds ({self.reward_consumption_seconds} s) is above iti_min_seconds ({iti_min_seconds} s): "
+                "the spouts are drawn out reward_consumption_seconds into the interval, before the stimulus"
+            )
+        if stimulus_to_response_window_seconds < self.stimulus_to_in_seconds - 1e-9:
+            raise ValueError(
+                f"stimulus_to_response_window_seconds ({stimulus_to_response_window_seconds} s) is below spouts.stimulus_to_in_seconds "
+                f"({self.stimulus_to_in_seconds} s): the response window would open before the spouts arrive"
+            )
+
+
 class AutoReward(TaskBlock):
     """Auto-reward: the chance a trial is rewarded without a correct response. How it is given is the task's."""
 

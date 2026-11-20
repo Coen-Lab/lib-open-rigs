@@ -28,7 +28,7 @@ from open_rigs.core.calibration import (
     DispenseProcedure,
 )
 from open_rigs.core.experiment import ExperimentSession
-from open_rigs.core.task import AutoReward, Iti, LickQuietWait, Optogenetics, Penalty, PenaltySound, ResponseWindow, Reward, Task, TaskParameters, WheelQuietWait
+from open_rigs.core.task import AutoReward, Iti, LickQuietWait, Optogenetics, Penalty, PenaltySound, ResponseWindow, Reward, Spouts, Task, TaskParameters, WheelQuietWait
 
 __all__ = [
     "DiscriminatorTypeMixin",
@@ -64,6 +64,7 @@ __all__ = [
     "WheelQuietWait",
     "Iti",
     "ResponseWindow",
+    "Spouts",
     "AutoReward",
     "Reward",
     "Optogenetics",

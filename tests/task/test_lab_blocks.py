@@ -15,6 +15,7 @@ from open_rigs.core.task import (
     ResponseWindow,
     Reward,
     RewardTone,
+    Spouts,
     WheelQuietWait,
 )
 
@@ -201,6 +202,24 @@ def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
     # Each buffer's peak is checked as it is built; two sounds playing at once on one speaker add up.
     help_text = RewardTone.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]
     assert "Sounds overlapping on a speaker share its headroom: each buffer's peak is checked, not their mix" in help_text
+
+
+def test_spouts_keys_default_and_rules():
+    spouts = Spouts.model_validate({"stimulusToInSeconds": 0.5})
+    assert spouts.model_dump(by_alias=True) == {"stayIn": False, "stimulusToInSeconds": 0.5, "rewardConsumptionSeconds": 1.5}
+    spouts.check_fits(1.5, 0.5)
+    with pytest.raises(ValueError, match=r"reward_consumption_seconds \(1.5 s\) is above iti_min_seconds \(1.4 s\)"):
+        spouts.check_fits(1.4, 0.5)
+    with pytest.raises(ValueError, match="response window would open before the spouts arrive"):
+        spouts.check_fits(3, 0.4)
+    with pytest.raises(ValidationError, match="finite number"):
+        Spouts.model_validate({"stimulusToInSeconds": float("inf")})
+
+
+def test_spouts_default_is_the_csharp_default():
+    source = (Path(__file__).parents[2] / "src" / "OpenRigs.Trials" / "Spouts.cs").read_text(encoding="utf-8")
+    match = re.search(r"public const double DefaultRewardConsumptionSeconds = ([0-9.]+);", source)
+    assert match and float(match.group(1)) == task.SPOUTS_REWARD_CONSUMPTION_SECONDS
 
 
 def test_max_reward_ul_is_the_csharp_default():
