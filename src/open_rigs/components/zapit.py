@@ -16,6 +16,12 @@ ZAPIT_MAX_RAMP_DOWN_SECONDS = 0.5
 RAMP_DOWN_CONTEXT = "zapit_ramp_down_seconds"
 
 
+def ramp_down_from(context) -> float:
+    """The conditions file's largest ramp-down from a validation's context (a pydantic ValidationInfo, a context dict or
+    None), in seconds; 0 without it, the workflow then checking the file at Go."""
+    return float((getattr(context, "context", context) or {}).get(RAMP_DOWN_CONTEXT, 0.0))
+
+
 def max_ramp_down_seconds(path: str | Path) -> float:
     """A Zapit conditions file's highest offRampDownDuration_ms over its stimLocationsNN conditions, in seconds
     (ZapitConditions.Check's MaxRampDownSeconds; the file's other checks are the workflow's, at Go). ValueError for a

@@ -37,7 +37,7 @@ class Params(TaskParameters, ct.ConditionedTask):
     delay_seconds: float = 0.0
 
     @classmethod
-    def between_trials(cls, tasks):
+    def between_trials(cls, tasks, context=None):
         if any(task["delaySeconds"] > 5 for task in tasks):
             raise ValueError("delay too long")
 

@@ -205,8 +205,8 @@ class ConditionedTask(TaskBlock):
     @classmethod
     def between_trials(cls, tasks: list[dict], context: dict | None = None) -> None:
         """The timing rules between a trial and the next, on every weighted combination's values (by alias, as JSON); raise
-        ValueError on a break. None by default. `context`, the validation's (a Zapit file's ramp-down, RAMP_DOWN_CONTEXT),
-        is passed only when there is one."""
+        ValueError on a break. None by default. `context`, the validation's (a Zapit file's ramp-down, RAMP_DOWN_CONTEXT;
+        ramp_down_from reads it), is always passed, None without one."""
 
     def derive_trial_type(self, condition: TrialCondition) -> str:
         """A condition's trialType from its settings (its set over the task's), by TRIAL_TYPES (x-trial-types)."""
@@ -257,7 +257,7 @@ class ConditionedTask(TaskBlock):
             drawn += built[key] * (condition.weight > 0)
         if problems := conditions.required_problems(list(self.REQUIRED_CONDITIONS), base, drawn):
             raise ValueError("; ".join(f"{problem} (x-required-conditions)" for problem in problems))
-        self.between_trials(drawn, **({"context": info.context} if info.context else {}))  # a hook without one still works
+        self.between_trials(drawn, context=info.context)
         return self
 
     def _combinations(self, base: dict, condition: TrialCondition, where: str, context: dict) -> list[dict]:

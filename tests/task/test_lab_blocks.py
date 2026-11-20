@@ -224,6 +224,17 @@ def test_zapit_must_be_free_before_the_next_trigger_less_the_reply_margin():
         on.check_zapit_free_in_time(2.0, trigger_hold_seconds=1.0)
 
 
+def test_a_laser_until_the_outcome_holds_the_line_through_the_files_ramp_down():
+    from open_rigs.components.zapit import RAMP_DOWN_CONTEXT, ramp_down_from
+
+    on = Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5, "enabled": True, "zapitConditionsPath": "z.yml", "laserPowerMw": 2})
+    with pytest.raises(ValueError, match=r"ramp-down \(0.5 s\) must be at most 0.3 s"):
+        on.check_ramp_down_fits(1.0, 0.5)
+    on.check_ramp_down_fits(1.0, 0.3)
+    Optogenetics.model_validate({**OPTO, "laserToStimulusSeconds": 0.5}).check_ramp_down_fits(1.0, 0.5)  # Zapit off
+    assert ramp_down_from(None) == 0 and ramp_down_from({RAMP_DOWN_CONTEXT: 0.4}) == 0.4
+
+
 def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
     # Each buffer's peak is checked as it is built; two sounds playing at once on one speaker add up.
     help_text = RewardTone.model_json_schema(by_alias=True)["properties"]["levelDbfs"]["description"]

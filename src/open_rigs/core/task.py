@@ -273,6 +273,22 @@ class Optogenetics(TaskBlock):
                 "StartStimulus goes once the laser and its ramp-down are done"
             )
 
+    def check_ramp_down_fits(self, iti_min_seconds: float, ramp_down_seconds: float) -> None:
+        """Refuses a ramp-down that leaves Zapit busy at the next trigger when the laser runs until the outcome
+        (LaserTiming.UntilOutcome): the trigger line is held the ramp-down past the outcome, and the next trigger comes at the
+        soonest iti_min_seconds - laser_to_stimulus_seconds after it, less the reply margin. Off unless enabled.
+        ramp_down_seconds is the conditions file's largest (ramp_down_from a validation's context; 0 without it)."""
+        if not self.enabled:
+            return
+        margin = ZAPIT_REPLY_MARGIN_SECONDS
+        hold_max = iti_min_seconds - self.laser_to_stimulus_seconds - margin
+        if ramp_down_seconds > hold_max + 1e-9:
+            raise ValueError(
+                f"the Zapit conditions file's largest ramp-down ({ramp_down_seconds:g} s) must be at most {hold_max:g} s "
+                f"(trial_structure.iti_min_seconds - optogenetics.laser_to_stimulus_seconds - Zapit's {margin} s reply margin): "
+                "the trigger line is held that long past the outcome and the next trial is armed once it falls"
+            )
+
 
 # The lab's sound levels, in dBFS RMS: the RMS of a sound over its samples outside silent stretches (a silent stretch a
 # run of exactly-zero samples at least 1 ms long), as the task gives it (before the speaker's equalisation), against full
