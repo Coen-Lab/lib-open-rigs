@@ -117,7 +117,7 @@ namespace OpenRigs.Trials
         /// <summary>The stimulus as it was due (the trial start plus the lead); a trial whose stimulus never came has none of these after
         /// it. Negative seconds come before the stimulus, within the trial's lead, which grows to hold them (TrialLoop.Lead).</summary>
         Stimulus,
-        /// <summary>The start of the interval after the trial's outcome (the outcome plus its timeout).</summary>
+        /// <summary>The start of the interval after the trial's outcome (the outcome plus its timeout; TrialTimes.TrialEndTime plus it when the response window always runs in full).</summary>
         NextIti
     }
 
@@ -202,6 +202,12 @@ namespace OpenRigs.Trials
         /// <summary>Gets or sets how long the response window stays open, in seconds; at its end the rules' ResponseEnd gives the outcome. Infinity for no limit.</summary>
         public double ResponseWindowSeconds { get; set; }
 
+        /// <summary>Gets or sets whether the response window always runs in full (false, the default: the outcome ends the
+        /// trial). The outcome still comes at the choice, with everything it sets off; later licks and the wheel are not the
+        /// rules' (as after any outcome); but the trial ends, and its timeout and so the next interval start, only at the
+        /// window's end (TrialTimes.TrialEndTime), rewarded or not. Needs a finite ResponseWindowSeconds.</summary>
+        public bool ResponseWindowAlwaysFull { get; set; }
+
         /// <summary>Gets or sets the trial's cues; null or empty for none.</summary>
         public IList<TrialCue> Cues { get; set; }
     }
@@ -246,6 +252,14 @@ namespace OpenRigs.Trials
         /// <summary>Gets or sets the Harp clock's latest tick: an outcome given now is timed then (outcomeTime).</summary>
         public double Now { get; set; }
 
+        /// <summary>Gets or sets the trial's TrialTiming.ResponseWindowAlwaysFull.</summary>
+        public bool ResponseWindowAlwaysFull { get; set; }
+
+        /// <summary>Gets when the trial ends were the outcome at Now (trialEndTime): Now; when its response window always runs in full
+        /// (ResponseWindowAlwaysFull), the window's end (Now once it has come, a miss). Its timeout starts then, and the next
+        /// interval after it.</summary>
+        public double TrialEndTime { get { return ResponseWindowAlwaysFull && Now < ResponseEndTime - TrialLoop.Tolerance ? ResponseEndTime : Now; } }
+
         /// <summary>Gets whether the laser was triggered: an outcome given now logs its power, else 0 mW.</summary>
         public bool LaserFired { get { return !double.IsNaN(LaserTriggerTime); } }
 
@@ -263,7 +277,7 @@ namespace OpenRigs.Trials
     /// <summary>A trial's outcome as a task's rules give it: the loop needs only its timeout.</summary>
     public interface ITrialOutcome
     {
-        /// <summary>Gets the timeout after the trial, in seconds (penaltyTimeoutSeconds, 0 unless penalised): the next interval starts at the outcome plus this.</summary>
+        /// <summary>Gets the timeout after the trial, in seconds (penaltyTimeoutSeconds, 0 unless penalised): the next interval starts at the outcome plus this (at TrialTimes.TrialEndTime plus this when the response window always runs in full).</summary>
         double PenaltyTimeoutSeconds { get; }
     }
 

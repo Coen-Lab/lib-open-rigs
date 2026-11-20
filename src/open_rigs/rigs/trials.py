@@ -3,7 +3,8 @@
 Every task's schemas/trial-columns.yml starts with the shared block, in order, with these types, units and descriptions
 word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
-(QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPowerMw,
+(QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, trialEnd (TRIAL_END_COLUMNS: trialEndTime, for a task whose
+response window always runs in full) after outcomeTime, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPowerMw,
 laserTriggerTime) after penalised, then a conditioned task's conditions (CONDITIONS_COLUMNS), stimulus (STIMULUS_COLUMNS)
 and autoReward (AUTO_REWARD_COLUMNS) blocks, in that order. trialType and outcome are in the core by name, type and place,
 each described by its task. A task's own columns follow the block.
@@ -19,7 +20,8 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
 - each stimulus came itiSeconds plus quietWaitSeconds after its interval started (itiStartTime), within 2 ms;
 - each laser trigger (laserTriggerTime, when there was one) came laserToStimulusSeconds before the stimulus was due,
   within 2 ms;
-- each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds, within 2 ms;
+- each interval after the first started at the last trial's outcome (its trialEndTime in a log with the trialEnd block,
+  never before its outcome) plus its penaltyTimeoutSeconds, within 2 ms;
 - each penalised trial (penalised) had its kind's timeout as its penaltyTimeoutSeconds (penalty.incorrect.timeoutSeconds, or on a miss
   penalty.noResponse.timeoutSeconds), an unpenalised one 0, and, in a log with penaltyFlashBrightness, its kind's
   flash.brightness as that (0 unpenalised);
@@ -130,6 +132,14 @@ QUIET_WAIT_COLUMNS: List[Column] = [
      "held this trial's start past the end of its interval less the lead; 0 with the waits off or a quiet mouse."),
 ]
 
+TRIAL_END_COLUMNS: List[Column] = [
+    ("trialEndTime", "double", "s",
+     "Harp time the trial ended and its timeout began: its outcomeTime; in a task whose response window always runs in full after a "
+     "choice (responseWindowAlwaysFull; OpenRigs.Trials TrialTiming.ResponseWindowAlwaysFull), the response window's end, rewarded "
+     "or not (outcomeTime on a miss). The next interval starts at it plus penaltyTimeoutSeconds (itiStartTime). Known at "
+     "the outcome, so logged in the row although it may come later."),
+]
+
 OPTOGENETICS_COLUMNS: List[Column] = [
     ("laserCondition", "int", None,
      "The Zapit condition sent to Zapit this trial (its conditions file's number, from 1), laser on or off: every trial "
@@ -181,6 +191,7 @@ AUTO_REWARD_COLUMNS: List[Column] = [
 # this order.
 BLOCKS: Dict[str, Tuple[str, List[Column]]] = {
     "quietWait": ("itiSeconds", QUIET_WAIT_COLUMNS),
+    "trialEnd": ("outcomeTime", TRIAL_END_COLUMNS),
     "optogenetics": ("penalised", OPTOGENETICS_COLUMNS),
     "conditions": ("penalised", CONDITIONS_COLUMNS),
     "stimulus": ("penalised", STIMULUS_COLUMNS),
@@ -307,7 +318,7 @@ class Summary:
     performance: float  # performance()'s first: correct / (correct + incorrect), two-spout and go/no-go trials; NaN with none
     responded: float = float("nan")  # performance()'s second: the share responded to; NaN with none
     response_seconds: List[float] = field(default_factory=list)  # each trial's outcome less its stimulus onset
-    interval_seconds: List[float] = field(default_factory=list)  # each outcome to the next stimulus onset
+    interval_seconds: List[float] = field(default_factory=list)  # each trial's end (trialEndTime, else outcomeTime) to the next stimulus onset
     requested_ul: float = 0.0  # the task's rewards: rewardOfferedUl of each rewarded trial
     delivered_ul: float = 0.0  # every RewardDelivered row's Value (manual rewards included)
     problems: List[str] = field(default_factory=list)
@@ -352,6 +363,11 @@ def _quiet(row: Dict[str, str]) -> float:
     return _f(row, "quietWaitSeconds") if "quietWaitSeconds" in row else 0.0
 
 
+def _end(row: Dict[str, str]) -> float:
+    """When a trial ended and its timeout began: trialEndTime, or outcomeTime in a log without the trialEnd block."""
+    return _f(row, "trialEndTime") if "trialEndTime" in row else _f(row, "outcomeTime")
+
+
 def _true(text: Any) -> bool:
     return str(text).strip().lower() == "true"
 
@@ -362,7 +378,8 @@ EVENT_NEEDS = (TIME_COLUMN, "Event", "Value")
 # A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an infinity, an
 # empty cell or text is a problem and the row's checks are skipped.
 TRIAL_NUMBERS = ("trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime",
-                 "rewardOfferedUl", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "quietWaitSeconds", "laserTriggerTime")
+                 "rewardOfferedUl", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "quietWaitSeconds", "laserTriggerTime",
+                 "trialEndTime")
 NAN_ALLOWED = ("stimulusOnsetTime", "laserTriggerTime")
 
 
@@ -582,13 +599,15 @@ def _summarise(folder: Path) -> Summary:
                 if abs(flash - want) > 1e-9:
                     s.problems.append(f"trial {number}: penaltyFlashBrightness {flash:g} on a trial "
                                       f"{'penalised' if penalised else 'not penalised'}, not {want:g}")
+        if "trialEndTime" in row and _f(row, "trialEndTime") < end - TOLERANCE_S:
+            s.problems.append(f"trial {number}: trialEndTime {_f(row, 'trialEndTime') - end:+.4f} s from its outcome, before it")
         if last is not None:
-            due = _f(last, "outcomeTime") + _f(last, "penaltyTimeoutSeconds")
+            due = _end(last) + _f(last, "penaltyTimeoutSeconds")
             if abs(_f(row, "itiStartTime") - due) > TOLERANCE_S:
                 s.problems.append(f"trial {number}: interval started {_f(row, 'itiStartTime') - due:+.4f} s from the last "
-                                  "outcome plus its timeout")
+                                  + ("trial's end (trialEndTime)" if "trialEndTime" in last else "outcome") + " plus its timeout")
             if shown:
-                s.interval_seconds.append(onset - _f(last, "outcomeTime"))
+                s.interval_seconds.append(onset - _end(last))
         last = row
         at_outcome = [r for t, r in reward_times if end - TOLERANCE_S <= t <= end + REWARD_ANSWER_S]
         offered = _f(row, "rewardOfferedUl")
@@ -645,7 +664,7 @@ def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Op
     for r in mine:
         try:
             if any(STIMULUS_ON_COLUMNS[c](r[c]) for c in onsets):
-                s.interval_seconds.append(_f(r, TIME_COLUMN) - _f(last, "outcomeTime"))
+                s.interval_seconds.append(_f(r, TIME_COLUMN) - _end(last))
                 return
         except (TypeError, ValueError):
             continue
@@ -664,7 +683,7 @@ def describe(s: Summary) -> str:
              f"  performance {percent(s.performance)} (correct / (correct + incorrect), two-spout and go/no-go trials),"
              f" responded {percent(s.responded)}",
              f"  response (outcome less stimulus onset): {spread(s.response_seconds)}",
-             f"  outcome to next stimulus: {spread(s.interval_seconds)}",
+             f"  trial end to next stimulus:{spread(s.interval_seconds)}",
              f"  water: {s.requested_ul:g} ul asked by the task, {s.delivered_ul:g} ul delivered (RewardDelivered)"]
     lines += [f"  video {v}" for v in s.videos]
     lines += [f"  NOTE {n}" for n in s.notes]

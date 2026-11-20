@@ -293,3 +293,17 @@ def test_max_reward_ul_is_the_csharp_default():
     match = re.search(r"public const double DefaultMaxRewardUl = ([0-9.]+);", source)
     assert match, "RewardLine.cs has no DefaultMaxRewardUl"
     assert float(match.group(1)) == MAX_REWARD_UL
+
+
+class AlwaysFullRow(Iti, ResponseWindow, task.ResponseWindowAlwaysFull):
+    label: str
+
+
+def test_an_always_full_window_is_on_by_default_in_a_task_with_the_block_and_needs_a_limit():
+    row = {"label": "a", "itiMinSeconds": 2, "itiMaxSeconds": 3}
+    assert AlwaysFullRow.model_validate({**row, "responseWindowSeconds": 1.5}).response_window_always_full is True
+    assert AlwaysFullRow.model_validate({**row, "responseWindowAlwaysFull": False}).response_window_always_full is False
+    with pytest.raises(ValidationError, match="response_window_always_full needs a response_window_seconds"):
+        AlwaysFullRow.model_validate(row)
+    with pytest.raises(ValidationError, match="response_window_always_full needs a response_window_seconds"):
+        AlwaysFullRow.model_validate({**row, "responseWindowAlwaysFull": True})
