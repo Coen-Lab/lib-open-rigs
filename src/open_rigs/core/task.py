@@ -95,10 +95,10 @@ class Spouts(TaskBlock):
     interval start, in at the SpoutsIn cue, the rewarded spout alone at the outcome (else both out), both out at the
     SpoutsOut cue. Which spouts come in is the task's. A task holds it as its spouts field."""
 
-    stay_in: bool = Field(
-        default=False, description="Whether the trial's spouts stay in: they move only at the SpoutsIn cue, never drawn out"
+    always_in: bool = Field(
+        default=False, description="Always in: every spout the task uses is in for the whole trial and interval; they move only at the SpoutsIn cue, never drawn out"
     )
-    stimulus_to_in_seconds: float = Field(
+    stimulus_to_spouts_in_seconds: float = Field(
         ge=0, description="From stimulus onset to moving the spouts in (the SpoutsIn cue), in seconds; at most the stimulus to the response window's opening"
     )
     reward_consumption_seconds: float = Field(
@@ -115,10 +115,45 @@ class Spouts(TaskBlock):
                 f"spouts.reward_consumption_seconds ({self.reward_consumption_seconds} s) is above iti_min_seconds ({iti_min_seconds} s): "
                 "the spouts are drawn out reward_consumption_seconds into the interval, before the stimulus"
             )
-        if stimulus_to_response_window_seconds < self.stimulus_to_in_seconds - 1e-9:
+        if stimulus_to_response_window_seconds < self.stimulus_to_spouts_in_seconds - 1e-9:
             raise ValueError(
-                f"stimulus_to_response_window_seconds ({stimulus_to_response_window_seconds} s) is below spouts.stimulus_to_in_seconds "
-                f"({self.stimulus_to_in_seconds} s): the response window would open before the spouts arrive"
+                f"stimulus_to_response_window_seconds ({stimulus_to_response_window_seconds} s) is below spouts.stimulus_to_spouts_in_seconds "
+                f"({self.stimulus_to_spouts_in_seconds} s): the response window would open before the spouts arrive"
+            )
+
+
+class StimulusTiming(TaskBlock):
+    """When the stimulus ends (OpenRigs.Trials StimulusTiming, TrialTiming.StimulusDurationSeconds and ResponseToStimulusOffSeconds):
+    the earlier of its onset plus durationSeconds and the response (the outcome) plus responseToStimulusOffSeconds, logged as
+    stimulusOffTime. A task's own stimulus model takes it by inheritance, keeping its keys in the stimulus block."""
+
+    duration_seconds: float = Field(gt=0, description="The longest the stimulus lasts from its onset, in seconds; at most itiMinSeconds")
+    response_to_stimulus_off_seconds: float | None = Field(
+        default=None,
+        ge=0,
+        description="From the response (the outcome; on a miss, the response window's end) to the stimulus off, in seconds, unless the duration ends it first: 0, off at the response; null, the response does not end it (it runs durationSeconds); at most the shortest timeout plus itiMinSeconds",
+    )
+
+    def check_fits(self, iti_min_seconds: float, stimulus_to_response_end_seconds: float = float("inf"), min_timeout_seconds: float = 0.0) -> None:
+        """Refuses a stimulus still on at the next trial's (durationSeconds above iti_min_seconds, or
+        responseToStimulusOffSeconds above min_timeout_seconds, the shortest timeout after an outcome, 0 when a rewarded
+        trial has none, plus iti_min_seconds) or past the response window's close (OpenRigs.Trials StimulusTiming.Problems,
+        the same rules). Each task's model calls it with its own values."""
+        after = self.response_to_stimulus_off_seconds
+        if after is not None and after > min_timeout_seconds + iti_min_seconds + 1e-9:
+            raise ValueError(
+                f"stimulus.response_to_stimulus_off_seconds ({after} s) is longer than the shortest timeout ({min_timeout_seconds} s) "
+                f"plus iti_min_seconds ({iti_min_seconds} s): the stimulus could still be on at the next trial's"
+            )
+        if self.duration_seconds > iti_min_seconds + 1e-9:
+            raise ValueError(
+                f"stimulus.duration_seconds ({self.duration_seconds} s) is longer than iti_min_seconds ({iti_min_seconds} s): "
+                "the stimulus would still be on when the next trial's comes"
+            )
+        if self.duration_seconds > stimulus_to_response_end_seconds + 1e-9:
+            raise ValueError(
+                f"stimulus.duration_seconds ({self.duration_seconds} s) is longer than the stimulus to the response window's close "
+                f"({stimulus_to_response_end_seconds} s)"
             )
 
 

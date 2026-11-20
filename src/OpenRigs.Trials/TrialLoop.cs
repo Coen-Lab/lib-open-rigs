@@ -16,7 +16,8 @@ namespace OpenRigs.Trials
     /// until the quiet waits hold (QuietWait), the trigger laserToStimulusSeconds before the stimulus (the workflow stops
     /// if Zapit has not armed the trial by then, naming the last laser when it held Zapit too long, and a trial answered
     /// first gets no laser), the stimulus the lead after the start, the response window, the outcome and its timeout
-    /// (cues still to come that are DroppedAtOutcome never come). What is the task's own (the draw, the stimulus, the
+    /// (cues still to come that are DroppedAtOutcome never come), and with a timed stimulus (TrialTiming.StimulusDurationSeconds)
+    /// its StimulusOff, once, at StimulusTiming.Time (rules that are an IStimulusAfterOutcome update it after the outcome until then). What is the task's own (the draw, the stimulus, the
     /// response rule, the outcome) is its <see cref="ITrialRules{TTrial, TUpdate, TOutcome}"/>. Every time is on the Harp
     /// clock: inputs between ticks are timed at the latest tick. Not thread-safe: <see cref="TrialLoop.Observe"/> runs it
     /// under one lock.
@@ -52,6 +53,11 @@ namespace OpenRigs.Trials
         bool armSent, triggered, stimulated, capped;
         TTrial awaitingReply;   // the trial whose StartStimulus Zapit has not yet answered
         TTrial armed;           // the last trial Zapit armed
+        readonly IStimulusAfterOutcome<TTrial, TUpdate> after;   // the rules' stimulus after the outcome, if they have one
+        TTrial onTrial;         // the trial whose timed stimulus is on (StimulusDurationSeconds), until its StimulusOff
+        TrialTimes onTimes;     // its times from its outcome
+        double offDue;          // its off time: onset + duration, from the outcome the earlier of that and outcome + responseToStimulusOffSeconds
+        bool afterOutcome, hookOpen;   // its outcome has come; AfterOutcome still called (until its off or the next trial's start)
 
         /// <summary>A loop running <paramref name="rules"/>' trials; the first is drawn at the first clock tick. Without
         /// a wheel (<paramref name="hasWheel"/> false) the wheel's distance stays NaN and a trial that waits for the wheel
@@ -62,6 +68,7 @@ namespace OpenRigs.Trials
             this.rules = rules;
             this.hasWheel = hasWheel;
             laser = rules.Laser;
+            after = rules as IStimulusAfterOutcome<TTrial, TUpdate>;
         }
 
         /// <summary>Gets the trial drawn last: in its interval, running, or in its timeout; null before the first tick.</summary>
@@ -89,6 +96,8 @@ namespace OpenRigs.Trials
                 timers.RemoveAt(0);
                 events.Add(Event(due.Kind, now, due.Trial, due.Cue));
             }
+            if (onTrial != null && now >= offDue - TrialLoop.Tolerance) Off(events);
+            else if (onTrial != null && afterOutcome) AfterOutcome(events);
             if (trial != null && timing.Laser && laser.HardwareTriggered && !armSent && (phase == Phase.Iti || phase == Phase.Running)
                 && now >= armAt - TrialLoop.Tolerance)
             {
@@ -126,6 +135,7 @@ namespace OpenRigs.Trials
             var events = new List<TrialEvent<TTrial, TUpdate, TOutcome>>();
             wheel = cm;
             if (phase == Phase.Iti && !double.IsNaN(now)) wait.Wheel(cm, now);
+            if (onTrial != null && afterOutcome) AfterOutcome(events);
             if (phase != Phase.Running) return events;
             var updates = new List<TUpdate>();
             var outcome = rules.Wheel(trial, cm, Times(), updates);
@@ -179,6 +189,9 @@ namespace OpenRigs.Trials
             problems.AddRange(QuietWait.LickProblems(t.LickQuietSeconds));
             problems.AddRange(QuietWait.WheelProblems(t.WheelQuietSeconds, t.WheelQuietCm));
             if (!hasWheel && t.WheelQuietSeconds > 0) problems.Add(string.Format("it waits {0} s for the wheel to be quiet, but the loop has no wheel", t.WheelQuietSeconds));
+            if (!double.IsNaN(t.StimulusDurationSeconds) && (!(t.StimulusDurationSeconds > 0) || double.IsInfinity(t.StimulusDurationSeconds))) problems.Add(string.Format("its stimulus duration is {0} s, not a finite number above 0 (NaN for none)", t.StimulusDurationSeconds));
+            if (t.ResponseToStimulusOffSeconds.HasValue && double.IsNaN(t.StimulusDurationSeconds)) problems.Add("it has a responseToStimulusOffSeconds but no stimulus duration");
+            else if (t.ResponseToStimulusOffSeconds.HasValue && (!(t.ResponseToStimulusOffSeconds.Value >= 0) || double.IsInfinity(t.ResponseToStimulusOffSeconds.Value))) problems.Add(string.Format("its responseToStimulusOffSeconds is {0} s, not null or a finite number from 0", t.ResponseToStimulusOffSeconds.Value));
             if (problems.Count > 0) throw new InvalidOperationException(string.Format("Trial {0} cannot be run: {1}.", next.TrialNumber, string.Join("; ", problems)));
         }
 
@@ -204,6 +217,14 @@ namespace OpenRigs.Trials
             {
                 stimulated = true;
                 onset = now;
+                if (onTrial != null) throw new InvalidOperationException(string.Format("Trial {0}'s stimulus came at {1} s while trial {2}'s was still on until {3} s: the task's stimulus.durationSeconds must be at most its shortest itiMinSeconds (StimulusTiming.Problems).", trial.TrialNumber, now, onTrial.TrialNumber, offDue));
+                if (!double.IsNaN(timing.StimulusDurationSeconds))
+                {
+                    onTrial = trial;
+                    offDue = onset + timing.StimulusDurationSeconds;
+                    afterOutcome = false;
+                    hookOpen = true;
+                }
                 events.Add(Event(TrialEventKind.Stimulus, now, trial, null));
                 if (timing.Cues != null)
                 {
@@ -290,6 +311,13 @@ namespace OpenRigs.Trials
             nextItiStart = now + timeout;
             timers.RemoveAll(t => t.Kind == TrialEventKind.Cue && t.Trial == trial && t.DroppedAtOutcome);
             events.Add(new TrialEvent<TTrial, TUpdate, TOutcome>(TrialEventKind.Outcome, now, trial, null, default(TUpdate), outcome));
+            if (onTrial == trial)
+            {
+                onTimes = Times();
+                offDue = onTimes.StimulusOffTime;
+                afterOutcome = true;
+                if (now >= offDue - TrialLoop.Tolerance) Off(events);
+            }
             if (timing.Cues != null)
             {
                 foreach (var cue in timing.Cues)
@@ -298,6 +326,28 @@ namespace OpenRigs.Trials
                 }
             }
             if (timeout <= 0) NextTrial(events);
+        }
+
+        void Off(List<TrialEvent<TTrial, TUpdate, TOutcome>> events)
+        {
+            events.Add(Event(TrialEventKind.StimulusOff, now, onTrial, null));
+            onTrial = null;
+            onTimes = null;
+        }
+
+        // The ended trial's stimulus while on, until the next trial starts.
+        void AfterOutcome(List<TrialEvent<TTrial, TUpdate, TOutcome>> events)
+        {
+            if (after == null || !hookOpen) return;
+            if (phase == Phase.Running || (phase == Phase.Iti && now >= wait.TrialStartTime - TrialLoop.Tolerance))
+            {
+                hookOpen = false;
+                return;
+            }
+            var updates = new List<TUpdate>();
+            onTimes.Now = now;
+            after.AfterOutcome(onTrial, onTimes, wheel, updates);
+            foreach (var update in updates) events.Add(new TrialEvent<TTrial, TUpdate, TOutcome>(TrialEventKind.Update, now, onTrial, null, update, null));
         }
 
         void Schedule(double due, TrialEventKind kind, TTrial owner, string cue, bool droppedAtOutcome = false)
@@ -319,6 +369,7 @@ namespace OpenRigs.Trials
                 ResponseStartTime = responseStart,
                 ResponseEndTime = responseEnd,
                 LaserTriggerTime = triggerTime,
+                StimulusOffTime = double.IsNaN(timing.StimulusDurationSeconds) ? double.NaN : StimulusTiming.Time(onset, timing.StimulusDurationSeconds, now, timing.ResponseToStimulusOffSeconds),
                 Now = now,
             };
         }

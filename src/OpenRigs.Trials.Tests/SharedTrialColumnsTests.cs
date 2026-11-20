@@ -17,6 +17,7 @@ namespace OpenRigs.Trials.Tests
             public double quietWaitSeconds;
             public double trialStartTime;
             public double stimulusOnsetTime;
+            public double stimulusOffTime;
             public double outcomeTime;
             public double rewardOfferedUl;
             public bool rewarded;
@@ -35,6 +36,7 @@ namespace OpenRigs.Trials.Tests
             public double itiSeconds;
             public double trialStartTime;
             public double stimulusOnsetTime;
+            public double stimulusOffTime;
             public double outcomeTime;
             public double rewardOfferedUl;
             public bool rewarded;
@@ -53,6 +55,7 @@ namespace OpenRigs.Trials.Tests
             public float itiSeconds;
             public double trialStartTime;
             public double stimulusOnsetTime;
+            public double stimulusOffTime;
             public double outcomeTime;
             public double rewardOfferedUl;
             public bool rewarded;
@@ -62,7 +65,7 @@ namespace OpenRigs.Trials.Tests
 
         static TrialTimes Times(double trigger)
         {
-            return new TrialTimes { ItiStartTime = 10, ItiSeconds = 2.5, QuietWaitSeconds = 0.25, TrialStartTime = 12.25, StimulusOnsetTime = 12.751, LaserTriggerTime = trigger, Now = 13.5 };
+            return new TrialTimes { ItiStartTime = 10, ItiSeconds = 2.5, QuietWaitSeconds = 0.25, TrialStartTime = 12.25, StimulusOnsetTime = 12.751, StimulusOffTime = 13.751, LaserTriggerTime = trigger, Now = 13.5 };
         }
 
         static StubTrial Laser() { return new StubTrial { TrialNumber = 7, LaserCondition = 3, LaserOn = true, LaserPowerMw = 4.5 }; }
@@ -77,6 +80,7 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(0.25, row.quietWaitSeconds);
             Assert.AreEqual(12.25, row.trialStartTime);
             Assert.AreEqual(12.751, row.stimulusOnsetTime);
+            Assert.AreEqual(13.751, row.stimulusOffTime);
             Assert.AreEqual(13.5, row.outcomeTime, "the outcome is Now");
             Assert.AreEqual(3, row.rewardOfferedUl, "the offer, on a trial not rewarded too");
             Assert.IsFalse(row.rewarded);

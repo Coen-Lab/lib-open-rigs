@@ -86,6 +86,11 @@ CORE_COLUMNS: List[Column] = [
     ("stimulusOnsetTime", "double", "s",
      "Harp time the workflow commanded the stimulus on, NaN if it never was: the first tick of the 1 ms Harp clock at "
      "or after trialStartTime plus the lead, in every experiment. The physical onset is in the hardware logs."),
+    ("stimulusOffTime", "double", "s",
+     "Harp time the workflow commanded the stimulus off (OpenRigs.Trials StimulusTiming): the earlier of stimulusOnsetTime "
+     "plus stimulus.durationSeconds and outcomeTime plus stimulus.responseToStimulusOffSeconds (unless null), at the first tick at "
+     "or after it; known at the outcome, so logged in the row although it may come later. NaN if the stimulus never came "
+     "on, or in a task whose stimulus the trial loop does not time. A task that ends it sooner itself says so (its note)."),
     ("outcomeTime", "double", "s",
      "Harp time the workflow knew the outcome, the same time as harpTime, as its own column so that every moment of a "
      "trial is named; the reward, the penalty sound and the timeout are timed from it. On a lick it is the Harp clock's "

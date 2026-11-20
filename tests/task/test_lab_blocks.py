@@ -16,6 +16,7 @@ from open_rigs.core.task import (
     Reward,
     RewardTone,
     Spouts,
+    StimulusTiming,
     WheelQuietWait,
 )
 
@@ -205,15 +206,33 @@ def test_a_level_s_help_says_overlapping_sounds_share_a_speaker_s_headroom():
 
 
 def test_spouts_keys_default_and_rules():
-    spouts = Spouts.model_validate({"stimulusToInSeconds": 0.5})
-    assert spouts.model_dump(by_alias=True) == {"stayIn": False, "stimulusToInSeconds": 0.5, "rewardConsumptionSeconds": 1.5}
+    spouts = Spouts.model_validate({"stimulusToSpoutsInSeconds": 0.5})
+    assert spouts.model_dump(by_alias=True) == {"alwaysIn": False, "stimulusToSpoutsInSeconds": 0.5, "rewardConsumptionSeconds": 1.5}
     spouts.check_fits(1.5, 0.5)
     with pytest.raises(ValueError, match=r"reward_consumption_seconds \(1.5 s\) is above iti_min_seconds \(1.4 s\)"):
         spouts.check_fits(1.4, 0.5)
     with pytest.raises(ValueError, match="response window would open before the spouts arrive"):
         spouts.check_fits(3, 0.4)
     with pytest.raises(ValidationError, match="finite number"):
-        Spouts.model_validate({"stimulusToInSeconds": float("inf")})
+        Spouts.model_validate({"stimulusToSpoutsInSeconds": float("inf")})
+
+
+def test_stimulus_timing_keys_default_and_rules():
+    timing = StimulusTiming.model_validate({"durationSeconds": 1.5})
+    assert timing.model_dump(by_alias=True) == {"durationSeconds": 1.5, "responseToStimulusOffSeconds": None}
+    assert StimulusTiming.model_validate({"durationSeconds": 1.5, "responseToStimulusOffSeconds": 0}).response_to_stimulus_off_seconds == 0
+    timing.check_fits(1.5, 1.5)
+    with pytest.raises(ValueError, match=r"duration_seconds \(1.5 s\) is longer than iti_min_seconds \(1.4 s\)"):
+        timing.check_fits(1.4)
+    with pytest.raises(ValueError, match="response window's close"):
+        timing.check_fits(3, 1)
+    late = StimulusTiming.model_validate({"durationSeconds": 1, "responseToStimulusOffSeconds": 2.5})
+    late.check_fits(2, min_timeout_seconds=0.5)
+    with pytest.raises(ValueError, match=r"response_to_stimulus_off_seconds \(2.5 s\) is longer than the shortest timeout \(0.0 s\) plus iti_min_seconds \(2 s\)"):
+        late.check_fits(2)
+    for bad in ({"durationSeconds": 0}, {"durationSeconds": float("inf")}, {"durationSeconds": 1, "responseToStimulusOffSeconds": -1}):
+        with pytest.raises(ValidationError):
+            StimulusTiming.model_validate(bad)
 
 
 def test_spouts_default_is_the_csharp_default():

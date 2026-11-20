@@ -15,9 +15,10 @@
 | Stimulus | the first tick at or after the start plus the lead | `Stimulus`, then the rules' `Update`s |
 | Response | from `ResponseDelaySeconds` after the stimulus for `ResponseWindowSeconds` (infinity: no limit) | the rules' `Update`s; `LaserCap` once the laser has run `LaserCapSeconds` |
 | Outcome | the tick (or lick or wheel sample, timed at the latest tick) the rules return an outcome, or the window's end | `Outcome`; `TriggerOff` when the line falls |
+| Stimulus off | with `TrialTiming.StimulusDurationSeconds`, at `StimulusTiming.Time`: the earlier of the onset plus the duration and the outcome plus `ResponseToStimulusOffSeconds` | `StimulusOff`, once per trial whose stimulus came on; until then, after the outcome, an `IStimulusAfterOutcome`'s `AfterOutcome` updates (each tick and wheel input, never past the next trial's start) |
 | Cues | the task's `TrialCue`s, from the stimulus or the next interval's start (`CueAnchor.Stimulus`, `NextIti`), outcome or not; a stimulus cue made with `droppedAtOutcome` never comes once the trial has its outcome (the spouts in after an early answer) | `Cue` |
 
-`TrialTimes` gives the rules the trial's times as its row logs them (`ItiStartTime` for `itiStartTime`, `ItiSeconds` for `itiSeconds`, `quietWaitSeconds`, `trialStartTime`, `stimulusOnsetTime`, `laserTriggerTime`, and `Now` for `outcomeTime`); `LaserFired` is false on a trial answered before its trigger, which logs 0 mW. `SharedTrialColumns.Fill` fills a row's shared block from them and the outcome's reward and penalty (`rewardOfferedUl`, `rewarded`, `penalised`), so every task logs it one way; a task makes its reward command from the same `rewarded` it gives `Fill`.
+`TrialTimes` gives the rules the trial's times as its row logs them (`ItiStartTime` for `itiStartTime`, `ItiSeconds` for `itiSeconds`, `quietWaitSeconds`, `trialStartTime`, `stimulusOnsetTime`, `StimulusOffTime` for `stimulusOffTime`, `laserTriggerTime`, and `Now` for `outcomeTime`); `LaserFired` is false on a trial answered before its trigger, which logs 0 mW. `SharedTrialColumns.Fill` fills a row's shared block from them and the outcome's reward and penalty (`rewardOfferedUl`, `rewarded`, `penalised`), so every task logs it one way; a task makes its reward command from the same `rewarded` it gives `Fill`.
 
 ## The laser
 

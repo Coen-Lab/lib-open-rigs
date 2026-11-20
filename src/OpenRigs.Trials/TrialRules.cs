@@ -26,7 +26,10 @@ namespace OpenRigs.Trials
         /// <summary>The laser has run to its cap (LaserTiming.LaserCapSeconds from the trigger) with no outcome yet: stop it.</summary>
         LaserCap,
         /// <summary>The trigger line falls.</summary>
-        TriggerOff
+        TriggerOff,
+        /// <summary>The trial's stimulus goes off (StimulusTiming): once per trial whose stimulus came on and whose timing has a
+        /// StimulusDurationSeconds, at the first tick at or after StimulusTiming.Time, or at the outcome itself when that is the time.</summary>
+        StimulusOff
     }
 
     /// <summary>When a trial's laser ends, and so when the next trial's StartStimulus may go.</summary>
@@ -163,7 +166,16 @@ namespace OpenRigs.Trials
         public TrialTiming()
         {
             ResponseWindowSeconds = double.PositiveInfinity;
+            StimulusDurationSeconds = double.NaN;
         }
+
+        /// <summary>Gets or sets the longest the stimulus lasts from its onset (stimulus.durationSeconds); NaN (the default): the
+        /// loop does not time the stimulus off, and no StimulusOff event comes.</summary>
+        public double StimulusDurationSeconds { get; set; }
+
+        /// <summary>Gets or sets the outcome to the stimulus off (stimulus.responseToStimulusOffSeconds): null, the response does not end
+        /// it; 0, off at the outcome; X, off X s after it, whichever of that and the duration comes first. Needs a StimulusDurationSeconds.</summary>
+        public double? ResponseToStimulusOffSeconds { get; set; }
 
         /// <summary>Gets or sets the inter-trial interval drawn for the trial (itiSeconds): its start to the stimulus with a quiet mouse.</summary>
         public double ItiSeconds { get; set; }
@@ -222,6 +234,10 @@ namespace OpenRigs.Trials
 
         /// <summary>Gets or sets when it closes; infinity for no limit.</summary>
         public double ResponseEndTime { get; set; }
+
+        /// <summary>Gets or sets when the stimulus goes off were the outcome at Now (stimulusOffTime, StimulusTiming.Time): at the
+        /// outcome, the trial's off time. NaN with no onset or no StimulusDurationSeconds.</summary>
+        public double StimulusOffTime { get; set; }
 
         /// <summary>Gets or sets the tick the trigger line rose (laserTriggerTime); NaN if it has not.</summary>
         public double LaserTriggerTime { get; set; }
@@ -286,6 +302,18 @@ namespace OpenRigs.Trials
 
         /// <summary>The response window closed with no outcome: the outcome then, never null.</summary>
         TOutcome ResponseEnd(TTrial trial, TrialTimes times);
+    }
+
+    /// <summary>
+    /// Rules whose stimulus goes on changing after the outcome while it is still on (the outcome decided; licks and the wheel
+    /// no longer change it): the loop calls AfterOutcome on each Harp clock tick and each wheel input from the outcome until
+    /// the trial's StimulusOff event or the next trial's start, whichever is first, and emits its updates as Update events
+    /// of that trial. Rules without it show nothing new after the outcome.
+    /// </summary>
+    public interface IStimulusAfterOutcome<TTrial, TUpdate>
+    {
+        /// <summary>The trial's stimulus after its outcome; times are its own, Now the latest tick; wheelCm the wheel's latest distance (NaN for none).</summary>
+        void AfterOutcome(TTrial trial, TrialTimes times, double wheelCm, ICollection<TUpdate> updates);
     }
 
     /// <summary>One thing a trial loop asks the workflow to do, at a Harp time.</summary>

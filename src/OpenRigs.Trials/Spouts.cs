@@ -11,8 +11,8 @@ namespace OpenRigs.Trials
     /// <summary>A trial of a task whose spouts move (its spouts block, open_rigs.core.task Spouts).</summary>
     public interface ISpoutTrial : ITrial
     {
-        /// <summary>Gets whether the trial's spouts stay in (spouts.stayIn): no move but its SpoutsInCommand.</summary>
-        bool SpoutsStayIn { get; }
+        /// <summary>Gets whether the trial's spouts are always in (spouts.alwaysIn): every spout the task uses in for the whole trial and interval, no move but its SpoutsInCommand.</summary>
+        bool SpoutsAlwaysIn { get; }
 
         /// <summary>Gets where the spouts go at the trial's SpoutsIn cue: both in, or one spout alone (the task's choice).</summary>
         LickSpoutCommand SpoutsInCommand { get; }
@@ -21,7 +21,7 @@ namespace OpenRigs.Trials
     /// <summary>An outcome that moves the spouts: <see cref="TrialOutcome{TRow}"/> is one, by its reward's valve.</summary>
     public interface ISpoutOutcome : ITrialOutcome
     {
-        /// <summary>Gets where the spouts go at the outcome, unless the trial's stay in (<see cref="Spouts.AtOutcome"/>).</summary>
+        /// <summary>Gets where the spouts go at the outcome, unless the trial's spouts are always in (<see cref="Spouts.AtOutcome"/>).</summary>
         LickSpoutCommand SpoutCommand { get; }
     }
 
@@ -31,21 +31,21 @@ namespace OpenRigs.Trials
     /// </summary>
     public static class Spouts
     {
-        /// <summary>The cue that brings the spouts in, spouts.stimulusToInSeconds after the stimulus.</summary>
+        /// <summary>The cue that brings the spouts in, spouts.stimulusToSpoutsInSeconds after the stimulus.</summary>
         public const string InCue = "SpoutsIn";
 
-        /// <summary>The cue that draws the spouts out, spouts.rewardConsumptionSeconds into the next interval, unless the coming trial's stay in.</summary>
+        /// <summary>The cue that draws the spouts out, spouts.rewardConsumptionSeconds into the next interval, unless the coming trial's spouts are always in.</summary>
         public const string OutCue = "SpoutsOut";
 
         /// <summary>spouts.rewardConsumptionSeconds' lab default, in seconds.</summary>
         public const double DefaultRewardConsumptionSeconds = 1.5;
 
         /// <summary>The two cues for a trial's TrialTiming: SpoutsIn from the stimulus, SpoutsOut from the next interval's start.</summary>
-        public static TrialCue[] Cues(double stimulusToInSeconds, double rewardConsumptionSeconds)
+        public static TrialCue[] Cues(double stimulusToSpoutsInSeconds, double rewardConsumptionSeconds)
         {
             return new[]
             {
-                new TrialCue(InCue, CueAnchor.Stimulus, stimulusToInSeconds),
+                new TrialCue(InCue, CueAnchor.Stimulus, stimulusToSpoutsInSeconds),
                 new TrialCue(OutCue, CueAnchor.NextIti, rewardConsumptionSeconds),
             };
         }
@@ -64,16 +64,16 @@ namespace OpenRigs.Trials
             return reward == null ? LickSpoutCommand.SpoutsOut : Only(reward.Item1);
         }
 
-        /// <summary>One combination's spouts block against its trial structure: stimulusToInSeconds and rewardConsumptionSeconds
+        /// <summary>One combination's spouts block against its trial structure: stimulusToSpoutsInSeconds and rewardConsumptionSeconds
         /// each a finite number, 0 or more; rewardConsumptionSeconds at most itiMinSeconds (the spouts go out inside the
         /// interval, before the stimulus); the response window (stimulusToResponseWindowSeconds) not before the spouts are in.</summary>
-        public static List<string> Problems(double stimulusToInSeconds, double rewardConsumptionSeconds, double itiMinSeconds, double stimulusToResponseWindowSeconds)
+        public static List<string> Problems(double stimulusToSpoutsInSeconds, double rewardConsumptionSeconds, double itiMinSeconds, double stimulusToResponseWindowSeconds)
         {
             var problems = new List<string>();
-            Finite(problems, "spouts.stimulusToInSeconds", stimulusToInSeconds);
+            Finite(problems, "spouts.stimulusToSpoutsInSeconds", stimulusToSpoutsInSeconds);
             Finite(problems, "spouts.rewardConsumptionSeconds", rewardConsumptionSeconds);
             if (rewardConsumptionSeconds > itiMinSeconds + 1e-9) problems.Add(string.Format("spouts.rewardConsumptionSeconds ({0} s) is above itiMinSeconds ({1} s): the spouts are drawn out rewardConsumptionSeconds into the interval, before the stimulus", rewardConsumptionSeconds, itiMinSeconds));
-            if (stimulusToResponseWindowSeconds < stimulusToInSeconds - 1e-9) problems.Add(string.Format("stimulusToResponseWindowSeconds ({0} s) is below spouts.stimulusToInSeconds ({1} s): the response window would open before the spouts arrive", stimulusToResponseWindowSeconds, stimulusToInSeconds));
+            if (stimulusToResponseWindowSeconds < stimulusToSpoutsInSeconds - 1e-9) problems.Add(string.Format("stimulusToResponseWindowSeconds ({0} s) is below spouts.stimulusToSpoutsInSeconds ({1} s): the response window would open before the spouts arrive", stimulusToResponseWindowSeconds, stimulusToSpoutsInSeconds));
             return problems;
         }
 
@@ -97,7 +97,7 @@ namespace OpenRigs.Trials
 
     /// <summary>Every spout move from the trial events, as LickSpoutStage takes them.</summary>
     [Combinator]
-    [Description("Every spout move, from the trial events (OpenRigs.Trials Spouts): both out at trial 1's interval start and at each SpoutsOut cue, unless the coming trial's spouts stay in (spouts.stayIn, the trial drawn at its interval's start); at each SpoutsIn cue the trial's SpoutsInCommand; at the outcome, unless the trial's spouts stay in, the outcome's (the rewarded spout alone, else both out).")]
+    [Description("Every spout move, from the trial events (OpenRigs.Trials Spouts): both out at trial 1's interval start and at each SpoutsOut cue, unless the coming trial's spouts are always in (spouts.alwaysIn, the trial drawn at its interval's start); at each SpoutsIn cue the trial's SpoutsInCommand; at the outcome, unless the trial's spouts are always in, the outcome's (the rewarded spout alone, else both out).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class SpoutCommands
     {
@@ -130,13 +130,13 @@ namespace OpenRigs.Trials
             switch (kind)
             {
                 case TrialEventKind.Iti:
-                    return firstIti && !trial.SpoutsStayIn ? LickSpoutCommand.SpoutsOut : (LickSpoutCommand?)null;
+                    return firstIti && !trial.SpoutsAlwaysIn ? LickSpoutCommand.SpoutsOut : (LickSpoutCommand?)null;
                 case TrialEventKind.Cue:
                     if (cue == Spouts.InCue) return trial.SpoutsInCommand;
-                    if (cue == Spouts.OutCue) return coming != null && coming.SpoutsStayIn ? (LickSpoutCommand?)null : LickSpoutCommand.SpoutsOut;
+                    if (cue == Spouts.OutCue) return coming != null && coming.SpoutsAlwaysIn ? (LickSpoutCommand?)null : LickSpoutCommand.SpoutsOut;
                     return null;
                 case TrialEventKind.Outcome:
-                    return trial.SpoutsStayIn ? (LickSpoutCommand?)null : outcome.SpoutCommand;
+                    return trial.SpoutsAlwaysIn ? (LickSpoutCommand?)null : outcome.SpoutCommand;
                 default:
                     return null;
             }

@@ -181,7 +181,7 @@ def test_each_block_sits_in_its_place_in_the_core():
     assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-7:] == [
         "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds", "penalised", "laserCondition",
         "laserPowerMw", "laserTriggerTime"]
-    assert len(both) == 17 and len(core) == 13
+    assert len(both) == 18 and len(core) == 14
 
 
 def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
@@ -194,8 +194,8 @@ def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
 def test_a_task_without_a_block_is_held_to_the_core_alone():
     assert shared_block_problems(_block(()), ()) == []
     # A task naming a block its file lacks, or lacking one it names, is told.
-    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 16 columns are")
-    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 13 columns are")
+    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 17 columns are")
+    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 14 columns are")
 
 
 def test_an_unknown_block_is_refused():
@@ -212,7 +212,7 @@ def test_a_change_to_the_shared_block_is_named():
         "laserCondition is double, not int",
     ]
     reordered = dict(reversed(list(_block().items())))
-    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 17 columns are")
+    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 18 columns are")
 
 
 def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):

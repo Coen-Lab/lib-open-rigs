@@ -11,7 +11,7 @@ namespace OpenRigs.Trials.Tests
     class SpoutTrial : ISpoutTrial
     {
         public int TrialNumber { get; set; }
-        public bool SpoutsStayIn { get; set; }
+        public bool SpoutsAlwaysIn { get; set; }
         public LickSpoutCommand SpoutsInCommand { get; set; }
     }
 
@@ -19,14 +19,14 @@ namespace OpenRigs.Trials.Tests
     /// 0.5 s and RewardConsumptionSeconds; a lick in the window rewarded at its spout, else noResponse after Timeout.</summary>
     class SpoutRules : ITrialRules<SpoutTrial, string, TrialOutcome<PieceRow>>
     {
-        public Func<int, bool> StayIn = n => false;
+        public Func<int, bool> AlwaysIn = n => false;
         public Func<int, LickSpoutCommand> InCommand = n => LickSpoutCommand.SpoutsIn;
         public double RewardConsumptionSeconds = 1.5;
         public double Timeout;
         int drawn;
 
         public LaserTiming Laser { get { return null; } }
-        public SpoutTrial Draw(TrialOutcome<PieceRow> previous) { var n = ++drawn; return new SpoutTrial { TrialNumber = n, SpoutsStayIn = StayIn(n), SpoutsInCommand = InCommand(n) }; }
+        public SpoutTrial Draw(TrialOutcome<PieceRow> previous) { var n = ++drawn; return new SpoutTrial { TrialNumber = n, SpoutsAlwaysIn = AlwaysIn(n), SpoutsInCommand = InCommand(n) }; }
         public TrialTiming Timing(SpoutTrial trial)
         {
             return new TrialTiming { ItiSeconds = 2, ResponseDelaySeconds = 0.5, ResponseWindowSeconds = 1.5, Cues = Spouts.Cues(0.5, RewardConsumptionSeconds) };
@@ -123,20 +123,20 @@ namespace OpenRigs.Trials.Tests
         }
 
         [TestMethod]
-        public void WhenTheSpoutsStayInOnlyTheSpoutsInCueMovesThem()
+        public void WhenTheSpoutsAlwaysInOnlyTheSpoutsInCueMovesThem()
         {
-            Run(new SpoutRules { StayIn = n => true }, 120);
+            Run(new SpoutRules { AlwaysIn = n => true }, 120);
             var spoutsIn = events.Where(e => e.Kind == TrialEventKind.Cue && e.Cue == Spouts.InCue).ToList();
             Assert.IsTrue(spoutsIn.Count >= 2 && events.Any(e => e.Cue == Spouts.OutCue));
             CollectionAssert.AreEqual(spoutsIn.Select(e => LickSpoutCommand.SpoutsIn).ToArray(), Commands().ToArray());
         }
 
         [TestMethod]
-        public void ATrialWhoseSpoutsStayInBetweenMovingOnesIsNeverWithdrawn()
+        public void ATrialWhoseSpoutsAlwaysInBetweenMovingOnesIsNeverWithdrawn()
         {
-            // Every third trial stays in, from trial 2, every trial a miss: a stay-in trial's outcome moves nothing and its
+            // Every third trial is always in, from trial 2, every trial a miss: an always-in trial's outcome moves nothing and its
             // SpoutsIn sends its own command; each SpoutsOut cue draws the spouts out only before a trial that moves.
-            Run(new SpoutRules { StayIn = n => n % 3 == 2, InCommand = n => n % 2 == 0 ? LickSpoutCommand.SpoutsIn : LickSpoutCommand.RightOnly }, 150);
+            Run(new SpoutRules { AlwaysIn = n => n % 3 == 2, InCommand = n => n % 2 == 0 ? LickSpoutCommand.SpoutsIn : LickSpoutCommand.RightOnly }, 150);
             SpoutTrial coming = null;
             var outs = 0;
             foreach (var m in Moves())
@@ -145,19 +145,19 @@ namespace OpenRigs.Trials.Tests
                 var expected = new LickSpoutCommand[0];
                 if (e.Kind == TrialEventKind.Iti && e.Trial.TrialNumber == 1) expected = new[] { LickSpoutCommand.SpoutsOut };
                 if (e.Kind == TrialEventKind.Cue && e.Cue == Spouts.InCue) expected = new[] { e.Trial.SpoutsInCommand };
-                if (e.Kind == TrialEventKind.Cue && e.Cue == Spouts.OutCue && !coming.SpoutsStayIn) { expected = new[] { LickSpoutCommand.SpoutsOut }; outs++; }
-                if (e.Kind == TrialEventKind.Outcome && !e.Trial.SpoutsStayIn) expected = new[] { LickSpoutCommand.SpoutsOut };
+                if (e.Kind == TrialEventKind.Cue && e.Cue == Spouts.OutCue && !coming.SpoutsAlwaysIn) { expected = new[] { LickSpoutCommand.SpoutsOut }; outs++; }
+                if (e.Kind == TrialEventKind.Outcome && !e.Trial.SpoutsAlwaysIn) expected = new[] { LickSpoutCommand.SpoutsOut };
                 CollectionAssert.AreEqual(expected, m.Item2, e.Kind + " " + e.Cue + " of trial " + e.Trial.TrialNumber);
                 if (e.Kind == TrialEventKind.Iti) coming = e.Trial;
             }
             Assert.IsTrue(coming.TrialNumber > 10 && outs > 3);
-            Assert.IsTrue(events.Any(e => e.Cue == Spouts.OutCue && e.Trial.TrialNumber == 1), "trial 1's SpoutsOut falls before trial 2, which stays in");
+            Assert.IsTrue(events.Any(e => e.Cue == Spouts.OutCue && e.Trial.TrialNumber == 1), "trial 1's SpoutsOut falls before trial 2, which is always in");
         }
 
         [TestMethod]
-        public void ATrialOneThatStaysInIsNotDrawnOutAtItsIntervalStart()
+        public void ATrialOneAlwaysInIsNotDrawnOutAtItsIntervalStart()
         {
-            Run(new SpoutRules { StayIn = n => n == 1 }, 103);
+            Run(new SpoutRules { AlwaysIn = n => n == 1 }, 103);
             CollectionAssert.AreEqual(new[] { LickSpoutCommand.SpoutsIn }, Commands().ToArray());
         }
 
@@ -165,12 +165,12 @@ namespace OpenRigs.Trials.Tests
         public void AtRewardConsumptionZeroTheNextTrialIsDrawnBeforeTheSpoutsOutCue()
         {
             // SpoutsOut is due at the next interval's start; the loop draws that interval's trial first (its Iti event), so the
-            // coming trial is the one whose stay-in decides.
-            Run(new SpoutRules { RewardConsumptionSeconds = 0, StayIn = n => n == 2 }, 106);
+            // coming trial is the one whose alwaysIn decides.
+            Run(new SpoutRules { RewardConsumptionSeconds = 0, AlwaysIn = n => n == 2 }, 106);
             var cue = events.FindIndex(e => e.Kind == TrialEventKind.Cue && e.Cue == Spouts.OutCue && e.Trial.TrialNumber == 1);
             var next = events.FindIndex(e => e.Kind == TrialEventKind.Iti && e.Trial.TrialNumber == 2);
             Assert.IsTrue(next >= 0 && next < cue);
-            Assert.AreEqual(0, Moves()[cue].Item2.Length, "trial 2 stays in");
+            Assert.AreEqual(0, Moves()[cue].Item2.Length, "trial 2 is always in");
         }
 
         [TestMethod]
@@ -209,8 +209,8 @@ namespace OpenRigs.Trials.Tests
         {
             Assert.AreEqual(0, Spouts.Problems(0.5, 1.5, 1.5, 0.5).Count);
             CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds (2 s) is above itiMinSeconds (1.5 s): the spouts are drawn out rewardConsumptionSeconds into the interval, before the stimulus" }, Spouts.Problems(0.5, 2, 1.5, 0.5));
-            CollectionAssert.AreEqual(new[] { "stimulusToResponseWindowSeconds (0.4 s) is below spouts.stimulusToInSeconds (0.5 s): the response window would open before the spouts arrive" }, Spouts.Problems(0.5, 1.5, 3, 0.4));
-            CollectionAssert.AreEqual(new[] { "spouts.stimulusToInSeconds must be a finite number, 0 or more", "spouts.rewardConsumptionSeconds must be a finite number, 0 or more" }, Spouts.Problems(double.NaN, double.PositiveInfinity, 3, 1).Take(2).ToArray());
+            CollectionAssert.AreEqual(new[] { "stimulusToResponseWindowSeconds (0.4 s) is below spouts.stimulusToSpoutsInSeconds (0.5 s): the response window would open before the spouts arrive" }, Spouts.Problems(0.5, 1.5, 3, 0.4));
+            CollectionAssert.AreEqual(new[] { "spouts.stimulusToSpoutsInSeconds must be a finite number, 0 or more", "spouts.rewardConsumptionSeconds must be a finite number, 0 or more" }, Spouts.Problems(double.NaN, double.PositiveInfinity, 3, 1).Take(2).ToArray());
             Assert.AreEqual(0, Spouts.BetweenTrialsProblems(new[] { 1.0, 1.5 }, new[] { 1.5, 3.0 }).Count);
             CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds 2 s exceeds itiMinSeconds 1.5 s of a combination that may come next" }, Spouts.BetweenTrialsProblems(new[] { 1.0, 2.0 }, new[] { 1.5, 3.0 }));
         }

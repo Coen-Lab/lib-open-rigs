@@ -14,7 +14,7 @@ namespace OpenRigs.Trials
     public static class SharedTrialColumns
     {
         /// <summary>The core columns this fills; every row has them (harpTime is the row's timestamp, and trialType and outcome the task's).</summary>
-        public static readonly string[] Core = { "trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds", "penalised" };
+        public static readonly string[] Core = { "trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "stimulusOffTime", "outcomeTime", "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds", "penalised" };
 
         /// <summary>The quietWait block: filled when the row has it.</summary>
         public static readonly string[] QuietWait = { "quietWaitSeconds" };
@@ -23,7 +23,7 @@ namespace OpenRigs.Trials
         public static readonly string[] Optogenetics = { "laserCondition", "laserPowerMw", "laserTriggerTime" };
 
         /// <summary>
-        /// Fills <paramref name="row"/>'s shared block at the trial's outcome (times.Now): its number; the loop's times;
+        /// Fills <paramref name="row"/>'s shared block at the trial's outcome (times.Now): its number; the loop's times (stimulusOffTime its StimulusOffTime, StimulusTiming.Time: NaN without a StimulusDurationSeconds);
         /// rewardOfferedUl, the microlitres a reward on this trial gives, on every trial; rewarded, whether the outcome
         /// delivers it (the same value the task's valve command is made from); penaltyTimeoutSeconds the trial's resolved
         /// timeout (<see cref="Penalties.Resolve"/>: a miss's own where it has one) when penalised, else 0; penalised itself; with the optogenetics block, the trial's laser condition, its power only if the
@@ -43,6 +43,7 @@ namespace OpenRigs.Trials
                 { "itiSeconds", times.ItiSeconds },
                 { "trialStartTime", times.TrialStartTime },
                 { "stimulusOnsetTime", times.StimulusOnsetTime },
+                { "stimulusOffTime", times.StimulusOffTime },
                 { "outcomeTime", times.Now },
                 { "rewardOfferedUl", rewardOfferedUl },
                 { "rewarded", rewarded },
