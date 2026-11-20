@@ -1,11 +1,11 @@
-"""A task's own Python model run on its task values, for the experiment launcher (app-rig-control) to refuse a value as it
+"""A task's own Python model run on its task values, for the experiment launcher to refuse a value as it
 is typed rather than at Go: every rule the model holds (the timing between fields, each combination, between trials)
 said once, in the task's Python, never copied into its schema.
 
 A task names its parameters model in its pyproject.toml:
 
     [project.entry-points."open_rigs.task"]
-    parameters = "ucl_open_coen_dome_navigation.task:UclOpenCoenDomeNavigationTaskParameters"
+    parameters = "my_task.task:MyTaskParameters"
 
 `python -m open_rigs.rigs.check_task <task file>` prints the file's problems (exit 1 on any). With no file it serves:
 its first line says {"model": ...} (or {"error": ...} and it exits), then each stdin line {"taskParameters": {...}} gets

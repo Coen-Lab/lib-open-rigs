@@ -30,7 +30,8 @@ def test_problems_word_the_models_refusals():
 def test_a_combinations_refusal_is_its_condition_and_the_models_words():
     message = ("trial_conditions[0] (visual) with {'target': 'left'}: 1 validation error for Task\n  Value error, consumption exceeds "
                "iti [type=value_error, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev")
-    assert check_task._inner(message) == "trial_conditions[0] (visual): consumption exceeds iti"
+    inner = check_task._inner(message)  # pyright: ignore[reportPrivateUsage]
+    assert inner == "trial_conditions[0] (visual): consumption exceeds iti"
 
 
 def test_serves_one_answer_per_line(monkeypatch, capsys):

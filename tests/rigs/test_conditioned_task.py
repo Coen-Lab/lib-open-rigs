@@ -166,8 +166,9 @@ def test_the_validation_s_context_reaches_each_combination_and_between_trials():
     class Timed(Params):
         @model_validator(mode="after")
         def _ramp(self, info: ValidationInfo):
-            if (info.context or {}).get("condition"):
-                seen.append(info.context.get("ramp"))
+            context = info.context or {}
+            if context.get("condition"):
+                seen.append(context.get("ramp"))
             return self
 
         @classmethod

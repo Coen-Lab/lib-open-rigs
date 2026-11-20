@@ -400,7 +400,7 @@ MISS_TIMEOUT_PATH = "penalty.noResponse.timeoutSeconds"  # a penalised miss's; p
 _MISSING = object()
 
 
-def _at(values: Dict[str, Any], path: str) -> Any:
+def _at(values: Any, path: str) -> Any:
     """A dotted path in nested task values, _MISSING where a key is not there, None under a null block."""
     for key in path.split("."):
         if values is None:

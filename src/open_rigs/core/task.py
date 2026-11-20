@@ -1,4 +1,5 @@
-from typing import Annotated, Literal, Optional
+import math
+from typing import Annotated, Any, Literal, Optional
 
 from pydantic import ConfigDict, Field, WithJsonSchema, model_validator
 
@@ -146,7 +147,7 @@ class StimulusTiming(TaskBlock):
     )
 
     def check_fits(
-        self, iti_min_seconds: float, stimulus_to_response_end_seconds: float = float("inf"), *, stimulus_to_earliest_outcome_seconds: float, min_outcome_to_iti_seconds: float
+        self, iti_min_seconds: float, stimulus_to_response_end_seconds: float = math.inf, *, stimulus_to_earliest_outcome_seconds: float, min_outcome_to_iti_seconds: float
     ) -> None:
         """Refuses a stimulus that never ends (both null), one still on at the next trial's, or one past the response
         window's close (OpenRigs.Trials StimulusTiming.Problems, the same rules). The next stimulus comes at the soonest
@@ -311,7 +312,7 @@ SoundLevelDbfs = Annotated[
 ]
 
 
-def level_dbfs(default: float | str, sound: str):
+def level_dbfs(default: float | str, sound: str) -> Any:
     """A sound's levelDbfs field, with its lab default."""
     return Field(
         default=default,
