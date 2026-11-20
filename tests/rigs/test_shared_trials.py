@@ -191,10 +191,10 @@ def test_each_block_sits_in_its_place_in_the_core():
     core = [name for name, _, _, _ in CORE_COLUMNS]
     assert [name for name, _, _, _ in shared_columns(())] == core
     both = [name for name, _, _, _ in shared_columns(BOTH)]
-    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-7:] == [
-        "rewarded", "rewardConsumptionSeconds", "penaltyTimeoutSeconds", "penalised", "laserCondition",
+    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-8:] == [
+        "rewarded", "rewardConsumptionSeconds", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "penalised", "laserCondition",
         "laserPowerMw", "laserTriggerTime"]
-    assert len(both) == 19 and len(core) == 15
+    assert len(both) == 20 and len(core) == 16
 
 
 def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
@@ -207,8 +207,8 @@ def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
 def test_a_task_without_a_block_is_held_to_the_core_alone():
     assert shared_block_problems(_block(()), ()) == []
     # A task naming a block its file lacks, or lacking one it names, is told.
-    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 18 columns are")
-    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 15 columns are")
+    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 19 columns are")
+    assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 16 columns are")
 
 
 def test_an_unknown_block_is_refused():
@@ -225,7 +225,7 @@ def test_a_change_to_the_shared_block_is_named():
         "laserCondition is double, not int",
     ]
     reordered = dict(reversed(list(_block().items())))
-    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 19 columns are")
+    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 20 columns are")
 
 
 def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):
@@ -249,6 +249,22 @@ def test_a_timeout_on_an_unpenalised_trial_is_named(tmp_path):
     text = "\n".join(summarise(_experiment(tmp_path, trials, rewards, task=task)).problems)
     assert "trial 1: penaltyTimeoutSeconds 0.5 on a trial not penalised, not 0" in text
     assert len(text.splitlines()) == 2  # and the next interval, timed from that timeout; a mute penalty asks nothing of the log
+
+
+def test_the_flash_brightness_is_held_to_the_penalised_kind_s(tmp_path):
+    # A log with penaltyFlashBrightness: a penalised choice its penalty.incorrect.flash.brightness, any other trial 0.
+    trials = _chain(4)
+    for t in trials:
+        t["penaltyFlashBrightness"] = 0.5 if t["penalised"] else 0.0
+    task = {**TASK, "penalty": {"incorrect": {"timeoutSeconds": 4.0, "flash": {"brightness": 0.5, "rateHz": 10}}}}
+    columns = COLUMNS[:14] + ["penaltyFlashBrightness"] + COLUMNS[14:]
+    rewards = [(t["outcomeTime"], 2.0) for t in trials if t["rewarded"]]
+    assert summarise(_experiment(tmp_path / "a", trials, rewards, columns=columns, task=task)).problems == []
+    trials[3]["penaltyFlashBrightness"] = 1.0
+    trials[0]["penaltyFlashBrightness"] = 0.25
+    text = "\n".join(summarise(_experiment(tmp_path / "b", trials, rewards, columns=columns, task=task)).problems)
+    assert "trial 4: penaltyFlashBrightness 1 on a trial penalised, not 0.5" in text
+    assert "trial 1: penaltyFlashBrightness 0.25 on a trial not penalised, not 0" in text
 
 
 def test_a_reward_answered_by_the_board_after_the_outcome_is_at_it(tmp_path):

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:tk="clr-namespace:OpenTK;assembly=OpenTK"
+                 xmlns:test="clr-namespace:OpenRigs.Trials.Tests;assembly=OpenRigs.Trials.Tests"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>PlayPenaltyFlash: rules whose flash has a TIMEOUT s timeout and the speakers of RIG_FILE (a 0.1 s penalty sound), a DrawStimuli that never draws (no window; the view matrix ProjectorDisplay publishes each frame), then three outcomes (PieceOutcomes: trial 2 penalised with a flash at brightness 1). The output describes the include's output and PenaltyFlashDuration.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceFlashRulesSource">
+          <test:TimeoutSeconds>TIMEOUT</test:TimeoutSeconds>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>TrialRules</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceSpeakers">
+          <test:RigFile>RIG_FILE</test:RigFile>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>Speakers</Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="tk:Matrix4">
+        <rx:Name>DrawStimuli</rx:Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceOutcomes" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Vision:PlayPenaltyFlash.bonsai" />
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceDescribe" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PenaltyFlashDuration</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="test:PieceDescribe" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
+      <Expression xsi:type="WorkflowOutput" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="7" To="10" Label="Source1" />
+      <Edge From="9" To="10" Label="Source2" />
+      <Edge From="10" To="11" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

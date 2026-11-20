@@ -28,7 +28,7 @@ namespace OpenRigs.Trials
 
     /// <summary>
     /// A trial's outcome, built the same way in every task from its filled row (<see cref="SharedTrialColumns.Fill"/>): the
-    /// row stamped with its outcomeTime, the reward, whether it was penalised with the trial's penalty level, the timeout
+    /// row stamped with its outcomeTime, the reward, whether it was penalised with the trial's penalty level and flash, the timeout
     /// and the reward consumption (TrialOutcomeEffects and the trial loop read them). A task that sets off more at the outcome (its spouts) derives from it.
     /// </summary>
     /// <typeparam name="TRow">The task's trial row.</typeparam>
@@ -38,9 +38,10 @@ namespace OpenRigs.Trials
         /// The outcome of <paramref name="row"/>, whose shared block is filled: the reward, when the row is rewarded,
         /// is its rewardOfferedUl at <paramref name="valveInstance"/> (as rig.yml's wiring names the reward valve), else null;
         /// <paramref name="penaltyLevelDbfs"/> the trial's penalty level (Penalties.For's LevelDbfs, <see cref="SoundLevels.Parse"/>: NaN when
-        /// mute). Throws when the row's outcome is not one of <see cref="TrialOutcomes.All"/>.
+        /// mute); the flash the row's penaltyFlashBrightness (0: none) at <paramref name="penaltyFlashRateHz"/> (Penalties.For's
+        /// Flash.RateHz). Throws when the row's outcome is not one of <see cref="TrialOutcomes.All"/>.
         /// </summary>
-        public TrialOutcome(TRow row, string valveInstance, double penaltyLevelDbfs)
+        public TrialOutcome(TRow row, string valveInstance, double penaltyLevelDbfs, double penaltyFlashRateHz)
         {
             if (row == null) throw new ArgumentNullException("row");
             var outcome = Get<string>(row, "outcome");
@@ -54,6 +55,8 @@ namespace OpenRigs.Trials
             Penalised = Get<bool>(row, "penalised");
             PenaltyLevelDbfs = penaltyLevelDbfs;
             PenaltyTimeoutSeconds = Get<double>(row, "penaltyTimeoutSeconds");
+            var brightness = Get<double>(row, "penaltyFlashBrightness");
+            PenaltyFlash = Penalised && brightness > 0 ? new PenaltyFlash(brightness, penaltyFlashRateHz) : PenaltyFlash.None;
             RewardConsumptionSeconds = Get<double>(row, "rewardConsumptionSeconds");
         }
 
@@ -74,6 +77,9 @@ namespace OpenRigs.Trials
 
         /// <summary>Gets the timeout after the trial, in seconds (the row's penaltyTimeoutSeconds).</summary>
         public double PenaltyTimeoutSeconds { get; private set; }
+
+        /// <summary>Gets the penalty flash OpenRigs.Vision PlayPenaltyFlash plays at the outcome (the row's penaltyFlashBrightness); <see cref="PenaltyFlash.None"/> when none plays, never null.</summary>
+        public PenaltyFlash PenaltyFlash { get; private set; }
 
         /// <summary>Gets the time to drink the reward after the trial, in seconds (the row's rewardConsumptionSeconds): the next interval starts after it.</summary>
         public double RewardConsumptionSeconds { get; private set; }

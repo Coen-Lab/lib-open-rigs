@@ -22,6 +22,8 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Trials\OpenRigs.Trials.csproj" />
     <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
+    <!-- PlayPenaltyFlash, built here with BonVision's DrawQuad -->
+    <ProjectReference Include="..\OpenRigs.Vision\OpenRigs.Vision.csproj" />
     <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
   </ItemGroup>
 

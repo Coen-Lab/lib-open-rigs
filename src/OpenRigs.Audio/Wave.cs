@@ -121,6 +121,13 @@ namespace OpenRigs.Audio
             return RigSound.Read(speakers.PenaltySoundFile, "penaltySound", "the lab's penalty sound every task plays", "penalty_tone.wav", speakers.SampleRate);
         }
 
+        /// <summary>The penalty sound's length in seconds, as stored; NaN when rig.yml names none. Throws, naming the file, when it is missing or at another rate.</summary>
+        public static double Seconds(SpeakerSet speakers)
+        {
+            if (speakers.PenaltySoundFile == null) return double.NaN;
+            using (var sound = Read(speakers)) return sound.Cols / (double)speakers.SampleRate;
+        }
+
         /// <summary>The mixer's buffer for the penalty sound: on rig.yml's penaltySoundChannel alone, equalised for that speaker, at the task's level in dBFS RMS.</summary>
         public static Mat Buffer(SpeakerSet speakers, double levelDbfs)
         {

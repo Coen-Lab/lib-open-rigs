@@ -131,8 +131,8 @@ def test_optogenetics_schema_holds_the_same_rule():
 def test_penalty_kinds_default_to_4_s_and_minus_35_dbfs_and_mute_is_off():
     penalty = Penalty.model_validate({})
     assert penalty.model_dump(by_alias=True) == {
-        "incorrect": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -35.0}},
-        "noResponse": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -35.0}},
+        "incorrect": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -35.0}, "flash": {"brightness": 0.0, "rateHz": 10.0}},
+        "noResponse": {"timeoutSeconds": 4.0, "sound": {"levelDbfs": -35.0}, "flash": {"brightness": 0.0, "rateHz": 10.0}},
     }
     assert set(Penalty.model_json_schema(by_alias=True)["$defs"]["PenaltySound"]["properties"]) == {"levelDbfs"}
     assert Penalty.model_validate({"incorrect": {"sound": {"levelDbfs": "mute"}}}).incorrect.sound.level_dbfs == "mute"
@@ -156,6 +156,17 @@ def test_each_penalty_kind_has_its_own_full_values_and_no_response_may_be_null()
     with pytest.raises(ValueError, match="penalty.no_response is null, but this task penalises a miss"):
         never.check_misses(True)
     Penalty().check_misses(True)
+
+
+def test_a_penalty_flash_is_off_by_default_and_held_to_its_rules():
+    # brightness 0 to 1 of full white (0: no flash, the default), rateHz above 0 and at most 30 Hz (half the 60 Hz render loop)
+    flash = Penalty.model_validate({"noResponse": {"flash": {"brightness": 1, "rateHz": 30}}}).no_response.flash
+    assert (flash.brightness, flash.rate_hz) == (1, 30)
+    assert Penalty().incorrect.flash.brightness == 0
+    for refused in ({"brightness": 1.5}, {"brightness": -0.1}, {"brightness": float("nan")}, {"rateHz": 0}, {"rateHz": 31}, {"rateHz": float("inf")}):
+        with pytest.raises(ValidationError):
+            Penalty.model_validate({"incorrect": {"flash": refused}})
+    assert task.PENALTY_FLASH_MAX_RATE_HZ == 30 and task.PENALTY_FLASH_RATE_HZ == 10  # OpenRigs.Trials PenaltyFlash.MaxRateHz, DefaultRateHz
 
 
 def test_reward_holds_its_consumption_and_tone():

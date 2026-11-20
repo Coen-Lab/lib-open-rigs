@@ -27,12 +27,13 @@ namespace OpenRigs.Trials.Tests
         public double rewardConsumptionSeconds;
         public bool penalised;
         public double penaltyTimeoutSeconds;
+        public double penaltyFlashBrightness;
     }
 
     /// <summary>A task's outcome type derived from the lib's, as each task's is: its members are inherited.</summary>
     public class PieceOutcome : TrialOutcome<PieceRow>
     {
-        public PieceOutcome(PieceRow row, double penaltyLevelDbfs = double.NaN) : base(row, "Left", penaltyLevelDbfs) { }
+        public PieceOutcome(PieceRow row, double penaltyLevelDbfs = double.NaN) : base(row, "Left", penaltyLevelDbfs, 10) { }
     }
 
     /// <summary>A valve that plans each reward request (Present), or none, as when the stop has ended the valve's path.</summary>
@@ -84,6 +85,25 @@ namespace OpenRigs.Trials.Tests
         }
     }
 
+    /// <summary>A task's trial rules as PlayPenaltyFlash reads them: its flashes (PenaltyFlashes).</summary>
+    public class PieceFlashRules
+    {
+        public PenaltyFlashRules PenaltyFlashes { get; set; }
+    }
+
+    /// <summary>The rules at Go: a flash with a timeout of TimeoutSeconds.</summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Source)]
+    public class PieceFlashRulesSource
+    {
+        public double TimeoutSeconds { get; set; }
+
+        public IObservable<PieceFlashRules> Process()
+        {
+            return Observable.Defer(() => Observable.Return(new PieceFlashRules { PenaltyFlashes = new PenaltyFlashRules { ShortestTimeoutSeconds = TimeoutSeconds, Where = "penalty.incorrect.timeoutSeconds in the test" } }));
+        }
+    }
+
     /// <summary>The speakers of RigFile, as measured on TEST-RIG.</summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
@@ -107,7 +127,7 @@ namespace OpenRigs.Trials.Tests
             var rows = new[]
             {
                 new PieceRow { trialNumber = 1, outcome = TrialOutcomes.Correct, rewarded = true, rewardOfferedUl = 2.5 },
-                new PieceRow { trialNumber = 2, outcome = TrialOutcomes.Incorrect, penalised = true },
+                new PieceRow { trialNumber = 2, outcome = TrialOutcomes.Incorrect, penalised = true, penaltyFlashBrightness = 1 },
                 new PieceRow { trialNumber = 3, outcome = TrialOutcomes.NoResponse, penalised = true },
             };
             var levels = new[] { -36, -36, double.NaN };
@@ -199,6 +219,8 @@ namespace OpenRigs.Trials.Tests
 
         public IObservable<string> Process(IObservable<Mat> source) { return source.Select(m => "penalty " + m.Rows); }
 
+        public IObservable<string> Process(IObservable<TimeSpan> source) { return source.Select(t => "flash lasts " + t.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
+
         public IObservable<string> Process(IObservable<ZapitCommand> source)
         {
             return source.Select(c => "zapit " + c.Command + (c.Command == ZapitCommandType.StartStimulus
@@ -288,6 +310,35 @@ namespace OpenRigs.Trials.Tests
             var outputs = RunEffects(true, 60000);
             CollectionAssert.AreEquivalent(new[] { "reward Left 2.5", "row 1", "out 1", "row 2", "penalty 4", "out 2", "row 3", "out 3" }, outputs, string.Join(", ", outputs));
             Assert.IsTrue(outputs.IndexOf("row 1") < outputs.IndexOf("row 2"), "The rows went out of order: " + string.Join(", ", outputs));
+        }
+
+        static Tuple<List<string>, Exception> RunFlash(double timeoutSeconds)
+        {
+            var rig = Rig();
+            var xml = File.ReadAllText(Path.Combine(Folder, "PlayPenaltyFlash.bonsai")).Replace("RIG_FILE", SecurityElement.Escape(rig))
+                .Replace("TIMEOUT", timeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var result = InProcessWorkflow.Run(xml, 1.5);
+            Directory.Delete(Path.GetDirectoryName(rig), true);
+            return result;
+        }
+
+        // PlayPenaltyFlash, built as at Start with BonVision's DrawQuad: the penalty sound's 0.1 s fits the 4 s timeout, so
+        // the flash lasts 0.1 s (PenaltyFlashDuration) and every outcome is passed on, trial 2's flash started (it draws
+        // only with a window, which a test has none of).
+        [TestMethod]
+        public void PlayPenaltyFlashLastsThePenaltySoundAndPassesTheOutcomeOn()
+        {
+            var result = RunFlash(4);
+            Assert.IsNull(result.Item2, InProcessWorkflow.Innermost(result.Item2));
+            CollectionAssert.AreEquivalent(new[] { "flash lasts 0.1", "out 1", "out 2", "out 3" }, result.Item1, string.Join(", ", result.Item1));
+        }
+
+        // A timeout shorter than the penalty sound, with a flash: refused at Go, naming both.
+        [TestMethod]
+        public void PlayPenaltyFlashRefusesASoundLongerThanTheTimeout()
+        {
+            var result = RunFlash(0.05);
+            StringAssert.Contains(InProcessWorkflow.Innermost(result.Item2), "the penalty sound lasts 0.1 s, longer than penalty.incorrect.timeoutSeconds in the test (0.05 s) with a flash");
         }
 
         static List<string> RunZapit(string stop, bool hardwareTriggered, double laserCapSeconds, double outcomeAt)

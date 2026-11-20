@@ -268,6 +268,8 @@ class Optogenetics(TaskBlock):
 STIMULUS_LEVEL_DBFS = -30.0
 PENALTY_LEVEL_DBFS = -35.0
 PENALTY_TIMEOUT_SECONDS = 4.0  # penalty.incorrect and penalty.noResponse's timeoutSeconds
+PENALTY_FLASH_RATE_HZ = 10.0  # penalty.<kind>.flash.rateHz (OpenRigs.Trials PenaltyFlash.DefaultRateHz)
+PENALTY_FLASH_MAX_RATE_HZ = 30.0  # half ProjectorDisplay's 60 Hz render loop (PenaltyFlash.MaxRateHz)
 REWARD_CONSUMPTION_SECONDS = 1.5  # reward.consumptionSeconds
 BACKGROUND_LEVEL_DBFS = -60.0
 PEAK_LIMIT_DBFS = -1.0  # every buffer's peak stays under this after equalisation, checked as the buffer is built
@@ -322,11 +324,35 @@ class PenaltySound(TaskBlock):
     level_dbfs: SoundLevelDbfs = level_dbfs(PENALTY_LEVEL_DBFS, "The penalty sound")
 
 
+class PenaltyFlash(TaskBlock):
+    """The penalty flash (OpenRigs.Vision PlayPenaltyFlash, the same in every task with a projector): the whole projector
+    field at brightness of full white, flashing at rateHz from the outcome for the penalty sound's length, which must fit in
+    the kind's timeout (checked at Go against the sound file, OpenRigs.Trials PenaltyFlashRules, the same rules)."""
+
+    brightness: float = Field(
+        default=0.0,
+        ge=0,
+        le=1,
+        description="Brightness of the flash, 0 to 1 of the projector's full white after gamma correction (1: full white), over the whole "
+        "field and everything drawn, a stimulus still on included; 0: no flash (as the sound's mute). Logged as penaltyFlashBrightness",
+    )
+    rate_hz: float = Field(
+        default=PENALTY_FLASH_RATE_HZ,
+        gt=0,
+        le=PENALTY_FLASH_MAX_RATE_HZ,
+        description=f"Flash rate in Hz: the field is white for the first half of each 1/rateHz cycle and the normal display the other half, "
+        f"from the outcome for the penalty sound's length (refused at Go when longer than timeoutSeconds); at most {PENALTY_FLASH_MAX_RATE_HZ:g}, "
+        "half the projector's 60 Hz render loop",
+    )
+
+
 class PenaltyCost(TaskBlock):
-    """What one kind of penalised outcome costs: its timeout (the trial log's penaltyTimeoutSeconds) and the penalty sound."""
+    """What one kind of penalised outcome costs: its timeout (the trial log's penaltyTimeoutSeconds), the penalty sound and
+    the penalty flash (penaltyFlashBrightness)."""
 
     timeout_seconds: float = Field(default=PENALTY_TIMEOUT_SECONDS, ge=0, description="Timeout after the penalised outcome, in seconds; the next interval starts after it")
     sound: PenaltySound = Field(default=PenaltySound(), description="The penalty sound, with the timeout")
+    flash: PenaltyFlash = Field(default=PenaltyFlash(), description="The penalty flash, with the sound; off (brightness 0) by default")
 
 
 class Penalty(TaskBlock):

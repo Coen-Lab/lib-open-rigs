@@ -39,12 +39,12 @@ namespace OpenRigs.Trials.Tests
         {
             if (!times.Responding) return null;
             var row = new PieceRow { trialNumber = trial.TrialNumber, outcome = TrialOutcomes.Correct, outcomeTime = times.Now, rewarded = true, rewardOfferedUl = 3, rewardConsumptionSeconds = RewardConsumptionSeconds };
-            return new TrialOutcome<PieceRow>(row, spout == 0 ? "left" : "right", double.NaN);
+            return new TrialOutcome<PieceRow>(row, spout == 0 ? "left" : "right", double.NaN, 10);
         }
         public TrialOutcome<PieceRow> ResponseEnd(SpoutTrial trial, TrialTimes times)
         {
             var row = new PieceRow { trialNumber = trial.TrialNumber, outcome = TrialOutcomes.NoResponse, outcomeTime = times.Now, penalised = Timeout > 0, penaltyTimeoutSeconds = Timeout };
-            return new TrialOutcome<PieceRow>(row, "left", double.NaN);
+            return new TrialOutcome<PieceRow>(row, "left", double.NaN, 10);
         }
     }
 
@@ -192,7 +192,7 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(LickSpoutCommand.RightOnly, Spouts.AtOutcome(Tuple.Create("right", 3.0)));
             Assert.AreEqual(LickSpoutCommand.SpoutsOut, Spouts.AtOutcome(null));
             StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => Spouts.Only("centre")).Message, "neither left nor right");
-            var missed = new TrialOutcome<PieceRow>(new PieceRow { outcome = TrialOutcomes.Incorrect }, "right", double.NaN);
+            var missed = new TrialOutcome<PieceRow>(new PieceRow { outcome = TrialOutcomes.Incorrect }, "right", double.NaN, 10);
             Assert.AreEqual(LickSpoutCommand.SpoutsOut, missed.SpoutCommand);
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reactive.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Core;
 using OpenRigs.Devices.Rigs;
@@ -51,10 +52,20 @@ namespace OpenRigs.Trials.Tests
         [YamlDotNet.Serialization.YamlMember(Alias = "levelDbfs")][Newtonsoft.Json.JsonProperty("levelDbfs")] public object LevelDbfs { get; set; }
     }
 
+    public class CostFlash
+    {
+        [YamlDotNet.Serialization.YamlMember(Alias = "brightness")][Newtonsoft.Json.JsonProperty("brightness")] public double Brightness { get; set; }
+        [YamlDotNet.Serialization.YamlMember(Alias = "rateHz")][Newtonsoft.Json.JsonProperty("rateHz")] public double RateHz { get; set; } = 10;
+    }
+
     public class Cost
     {
         [YamlDotNet.Serialization.YamlMember(Alias = "timeoutSeconds")][Newtonsoft.Json.JsonProperty("timeoutSeconds")] public double TimeoutSeconds { get; set; } = 3;
         [YamlDotNet.Serialization.YamlMember(Alias = "sound")][Newtonsoft.Json.JsonProperty("sound")] public CostSound Sound { get; set; } = new CostSound { LevelDbfs = -35.0 };
+        [YamlDotNet.Serialization.YamlMember(Alias = "flash")][Newtonsoft.Json.JsonProperty("flash")] public CostFlash Flash { get; set; } = new CostFlash();
+
+        /// <summary>As a task resolves it (Penalties.Of).</summary>
+        public ResolvedPenalty Resolve() { return Penalties.Of(TimeoutSeconds, Sound.LevelDbfs, Flash.Brightness, Flash.RateHz); }
     }
 
     public class PenaltyBlock
@@ -238,16 +249,79 @@ namespace OpenRigs.Trials.Tests
         [TestMethod]
         public void APenalisedTrialCostsItsKindsOwnBlock()
         {
-            var incorrect = Penalties.For(PenaltyKind.Incorrect, 4, -35.0, 1, SoundLevels.Mute);
+            var incorrect = Penalties.For(PenaltyKind.Incorrect, 4, -35.0, 0.5, 8, 1, SoundLevels.Mute, 0, 10);
             Assert.AreEqual(4, incorrect.TimeoutSeconds);
             Assert.AreEqual(-35, incorrect.LevelDbfs);
-            var miss = Penalties.For(PenaltyKind.NoResponse, 4, -35.0, 1, SoundLevels.Mute);
+            Assert.AreEqual(0.5, incorrect.Flash.Brightness);
+            Assert.AreEqual(8, incorrect.Flash.RateHz);
+            var miss = Penalties.For(PenaltyKind.NoResponse, 4, -35.0, 0.5, 8, 1, SoundLevels.Mute, 0, 10);
             Assert.AreEqual(1, miss.TimeoutSeconds);
             Assert.IsTrue(double.IsNaN(miss.LevelDbfs), "mute is NaN");
-            Assert.AreEqual(-40, Penalties.For(PenaltyKind.NoResponse, 4, -35.0, 2, "-40").LevelDbfs);
-            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => Penalties.For(PenaltyKind.NoResponse, 4, -35.0, null, null)).Message, "penalty.noResponse is null");
+            Assert.IsFalse(miss.Flash.Plays, "brightness 0: no flash");
+            Assert.AreEqual(-40, Penalties.For(PenaltyKind.NoResponse, 4, -35.0, 0, 10, 2, "-40", 1, 10).LevelDbfs);
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => Penalties.For(PenaltyKind.NoResponse, 4, -35.0, 0, 10, null, null, null, null)).Message, "penalty.noResponse is null");
             Assert.AreEqual(0, Penalties.Problems(true, true).Count + Penalties.Problems(false, false).Count);
             CollectionAssert.AreEqual(new[] { "penalty.noResponse is null, but this task penalises a miss: give penalty.noResponse its timeoutSeconds and sound" }, Penalties.Problems(true, false));
+        }
+
+        // The flash's rules: brightness 0 to 1, rateHz above 0 and at most 30 Hz; its cycle to the tick, on for half.
+        [TestMethod]
+        public void APenaltyFlashsRulesAndCycle()
+        {
+            Assert.AreEqual(0, PenaltyFlash.Problems("penalty.incorrect.flash", 0, 10).Count + PenaltyFlash.Problems("p", 1, 30).Count);
+            CollectionAssert.AreEqual(new[] { "p.brightness is 1.5, not 0 to 1 (of the projector's full white; 0: no flash)" }, PenaltyFlash.Problems("p", 1.5, 10));
+            Assert.AreEqual(1, PenaltyFlash.Problems("p", -0.1, 10).Count);
+            Assert.AreEqual(1, PenaltyFlash.Problems("p", double.NaN, 10).Count);
+            Assert.AreEqual(1, PenaltyFlash.Problems("p", 0.5, 0).Count);
+            Assert.AreEqual(1, PenaltyFlash.Problems("p", 0.5, double.PositiveInfinity).Count);
+            StringAssert.Contains(PenaltyFlash.Problems("p", 0.5, 31)[0], "p.rateHz is 31, not above 0 and at most 30 (half the projector's 60 Hz render loop)");
+            var flash = new PenaltyFlash(1, 30);
+            Assert.AreEqual(333333, flash.Period.Ticks, "1/30 s to the tick, not rounded to 33 ms");
+            Assert.AreEqual(166667, flash.OnTime.Ticks);
+            Assert.IsTrue(flash.Plays);
+            Assert.IsFalse(PenaltyFlash.None.Plays);
+        }
+
+        // At Go: the flash blocks the weighted conditions draw, each checked; the shortest timeout with a flash, which the
+        // penalty sound must fit; no flash, no sound needed.
+        [TestMethod]
+        public void PenaltyFlashRulesTakeTheShortestFlashedTimeoutAndTheSound()
+        {
+            var schema = new ConditionsSchema(new[] { "trialConditions" }, new string[0], 8, @"[{""trialType"":""any""}]");
+            Func<string, PenaltyFlashRules> rules = text =>
+            {
+                var problems = new List<string>();
+                var built = TrialConditions.Build(text, TaskYaml.Read<PenaltyLogic>(text).TaskParameters, t => TaskYaml.Read<PenaltyLogic>(t).TaskParameters, schema, problems);
+                CollectionAssert.AreEqual(new string[0], problems);
+                return PenaltyFlashRules.Of(built, t => t.Penalty.Incorrect.Resolve(), t => t.Penalty.NoResponse == null ? null : t.Penalty.NoResponse.Resolve());
+            };
+            var none = rules("taskParameters:\n  trialConditions:\n  - {weight: 1}\n");
+            Assert.IsFalse(none.Plays);
+            Assert.AreEqual(0, none.ProblemsWith(double.NaN).Count, "no flash: no penalty sound needed");
+
+            var flashed = rules("taskParameters:\n  penalty:\n    incorrect: {timeoutSeconds: 4, flash: {brightness: 1}}\n  trialConditions:\n  - {weight: 1}\n" +
+                "  - {weight: 1, set: {penalty.noResponse.flash.brightness: 0.5, penalty.noResponse.timeoutSeconds: 2}}\n  - {weight: 0, set: {penalty.incorrect.timeoutSeconds: 0.5}}\n");
+            Assert.AreEqual(2, flashed.ShortestTimeoutSeconds, "the weight-0 condition is never drawn");
+            Assert.AreEqual("penalty.noResponse.timeoutSeconds in trialConditions[1] (any)", flashed.Where);
+            Assert.AreEqual(0, flashed.ProblemsWith(1.0).Count);
+            Assert.AreEqual(0, flashed.ProblemsWith(2.0).Count, "a sound as long as the timeout fits");
+            CollectionAssert.AreEqual(new[] { "the penalty sound lasts 2.5 s, longer than penalty.noResponse.timeoutSeconds in trialConditions[1] (any) (2 s) with a flash: the flash lasts the sound, so it must fit in the timeout" },
+                flashed.ProblemsWith(2.5));
+            StringAssert.Contains(flashed.ProblemsWith(double.NaN)[0], "names no penaltySound");
+
+            var broken = rules("taskParameters:\n  penalty:\n    incorrect: {flash: {brightness: 2, rateHz: 60}}\n  trialConditions:\n  - {weight: 1}\n  - {weight: 1}\n");
+            CollectionAssert.AreEqual(new[]
+            {
+                "penalty.incorrect.flash.brightness is 2, not 0 to 1 (of the projector's full white; 0: no flash) (trialConditions[0] (any))",
+                "penalty.incorrect.flash.rateHz is 60, not above 0 and at most 30 (half the projector's 60 Hz render loop) (trialConditions[0] (any))",
+                "penalty.incorrect.flash.brightness is 2, not 0 to 1 (of the projector's full white; 0: no flash) (trialConditions[1] (any))",
+                "penalty.incorrect.flash.rateHz is 60, not above 0 and at most 30 (half the projector's 60 Hz render loop) (trialConditions[1] (any))",
+            }, broken.Problems);
+
+            var check = new CheckPenaltyFlashes();
+            Assert.AreEqual(TimeSpan.FromSeconds(1), check.Process(System.Reactive.Linq.Observable.Return(Tuple.Create(flashed, 1.0))).Wait());
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => check.Process(System.Reactive.Linq.Observable.Return(Tuple.Create(flashed, 2.5))).Wait()).Message,
+                "The task's penalty flash is refused: the penalty sound lasts 2.5 s");
         }
 
         [TestMethod]

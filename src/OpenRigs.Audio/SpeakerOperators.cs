@@ -79,6 +79,19 @@ namespace OpenRigs.Audio
         }
     }
 
+    /// <summary>The lab's penalty sound's length (<see cref="PenaltySound.Seconds"/>).</summary>
+    [Combinator]
+    [Description("The lab's penalty sound's length in seconds, read from the file rig.yml's speakerArray.penaltySound names (NaN when it names none): how long OpenRigs.Vision PlayPenaltyFlash flashes. Stops the workflow, naming the file, when it is missing or not at the audio device's rate. Input: the speakers.")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class PenaltySoundSeconds
+    {
+        /// <summary>The length for each input.</summary>
+        public IObservable<double> Process(IObservable<SpeakerSet> source)
+        {
+            return source.Select(PenaltySound.Seconds);
+        }
+    }
+
     /// <summary>Plays a buffer laid out at one level at each trial's own level, a gain per play (<see cref="Scale"/>).</summary>
     [Combinator]
     [Description("Each trial's copy of a buffer laid out at BufferLevelDbfs (the highest level any trial draws, its peak checked when it was laid out), scaled to the trial's level: input (the trial's level in dBFS RMS, the buffer). A NaN level (mute) plays nothing; a level above BufferLevelDbfs stops the workflow, as its peak was never checked.")]

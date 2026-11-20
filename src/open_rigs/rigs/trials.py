@@ -21,7 +21,8 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
   within 2 ms;
 - each interval after the first started at the last trial's outcome plus its penaltyTimeoutSeconds and rewardConsumptionSeconds, within 2 ms;
 - each penalised trial (penalised) had its kind's timeout as its penaltyTimeoutSeconds (penalty.incorrect.timeoutSeconds, or on a miss
-  penalty.noResponse.timeoutSeconds), an unpenalised one 0;
+  penalty.noResponse.timeoutSeconds), an unpenalised one 0, and, in a log with penaltyFlashBrightness, its kind's
+  flash.brightness as that (0 unpenalised);
 - each rewarded trial had reward.consumptionSeconds as its rewardConsumptionSeconds, and any other 0 or that (a reward the
   board never answered keeps the consumption the loop waited);
 - each rewarded trial (rewarded) has a RewardDelivered row at its outcome (from 2 ms before it to REWARD_ANSWER_S after:
@@ -117,6 +118,12 @@ CORE_COLUMNS: List[Column] = [
     ("penaltyTimeoutSeconds", "double", "s",
      "The timeout after this trial when it was penalised, else 0: the trial's penalty.incorrect.timeoutSeconds, or on a "
      "miss its penalty.noResponse.timeoutSeconds. The next interval starts after it (itiStartTime)."),
+    ("penaltyFlashBrightness", "double", None,
+     "The brightness of the penalty flash after this trial when it was penalised, else 0: the trial's "
+     "penalty.incorrect.flash.brightness, or on a miss its penalty.noResponse.flash.brightness, 0 to 1 of the projector's "
+     "full white after gamma correction; 0 when no flash played. A flash covers the whole projector field at its kind's "
+     "flash.rateHz (white the first half of each cycle) from the outcome for the penalty sound's length (OpenRigs.Vision "
+     "PlayPenaltyFlash)."),
     ("penalised", "bool", None,
      "True when the trial was penalised: the timeout (penaltyTimeoutSeconds) and the penalty sound at the trial's "
      "penalty.incorrect.sound.levelDbfs, or on a miss its penalty.noResponse.sound.levelDbfs (none when mute), followed "
@@ -365,7 +372,7 @@ EVENT_NEEDS = (TIME_COLUMN, "Event", "Value")
 # A trial row's numbers, and those of them that may be NaN, by their descriptions above; any other NaN, an infinity, an
 # empty cell or text is a problem and the row's checks are skipped.
 TRIAL_NUMBERS = ("trialNumber", "itiStartTime", "itiSeconds", "trialStartTime", "stimulusOnsetTime", "outcomeTime",
-                 "rewardOfferedUl", "rewardConsumptionSeconds", "penaltyTimeoutSeconds", "quietWaitSeconds", "laserTriggerTime")
+                 "rewardOfferedUl", "rewardConsumptionSeconds", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "quietWaitSeconds", "laserTriggerTime")
 NAN_ALLOWED = ("stimulusOnsetTime", "laserTriggerTime")
 
 
@@ -456,6 +463,11 @@ class _Task:
         if miss is None:
             raise ValueError("a penalised miss, but penalty.noResponse is null")
         return float(miss)
+
+    def flash_brightness(self, row: Dict[str, str]) -> float:
+        """A penalised trial's flash brightness: its kind's flash.brightness (as timeout() picks the kind), 0 by default."""
+        kind = "penalty.incorrect" if _responded(row) else "penalty.noResponse"
+        return float(self.value(row, kind + ".flash.brightness", 0.0) or 0.0)
 
     def consumption(self, row: Dict[str, str]) -> float:
         return float(self.value(row, CONSUMPTION_PATH, REWARD_CONSUMPTION_SECONDS))
@@ -574,6 +586,16 @@ def _summarise(folder: Path) -> Summary:
             if abs(timeout - want) > 1e-9:
                 s.problems.append(f"trial {number}: penaltyTimeoutSeconds {timeout:g} on a trial "
                                   f"{'penalised' if penalised else 'not penalised'}, not {want:g}")
+            if "penaltyFlashBrightness" in row:
+                flash = _f(row, "penaltyFlashBrightness")
+                try:
+                    want = task.flash_brightness(row) if penalised else 0.0
+                except (ValueError, TypeError) as e:
+                    s.problems.append(f"trial {number}: {e}, so its flash is not checked")
+                    want = flash
+                if abs(flash - want) > 1e-9:
+                    s.problems.append(f"trial {number}: penaltyFlashBrightness {flash:g} on a trial "
+                                      f"{'penalised' if penalised else 'not penalised'}, not {want:g}")
             if "rewardConsumptionSeconds" in row:
                 drink = _f(row, "rewardConsumptionSeconds")
                 try:
