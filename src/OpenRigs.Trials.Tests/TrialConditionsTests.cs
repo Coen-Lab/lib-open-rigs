@@ -174,6 +174,10 @@ namespace OpenRigs.Trials.Tests
             var none = new Dictionary<string, Newtonsoft.Json.Linq.JToken>();
             Assert.AreEqual("conflict", TrialTypes.Derive(types, task, none, paired));
             Assert.AreEqual("neutral", TrialTypes.Derive(types, task, none, new List<List<string>>()), "mirrored needs the pair");
+            var wide = new Dictionary<string, Newtonsoft.Json.Linq.JToken> { { "a", j(new[] { -90, 90 }) } };
+            Assert.AreEqual("conflict", TrialTypes.Derive(types, task, wide, paired), "sides, not magnitudes");
+            Assert.AreEqual("neutral", TrialTypes.Derive(types, task, new Dictionary<string, Newtonsoft.Json.Linq.JToken> { { "a", j(new[] { -90, -90 }) } }, paired));
+            Assert.AreEqual("neutral", TrialTypes.Derive(types, task, new Dictionary<string, Newtonsoft.Json.Linq.JToken> { { "a", j(new[] { 0, -60 }) } }, paired), "0 has no side");
             Assert.AreEqual("sound", TrialTypes.Derive(types, task, new Dictionary<string, Newtonsoft.Json.Linq.JToken> { { "level", j(-40) } }, new List<List<string>>()));
             Assert.IsTrue(TrialTypes.Matches(Newtonsoft.Json.Linq.JToken.Parse(@"{""const"":1}"), j(1.0)));
             Assert.IsFalse(TrialTypes.Matches(Newtonsoft.Json.Linq.JToken.Parse(@"{""const"":1}"), j(true)));

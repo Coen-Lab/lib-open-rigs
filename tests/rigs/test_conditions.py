@@ -32,6 +32,9 @@ def test_flatten_keys_leaves_by_dotted_path():
     ({}, [[V, A]], "coherent"),
     ({A: [60, -60]}, [[V, A]], "conflict"),
     ({A: [60, -60]}, [], "coherent"),
+    ({V: [-60, 60], A: [90, -90]}, [[V, A]], "conflict"),  # sides, not magnitudes
+    ({V: [-60, 60], A: [-90, -90]}, [[V, A]], "coherent"),
+    ({V: [60, 60], A: [0, -60]}, [[V, A]], "coherent"),  # 0 has no side
     ({V: [60, "all"], A: [-60, "all"]}, [[V, A]], "coherent"),  # a non-number is never mirrored
     ({A: [0, "all"]}, [], "visual"),
     ({A: [0, 60]}, [], "coherent"),

@@ -6,7 +6,8 @@ Both are JSON Schema subschemas checked against a flat object keyed by dotted pa
         matching S leaves the unused paths unread.
     x-trial-types: ordered [{"trialType": name, "if": S, "mirrored": [a, b]}], the last with no "if"
         on a condition's values, every value a list; the first entry that matches names it. "mirrored": a and b share
-        a pairs group and b's list is a's negated (a non-number, such as "all", is never mirrored).
+        a pairs group and b's list is on the opposite side to a's, index by index (opposite
+        non-zero signs, magnitudes free; 0 and a non-number such as "all" have no side, so are never mirrored).
     x-required-conditions: [{"if": S, "some": T, "message": m}]
         S on the task's resolved values: when it matches, some combination of a condition with weight > 0 must match T, else m.
 """
@@ -74,6 +75,11 @@ def unused_paths(rules: list[dict], values: dict) -> set[str]:
     return {path for rule, _ in _applying(rules, values) for path in rule.get("unused", [])}
 
 
+def _opposite(x: Any, y: Any) -> bool:
+    """Whether x and y are numbers on opposite sides of zero (0 and a non-number have no side)."""
+    return all(isinstance(v, (int, float)) and not isinstance(v, bool) and v != 0 for v in (x, y)) and (x > 0) != (y > 0)
+
+
 def derive_trial_type(trial_types: list[dict], task: dict, values: dict[str, Any], pairs: Sequence[Sequence[str]] = ()) -> str:
     """A condition's trialType by x-trial-types: task the task's values (by alias, as JSON), values the condition's set by
     dotted path, pairs its pairs."""
@@ -86,8 +92,7 @@ def derive_trial_type(trial_types: list[dict], task: dict, values: dict[str, Any
             continue
         if "mirrored" in entry:
             a, b = entry["mirrored"]
-            numbers = all(isinstance(pick, (int, float)) and not isinstance(pick, bool) for pick in flat[a])
-            if not any(a in group and b in group for group in pairs) or not numbers or [-pick for pick in flat[a]] != flat[b]:
+            if not any(a in group and b in group for group in pairs) or len(flat[a]) != len(flat[b]) or not all(_opposite(x, y) for x, y in zip(flat[a], flat[b])):
                 continue
         return entry["trialType"]
     raise ValueError(f"no x-trial-types entry matches the condition {values} with pairs {pairs}")

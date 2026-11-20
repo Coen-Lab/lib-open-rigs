@@ -14,7 +14,7 @@ namespace OpenRigs.Trials
 
         /// <summary>The trialType of a condition: task the task's values by dotted path (a list a leaf), set the condition's set by
         /// dotted path, pairs its pairs; every value read as a list (a scalar a one-entry list). The first entry whose if matches
-        /// names it; a mirrored entry [a, b] also needs a and b in one pairs group and b's numbers a's negated. Throws on a
+        /// names it; a mirrored entry [a, b] also needs a and b in one pairs group and b's numbers on the opposite side of zero to a's, index by index (opposite non-zero signs, magnitudes free; 0 and a non-number have no side, so are never mirrored). Throws on a
         /// malformed entry, an if naming a path not in the values, a JSON Schema keyword it does not evaluate, or no match.</summary>
         public static string Derive(JArray trialTypes, IDictionary<string, JToken> task, IDictionary<string, JToken> set, IList<List<string>> pairs)
         {
@@ -44,7 +44,7 @@ namespace OpenRigs.Trials
                     var aList = (JArray)flat[a];
                     var bList = (JArray)flat[b];
                     var together = (pairs ?? new List<List<string>>()).Any(g => g != null && g.Contains(a) && g.Contains(b));
-                    if (!together || !aList.All(IsNumber) || aList.Count != bList.Count || !aList.Zip(bList, (x, y) => IsNumber(y) && -(double)x == (double)y).All(same => same)) continue;
+                    if (!together || aList.Count != bList.Count || !aList.Zip(bList, Opposite).All(same => same)) continue;
                 }
                 return (string)entry["trialType"];
             }
@@ -89,6 +89,8 @@ namespace OpenRigs.Trials
             }
             return true;
         }
+
+        static bool Opposite(JToken x, JToken y) => IsNumber(x) && IsNumber(y) && (double)x != 0 && (double)y != 0 && ((double)x > 0) != ((double)y > 0);
 
         static bool IsNumber(JToken value) => value.Type == JTokenType.Integer || value.Type == JTokenType.Float;
 
