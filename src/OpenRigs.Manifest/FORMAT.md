@@ -2,7 +2,7 @@
 
 One `manifest.json` in every experiment folder a rig records: what was launched, from which commit, with which settings files, what the experiment had to leave, how the run went, and every file it left.
 
-The workflow (`ExperimentManifest`, this package) is its only writer: when the experiment folder exists, when the workflow's Finished or the controller's stop comes, and when the run ends. Nobody else ever writes it. What happens to the experiment afterwards goes in files of its own beside it, each with one writer: `sync.json` from the overnight copy (what became of a run that never wrote `run.final`, a renamed session, the files' hashes; where it states `run` or `session`, it wins) and `ingest.json` from the server.
+The workflow (`ExperimentManifest`, this package) is its only writer: when the experiment folder exists, when the workflow's Finished or the controller's stop comes, and when the run ends. Nobody else writes it, except jacuzzi-ingest's converter (`ingest.convert`), which writes version 4 for old-format runs that never had one. What happens to the experiment afterwards goes in files of its own beside it, each with one writer: `sync.json` from the overnight copy (what became of a run that never wrote `run.final`, a renamed session, the files' hashes; where it states `run` or `session`, it wins) and `ingest.json` from the server.
 
 Every write is `manifest.json.<pid>.tmp`, then a rename over the old file, so no reader sees half a file. UTF-8 without a BOM, `\n` line ends; a reader decodes with `utf-8-sig`. Times are UTC, `YYYY-MM-DDTHH:MM:SSZ`. A field with no value is `null`, never absent. Paths in `files` and `expected` use `/`, relative to the experiment folder, no leading `./`, no `..`. No object has two keys differing only in case: Windows PowerShell 5.1 refuses to read one.
 
@@ -16,7 +16,7 @@ The examples are [`fixtures/manifest/v4/`](../../fixtures/manifest/v4/): `src\Op
 
 | Field | Meaning |
 | --- | --- |
-| `version` | 3. |
+| `version` | 4. |
 | `created` | When this file was last written. |
 | `ingest_script` | The node's `IngestScript`: the name of the server's registry entry for this kind of data, never a path or a command; `null` when blank. |
 | `writer` | `package` and `version`, the package that wrote it, its build suffix left out. |
