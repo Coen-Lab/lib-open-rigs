@@ -26,18 +26,18 @@ namespace OpenRigs.Trials
         public double itiSeconds;
         /// <summary>What a reward on it gives, in microlitres, on every trial; 0 where none is on offer.</summary>
         public double rewardOfferedUl;
-        /// <summary>The grating's contrast; 0 for a grey screen.</summary>
-        public double visualContrast;
+        /// <summary>The grating's contrast as the trial starts; 0 for a grey screen.</summary>
+        public double visualInitialContrast;
         /// <summary>The grating's phase, in radians (DrawVisualPhase).</summary>
         public double visualPhaseRad;
-        /// <summary>The sound's level in dBFS RMS (SoundLevels.Parse); NaN when mute.</summary>
-        public double auditoryLevelDbfs;
+        /// <summary>The sound's level as the trial starts, in dBFS RMS (SoundLevels.Parse); NaN when mute.</summary>
+        public double auditoryInitialLevelDbfs;
         /// <summary>The mixer channel of rig.yml's speaker nearest the initial azimuth drawn; -1 when mute, SoundAzimuths.AllSpeakersChannel at "all".</summary>
         public int speakerChannel;
         /// <summary>That speaker's azimuth, in degrees; NaN when mute or at "all".</summary>
         public double auditoryInitialAzimuthDeg;
-        /// <summary>That speaker's elevation, in degrees; NaN when mute or at "all".</summary>
-        public double auditoryElevationDeg;
+        /// <summary>That speaker's elevation as the trial starts, in degrees; NaN when mute or at "all".</summary>
+        public double auditoryInitialElevationDeg;
         /// <summary>Its Zapit condition, from 1; 0 without optogenetics.</summary>
         public int laserCondition;
         /// <summary>Whether the laser fires on it.</summary>

@@ -364,7 +364,7 @@ namespace OpenRigs.Trials.Tests
             CollectionAssert.AreEqual(new[] { "largeMultiplier is 1, not above 1" }, TaskBlocks.LargeRewardProblems(2, 1, 0, 20));
             Assert.AreEqual(0, TaskBlocks.LargeRewardProblems(8, 3, 0, 20).Count);
             CollectionAssert.AreEqual(new[] { "laserOnProbability must be in [0, 1]" }, TaskBlocks.LaserOnProbabilityProblems(1.5));
-            CollectionAssert.AreEqual(new[] { "visualStimulus.contrasts must each be a finite number, 0 or more, at least one", "auditoryStimulus.levelDbfs must be mute or a number of dBFS RMS from -120 to -1" }, TaskBlocks.StimulusProblems(new List<double>(), 0));
+            CollectionAssert.AreEqual(new[] { "visualStimulus.initialContrasts must each be a finite number, 0 or more, at least one", "auditoryStimulus.initialLevelDbfs must be mute or a number of dBFS RMS from -120 to -1" }, TaskBlocks.StimulusProblems(new List<double>(), 0));
             Assert.AreEqual(0, TaskBlocks.StimulusProblems(new List<double> { 0, 1 }, -40).Count);
             Assert.AreEqual(0, TaskBlocks.StimulusProblems(new List<double> { 1 }, double.NaN).Count);
         }

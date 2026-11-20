@@ -163,11 +163,13 @@ class Curriculum(TaskBlock):
 
 
 class AuditoryStimulus(TaskBlock):
-    """A sound stimulus: its level (mute for none), the azimuths it plays at (a number, or "all" for every rig.yml speaker)
-    and the elevation the nearest speaker is found at. A task subclasses it to give its own defaults and descriptions."""
+    """A sound stimulus as each trial starts: its initial level (mute for none), the azimuths it plays at (a number, or "all" for every
+    rig.yml speaker) and the initial elevation the nearest speaker is found at. A task subclasses it to give its own defaults and descriptions."""
 
-    level_dbfs: SoundLevelDbfs = level_dbfs(STIMULUS_LEVEL_DBFS, "The stimulus sound")
-    elevation_deg: Double = Field(default=0.0, ge=-90, le=90, description="Elevation the sound plays at, in degrees: with the azimuth drawn, it picks rig.yml's nearest speaker")
+    initial_level_dbfs: SoundLevelDbfs = level_dbfs(STIMULUS_LEVEL_DBFS, "The stimulus sound at the trial's start")
+    initial_elevation_deg: Double = Field(
+        default=0.0, ge=-90, le=90, description="Elevation the sound plays at as the trial starts, in degrees: with the azimuth drawn, it picks rig.yml's nearest speaker"
+    )
     initial_azimuths_deg: list[SoundAzimuth] = Field(
         default=[ALL_SPEAKERS], min_length=1, description="Signed azimuths the sound plays at, in degrees, one picked per trial, on rig.yml's speaker nearest it; \"all\" on every speaker"
     )

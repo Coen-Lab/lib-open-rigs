@@ -200,8 +200,8 @@ def test_each_block_sits_in_its_place_in_the_core():
 def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
     names = [name for name, _, _, _ in shared_columns(("conditions", "autoReward", "stimulus", "optogenetics", "quietWait"))]
     assert names[names.index("penalised"):] == ["penalised", "laserCondition", "laserPowerMw", "laserTriggerTime", "trialConditionId",
-                                                "trialCombinationId", "visualContrast", "visualPhaseRad", "auditoryLevelDbfs",
-                                                "auditoryInitialAzimuthDeg", "auditoryElevationDeg", "autoReward"]
+                                                "trialCombinationId", "visualInitialContrast", "visualPhaseRad", "auditoryInitialLevelDbfs",
+                                                "auditoryInitialAzimuthDeg", "auditoryInitialElevationDeg", "autoReward"]
 
 
 def test_a_task_without_a_block_is_held_to_the_core_alone():

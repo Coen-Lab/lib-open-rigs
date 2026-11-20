@@ -129,8 +129,8 @@ def test_only_chunk_names_are_read(tmp_path):
 # file's NaN is text, the table's bare. contrasts and reward.sizeUl vary; stim.azimuth is constant, a one-entry list.
 TABLE_COLUMNS = {
     "trialConditionId": {"type": "int"}, "trialCombinationId": {"type": "int"}, "trialType": {"type": "string"},
-    "target": {"type": "string"}, "visualContrast": {"type": "double", "copyOf": "contrasts"},
-    "visualAzimuthDeg": {"type": "double", "copyOf": "stim.azimuth", "nanWhen": {"column": "visualContrast", "equals": "0"}},
+    "target": {"type": "string"}, "visualInitialContrast": {"type": "double", "copyOf": "contrasts"},
+    "visualAzimuthDeg": {"type": "double", "copyOf": "stim.azimuth", "nanWhen": {"column": "visualInitialContrast", "equals": "0"}},
     "rewardUl": {"type": "double", "copyOf": "reward.sizeUl"}, "delay": {"type": "double", "copyOf": "delaySeconds"},
 }
 TABLE_TASK = {"taskParameters": {"contrasts": [0, 1], "target": "left", "stim": {"azimuth": [-60]}, "reward": {"sizeUl": 3},
@@ -141,9 +141,9 @@ TABLE = {"rows": [
     {"trialCombinationId": 2, "trialConditionId": 1, "trialType": "auditory", "conditionWeight": 1, "values": {"contrasts": 0, "reward.sizeUl": 2, "target": "right"}},
 ]}
 TABLE_LOG = [  # target is resolved, not a copy: the third trial's centre stays as recorded
-    {"trialConditionId": "0", "trialCombinationId": "0", "trialType": "visual", "target": "left", "visualContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "3", "delay": "NaN"},
-    {"trialConditionId": "0", "trialCombinationId": "1", "trialType": "visual", "target": "left", "visualContrast": "1", "visualAzimuthDeg": "-60", "rewardUl": "NaN", "delay": "NaN"},
-    {"trialConditionId": "1", "trialCombinationId": "2", "trialType": "auditory", "target": "centre", "visualContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "2", "delay": "NaN"},
+    {"trialConditionId": "0", "trialCombinationId": "0", "trialType": "visual", "target": "left", "visualInitialContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "3", "delay": "NaN"},
+    {"trialConditionId": "0", "trialCombinationId": "1", "trialType": "visual", "target": "left", "visualInitialContrast": "1", "visualAzimuthDeg": "-60", "rewardUl": "NaN", "delay": "NaN"},
+    {"trialConditionId": "1", "trialCombinationId": "2", "trialType": "auditory", "target": "centre", "visualInitialContrast": "0", "visualAzimuthDeg": "NaN", "rewardUl": "2", "delay": "NaN"},
 ]
 
 
@@ -195,9 +195,9 @@ def test_a_log_with_neither_reads_as_written_without_a_table(tmp_path):
 @pytest.mark.parametrize("trial, column, value, words", [
     (2, "trialConditionId", "0", "trial 3: trialConditionId 0, its combination 2's is 1"),
     (2, "trialType", "visual", "trial 3: trialType 'visual'"),
-    (1, "visualContrast", "0.5", "trial 2: visualContrast 0.5, its combination 1's contrasts is 1"),  # the row's value
+    (1, "visualInitialContrast", "0.5", "trial 2: visualInitialContrast 0.5, its combination 1's contrasts is 1"),  # the row's value
     (1, "visualAzimuthDeg", "60", "trial 2: visualAzimuthDeg 60.0, its combination 1's stim.azimuth is -60"),  # Settings_Task's, unwrapped
-    (0, "visualAzimuthDeg", "-60", "trial 1: visualAzimuthDeg -60.0, not NaN where visualContrast is 0"),  # nanWhen
+    (0, "visualAzimuthDeg", "-60", "trial 1: visualAzimuthDeg -60.0, not NaN where visualInitialContrast is 0"),  # nanWhen
     (0, "rewardUl", "NaN", "trial 1: rewardUl nan, its combination 0's reward.sizeUl is 3"),
     (1, "rewardUl", "3", "trial 2: rewardUl 3.0"),  # the table's bare NaN
     (0, "delay", "1", "trial 1: delay 1.0, its combination 0's delaySeconds is 'NaN'"),  # Settings_Task's text NaN
@@ -214,22 +214,22 @@ def test_check_catches_a_planted_mismatch(tmp_path, trial, column, value, words)
 
 def test_a_level_s_mute_is_logged_as_nan(tmp_path):
     table = {"rows": [{**row, "values": {**row["values"], "sound.levelDbfs": level}} for row, level in zip(TABLE["rows"], ("mute", -40, "mute"))]}
-    log = [{**row, "auditoryLevelDbfs": level} for row, level in zip(TABLE_LOG, ("NaN", "-40", "NaN"))]
+    log = [{**row, "auditoryInitialLevelDbfs": level} for row, level in zip(TABLE_LOG, ("NaN", "-40", "NaN"))]
     run = table_run(tmp_path / "clean", log=log, table=table)
-    manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "auditoryLevelDbfs": {"type": "double", "copyOf": "sound.levelDbfs"}}})
+    manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "auditoryInitialLevelDbfs": {"type": "double", "copyOf": "sound.levelDbfs"}}})
     trial_log.check(run)
-    log[0]["auditoryLevelDbfs"] = "-40"
+    log[0]["auditoryInitialLevelDbfs"] = "-40"
     run = table_run(tmp_path / "planted", log=log, table=table)
-    manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "auditoryLevelDbfs": {"type": "double", "copyOf": "sound.levelDbfs"}}})
-    with pytest.raises(ValueError, match="trial 1: auditoryLevelDbfs -40.0, its combination 0's sound.levelDbfs is nan"):
+    manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "auditoryInitialLevelDbfs": {"type": "double", "copyOf": "sound.levelDbfs"}}})
+    with pytest.raises(ValueError, match="trial 1: auditoryInitialLevelDbfs -40.0, its combination 0's sound.levelDbfs is nan"):
         trial_log.check(run)
 
 
 def test_copy_of_comes_from_the_manifest_only(tmp_path):
     # Without copyOf in the manifest's columns, only trialConditionId and trialType are held to the table.
-    run = table_run(tmp_path, log=[{**TABLE_LOG[1], "visualContrast": "0.5"}])
+    run = table_run(tmp_path, log=[{**TABLE_LOG[1], "visualInitialContrast": "0.5"}])
     manifest(run, trial_columns={"columns": {k: {"type": v["type"]} for k, v in TABLE_COLUMNS.items()}})
-    assert trial_log.read(run)[0]["visualContrast"] == 0.5
+    assert trial_log.read(run)[0]["visualInitialContrast"] == 0.5
     with pytest.raises(ValueError, match="copyOf nowhere, a path in neither"):
-        manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "visualContrast": {"type": "double", "copyOf": "nowhere"}}})
+        manifest(run, trial_columns={"columns": {**TABLE_COLUMNS, "visualInitialContrast": {"type": "double", "copyOf": "nowhere"}}})
         trial_log.check(run)

@@ -29,7 +29,8 @@ RewardDelivered row, Value the microlitres delivered and Detail the microlitres 
 
 These checks run on finished trials, the rows of WorkflowData_Trials. A run stopped mid-trial has no row for that trial, but
 a task that logs WorkflowData/WorkflowData_StimulusState_*.csv (harpTime, trialNumber, and auditoryLevelDbfs,
-visualContrast or both) shows it: rows for the trial after the last finished one are an
+visualContrast or both: StimulusState's instantaneous columns, not the trial log's auditoryInitialLevelDbfs and
+visualInitialContrast) shows it: rows for the trial after the last finished one are an
 unfinished trial, reported in the summary (never a problem), and the first of them with a stimulus on (auditoryLevelDbfs
 not NaN, or visualContrast above 0) is its stimulus onset, which gives the last outcome's interval
 to the next stimulus. A task without that log has no unfinished trial.
@@ -156,16 +157,17 @@ CONDITIONS_COLUMNS: List[Column] = [
 ]
 
 STIMULUS_COLUMNS: List[Column] = [
-    ("visualContrast", "double", None, "Grating contrast as BonVision's Contrast, 1 full contrast; 0 when no grating was shown."),
+    ("visualInitialContrast", "double", None,
+     "Grating contrast as the trial starts, as BonVision's Contrast, 1 full contrast; 0 when no grating was shown."),
     ("visualPhaseRad", "double", "rad",
      "The grating's phase, drawn uniformly from 0 to 2 pi for every trial from the seeded stream (OpenRigs.Trials ConditionedTrial)."),
-    ("auditoryLevelDbfs", "double", "dBFS",
-     "The sound's level in dBFS RMS, the trial's auditoryStimulus.levelDbfs; NaN when no sound played (mute)."),
+    ("auditoryInitialLevelDbfs", "double", "dBFS",
+     "The sound's level in dBFS RMS as the trial starts, the trial's auditoryStimulus.initialLevelDbfs; NaN when no sound played (mute)."),
     ("auditoryInitialAzimuthDeg", "double", "deg",
      "Azimuth of the speaker that played, rig.yml's nearest to the initial azimuth drawn; NaN when none played "
-     "(auditoryLevelDbfs NaN) or when every speaker played (auditoryStimulus.initialAzimuthsDeg all)."),
-    ("auditoryElevationDeg", "double", "deg",
-     "Elevation of the speaker that played; NaN when none or every speaker played, as auditoryInitialAzimuthDeg."),
+     "(auditoryInitialLevelDbfs NaN) or when every speaker played (auditoryStimulus.initialAzimuthsDeg all)."),
+    ("auditoryInitialElevationDeg", "double", "deg",
+     "Elevation of the speaker that played as the trial starts; NaN when none or every speaker played, as auditoryInitialAzimuthDeg."),
 ]
 
 AUTO_REWARD_COLUMNS: List[Column] = [
@@ -605,7 +607,8 @@ def _summarise(folder: Path) -> Summary:
     return s
 
 
-# StimulusState's stimulus columns, each with when its value says the stimulus is on.
+# WorkflowData_StimulusState's stimulus columns (instantaneous values, never renamed: not the trial log's
+# auditoryInitialLevelDbfs and visualInitialContrast), each with when its value says the stimulus is on.
 STIMULUS_ON_COLUMNS = {
     "auditoryLevelDbfs": lambda v: not math.isnan(float(v)),
     "visualContrast": lambda v: float(v) > 0,
