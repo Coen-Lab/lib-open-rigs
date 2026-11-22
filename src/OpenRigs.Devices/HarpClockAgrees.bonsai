@@ -4,7 +4,7 @@
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>One Harp device's clock held to the rig's, on a rig whose clock is a device of its own (ClockFromTimestampGenerator), included once per Harp device after that device's piece: Device (such as BehaviorBoard-Main, LicketySplit-Left, StepperDriver-A), whose heartbeats on Device.Data (DeviceDataSubjectName) are compared with Timestamp (HarpClockAgrees). Announces Device into ReadyStages once three heartbeats agree within 0.5 s; three that disagree stop the workflow, before Go or during the run, naming the device and its clock-sync cable. A device off that cable counts from its own power-on, and its data would be logged on that time with nothing said.</Description>
+  <Description>One Harp device's clock held to the rig's, on a rig whose clock is a device of its own (ClockFromTimestampGenerator), included once per Harp device after that device's piece: Device (such as BehaviorBoard-Main, LicketySplit-Left, StepperDriver-A), whose heartbeats on Device.Data (DeviceDataSubjectName) are compared with Timestamp (HarpClockAgrees). Announces Device into ReadyStages once three heartbeats agree within 0.5 s; three that disagree stop the workflow before Go (ExperimentGo) and after it only write a warning, naming the device and its clock-sync cable, as a session already recording is worth more than its clock. A device off that cable counts from its own power-on, and its data would be logged on that time with nothing said.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -18,6 +18,9 @@
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:HarpClockAgrees">
@@ -45,14 +48,15 @@
     </Nodes>
     <Edges>
       <Edge From="1" To="2" Label="Source1" />
-      <Edge From="2" To="4" Label="Source1" />
-      <Edge From="3" To="4" Label="Source2" />
-      <Edge From="0" To="4" Label="Source3" />
-      <Edge From="0" To="5" Label="Source1" />
-      <Edge From="5" To="6" Label="Source1" />
-      <Edge From="4" To="7" Label="Source1" />
-      <Edge From="6" To="7" Label="Source2" />
-      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="2" To="5" Label="Source1" />
+      <Edge From="3" To="5" Label="Source2" />
+      <Edge From="4" To="5" Label="Source3" />
+      <Edge From="0" To="5" Label="Source4" />
+      <Edge From="0" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="5" To="8" Label="Source1" />
+      <Edge From="7" To="8" Label="Source2" />
+      <Edge From="8" To="9" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

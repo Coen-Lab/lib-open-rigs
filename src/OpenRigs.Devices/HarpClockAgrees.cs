@@ -11,12 +11,13 @@ namespace OpenRigs.Devices
     /// Holds a Harp device's clock to the rig's clock (Timestamp): each heartbeat (its TimestampSeconds event) is compared with
     /// the clock's latest time. A device off its clock-sync cable runs on its own clock from power-on, and its every sample
     /// would be logged on that timebase with nothing said. Passes each agreeing heartbeat once <see cref="Beats"/> in a row
-    /// have agreed (the device's ready stage announces at the first), and stops the workflow, before Go or during the run,
-    /// once <see cref="Beats"/> in a row disagree by more than <see cref="ToleranceSeconds"/>. On a rig whose clock is this
-    /// device, the two always agree.
+    /// have agreed (the device's ready stage announces at the first). <see cref="Beats"/> in a row that disagree by more than
+    /// <see cref="ToleranceSeconds"/> stop the workflow before Go; after Go they only write a warning, once each time the device
+    /// falls out, as a session already recording is worth more than its clock. On a rig whose clock is this device, the two
+    /// always agree.
     /// </summary>
     [Combinator]
-    [Description("Each heartbeat of the device (Name.Data, first input) compared with the rig's clock (Timestamp, second input): passes the device's time once Beats heartbeats in a row agree within ToleranceSeconds, and stops the workflow once Beats in a row disagree, naming the device and its clock-sync cable.")]
+    [Description("Each heartbeat of the device (Name.Data, first input) compared with the rig's clock (Timestamp, second input): passes the device's time once Beats heartbeats in a row agree within ToleranceSeconds. Beats in a row that disagree stop the workflow before Go (third input) and only write a warning after it, naming the device and its clock-sync cable.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class HarpClockAgrees
     {
@@ -29,28 +30,30 @@ namespace OpenRigs.Devices
         public double ToleranceSeconds { get; set; } = 0.5;
 
         /// <summary>Gets or sets how many heartbeats in a row decide agreement or disagreement.</summary>
-        [Description("How many heartbeats in a row decide: so many agreeing pass, so many disagreeing stop the workflow. A clock set between two beats costs one.")]
+        [Description("How many heartbeats in a row decide: so many agreeing pass, so many disagreeing stop the workflow before Go or warn after it. A clock set between two beats costs one.")]
         public int Beats { get; set; } = 3;
 
         /// <summary>The device's time at each agreeing heartbeat, once <see cref="Beats"/> have agreed in a row.</summary>
-        public IObservable<double> Process(IObservable<HarpMessage> device, IObservable<double> clock)
+        public IObservable<double> Process<TGo>(IObservable<HarpMessage> device, IObservable<double> clock, IObservable<TGo> go)
         {
             return Observable.Defer(() =>
             {
                 var gate = new object();
                 double? latest = null;
+                var started = false;
                 int agreeing = 0, disagreeing = 0;
                 var clockTimes = clock.Do(seconds => { lock (gate) latest = seconds; }).IgnoreElements();
+                var goes = go.Take(1).Do(_ => { lock (gate) started = true; }).IgnoreElements().Select(_ => 0.0);
                 var beats = device
                     .Where(message => message.Address == TimestampSeconds.Address && message.MessageType == MessageType.Event && message.IsTimestamped)
-                    .Select(message => Judge(message.GetTimestamp(), gate, ref latest, ref agreeing, ref disagreeing))
+                    .Select(message => Judge(message.GetTimestamp(), gate, ref latest, ref started, ref agreeing, ref disagreeing))
                     .Where(seconds => seconds.HasValue)
                     .Select(seconds => seconds.Value);
-                return clockTimes.Merge(beats);
+                return clockTimes.Merge(goes).Merge(beats);
             });
         }
 
-        double? Judge(double beat, object gate, ref double? latest, ref int agreeing, ref int disagreeing)
+        double? Judge(double beat, object gate, ref double? latest, ref bool started, ref int agreeing, ref int disagreeing)
         {
             lock (gate)
             {
@@ -63,10 +66,12 @@ namespace OpenRigs.Devices
                 }
 
                 agreeing = 0;
-                if (++disagreeing < Beats) return null;
-                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
-                    "{0}'s Harp clock is {1:0.###} s from the rig's clock (Timestamp) on {2} heartbeats in a row, so its data would be logged on its own time: " +
-                    "check its clock-sync cable to the clock device, then start again.", Name, apart, Beats));
+                if (++disagreeing != Beats) return null;
+                var what = string.Format(CultureInfo.InvariantCulture,
+                    "{0}'s Harp clock is {1:0.###} s from the rig's clock (Timestamp) on {2} heartbeats in a row, so its data is logged on its own time", Name, apart, Beats);
+                if (!started) throw new InvalidOperationException(what + ": check its clock-sync cable to the clock device, then start again.");
+                Console.Error.WriteLine("HarpClockAgrees: warning: " + what + " while it is off; the session goes on: check its clock-sync cable to the clock device after it.");
+                return null;
             }
         }
     }

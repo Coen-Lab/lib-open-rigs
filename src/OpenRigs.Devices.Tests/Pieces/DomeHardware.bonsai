@@ -8,7 +8,7 @@
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>DomeHardware, the rig list, whole. PiecesSubscribeTests sets ConfigRoot; PathPrefix, ControlEvents and SubjectId (ExperimentControl's) never come, so nothing is logged.</Description>
+  <Description>DomeHardware, the rig list, whole. PiecesSubscribeTests sets ConfigRoot; PathPrefix, ControlEvents, SubjectId and ExperimentGo (ExperimentControl's) never come, so nothing is logged.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
@@ -23,6 +23,9 @@
       </Expression>
       <Expression xsi:type="rx:AsyncSubject" TypeArguments="sys:String">
         <rx:Name>SubjectId</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject" TypeArguments="ctl:ControlEvent">
+        <rx:Name>ExperimentGo</rx:Name>
       </Expression>
       <Expression xsi:type="rx:ReplaySubject" TypeArguments="harp:Timestamped(orl:EventRow)">
         <rx:Name>Events</rx:Name>
