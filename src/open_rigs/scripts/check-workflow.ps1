@@ -18,7 +18,7 @@ param(
 #      Skipped, and said, on a machine without the Spinnaker SDK (a CI runner). A workflow that includes NoExperimentFolder (a QC
 #      calibration, a preflight) records nothing, so it is built against the filled template and linted all the same, but the Harp records,
 #      the manifest's expectations and the trial row's columns are skipped, and said.
-#   4. Each config\task*.yml reads as the workflow reads it at Go, TaskPath is exposed (neither for a NoExperimentFolder workflow, which
+#   4. Each config\task*.yml deserializes as the generated reader does (not the Go check, which needs rig.yml), TaskPath is exposed (neither for a NoExperimentFolder workflow, which
 #      reads no generated TaskLogic), and every key in the template reaches the Settings_Rig JSON the experiment logs.
 # Needs the environment set up (.bonsai\Setup.ps1: .bonsai\Packages). Exit 0 when all pass.
 $ErrorActionPreference = 'Stop'
@@ -238,6 +238,7 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
         }
         [xml]$layout = Get-Content $layoutPath -Raw
         $layoutLines = @(Test-Layout $layout.VisualizerLayout $inspectable '')
+        if (-not $layoutLines.Count) { $layoutLines = @("  ok    config\$(Split-Path $layoutFile -Leaf) has no windows; nothing to check") }
         $layoutLines
         $failed += @($layoutLines | Where-Object { $_ -like '  FAIL*' }).Count
     } else { "  ok    no config\$(Split-Path $layoutFile -Leaf); nothing to check" }
@@ -252,7 +253,7 @@ if ($Step -eq 'Checks') {
     if (Test-Path (Join-Path $bin 'YamlDotNet.dll')) { [AppDomain]::CurrentDomain.remove_AssemblyResolve($script:resolver) }
     $failed = 0
     $rigYml = Write-FilledTemplate
-    # Each task file as the workflow reads it at Go (the generated deserializer: no unknown key).
+    # Each task file through the generated deserializer (no unknown key); the Go check itself needs rig.yml and is not run.
     $taskType = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq 'Extensions' } |
         ForEach-Object { $_.GetTypes() } | Where-Object { $_.IsPublic -and $_.Name -like '*TaskLogic' -and $_.Namespace -like '*Task' } | Select-Object -First 1
     # A workflow with NoExperimentFolder has no generated TaskLogic: its task file, if any, is read by an include.
@@ -265,7 +266,7 @@ if ($Step -eq 'Checks') {
             $d = (New-Object YamlDotNet.Serialization.DeserializerBuilder).Build()
             $c = $d.Deserialize((New-Object IO.StringReader ([IO.File]::ReadAllText($file.FullName))), $taskType)
             if ($null -eq $c.TaskParameters) { "  FAIL  config\$($file.Name) has no taskParameters"; $failed++ }
-            else { "  ok    config\$($file.Name) reads as the workflow reads it at Go" }
+            else { "  ok    config\$($file.Name) deserializes as the generated reader does" }
         } catch { $x = $_.Exception; while ($x.InnerException) { $x = $x.InnerException }; "  FAIL  config\$($file.Name): $($x.Message)"; $failed++ }
     }
     $wf = Get-Content $workflowFile -Raw

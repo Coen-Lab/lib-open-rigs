@@ -123,3 +123,11 @@ def test_only_a_workflow_with_no_experiment_folder_skips_the_records_and_task_ch
     script = SCRIPT.read_text(encoding="utf-8")
     assert "$script:noRecords = $script:plan.records_nothing" in script
     assert "NoExperimentFolder: the workflow records nothing" in script and "NoExperimentFolder: no generated TaskLogic" in script
+
+
+def test_an_empty_layout_says_so_and_the_task_check_claims_only_what_it_does():
+    # The layout step runs only with the Spinnaker SDK, so the script text holds it: a layout with no windows prints a
+    # line rather than nothing, and step 4 says it deserializes each task file, not that it runs the Go check.
+    script = SCRIPT.read_text(encoding="utf-8")
+    assert "if (-not $layoutLines.Count) { $layoutLines = @(\"  ok    config\$(Split-Path $layoutFile -Leaf) has no windows; nothing to check\") }" in script
+    assert "deserializes as the generated reader does\" }" in script and "reads it at Go" not in script
