@@ -34,6 +34,7 @@ NAMES_THE_LAB = {
     "fixtures/manifest/v3/running.json": 9,
     "fixtures/manifest/v3/stopped-not-final.json": 10,
     "fixtures/lab-settings/v1/as-on-k.yml": 1,  # the share's lab.yml as it is, copied byte for byte from its other reader
+    "fixtures/lab-settings/v1/extra-key.yml": 1,  # the same set's refused extra key, owner: <a lab member>
     "patches/README.md": 1,
     "src/OpenRigs.Control/OpenRigs.Control.csproj": 1,
     "src/OpenRigs.Audio/OpenRigs.Audio.csproj": 1,
