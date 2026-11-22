@@ -100,7 +100,7 @@ def _value(text: str, column: Optional[Dict[str, Any]], decode: bool) -> Any:
 
 
 def _text_rows(experiment: Union[str, Path]) -> Iterator[Tuple[Path, int, Dict[str, str]]]:
-    """Each row of the experiment's WorkflowData/WorkflowData_Trials_<start>.csv (several in name order), as written: its
+    """Each row of the experiment's WorkflowData/WorkflowData_Trials_<start>.csv (several in time order), as written: its
     file, line number and cells by column name. A file's last line without a newline (still being written) is left out.
     Only chunk names are read (open_rigs.chunks); any other file is skipped."""
     for path in chunks.files(Path(experiment) / LOG.split("_", 1)[0], LOG, ".csv")[0]:

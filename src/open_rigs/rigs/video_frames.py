@@ -126,7 +126,7 @@ def check_videos(folder: Path, ffprobe: Optional[str] = None, killed: Optional[b
     killed = run_killed(folder) if killed is None else killed
     checks: List[VideoCheck] = []
     for device in sorted(p for p in folder.iterdir() if p.is_dir()):
-        videos = sorted(p for suffix in VIDEO_SUFFIXES for p in chunks.files(device, device.name, suffix)[0])
+        videos = sorted((p for suffix in VIDEO_SUFFIXES for p in chunks.files(device, device.name, suffix)[0]), key=chunks.time_of)
         last_id: Optional[int] = None
         for video in videos:
             name = f"{device.name}/{video.name}"

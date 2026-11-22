@@ -13,7 +13,7 @@ Upstream column: an issue where reported, else "Not reported" for a fix upstream
 | Trials | The trial loop on OpenRigs.Devices: `TrialLoop`, `ITrialRules`, `ITrial`, `ITrialOutcome`, `TrialTiming`, `LaserTiming`, `TrialCue`, `TrialTimes`, `TrialEvent`, `PickTrialEvents`, `SharedTrialColumns`, `TrialOutcome<TRow>`, `TrialOutcomes`, `ZapitTrialCommand` and `IZapitTrial`; `Penalties`, `PenaltyFlash`, `PenaltyFlashRules` and `CheckPenaltyFlashes` | Own |
 | HarpDevices | `RecordHarpDevices`, every rig.yml Harp device logged with its `_device.json` and register map | Own |
 | LiveView | `StreamDevices`, each published `<Kind>-<Instance>.Data` streamed on fixed ports, with its own `liveview` report | Own |
-| Logging | Experiment folder `ses-<Session>_<DateTime>` (no `date-`) in `LogController` | ucl-open/roadmap#37 |
+| Logging | Experiment folder `ses-<Session>_<DateTime>` (no `date-`; local time and UTC offset) in `LogController` | ucl-open/roadmap#37 |
 | Logging | `CsvWriter`'s `AutoFlush`, `PublishRows`, `LoggedRows`, `ColumnNames`, and a `harpTime` first column for a Harp-timestamped record | Not reported |
 | Logging | `BinaryLogWriter` for `LogHarp` and `LogHarpDemux` in place of `MatrixWriter`, on a foreground thread so headless Bonsai stays open until each file is closed | Not reported |
 | Logging | `LogTrials`, `LogEvents`, `CreateEvent`, `ExperimentLogs`, `LogControlEvents`, `LogRngSeed`, `TaskLogs` (no `WorkflowOutput`), `LogVideoFfmpeg`, `ExperimentRecords`, `NoExperimentFolder` | Own |

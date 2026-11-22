@@ -5,7 +5,7 @@
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:rig="clr-namespace:OpenRigs.Devices.Rigs;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>What every lab experiment logs, the same in every task: once ExperimentIds (SubjectId, SessionId) is published at Go, LogController makes the experiment folder under rig.yml's rootPath (RigConfigs) and publishes PathPrefix; LogEvents declares Events and writes WorkflowData_Events (LogControlEvents adds the controller's events); once the folder exists, Settings_Rig (rig.yml as parsed) and Settings_Experiment (ExperimentSettings at Go) are written, the experiment's path is reported and the phase becomes Recording. The task logs its own trials and task file, and puts RecordHarpDevices and ExperimentManifest last. Needs ExperimentIds, RigConfigs (ReadLabRig) and ExperimentGo (ExperimentControl).</Description>
+  <Description>What every lab experiment logs, the same in every task: once ExperimentIds (SubjectId, SessionId) is published at Go, LogController checks the clock against ConfigRoot\shared\lab.yml (stopping the workflow when it fails), then makes the experiment folder under rig.yml's rootPath (RigConfigs) and publishes PathPrefix; LogEvents declares Events and writes WorkflowData_Events (LogControlEvents adds the controller's events); once the folder exists, Settings_Rig (rig.yml as parsed) and Settings_Experiment (ExperimentSettings at Go) are written, the experiment's path is reported and the phase becomes Recording. The task logs its own trials and task file, and puts RecordHarpDevices and ExperimentManifest last. Needs ExperimentIds, RigConfigs and ConfigRoot (ReadLabRig) and ExperimentGo (ExperimentControl).</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -32,6 +32,7 @@
         <SubjectId>UNMAPPED</SubjectId>
         <SessionId>UNMAPPED</SessionId>
         <Path>UNMAPPED</Path>
+        <ConfigRoot>UNMAPPED</ConfigRoot>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:DelaySubscription">
@@ -96,6 +97,14 @@
           <orcl:Phase>Recording</orcl:Phase>
         </Combinator>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ConfigRoot</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="ConfigRoot" />
+        </PropertyMappings>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -103,6 +112,8 @@
       <Edge From="3" To="4" Label="Source1" />
       <Edge From="1" To="5" Label="Source1" />
       <Edge From="4" To="5" Label="Source2" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="5" Label="Source3" />
       <Edge From="5" To="6" Label="Source1" />
       <Edge From="6" To="8" Label="Source1" />
       <Edge From="7" To="8" Label="Source2" />

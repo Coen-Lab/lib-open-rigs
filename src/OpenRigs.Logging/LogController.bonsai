@@ -5,6 +5,7 @@
                  xmlns:sys="clr-namespace:System;assembly=mscorlib"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:p1="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Workflow>
     <Nodes>
@@ -12,10 +13,11 @@
         <Property Name="SubjectId" />
         <Property Name="SessionId" />
         <Property Name="Path" />
+        <Property Name="ConfigRoot" />
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>LogController</Name>
-        <Description>Specifies default parameters for managing data logs.</Description>
+        <Description>Makes the experiment folder, Path\sub-SubjectId\ses-SessionId_time, the time the start's local time and UTC offset (FormatDate), and publishes it as PathPrefix. With ConfigRoot set, first checks the clock against ConfigRoot\shared\lab.yml (CheckLabClock) and stops the workflow, naming nothing, when it fails.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="ExternalizedMapping">
@@ -66,10 +68,18 @@
               </Combinator>
             </Expression>
             <Expression xsi:type="WorkflowOutput" />
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="ConfigRoot" Description="The root holding each machine's folder and shared\lab.yml (ReadLabRig's ConfigRoot); empty checks nothing." />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orl:CheckLabClock" />
+            </Expression>
           </Nodes>
           <Edges>
             <Edge From="0" To="1" Label="Source1" />
-            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="1" To="15" Label="Source1" />
+            <Edge From="14" To="15" Label="Source2" />
+            <Edge From="15" To="2" Label="Source1" />
             <Edge From="2" To="3" Label="Source1" />
             <Edge From="2" To="8" Label="Source1" />
             <Edge From="3" To="10" Label="Source1" />

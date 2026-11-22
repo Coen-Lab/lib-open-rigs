@@ -80,9 +80,9 @@ namespace OpenRigs.Video.Tests
             Check(IncludeWorkflow, count, width, height, channels, takeCount: count);
         }
 
-        // The hour ends 2 s (100 frames) into the run: the include's Switch disposes the first
-        // hour's writer at the next hour's first frame, and Bonsai exits soon after; both files
-        // must still hold every frame of their hour.
+        // The experiment started an hour before HourEnds, so its first chunk ends 2 s (100 frames) into
+        // the run: the include's Switch disposes the first chunk's writer at the next chunk's first
+        // frame, and Bonsai exits soon after; both files must still hold every frame of their chunk.
         [TestMethod]
         public void LogVideoFfmpeg_AnHourRollover_EachHoursFramesInItsOwnVideoAndCsv()
         {
@@ -93,7 +93,7 @@ namespace OpenRigs.Video.Tests
             const double HourEnds = 1083334 * 3600.0;  // 3900002400, the first whole hour after 3900000000
             var result = BonsaiWorkflowRunner.Run(IncludeWorkflow, new Dictionary<string, string>
             {
-                { "PathPrefix", data },
+                { "PathPrefix", Experiment(data, HourEnds - 3600) },
                 { "ConfigRoot", configRoot },
                 { "FrameCount", "250" },
                 { "Width", "320" },
@@ -236,6 +236,13 @@ namespace OpenRigs.Video.Tests
             catch (IOException) { return 0; }
         }
 
+        // An experiment folder under data started at Harp time startSeconds (UTC), as LogController names it.
+        static string Experiment(string data, double startSeconds)
+        {
+            var start = new DateTime(1904, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(startSeconds);
+            return Path.Combine(data, "sub-Test", "ses-001_" + start.ToString("yyyy-MM-dd'T'HH-mm-ss", CultureInfo.InvariantCulture) + "+00-00");
+        }
+
         const string WriterWorkflow = "FfmpegVideoWriterHeadless.bonsai";
         const string IncludeWorkflow = "LogVideoFfmpegHeadless.bonsai";
 
@@ -248,7 +255,7 @@ namespace OpenRigs.Video.Tests
 
             var result = BonsaiWorkflowRunner.Run(workflow, new Dictionary<string, string>
             {
-                { workflow == WriterWorkflow ? "FileName" : "PathPrefix", workflow == WriterWorkflow ? Path.Combine(data, "Camera-Test", "Camera-Test.mkv") : data },
+                { workflow == WriterWorkflow ? "FileName" : "PathPrefix", workflow == WriterWorkflow ? Path.Combine(data, "Camera-Test", "Camera-Test.mkv") : Experiment(data, 3900000000.0) },
                 { "ConfigRoot", configRoot },
                 { "FrameCount", count.ToString(CultureInfo.InvariantCulture) },
                 { "Width", width.ToString(CultureInfo.InvariantCulture) },

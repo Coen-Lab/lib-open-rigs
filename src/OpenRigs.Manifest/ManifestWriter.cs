@@ -448,8 +448,9 @@ namespace OpenRigs.Manifest
         }
 
         // The experiment folder's name, sub-<subject>/ses-<session>_<DateTime>, held to fixtures\experiment-folder\v1\names.json:
-        // neither ID is empty, holds _ < > : " / \ | ? * [ ] or a control character, or ends in a dot or a space.
-        static readonly Regex SessionName = new Regex(@"^ses-(?<id>[^_]+)_(?<dt>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})$", RegexOptions.CultureInvariant);
+        // neither ID is empty, holds _ < > : " / \ | ? * [ ] or a control character, or ends in a dot or a space. The time is
+        // local with its UTC offset (yyyy-MM-ddTHH-mm-ss±HH-MM, OpenRigs.Core's FormatDate) or, in older names, UTC with none.
+        static readonly Regex SessionName = new Regex(@"^ses-(?<id>[^_]+)_(?<dt>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:[+-]\d{2}-\d{2})?)$", RegexOptions.CultureInvariant);
         static readonly Regex IdRefused = new Regex(@"[_<>:""/\\|?*\[\]\x00-\x1f]", RegexOptions.CultureInvariant);
 
         /// <summary>Whether a subject or session ID can be part of an experiment folder's name.</summary>
@@ -466,13 +467,14 @@ namespace OpenRigs.Manifest
             var parent = parts.Length > 1 ? parts[parts.Length - 2] : string.Empty;
             var subject = parent.StartsWith("sub-", StringComparison.Ordinal) ? parent.Substring(4) : null;
             var m = SessionName.Match(parts[parts.Length - 1]);
-            var dt = default(DateTime);
+            var dt = default(DateTimeOffset);
+            var token = m.Groups["dt"].Value;
             var named = IdValid(subject) && m.Success && IdValid(m.Groups["id"].Value)
-                && DateTime.TryParseExact(m.Groups["dt"].Value, "yyyy-MM-dd'T'HH-mm-ss", CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt);
+                && DateTimeOffset.TryParseExact(token.Length > 19 ? token.Substring(0, 22) + ":" + token.Substring(23) : token + "+00:00",
+                    "yyyy-MM-dd'T'HH-mm-sszzz", CultureInfo.InvariantCulture, DateTimeStyles.None, out dt);
             session.Add("subject", named ? subject : null);
             session.Add("id", named ? m.Groups["id"].Value : null);
-            session.Add("started", named ? Iso(dt) : null);
+            session.Add("started", named ? Iso(dt.UtcDateTime) : null);
             session.Add("folder", experimentFolder);
             return session;
         }

@@ -95,6 +95,9 @@
         <Combinator xsi:type="rx:Switch" />
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PathPrefix</Name>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="2" Label="Source1" />
@@ -103,6 +106,7 @@
       <Edge From="3" To="4" Label="Source2" />
       <Edge From="4" To="5" Label="Source1" />
       <Edge From="5" To="6" Label="Source1" />
+      <Edge From="7" To="2" Label="Source3" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

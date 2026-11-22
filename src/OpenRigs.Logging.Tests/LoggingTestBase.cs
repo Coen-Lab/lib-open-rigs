@@ -131,24 +131,21 @@ namespace OpenRigs.Logging.Tests
                 $"Expected the subject folder to be named sub-<subject>.{result.Describe()}");
 
             // LogController lays out the session folder as ses-<session>_<datetime> (ucl-open/roadmap#37), where the
-            // datetime is a round-trip UTC timestamp with the time separators replaced.
+            // datetime is this machine's local time and UTC offset (FormatDate).
             var sessionFolder = segments[1];
             var sessionMatch = Regex.Match(
                 sessionFolder,
-                $@"^ses-{Regex.Escape(SessionId)}_(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}-\d{{2}}-\d{{2}})$");
+                $@"^ses-{Regex.Escape(SessionId)}_(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}-\d{{2}}-\d{{2}}[+-]\d{{2}}-\d{{2}})$");
             Assert.IsTrue(
                 sessionMatch.Success,
                 $"Expected the session folder to match ses-{SessionId}_<datetime> but found " +
                 $"'{sessionFolder}'.{result.Describe()}");
 
-            Assert.IsTrue(
-                DateTime.TryParseExact(
-                    sessionMatch.Groups[1].Value,
-                    "yyyy-MM-ddTHH-mm-ss",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.None,
-                    out var sessionDate),
-                $"Could not parse the session date from '{sessionFolder}'.{result.Describe()}");
+            var sessionDate = OpenRigs.Core.FormatDate.Parse(sessionMatch.Groups[1].Value);
+            Assert.AreEqual(
+                OpenRigs.Core.FormatDate.Format(sessionDate, TimeZoneInfo.Local),
+                sessionMatch.Groups[1].Value,
+                $"Expected the session time to be this machine's local time and offset.{result.Describe()}");
 
             // Guards against the session folder picking up a fixed epoch rather than the run time.
             var age = DateTime.UtcNow - sessionDate;
