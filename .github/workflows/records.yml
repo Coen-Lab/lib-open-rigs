@@ -1,15 +1,19 @@
-# The records this repo owns, checked on every push to main and daily: fixtures\manifest\v4 and
-# fixtures\experiment-folder\v1 are what OpenRigs.Manifest writes and reads. The check is the package's
-# own console program, which needs only the .NET SDK and git; it starts no Bonsai. The other lab
-# packages' console checks (Control, HarpDevices, LiveView) run here too: OpenRigs.yml's dotnet test
-# skips console programs.
+# Tests run by hand (workflow_dispatch) or nightly at 05:00 UK, and the nightly run starts only when this repo
+# or a repo in the gate job's repos list has a commit in the last 25 hours (Coen-Lab/.github ci-gate.yml). Two crons,
+# 04:57 and 05:57 UTC, put one in the 05:00 UK hour in both GMT and BST. Nothing runs on a push or pull request: local
+# tests before a push are the gate, and this keeps Actions inside its monthly budget.
+#
+# The records this repo owns: fixtures\manifest\v4 and fixtures\experiment-folder\v1 are what
+# OpenRigs.Manifest writes and reads. The check is the package's own console program, which needs only
+# the .NET SDK and git; it starts no Bonsai. The other lab packages' console checks (Control,
+# HarpDevices, LiveView) run here too: OpenRigs.yml's dotnet test skips console programs. This repo
+# reads no other repo, so only its own commits start the nightly run.
 
 name: Records
 
 on:
-  push:
-    branches: [main]
   schedule:
+    - cron: "57 4 * * *"
     - cron: "57 5 * * *"
   workflow_dispatch:
 
@@ -20,7 +24,16 @@ permissions:
   contents: read
 
 jobs:
+  gate:
+    # Manual, or nightly at 05:00 UK when this repo or one its tests read changed (Coen-Lab/.github ci-gate.yml).
+    uses: Coen-Lab/.github/.github/workflows/ci-gate.yml@main
+    with:
+      repos: ""
+    secrets: inherit
+
   manifest:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     # net472: the framework Bonsai loads the package under.
     runs-on: windows-latest
     timeout-minutes: 15
