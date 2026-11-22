@@ -43,7 +43,7 @@ def files(folder: Path, name: str, suffix: str) -> Tuple[List[Path], List[Path]]
         return [], []
     near = [p for p in found if p.name.startswith(f"{name}_") and p.name.endswith(suffix)]
     matched = [(m, p) for p in near if (m := chunk.fullmatch(p.name))]
-    ordered = [p for m, p in sorted(matched, key=lambda mp: parse_time(mp[0].group(1)))]
+    ordered = [p for _, p in sorted(matched, key=lambda mp: parse_time(mp[0].group(1)))]
     return ordered, [p for p in near if not chunk.fullmatch(p.name)]
 
 
