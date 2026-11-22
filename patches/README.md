@@ -26,6 +26,8 @@ Upstream column: an issue where reported, else "Not reported" for a fix upstream
 
 `OpenRigs.Streaming` declares Bonsai.Dsp and Bonsai.Vision 2.9.0 and Bonsai.Scripting.Expressions 2.10.0; Bonsai restores only what a workflow's `Bonsai.config` lists, so a workflow on 2.8.0 runs it on its 2.8.0 assemblies.
 
+The lab's pins differ from upstream's: every package and `.bonsai\Bonsai.config` on YamlDotNet 17.1.0 (upstream's Core on 16.0.0, open-rigs/open-rigs#41), and `.bonsai\Bonsai.config` on the workflows' Bonsai.Scripting.Expressions 2.10.0, System.Buffers 4.6.1, System.Memory 4.6.3, System.Numerics.Vectors 4.6.1 and System.Runtime.CompilerServices.Unsafe 6.1.2 (22 Nov 2026), so the lab's workflow update finds one third-party pin set across this file and every workflow.
+
 OpenRigs.yml's publish job also pushes each green build's packages, versioned `0.0.0-ciN`, to the organisation's GitHub Packages feed. No workflow installs from that feed.
 
 ## Switching to upstream

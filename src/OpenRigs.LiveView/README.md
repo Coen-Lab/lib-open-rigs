@@ -1,6 +1,6 @@
 # OpenRigs.LiveView
 
-One node, `StreamDevices`, that streams every device a rig has to the live view, at fixed rates, from the rig's own configuration. A workflow drops it in once, as its last node, and leaves `ConfigRoot` at its default; nothing else is wired to it.
+One node, `StreamDevices`, that streams every device a rig has to the live view, at fixed rates, from the rig's own configuration. A workflow drops it in once, as its last node, and sets `ConfigRoot` on the node to the folder holding the rigs' configurations; nothing is wired to it.
 
 ## What It Does
 
@@ -57,7 +57,7 @@ Data on TCP `DataPort` (5556), video on `VideoPort` (5558), on every interface, 
 - **Nothing throws at build.** The editor builds a workflow when it opens, on any machine: a missing or unreadable rig.yml streams no devices and says why in `liveview`.
 - **The inner workflow is generated.** It is one group, `LiveView`, remade from rig.yml whenever what it would hold changes. Saving the workflow writes it out (about 190 lines for a camera and a board); reopening rebuilds it, so edits made inside it are lost.
 - **Its settings live inside it.** Bonsai copies a group whenever the editor opens a workflow, the player shows a layout, or a workflow is saved, and the copy keeps only the group's name, description and inner workflow. So `ConfigRoot`, `DataPort` and `VideoPort` are kept in a `StreamDevicesSettings` node beside `LiveView` (set them on `StreamDevices`, which reads and writes that node). Without the copy's constructor and this node, the editor stops at open ("Constructor on type 'OpenRigs.LiveView.StreamDevices' not found"), and `--no-editor` too wherever a layout file exists. In such a copy every node is wrapped for inspection, and the generated `LiveView` is wrapped the same way.
-- **`ConfigRoot` can be mapped from the workflow**: the generated inner workflow externalizes it, so a workflow property such as `--property:ConfigRoot` reaches this node as it does the rig configuration (else Bonsai refuses the mapping: "The specified property 'ConfigRoot' was not found in the nested workflow"); `check-workflow.ps1` maps it, to a temporary root. `DataPort` and `VideoPort` are not externalized: set them on the node. Unset, `ConfigRoot` stops the workflow at Start naming it, as `RecordHarpDevices`' (no default, never a silent stream of nothing).
+- **`ConfigRoot` is set on the node, never mapped**: the generated inner workflow externalizes it, but any edge into `StreamDevices` (a top-level `ExternalizedMapping` for `ConfigRoot` included) makes Bonsai build it before the device groups, and it then finds no device published and streams nothing. So a workflow holds it as a literal fed by no edge, and `check-workflow.ps1` sets it on the node itself, to a temporary root, as it does every other node's copy of `ConfigRoot`. `DataPort` and `VideoPort` are not externalized: set them on the node. Unset, `ConfigRoot` stops the workflow at Start naming it, as `RecordHarpDevices`' (no default, never a silent stream of nothing).
 - **Bonsai internals.** Which subjects a workflow publishes is not public in Bonsai: `StreamDevices` asks Bonsai's internal build context by reflection (written against Bonsai.Core 2.9.0).
 
 ## Needs
