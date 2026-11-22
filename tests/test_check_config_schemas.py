@@ -6,6 +6,7 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "check-config-schemas.py"
 spec = importlib.util.spec_from_file_location("check_config_schemas", SCRIPT)
+assert spec is not None and spec.loader is not None
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
 
