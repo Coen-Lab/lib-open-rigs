@@ -514,6 +514,8 @@ EXPECTED = ("auto;harp;Settings/Settings_Rig_;WorkflowData/WorkflowData_Trials_;
 
 def test_every_file_a_workflow_writes_is_named_in_expected_files_with_its_condition(tmp_path):
     assert lint.expected_files_problems(workflow(tmp_path, LOGS + manifest_node(EXPECTED))) == []
+    # LabClockReady checks the clock and writes nothing (P1R-L4).
+    assert lint.expected_files_problems(workflow(tmp_path / "b", LOGS + include(lint.LAB_CLOCK_READY) + manifest_node(EXPECTED))) == []
 
 
 def test_a_folder_entry_in_place_of_each_log_is_refused(tmp_path):
