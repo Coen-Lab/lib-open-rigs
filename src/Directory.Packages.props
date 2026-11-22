@@ -1,0 +1,32 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="AllenNeuralDynamics.LicketySplit" Version="0.2.0" />
+    <PackageVersion Include="BonVision" Version="0.12.0" />
+    <PackageVersion Include="Bonsai.Arduino" Version="2.9.0" />
+    <PackageVersion Include="Bonsai.Core" Version="2.9.0" />
+    <PackageVersion Include="Bonsai.Dsp" Version="2.9.0" />
+    <PackageVersion Include="Bonsai.Harp" Version="3.6.1" />
+    <PackageVersion Include="Bonsai.Mixer" Version="0.2.0" />
+    <PackageVersion Include="Bonsai.Scripting.Expressions" Version="2.10.0" />
+    <PackageVersion Include="Bonsai.Spinnaker" Version="0.9.1" />
+    <PackageVersion Include="Bonsai.System" Version="2.9.0" />
+    <PackageVersion Include="Bonsai.Vision" Version="2.9.0" />
+    <PackageVersion Include="Bonsai.ZeroMQ" Version="0.2.0" />
+    <PackageVersion Include="Harp.Behavior" Version="0.2.0" />
+    <PackageVersion Include="Harp.Hobgoblin" Version="0.1.2" />
+    <PackageVersion Include="Harp.StepperDriver" Version="0.4.0" />
+    <PackageVersion Include="Harp.TimestampGeneratorGen3" Version="0.1.1" />
+    <PackageVersion Include="LibGit2Sharp" Version="0.31.0" />
+    <PackageVersion Include="MSTest.TestAdapter" Version="3.8.3" />
+    <PackageVersion Include="MSTest.TestFramework" Version="3.8.3" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageVersion Include="NetMQ" Version="4.0.1.12" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="OpenCV.Net" Version="3.4.2" />
+    <PackageVersion Include="YamlDotNet" Version="17.1.0" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+  </ItemGroup>
+</Project>

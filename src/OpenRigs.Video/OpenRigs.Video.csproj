@@ -13,9 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Bonsai.Harp" Version="3.6.1" />
-    <PackageReference Include="Bonsai.Spinnaker" Version="0.9.1" />
-    <PackageReference Include="YamlDotNet" Version="17.1.0" />
+    <PackageReference Include="Bonsai.Harp" />
+    <PackageReference Include="Bonsai.Spinnaker" />
+    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
   <!-- rig.yml's cameras, read as OpenRigs.LiveView reads its devices: UsbCamera never takes the rig's own. -->

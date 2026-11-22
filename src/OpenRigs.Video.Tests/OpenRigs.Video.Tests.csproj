@@ -13,13 +13,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="MSTest.TestAdapter" Version="3.6.3" />
-    <PackageReference Include="MSTest.TestFramework" Version="3.6.3" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="MSTest.TestAdapter" />
+    <PackageReference Include="MSTest.TestFramework" />
     <!-- Win32_Process, to find the workflow's Bonsai.exe under the launcher and kill it -->
     <Reference Include="System.Management" />
     <!-- The ExpressionTransform OpenRigs.Devices' TriggeredSpinnaker include makes its frames with -->
-    <PackageReference Include="Bonsai.Scripting.Expressions" Version="2.10.0" />
+    <PackageReference Include="Bonsai.Scripting.Expressions" />
   </ItemGroup>
 
   <ItemGroup>

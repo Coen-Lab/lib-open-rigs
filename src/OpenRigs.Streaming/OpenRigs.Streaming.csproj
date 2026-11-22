@@ -12,13 +12,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Bonsai.Core" Version="2.9.0" />
-    <PackageReference Include="Bonsai.Dsp" Version="2.9.0" />
-    <PackageReference Include="Bonsai.Scripting.Expressions" Version="2.10.0" />
-    <PackageReference Include="Bonsai.Vision" Version="2.9.0" />
-    <PackageReference Include="Bonsai.ZeroMQ" Version="0.2.0" />
-    <PackageReference Include="NetMQ" Version="4.0.1.12" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Bonsai.Core" />
+    <PackageReference Include="Bonsai.Dsp" />
+    <PackageReference Include="Bonsai.Scripting.Expressions" />
+    <PackageReference Include="Bonsai.Vision" />
+    <PackageReference Include="Bonsai.ZeroMQ" />
+    <PackageReference Include="NetMQ" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
   <ItemGroup>

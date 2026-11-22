@@ -18,8 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Bonsai.Harp" Version="3.6.1" />
-    <PackageReference Include="Harp.Behavior" Version="0.2.0" />
+    <PackageReference Include="Bonsai.Harp" />
+    <PackageReference Include="Harp.Behavior" />
   </ItemGroup>
 
 </Project>

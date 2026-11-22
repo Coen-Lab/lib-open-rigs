@@ -14,7 +14,7 @@
     <!-- Not a dependency of the package: the tests run a real ControlState, which the manifest reads by name. -->
     <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
     <!-- Not a dependency of the package: a real Harp package, whose register map is expected only once it is loaded. -->
-    <PackageReference Include="Harp.Behavior" Version="0.2.0" />
+    <PackageReference Include="Harp.Behavior" />
   </ItemGroup>
 
 </Project>
