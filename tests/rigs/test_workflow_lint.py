@@ -1099,3 +1099,40 @@ def test_a_preflight_taps_through_its_rig_list_s_taps(tmp_path):
     assert lint.preflight_tap_problems(workflow(tmp_path / "c", checks + box + own)) == [
         "the preflight includes BBoxHardware 1 and BBoxHardwareTaps 0 times: the taps once with their rig list",
         "the preflight taps a device itself (PreflightTap): its rig list's taps include taps every device"]
+
+
+def _csproj(path: Path, *pins: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    refs = "".join(f'<PackageReference Include="{p.split()[0]}" Version="{p.split()[1]}" />' for p in pins)
+    path.write_text(f'<Project Sdk="Microsoft.NET.Sdk"><ItemGroup>{refs}</ItemGroup></Project>', encoding="utf-8")
+
+
+def test_a_workflow_project_pinning_a_central_package_at_another_version_fails_naming_it(tmp_path):
+    wf = workflow(tmp_path, "")
+    _csproj(tmp_path / "src" / "Extensions.csproj", "YamlDotNet 16.3.0", "OpenCV.Net 3.4.2", "Some.Package 1.0.0")
+    _csproj(tmp_path / "tests" / "T" / "T.csproj", "yamldotnet 17.1.0")
+    _csproj(tmp_path / "src" / "bin" / "Old.csproj", "YamlDotNet 1.0.0")
+    versions = lint.central_versions(tmp_path)
+    assert versions["yamldotnet"] and versions["opencv.net"] == "3.4.2", "read from src\\Directory.Packages.props"
+    problems = lint.central_version_problems(wf)
+    assert len(problems) == 1 and problems[0].startswith(f"src\\Extensions.csproj pins YamlDotNet 16.3.0, and the library pins {versions['yamldotnet']} ")
+    assert "drop the reference" in problems[0] and "workflow update" in problems[0]
+    _csproj(tmp_path / "src" / "Extensions.csproj", "OpenCV.Net 3.4.2")
+    assert lint.central_version_problems(wf) == []
+
+
+def test_an_installed_lint_takes_the_central_versions_from_the_pinned_packages_dependencies(tmp_path):
+    wf = workflow(tmp_path, "")
+    (tmp_path / ".bonsai").mkdir()
+    (tmp_path / ".bonsai" / "Bonsai.config").write_text('<Package id="A.Pkg" version="1.2.0" />\n<Package id="B.Pkg" version="9.0.0" />', encoding="utf-8")
+    (tmp_path / "local_packages").mkdir()
+    with zipfile.ZipFile(tmp_path / "local_packages" / "A.Pkg.1.2.0.nupkg", "w") as z:
+        z.writestr("A.Pkg.nuspec", '<package><metadata><dependencies><group targetFramework=".NETFramework4.7.2">'
+                   '<dependency id="YamlDotNet" version="17.1.0" exclude="Build,Analyzers" />'
+                   '<dependency id="Bonsai.Core" version="[2.9.0, )" /></group></dependencies></metadata></package>')
+    with zipfile.ZipFile(tmp_path / "local_packages" / "A.Pkg.1.1.0.nupkg", "w") as z:
+        z.writestr("A.Pkg.nuspec", '<dependency id="YamlDotNet" version="16.3.0" />')
+    none = tmp_path / "no.props"
+    assert lint.central_versions(tmp_path, none) == {"yamldotnet": "17.1.0", "bonsai.core": "2.9.0"}
+    _csproj(tmp_path / "src" / "Extensions.csproj", "YamlDotNet 16.3.0", "Bonsai.Core 2.9.0")
+    assert [p.split(",")[0] for p in lint.central_version_problems(wf, none)] == ["src\\Extensions.csproj pins YamlDotNet 16.3.0"]

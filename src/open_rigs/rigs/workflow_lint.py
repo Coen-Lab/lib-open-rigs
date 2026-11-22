@@ -1175,7 +1175,49 @@ def expected_files_problems(wf: Workflow) -> list[str]:
     return problems
 
 
-TEMPLATE = Path(__file__).parent / "rig-template.yml"
+CENTRAL_VERSIONS = LIB_SRC / "Directory.Packages.props"
+NOT_PROJECTS = {"bin", "obj", ".bonsai", ".git", ".venv"}
+
+
+def central_versions(repo: Path, props: Path = CENTRAL_VERSIONS) -> dict[str, str]:
+    """This library's central package versions (src\\Directory.Packages.props), lower-case id to version: from the props
+    file when this module runs from the library's source, else from the dependencies of each package in the workflow's
+    local_packages at the version its Bonsai.config pins, which were built from that file."""
+    if props.is_file():
+        return {e.get("Include", "").lower(): e.get("Version", "") for e in ET.parse(props).getroot().iter("PackageVersion")}
+    versions: dict[str, str] = {}
+    config = Path(repo) / ".bonsai" / "Bonsai.config"
+    pins = re.findall(r'<Package id="([^"]+)" version="([^"]+)"', config.read_text(encoding="utf-8-sig")) if config.is_file() else []
+    for package, version in pins:
+        nupkg = Path(repo) / "local_packages" / f"{package}.{version}.nupkg"
+        if not nupkg.is_file():
+            continue
+        with zipfile.ZipFile(nupkg) as z:
+            spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode("utf-8-sig")
+        for dep, at in re.findall(r'<dependency id="([^"]+)" version="([^"]+)"', spec):
+            versions[dep.lower()] = at.strip("[( )]").split(",")[0]
+    return versions
+
+
+def central_version_problems(wf: Workflow, props: Path = CENTRAL_VERSIONS) -> list[str]:
+    """Each PackageReference in the workflow's .csproj files at a version other than the one this library pins centrally:
+    a lower one fails the build (NU1605) once the library's packages move past it, as YamlDotNet 16.3.0 did."""
+    versions = central_versions(wf.repo, props)
+    problems = []
+    for project in sorted(wf.repo.rglob("*.csproj")):
+        relative = project.relative_to(wf.repo)
+        if NOT_PROJECTS & set(relative.parts[:-1]):
+            continue
+        text = project.read_text(encoding="utf-8-sig")
+        for package, have in re.findall(r'<PackageReference\s+Include="([^"]+)"\s+Version="([^"]*)"', text):
+            want = versions.get(package.lower())
+            if want and have != want:
+                problems.append(f"{PureWindowsPath(relative)} pins {package} {have}, and the library pins {want} (src\\Directory.Packages.props): "
+                                "drop the reference if an OpenRigs package brings it, else let the workflow update set it to that version")
+    return problems
+
+
+TEMPLATE =Path(__file__).parent / "rig-template.yml"
 
 
 def filled_rig(wf: Workflow, root: PurePath, machine: str) -> tuple[str, list[str], list[str]]:
@@ -1229,7 +1271,7 @@ def main() -> None:
     the build should make, with what `includes` says of the workflow, as JSON."""
     repo, config_root, machine = sys.argv[1:4]
     wf = Workflow(Path(repo), sys.argv[4] if len(sys.argv) > 4 else "main.bonsai")
-    problems = hardware_problems(wf) + declared_twice(wf)
+    problems = hardware_problems(wf) + declared_twice(wf) + central_version_problems(wf)
     text, records, files = filled_rig(wf, Path(config_root).parent, machine)
     folder = Path(config_root) / machine
     folder.mkdir(parents=True, exist_ok=True)
