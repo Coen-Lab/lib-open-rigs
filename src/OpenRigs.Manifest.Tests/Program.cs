@@ -323,27 +323,23 @@ namespace OpenRigs.Manifest.Tests
             var logController = File.ReadAllText(Path.Combine(repo, "src", "OpenRigs.Logging", "LogController.bonsai"));
             var format = Regex.Match(logController, @"<Format>(\{0\}[^<]*)</Format>").Groups[1].Value;
             Check(@"LogController names the folder <root>\sub-<SubjectId>\ses-<SessionId>_<DateTime>", format == @"{0}\sub-{1}\ses-{2}_{3}", format);
-            // As OpenRigs.Core's FormatDate on a machine at UTC+00:00, which LogController gives the folder's time to. The
-            // fixture's names are the older form, UTC with no offset, which is still read.
+            // As OpenRigs.Core's FormatDate on a machine at UTC+00:00, which LogController gives the folder's time to. A
+            // fixture name with no offset is the older form, UTC, which is still read; one with an offset is read as its instant.
             Func<DateTime, string> formatDate = when => when.ToString("yyyy-MM-dd'T'HH-mm-ss", CultureInfo.InvariantCulture) + "+00-00";
 
             var names = entries("names");
-            Check("it has names to make and read", names.Count >= 4, names.Count.ToString());
+            Check("it has names to make and read, with and without an offset", names.Count >= 7, names.Count.ToString());
             foreach (var name in names)
             {
                 var started = DateTime.Parse(value(name, "started"), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
                 var made = string.Format(CultureInfo.InvariantCulture, format, "", value(name, "subject"), value(name, "session"), formatDate(started)).TrimStart('\\').Replace('\\', '/');
-                Check(value(name, "folder") + " with +00-00 is what the format makes", made == value(name, "folder") + "+00-00", made);
+                var offset = Regex.IsMatch(value(name, "folder"), @"[+-]\d{2}-\d{2}$");
+                if (!offset) Check(value(name, "folder") + " with +00-00 is what the format makes", made == value(name, "folder") + "+00-00", made);
                 foreach (var folder in new[] { value(name, "folder"), made })
                 {
                     var read = Json.Serialize(ManifestWriter.SessionSection(@"C:\Data\" + folder.Replace('/', '\\')));
                     Check("... " + folder + " reads back to its subject, session and start", Field(read, "subject") == value(name, "subject") && Field(read, "id") == value(name, "session") && Field(read, "started") == value(name, "started"), read);
                 }
-            }
-            foreach (var pair in new[] { new[] { "2026-07-20T15-32-56+01-00", "2026-07-20T14:32:56Z" }, new[] { "2026-11-20T07-32-56-07-00", "2026-11-20T14:32:56Z" } })
-            {
-                var read = Json.Serialize(ManifestWriter.SessionSection(@"C:\Data\sub-AM006\ses-004B1_" + pair[0]));
-                Check("ses-004B1_" + pair[0] + " started at " + pair[1], Field(read, "started") == pair[1], read);
             }
             var refused = entries("refused");
             Check("it has IDs to refuse", refused.Count >= 5, refused.Count.ToString());
