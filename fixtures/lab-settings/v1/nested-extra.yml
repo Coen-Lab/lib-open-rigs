@@ -1,0 +1,4 @@
+timeZone: GMT Standard Time
+maxSyncAgeDays: 7
+rigs:
+  timeZone: UTC

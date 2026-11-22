@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "detail": "line 3 sets 'rigs'; lab.yml takes only timeZone and maxSyncAgeDays"
+}

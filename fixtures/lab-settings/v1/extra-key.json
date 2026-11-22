@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "detail": "line 3 sets 'owner'; lab.yml takes only timeZone and maxSyncAgeDays"
+}

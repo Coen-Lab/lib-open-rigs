@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "detail": "line 1 is not a plain 'key: value' line: '---'"
+}

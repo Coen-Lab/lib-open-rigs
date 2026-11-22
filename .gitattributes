@@ -45,3 +45,5 @@ LICENSE text
 
 # Record fixtures are compared byte for byte
 fixtures/** text eol=lf
+# A lab.yml written on Windows: the readers take CRLF as well as LF.
+fixtures/lab-settings/v1/crlf.yml -text

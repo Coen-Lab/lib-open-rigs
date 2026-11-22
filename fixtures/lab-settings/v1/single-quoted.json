@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "detail": "line 2 gives 'maxSyncAgeDays' a value that is not plain text (no quotes, lists or maps): ''7''"
+}

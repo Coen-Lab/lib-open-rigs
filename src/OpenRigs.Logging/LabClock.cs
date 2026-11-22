@@ -9,7 +9,6 @@ using System.Reactive.Linq;
 using System.Text.RegularExpressions;
 using Bonsai;
 using Microsoft.Win32;
-using YamlDotNet.Serialization;
 
 namespace OpenRigs.Logging
 {
@@ -31,35 +30,74 @@ namespace OpenRigs.Logging
             public string TimeZone;
 
             /// <summary>The oldest Windows time sync, in days, that still allows a recording.</summary>
-            public double MaxSyncAgeDays;
+            public int MaxSyncAgeDays;
         }
 
-        /// <summary>Reads lab.yml under ConfigRoot, throwing with what is missing.</summary>
+        static readonly string[] Keys = { "timeZone", "maxSyncAgeDays" };
+
+        /// <summary>
+        /// Reads lab.yml's text: only the two plain top-level lines timeZone and maxSyncAgeDays (a whole number of days, at
+        /// least 1), with comments and blank lines; anything else is refused. Returns null and the settings, or why the
+        /// text is refused, naming the line. The same contract as the share's other reader, held to fixtures\lab-settings\v1.
+        /// </summary>
+        public static string ParseSettings(string text, out Settings settings)
+        {
+            settings = null;
+            var found = new Dictionary<string, string>();
+            var n = 0;
+            foreach (var raw in Regex.Split(text ?? string.Empty, "\r?\n"))
+            {
+                n++;
+                var line = Regex.Replace(raw, @"(^|\s+)#.*$", string.Empty);
+                if (line.Trim().Length == 0) continue;
+                if (Regex.IsMatch(line, @"^\s")) return "line " + n + " is indented; lab.yml takes only top-level lines: '" + raw + "'";
+                var m = Regex.Match(line, @"^([A-Za-z]\w*):(?:\s+(.*?))?\s*$");
+                if (!m.Success) return "line " + n + " is not a plain 'key: value' line: '" + raw + "'";
+                var key = m.Groups[1].Value;
+                var value = m.Groups[2].Value;
+                if (Array.IndexOf(Keys, key) < 0) return "line " + n + " sets '" + key + "'; lab.yml takes only timeZone and maxSyncAgeDays";
+                if (found.ContainsKey(key)) return "line " + n + " sets '" + key + "' again";
+                if (value.Length == 0) return "line " + n + " gives '" + key + "' no value";
+                if (Regex.IsMatch(value, @"^['""\[\]{}&*!|>%@`]")) return "line " + n + " gives '" + key + "' a value that is not plain text (no quotes, lists or maps): '" + value + "'";
+                int age;
+                if (key == "maxSyncAgeDays" && !(Regex.IsMatch(value, "^[0-9]+$") && int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out age) && age >= 1))
+                {
+                    return "line " + n + ": 'maxSyncAgeDays' is '" + value + "', not a whole number of days of at least 1";
+                }
+                found[key] = value;
+            }
+            foreach (var key in Keys)
+            {
+                if (!found.ContainsKey(key)) return "it has no '" + key + "'";
+            }
+            settings = new Settings { TimeZone = found["timeZone"], MaxSyncAgeDays = int.Parse(found["maxSyncAgeDays"], CultureInfo.InvariantCulture) };
+            return null;
+        }
+
+        /// <summary>Reads lab.yml under ConfigRoot, throwing with why it cannot be read or is refused.</summary>
         public static Settings ReadSettings(string configRoot)
         {
             var path = Path.GetFullPath(Path.Combine(configRoot, LabFile));
-            Dictionary<string, string> values;
+            string text;
             try
             {
-                values = new DeserializerBuilder().Build().Deserialize<Dictionary<string, string>>(File.ReadAllText(path))
-                    ?? new Dictionary<string, string>();
+                text = File.ReadAllText(path);
             }
             catch (Exception e)
             {
                 throw new InvalidOperationException("Recording refused: the lab settings " + path + " could not be read (" + e.Message +
-                    "). It is the lab's shared lab.yml, kept beside each machine's folder under ConfigRoot, with timeZone and maxSyncAgeDays.", e);
+                    "). Each machine's copy comes from the share's config\\shared when the rig is idle: copy lab.yml there from the share, or wait for the next copy, then start again.", e);
             }
 
-            string zone, age;
-            double maxAge;
-            values.TryGetValue("timeZone", out zone);
-            values.TryGetValue("maxSyncAgeDays", out age);
-            if (string.IsNullOrWhiteSpace(zone) || !double.TryParse(age, NumberStyles.Float, CultureInfo.InvariantCulture, out maxAge))
+            Settings settings;
+            var refused = ParseSettings(text, out settings);
+            if (refused != null)
             {
-                throw new InvalidOperationException("Recording refused: " + path + " needs timeZone (a Windows time zone id) and maxSyncAgeDays (a number of days).");
+                throw new InvalidOperationException("Recording refused: the lab settings " + path + " are refused: " + refused +
+                    ". lab.yml holds only the two plain lines timeZone (a Windows time zone id) and maxSyncAgeDays (a whole number of days, at least 1).");
             }
 
-            return new Settings { TimeZone = zone.Trim(), MaxSyncAgeDays = maxAge };
+            return settings;
         }
 
         /// <summary>What is wrong with the zone: its id differs from the lab's, or daylight saving is switched off.</summary>

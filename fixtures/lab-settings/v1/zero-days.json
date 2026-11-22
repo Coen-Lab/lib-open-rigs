@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "detail": "line 2: 'maxSyncAgeDays' is '0', not a whole number of days of at least 1"
+}

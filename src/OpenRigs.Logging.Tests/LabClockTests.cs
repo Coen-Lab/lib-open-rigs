@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -77,8 +77,38 @@ namespace OpenRigs.Logging.Tests
             StringAssert.Contains(both[1], "daylight saving is switched off");
         }
 
+        // fixtures\lab-settings\v1: each <case>.yml with its expected answer in <case>.json, the share's other reader's set
+        // copied byte for byte, so both readers take and refuse the same lab.yml, word for word.
         [TestMethod]
-        public void LabYml_IsReadFromSharedBesideTheMachines_AndNeedsBothKeys()
+        public void ParseSettings_HoldsEveryFixtureCase()
+        {
+            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "fixtures", "lab-settings", "v1"))) dir = dir.Parent;
+            Assert.IsNotNull(dir, @"no fixtures\lab-settings\v1 above " + AppDomain.CurrentDomain.BaseDirectory);
+            var cases = Directory.GetFiles(Path.Combine(dir.FullName, "fixtures", "lab-settings", "v1"), "*.yml");
+            Assert.IsTrue(cases.Length >= 20, cases.Length.ToString());
+            foreach (var yml in cases)
+            {
+                var want = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(Path.ChangeExtension(yml, ".json")));
+                LabClock.Settings settings;
+                var refused = LabClock.ParseSettings(File.ReadAllText(yml), out settings);
+                var name = Path.GetFileName(yml);
+                if ((bool)want["ok"])
+                {
+                    Assert.IsNull(refused, name);
+                    Assert.AreEqual((string)want["timeZone"], settings.TimeZone, name);
+                    Assert.AreEqual((int)want["maxSyncAgeDays"], settings.MaxSyncAgeDays, name);
+                }
+                else
+                {
+                    Assert.AreEqual((string)want["detail"], refused, name);
+                    Assert.IsNull(settings, name);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void ReadSettings_Missing_SaysWhereItComesFrom()
         {
             var root = Path.Combine(Path.GetTempPath(), "LabClockTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path.Combine(root, "shared"));
@@ -86,12 +116,14 @@ namespace OpenRigs.Logging.Tests
             {
                 var missing = Assert.ThrowsException<InvalidOperationException>(() => LabClock.ReadSettings(root));
                 StringAssert.Contains(missing.Message, Path.Combine(root, "shared", "lab.yml"));
+                StringAssert.Contains(missing.Message, @"comes from the share's config\shared when the rig is idle");
                 File.WriteAllText(Path.Combine(root, "shared", "lab.yml"), "# lab\ntimeZone: GMT Standard Time   # the zone\nmaxSyncAgeDays: 7   # days\n");
                 var settings = LabClock.ReadSettings(root);
                 Assert.AreEqual("GMT Standard Time", settings.TimeZone);
                 Assert.AreEqual(7, settings.MaxSyncAgeDays);
-                File.WriteAllText(Path.Combine(root, "shared", "lab.yml"), "timeZone: GMT Standard Time\n");
-                StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => LabClock.ReadSettings(root)).Message, "maxSyncAgeDays");
+                File.WriteAllText(Path.Combine(root, "shared", "lab.yml"), "timeZone: GMT Standard Time\nmaxSyncAgeDays: 7\nrigs:\n  timeZone: UTC\n");
+                var refused = Assert.ThrowsException<InvalidOperationException>(() => LabClock.ReadSettings(root));
+                StringAssert.Contains(refused.Message, "are refused: line 3 sets 'rigs'; lab.yml takes only timeZone and maxSyncAgeDays.");
             }
             finally
             {

@@ -17,7 +17,7 @@
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>LogController</Name>
-        <Description>Makes the experiment folder, Path\sub-SubjectId\ses-SessionId_time, the time the start's local time and UTC offset (FormatDate), and publishes it as PathPrefix. With ConfigRoot set, first checks the clock against ConfigRoot\shared\lab.yml (CheckLabClock) and stops the workflow, naming nothing, when it fails.</Description>
+        <Description>Makes the experiment folder, Path\sub-SubjectId\ses-SessionId_time, the time the start's local time and UTC offset (FormatDate), and publishes it as PathPrefix. With ConfigRoot set, first checks the clock against ConfigRoot\shared\lab.yml (CheckLabClock) and, when it fails, stops the workflow, saying why, before any folder is made.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="ExternalizedMapping">
