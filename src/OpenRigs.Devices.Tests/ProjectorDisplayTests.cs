@@ -103,6 +103,7 @@ namespace OpenRigs.Devices.Tests
         public void ProjectorDisplayRefusesAFullOrMissingPath_AtStart(string meshPath, string refusal)
         {
             if (DisplayDevice.GetDisplay(DisplayIndex.First) == null) Assert.Inconclusive("No display here, so ProjectorDisplay stops on that first.");
+            RequireHardwareGL();
             var root = Path.Combine(Path.GetTempPath(), "ProjectorDisplayTests", Guid.NewGuid().ToString("N"));
             var rig = Path.Combine(root, Environment.MachineName);
             Directory.CreateDirectory(Path.Combine(rig, "calibration"));

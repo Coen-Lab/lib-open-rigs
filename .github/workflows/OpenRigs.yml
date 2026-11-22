@@ -14,8 +14,12 @@
 # Note that this is a generic workflow meant for all Bonsai packages. Minor local modifications are fine, see https://github.com/bonsai-rx/prefect for more information.
 # =======================================================================================================================================================================
 name: OpenRigs
-# Lab: no push or pull_request trigger (22 Nov 2026, Actions budget). Run it by hand (gh workflow run OpenRigs) or on a release.
+# Lab: on a push to main, nightly at 05:00 UTC, on a release, or by hand (gh workflow run OpenRigs); a public repo's Actions minutes are free.
 on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 5 * * *'
   release:
     types: [published]
   workflow_dispatch:
@@ -60,6 +64,7 @@ jobs:
             python-version: "3.13"
     name: ${{ matrix.platform.name }} Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 20
     steps:
       # -------------------------------------------------------- Checkout
       - name: Checkout
@@ -145,6 +150,7 @@ jobs:
             collect-packages: true
     name: ${{matrix.platform.name}} ${{matrix.configuration}}
     runs-on: ${{matrix.platform.os}}
+    timeout-minutes: 20
     outputs:
       need-workflow-image-render: ${{steps.configure-build.outputs.need-workflow-image-render}}
     steps:
