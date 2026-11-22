@@ -69,6 +69,18 @@
         <FrameRate>50</FrameRate>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
+      <Expression xsi:type="SubscribeSubject">
+        <Name>PathPrefix</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TimeBase</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:CombineLatest" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SubscribeWhen" />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="3" Label="Source1" />
@@ -79,7 +91,11 @@
       <Edge From="6" To="7" Label="Source1" />
       <Edge From="8" To="10" Label="Source1" />
       <Edge From="9" To="10" Label="Source2" />
-      <Edge From="10" To="12" Label="Source1" />
+      <Edge From="10" To="20" Label="Source1" />
+      <Edge From="17" To="19" Label="Source1" />
+      <Edge From="18" To="19" Label="Source2" />
+      <Edge From="19" To="20" Label="Source2" />
+      <Edge From="20" To="12" Label="Source1" />
       <Edge From="11" To="12" Label="Source2" />
       <Edge From="12" To="13" Label="Source1" />
       <Edge From="13" To="15" Label="Source1" />
