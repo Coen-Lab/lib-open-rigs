@@ -229,7 +229,25 @@ def test_a_broken_combination_is_named(tmp_path):
         "SpinnakerCamera Camera-Overhead comes before ReadyGate",
         "CameraTriggers BehaviorBoard-Main comes before ReadyGate",
         "LicketySplit LicketySplit-Right's DataSubjectName is LicketySplit-Left.Data, not LicketySplit-Right.Data",
-        "CameraTriggers' CamerasExpected is Camera-Face, not Camera-Overhead"]
+        "CameraTriggers' CamerasExpected is Camera-Face, not Camera-Overhead"] + [f"{d}'s Harp clock is not held to the clock's: include HarpClockAgrees with Device {d}"
+        for d in ("BehaviorBoard-Main", "LicketySplit-Left", "LicketySplit-Right", "StepperDriver-A", "StepperDriver-B")]
+
+
+def test_with_a_clock_device_each_harp_device_is_held_to_its_clock(tmp_path):
+    # P1R-H1 (audit 22 Nov 2026): a follower off its clock-sync cable logs on its own time, so each needs HarpClockAgrees,
+    # which Ready waits for by its Device; a check on a rig with no clock device, or for no device, is refused.
+    def agrees(device):
+        return piece(lint.HARP_CLOCK_AGREES, Device=device, DeviceDataSubjectName=device + ".Data")
+    gate = piece(lint.READY_GATE, PieceStages="HarpClockSet")
+    rig = include(lint.READ_LAB_RIG) + gate + named(lint.CLOCK_FROM_GENERATOR, "TimestampGeneratorGen3-Main") + named(lint.BOARD, "BehaviorBoard-Main")
+    assert lint.hardware_problems(workflow(tmp_path, rig)) == [
+        "BehaviorBoard-Main's Harp clock is not held to the clock's: include HarpClockAgrees with Device BehaviorBoard-Main"]
+    held = rig.replace(gate, piece(lint.READY_GATE, PieceStages="HarpClockSet, BehaviorBoard-Main")) + agrees("BehaviorBoard-Main")
+    assert lint.hardware_problems(workflow(tmp_path / "b", held)) == []
+    assert lint.hardware_problems(workflow(tmp_path / "c", held + agrees("LicketySplit-Left"))) == [
+        "HarpClockAgrees' Device LicketySplit-Left is not a Harp device piece's Name",
+        "ReadyGate's PieceStages is HarpClockSet, BehaviorBoard-Main, not HarpClockSet, BehaviorBoard-Main, LicketySplit-Left"]
+    assert "HarpClockAgrees holds a device to ClockFromTimestampGenerator's clock, and the workflow has none" in         lint.hardware_problems(workflow(tmp_path / "d", MIXED + agrees("BehaviorBoard-Main")))
 
 
 def test_a_piece_s_kind_board_and_camera_are_its_own(tmp_path):

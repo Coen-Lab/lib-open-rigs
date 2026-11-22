@@ -74,6 +74,7 @@ RAW_PROJECTOR_DISPLAY = "OpenRigs.Vision:RawProjectorDisplay.bonsai"  # the same
 PULSE_OUTPUTS = DEVICES + "PulseOutputs.bonsai"
 RUNNING_WHEEL = DEVICES + "RunningWheel.bonsai"
 REWARD_VALVE = DEVICES + "RewardValve.bonsai"
+HARP_CLOCK_AGREES = DEVICES + "HarpClockAgrees.bonsai"
 # What each piece takes: Name, Board and Camera name a device; X.Commands / X.Data are the subject properties
 # (CommandsSubjectName, BoardDataSubjectName, ...) that must equal that device's name plus the suffix.
 PIECES = {
@@ -92,6 +93,7 @@ PIECES = {
     MANUAL_PULSES: ("Board", "Board.Commands"),
     SPEAKER_MIXER: (),
     PROJECTOR_DISPLAY: (),
+    HARP_CLOCK_AGREES: ("Device", "Device.Data"),
     RAW_PROJECTOR_DISPLAY: (),
 }
 # The Kind each named piece's Name starts with (Kind-Instance): RigDevice finds the entry by the Instance alone, in the
@@ -106,7 +108,7 @@ EXCLUSIVE = ((PROJECTOR_DISPLAY, RAW_PROJECTOR_DISPLAY),)
 # RewardValve its manual drop <Name>.Reward).
 DEVICE_DECLARERS = {CAMERA_LIVE_CONTROLS: "Camera", REWARD_VALVE: "Name"}
 # The stage each piece announces into ReadyStages (its AnnounceStage's Stage), which ReadyGate must wait for; a camera
-# announces its own Name. test_ready_stages checks each piece's file (or the file it announces from) says the same.
+# announces its own Name, HarpClockAgrees its Device. test_ready_stages checks each piece's file (or the file it announces from) says the same.
 READY_STAGES = {CLOCK_FROM_GENERATOR: "HarpClockSet", CLOCK_FROM_BOARD: "HarpClockSet", LICK_SPOUT_STAGE: "SpoutsHomed",
                 PULSE_OUTPUTS: "PulsesEnabled", SPEAKER_MIXER: "MixerStarted"}
 # A lick detector's lick state subject is LickState<Instance> (LicketySplit-Left: LickStateLeft), the name TrialLoop's tasks read.
@@ -120,6 +122,9 @@ CLOCK_READ = "HarpClockRead"
 DEVICE_GROUPS = {CLOCK_FROM_GENERATOR: "timestampGeneratorGen3", BOARD: "behaviorBoard", LICKETY_SPLIT: "licketySplit", CAMERA: "camera"}
 WHO_AM_I = {"behaviorBoard": 1216, "timestampGeneratorGen3": 1158, "stepperDriver": 1130, "licketySplit": 1400}
 LICK_SPOUT_DRIVERS = ("StepperDriver-A", "StepperDriver-B")  # fixed: the stage's C# drives drivers a and b
+# The Harp devices whose clock follows a clock device's (ClockFromTimestampGenerator) over its clock-sync cable: each needs
+# a HarpClockAgrees piece, as a device off that cable logs on its own time with nothing said.
+HARP_FOLLOWERS = (BOARD, LICKETY_SPLIT)
 # Lab includes read from the package (never from the workflow), found in OpenRigs.Devices.dll by the start of their
 # Description: a rig list holds only pieces, and is expanded in place.
 RIG_LISTS = {DEVICES + "DomeHardware.bonsai": "The hardware of a two-spout rig with a lick spout stage, projector and speakers", DEVICES + "BBoxHardware.bonsai": "The behaviour boxes' hardware"}
@@ -485,9 +490,10 @@ def hardware_problems(wf: Workflow) -> list[str]:
     ExperimentLogs reads RigConfigs), ReadyGate before every piece (a board's log waits for HarpClockSet, which ReadyGate
     declares); exactly one clock; each piece's Name unique and its subject properties that Name's .Commands and .Data;
     every Board a Behavior board piece and every Camera a camera piece; one CameraTriggers exactly when there is a
-    camera, expecting every camera; ReadyGate's PieceStages exactly the stages the pieces announce (HarpClockSet, or
+    camera, expecting every camera; with ClockFromTimestampGenerator, one HarpClockAgrees for each Behavior board, Lickety
+    Split and lick spout stage driver, and none without; ReadyGate's PieceStages exactly the stages the pieces announce (HarpClockSet, or
     HarpClockRead for a ClockFromBoard with SetClock false, which only a NoExperimentFolder workflow may have,
-    SpoutsHomed for the lick spout stage, each camera's Name, MixerStarted for SpeakerMixer) and its WorkflowStages
+    SpoutsHomed for the lick spout stage, each camera's Name, each HarpClockAgrees' Device, MixerStarted for SpeakerMixer) and its WorkflowStages
     exactly those the workflow announces itself (its own AnnounceStage nodes, such as a calibration's CalibrationReady);
     and the workflow makes no Ready report or StartCameras of its own. A named piece's Name starts with its Kind
     (KINDS); CameraLiveControls' Board is its camera's, and CameraTriggers' every camera's. The workflow's own included
@@ -567,7 +573,14 @@ def hardware_problems(wf: Workflow) -> list[str]:
     announced = list(dict.fromkeys(CLOCK_READ if p == CLOCK_FROM_BOARD and reads else READY_STAGES[p]
                                    for p in (*CLOCKS, PULSE_OUTPUTS, LICK_SPOUT_STAGE) if p in always)) \
         + [props.get("Name", "") for p, props, conditional in walked if p == CAMERA and not conditional] \
-        + ([READY_STAGES[SPEAKER_MIXER]] if SPEAKER_MIXER in always else [])
+        + ([READY_STAGES[SPEAKER_MIXER]] if SPEAKER_MIXER in always else [])         + [props.get("Device", "") for p, props, conditional in walked if p == HARP_CLOCK_AGREES and not conditional]
+    if CLOCK_FROM_GENERATOR in paths:
+        followers = [props.get("Name", "") for p, props in pieces if p in HARP_FOLLOWERS]             + (list(LICK_SPOUT_DRIVERS) if LICK_SPOUT_STAGE in paths else [])
+        checked = [props.get("Device", "") for p, props in pieces if p == HARP_CLOCK_AGREES]
+        problems += [f"{f}'s Harp clock is not held to the clock's: include HarpClockAgrees with Device {f}" for f in followers if f not in checked]
+        problems += [f"HarpClockAgrees' Device {d} is not a Harp device piece's Name" for d in checked if d not in followers]
+    elif HARP_CLOCK_AGREES in paths:
+        problems.append("HarpClockAgrees holds a device to ClockFromTimestampGenerator's clock, and the workflow has none")
     gate_props = next((props for p, props in pieces if p == READY_GATE), {})
     waits = gate_props.get("PieceStages")
     if READY_GATE in paths and set(_stages(waits)) != set(announced):

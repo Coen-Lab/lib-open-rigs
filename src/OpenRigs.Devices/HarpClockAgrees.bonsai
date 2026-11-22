@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>One Harp device's clock held to the rig's, on a rig whose clock is a device of its own (ClockFromTimestampGenerator), included once per Harp device after that device's piece: Device (such as BehaviorBoard-Main, LicketySplit-Left, StepperDriver-A), whose heartbeats on Device.Data (DeviceDataSubjectName) are compared with Timestamp (HarpClockAgrees). Announces Device into ReadyStages once three heartbeats agree within 0.5 s; three that disagree stop the workflow, before Go or during the run, naming the device and its clock-sync cable. A device off that cable counts from its own power-on, and its data would be logged on that time with nothing said.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="Device" Description="The Harp device whose clock follows the rig's, its piece's Name, such as BehaviorBoard-Main." />
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="Name" DisplayName="DeviceDataSubjectName" Description="Device.Data: the subject the device's messages are published on." />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:HarpClockAgrees">
+          <dev:Name />
+          <dev:ToleranceSeconds>0.5</dev:ToleranceSeconds>
+          <dev:Beats>3</dev:Beats>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name />
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="Stage" Selector="Name" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="4" Label="Source1" />
+      <Edge From="3" To="4" Label="Source2" />
+      <Edge From="0" To="4" Label="Source3" />
+      <Edge From="0" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="4" To="7" Label="Source1" />
+      <Edge From="6" To="7" Label="Source2" />
+      <Edge From="7" To="8" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

@@ -40,10 +40,12 @@ def test_each_piece_announces_the_stage_ready_waits_for():
         assert announcements(source(ANNOUNCED_IN.get(path, path))) == [("ReadyStages", stage)] + read, path
     # A camera announces its own Name, mapped from its rig.yml entry's.
     assert announcements(source(lint.CAMERA)) == [("ReadyStages", "<mapped from Name>")]
+    # HarpClockAgrees announces its Device, mapped from the device's own subject (its rig.yml entry's Name).
+    assert announcements(source(lint.HARP_CLOCK_AGREES)) == [("ReadyStages", "<mapped from Name>")]
 
 
 def test_no_other_piece_announces_into_ready_stages():
-    pieces = set(lint.READY_STAGES) | {lint.CAMERA} | set(ANNOUNCED_IN.values())
+    pieces = set(lint.READY_STAGES) | {lint.CAMERA, lint.HARP_CLOCK_AGREES} | set(ANNOUNCED_IN.values())
     for file in SRC.glob("OpenRigs.*/**/*.bonsai"):
         if file.relative_to(SRC).parts[0].endswith(".Tests") or file in {source(p) for p in pieces}:
             continue
