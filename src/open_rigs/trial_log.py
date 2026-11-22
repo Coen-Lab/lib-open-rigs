@@ -137,7 +137,7 @@ def _number(value: Any) -> Optional[float]:
         return float(value)
     try:
         return float(value) if isinstance(value, str) else None  # a manifest's scalars arrive as text
-    except ValueError:
+    except ValueError:  # text that is not a number: None, as for any other non-number
         return None
 
 

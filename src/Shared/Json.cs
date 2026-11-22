@@ -104,15 +104,15 @@ namespace OpenRigs.Shared
     /// <summary>A file written whole or not at all, as every file here that another program reads.</summary>
     static class AtomicFile
     {
-        /// <summary>&lt;path&gt;.tmp, then the rename, so no reader sees half a file, nor a moment with none. A write that fails takes its .tmp with it.</summary>
-        public static void Write(string path, string text)
+        /// <summary>&lt;path&gt;&lt;tmpSuffix&gt;, then the rename, so no reader sees half a file, nor a moment with none. UTF-8 without a BOM. A write that fails takes its .tmp with it.</summary>
+        public static void Write(string path, string text, string tmpSuffix = ".tmp")
         {
-            var tmp = path + ".tmp";
+            var tmp = path + tmpSuffix;
             try
             {
                 File.WriteAllText(tmp, text, new UTF8Encoding(false));
                 // Windows refuses the rename while a reader holds the file without delete sharing
-                // (Python's open(); a controller polls manifest.json every second): wait it out, about 0.5 s.
+                // (Python's open(), polling the file): wait it out, about 0.5 s.
                 for (var attempt = 1; ; attempt++)
                 {
                     try
@@ -129,7 +129,7 @@ namespace OpenRigs.Shared
             }
             catch
             {
-                try { File.Delete(tmp); } catch (Exception) { }
+                try { File.Delete(tmp); } catch (Exception) { }  // the write's own error is the one to throw
                 throw;
             }
         }

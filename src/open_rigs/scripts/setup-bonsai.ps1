@@ -22,7 +22,7 @@ if (!(Test-Path "./Bonsai.exe")) {
     # The zip holds a NuGet.config of its own, which would replace the workflow's.
     Move-Item -Path "NuGet.config" "temp.config" -ErrorAction SilentlyContinue
     Expand-Archive "temp.zip" -DestinationPath "." -Force
-    Move-Item -Path "temp.config" "NuGet.config" -Force -ErrorAction SilentlyContinue
+    if (Test-Path "temp.config") { Move-Item -Path "temp.config" "NuGet.config" -Force -ErrorAction Stop }
     Remove-Item -Path "temp.zip"
 }
 # The workflow's layout (config\main.layout), when it has one, into the editor's per-machine file. A rig's setup
@@ -32,7 +32,12 @@ $layout = ".\Settings\src\main.layout"
 $tracked = "..\config\main.layout"
 if (Test-Path $tracked) {
     New-Item -ItemType Directory -Path (Split-Path -Parent $layout) -Force | Out-Null
-    if ((Test-Path $layout) -and ((Get-FileHash $layout).Hash -ne (Get-FileHash $tracked).Hash)) {
+    # .NET's SHA-256: under Windows PowerShell started from pwsh, the Utility module's hash cmdlet does not load and both read null.
+    function Get-Sha256([string]$path) {
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $path).Path))) } finally { $sha.Dispose() }
+    }
+    if ((Test-Path $layout) -and ((Get-Sha256 $layout) -ne (Get-Sha256 $tracked))) {
         Copy-Item $layout ".\Settings\src\main.saved.layout" -Force
     }
     Copy-Item $tracked $layout -Force

@@ -359,7 +359,7 @@ namespace OpenRigs.Video
                 if (exited && !deadlinePassed)
                 {
                     exitCode = process.ExitCode;
-                    if (exitCode != 0) Fail("ffmpeg exited with code " + exitCode + LastErrors());
+                    if (exitCode != 0) Fail("ffmpeg stopped (exit code " + exitCode + ")" + LastErrors());
                 }
             }
             if (!exited)
@@ -377,7 +377,7 @@ namespace OpenRigs.Video
             {
                 ReadToTheEnd();  // ffmpeg's stderr says why
                 lock (gate) exitCode = deadlinePassed ? null : running.ExitCode;
-                return "ffmpeg stopped while recording (exit code " + running.ExitCode + ")" + LastErrors();
+                return "ffmpeg stopped (exit code " + running.ExitCode + ")" + LastErrors();
             }
             return "writing to ffmpeg failed: " + ex.Message + LastErrors();
         }

@@ -87,7 +87,7 @@ namespace OpenRigs.Shared
                     dir = dir.Parent;
                 }
             }
-            catch (Exception) { }
+            catch (Exception) { }  // an unreadable folder: no repository, as the summary says
             return null;
         }
 
@@ -138,7 +138,7 @@ namespace OpenRigs.Shared
                     commit = head;
                 }
             }
-            catch (Exception) { }
+            catch (Exception) { }  // an unreadable .git: branch and commit stay null, as for no repository
         }
 
         static string PackedRef(string packedRefs, string refName)
@@ -170,7 +170,7 @@ namespace OpenRigs.Shared
                     }
                 }
             }
-            catch (Exception) { }
+            catch (Exception) { }  // an unreadable config: no origin, as the summary says
             return null;
         }
 
@@ -227,7 +227,7 @@ namespace OpenRigs.Shared
                 {
                     var copy = p.StandardOutput.BaseStream.CopyToAsync(output);
                     p.StandardError.ReadToEndAsync();
-                    if (!p.WaitForExit(10000)) { try { p.Kill(); } catch (Exception) { } return null; }
+                    if (!p.WaitForExit(10000)) { try { p.Kill(); } catch (Exception) { /* it exited as we gave up */ } return null; }
                     copy.Wait();
                     if (p.ExitCode != 0) return null;
                     return output.ToArray();

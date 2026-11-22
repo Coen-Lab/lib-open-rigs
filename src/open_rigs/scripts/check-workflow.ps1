@@ -155,7 +155,7 @@ if ($Step -eq 'Build') {
         $built = [Bonsai.Expressions.ExpressionBuilderGraphExtensions]::Build($wb.Workflow)
     } catch {
         $x = $_.Exception
-        while ($x) { $b = $null; try { $b = $x.Builder } catch {}; $nm = if ($b) { [Bonsai.Expressions.ExpressionBuilder]::GetElementDisplayName($b) } else { '' }; "  FAIL  $($x.GetType().Name): $nm :: $($x.Message)"; $x = $x.InnerException }
+        while ($x) { $b = $null; try { $b = $x.Builder } catch { <# not a build error: no node to name #> }; $nm = if ($b) { [Bonsai.Expressions.ExpressionBuilder]::GetElementDisplayName($b) } else { '' }; "  FAIL  $($x.GetType().Name): $nm :: $($x.Message)"; $x = $x.InnerException }
         exit 1
     }
     "  ok    $Workflow builds"
@@ -246,7 +246,7 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
 
 if ($Step -eq 'Checks') {
     Initialize-Assemblies
-    foreach ($p in $script:resolveMap.Values) { if (Test-Path $p) { try { $null = [Reflection.Assembly]::LoadFrom($p) } catch {} } }
+    foreach ($p in $script:resolveMap.Values) { if (Test-Path $p) { try { $null = [Reflection.Assembly]::LoadFrom($p) } catch { "  warn  could not load ${p}: $($_.Exception.Message)" } } }
     # The resolver goes (a script block resolving on an Rx thread deadlocks) unless there is no Extensions build to
     # supply YamlDotNet at the version OpenRigs.Devices binds to: then the package's is resolved to it.
     if (Test-Path (Join-Path $bin 'YamlDotNet.dll')) { [AppDomain]::CurrentDomain.remove_AssemblyResolve($script:resolver) }

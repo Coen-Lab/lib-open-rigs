@@ -115,7 +115,8 @@ namespace OpenRigs.Devices.Zapit
                 }
             }
 
-            // Best effort: the connection is closing and Zapit may already be gone.
+            // Best effort: the connection is closing and Zapit may already be gone. Never throws;
+            // a stop Zapit did not confirm goes to Bonsai's console, as a stimulus may still be on.
             void TryStopStimulus()
             {
                 try
@@ -135,9 +136,12 @@ namespace OpenRigs.Devices.Zapit
                         if (count <= 0) break;
                         read += count;
                     }
+                    if (read < response.Length)
+                        Console.Error.WriteLine("ZapitClient: Zapit at {0} did not confirm StopStimulus at close ({1} of {2} bytes)", endpoint, read, response.Length);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    Console.Error.WriteLine("ZapitClient: Zapit at {0} did not confirm StopStimulus at close: {1}", endpoint, ex.Message);
                 }
             }
         }

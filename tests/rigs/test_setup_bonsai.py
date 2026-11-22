@@ -56,6 +56,19 @@ def test_a_folder_that_cannot_be_removed_is_said_and_does_not_fail_the_setup(tmp
     assert "Bonsai.FFmpeg.0.2.0-uniquepipe" not in left
 
 
+def test_a_different_layout_is_kept_as_main_saved_layout(tmp_path):
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "main.layout").write_text("tracked", encoding="utf-8")
+    settings = tmp_path / ".bonsai" / "Settings" / "src"
+    settings.mkdir(parents=True)
+    (settings / "main.layout").write_text("the person's", encoding="utf-8")
+    run, _ = run_setup(tmp_path, 0)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert (settings / "main.saved.layout").read_text(encoding="utf-8") == "the person's"
+    assert (settings / "main.layout").read_text(encoding="utf-8") == "tracked"
+    assert "Get-FileHash" not in SCRIPT.read_text(encoding="utf-8")
+
+
 def test_a_failed_restore_removes_nothing(tmp_path):
     run, left = run_setup(tmp_path, 1)
     assert run.returncode != 0

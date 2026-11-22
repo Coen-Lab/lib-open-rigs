@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reactive.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -230,6 +232,45 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual(2, replies.Count);
             Assert.AreEqual(ZapitCommandType.GetNumConditions, replies[0].Command);
             CollectionAssert.AreEqual(new byte[] { 4, 3, 0 }, received, "the queries, then StopStimulus on disconnect");
+        }
+
+        [TestMethod]
+        public void AStopZapitDoesNotConfirmAtCloseIsWrittenToTheConsole()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var server = Task.Run(() =>
+            {
+                // Answers the one query, then closes without answering StopStimulus.
+                using (var client = listener.AcceptTcpClient())
+                using (var stream = client.GetStream())
+                {
+                    var request = new byte[ZapitCommand.MessageLength];
+                    for (var read = 0; read < request.Length;) read += stream.Read(request, read, request.Length - read);
+                    var reply = new byte[ZapitReply.MessageLength];
+                    reply[8] = request[0];
+                    reply[9] = 2;
+                    stream.Write(reply, 0, reply.Length);
+                }
+            });
+            var error = new StringWriter();
+            var console = Console.Error;
+            Console.SetError(error);
+            try
+            {
+                var replies = new ZapitClient { Port = ((IPEndPoint)listener.LocalEndpoint).Port }
+                    .Process(Observable.Return(ZapitCommand.Query(ZapitQuery.GetState))).ToList().Wait();
+                Assert.AreEqual(1, replies.Count, "closing never throws");
+                Assert.IsTrue(server.Wait(5000));
+                // The connection closes after the reply is passed on, on Rx's thread: wait for its line.
+                for (var w = Stopwatch.StartNew(); error.ToString().Length == 0 && w.ElapsedMilliseconds < 3000;) Thread.Sleep(10);
+            }
+            finally
+            {
+                Console.SetError(console);
+                listener.Stop();
+            }
+            StringAssert.Contains(error.ToString(), "did not confirm StopStimulus at close");
         }
 
         [TestMethod]

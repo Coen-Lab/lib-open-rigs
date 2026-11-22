@@ -79,7 +79,7 @@ namespace OpenRigs.Vision
                                 finally
                                 {
                                     try { done.Set(); }
-                                    catch (ObjectDisposedException) { }
+                                    catch (ObjectDisposedException) { }  // the wait already gave up and disposed it
                                 }
                             });
 

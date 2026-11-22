@@ -56,7 +56,7 @@ namespace OpenRigs.HarpDevices
                     return string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
                 }
             }
-            catch (Exception)
+            catch (Exception)  // no readable key: the display name's port is used, as the summary says
             {
                 return null;
             }

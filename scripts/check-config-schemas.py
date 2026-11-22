@@ -22,6 +22,21 @@ import yaml
 
 HEADER = re.compile(r"^#\s*yaml-language-server:\s*\$schema=(\S+)", re.MULTILINE)
 
+FLOAT = "tag:yaml.org,2002:float"
+TIMESTAMP = "tag:yaml.org,2002:timestamp"
+
+
+class WorkflowLoader(yaml.SafeLoader):
+    """YAML as the workflow's YamlDotNet reads it: `1e-3` a number (YAML 1.1 wants a dot), a date-like value text."""
+
+
+WorkflowLoader.yaml_implicit_resolvers = {
+    first: [(tag, rx) for tag, rx in resolvers if tag not in (FLOAT, TIMESTAMP)]
+    for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()}
+WorkflowLoader.add_implicit_resolver(FLOAT, re.compile(
+    r"^(?:[-+]?(?:[0-9][0-9_]*\.[0-9_]*|\.[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)?|[-+]?[0-9][0-9_]*[eE][-+]?[0-9]+"
+    r"|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$"), list("-+0123456789."))
+
 
 def schema_for(config: Path, schemas: Path) -> tuple[Path | None, str]:
     """The schema file and the $defs name a config file is checked against."""
@@ -62,7 +77,7 @@ def problem(config: Path, schema_path: Path, definition: str) -> str:
         if definition not in schema.get("$defs", {}):
             return f"{schema_path.name} has no $defs/{definition}"
         schema = {"$schema": schema.get("$schema"), "$defs": schema["$defs"], "$ref": f"#/$defs/{definition}"}
-    doc = yaml.safe_load(config.read_text(encoding="utf-8-sig"))
+    doc = yaml.load(config.read_text(encoding="utf-8-sig"), Loader=WorkflowLoader)  # noqa: S506 (a SafeLoader)
     errors = sorted(jsonschema.Draft202012Validator(schema).iter_errors(doc), key=lambda e: list(e.absolute_path))
     if not errors:
         return ""

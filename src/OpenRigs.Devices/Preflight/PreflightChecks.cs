@@ -411,7 +411,7 @@ namespace OpenRigs.Devices
                 var thread = new Thread(() =>
                 {
                     try { new Run(inbox, cancel.Token, observer, skip).Check(); }
-                    catch (OperationCanceledException) { }
+                    catch (OperationCanceledException) { }  // the subscription was disposed: nothing left to report to
                 });
                 thread.IsBackground = true;
                 thread.Name = "Preflight check";

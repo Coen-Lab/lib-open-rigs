@@ -35,7 +35,7 @@ namespace OpenRigs.Shared
                 using (var reader = new StreamReader(path)) yaml.Load(reader);
                 root = yaml.Documents.Count > 0 ? yaml.Documents[0].RootNode as YamlMappingNode : null;
             }
-            catch (Exception)
+            catch (Exception)  // unreadable: empty, as the summary says (RigDevices.Read says why)
             {
                 return found;
             }

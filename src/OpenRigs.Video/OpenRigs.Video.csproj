@@ -4,7 +4,7 @@
     <Description>OpenRigs Logging Bonsai library.</Description>
     <PackageTags>$(PackageTags) Logging</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.22</Version>
+    <Version>0.1.1-coen-lab.23</Version>
   </PropertyGroup>
 
 
@@ -15,7 +15,7 @@
   <ItemGroup>
     <PackageReference Include="Bonsai.Harp" Version="3.6.1" />
     <PackageReference Include="Bonsai.Spinnaker" Version="0.9.1" />
-    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <PackageReference Include="YamlDotNet" Version="17.1.0" />
   </ItemGroup>
 
   <!-- rig.yml's cameras, read as OpenRigs.LiveView reads its devices: UsbCamera never takes the rig's own. -->

@@ -305,7 +305,7 @@ def performance(rows: Iterable[Dict[str, Any]], licks: Optional[Dict[int, bool]]
 def _trial_number(r: Dict[str, Any]) -> Optional[int]:
     try:
         return int(float(str(r.get("trialNumber"))))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # no number there: the row has no trial number
         return None
 
 
@@ -409,7 +409,7 @@ def _requested(detail: str) -> Optional[float]:
         if part.startswith("requested="):
             try:
                 return float(part[len("requested="):])
-            except ValueError:
+            except ValueError:  # requested= without a number: as without one
                 return None
     return None
 
@@ -490,7 +490,7 @@ def _task(folder: Path) -> Optional[_Task]:
                 rows = json.loads(tables[0].read_text(encoding="utf-8-sig"))["rows"]
                 combinations = {int(r[trial_log.ID]): r["values"] for r in rows}
             return _Task(params, combinations)
-        except (OSError, ValueError, KeyError, TypeError):
+        except (OSError, ValueError, KeyError, TypeError):  # unreadable: None, as the docstring says; the caller notes it
             return None
     return None
 
@@ -647,14 +647,14 @@ def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Op
         return
     try:
         cut = int(_f(trials[-1], "trialNumber")) + 1
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # the last trial has no number: no unfinished trial to look for
         return
     mine = []
     for r in rows:
         try:
             if int(_f(r, "trialNumber")) == cut:
                 mine.append(r)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # a row without a trial number belongs to no trial
             continue
     if not mine:
         return
@@ -666,7 +666,7 @@ def _unfinished(s: Summary, folder: Path, trials: List[Dict[str, str]], last: Op
             if any(STIMULUS_ON_COLUMNS[c](r[c]) for c in onsets):
                 s.interval_seconds.append(_f(r, TIME_COLUMN) - _end(last))
                 return
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # a stimulus or time that is not a number: passed over
             continue
 
 

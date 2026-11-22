@@ -2,7 +2,6 @@ using Bonsai;
 using Bonsai.Expressions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenTK;
-using OpenTK.Graphics.OpenGL4;
 using System;
 using System.IO;
 using System.Linq;
@@ -227,20 +226,25 @@ namespace OpenRigs.Devices.Tests
         }
 
         // GitHub's runner has only Windows' software OpenGL 1.1 ("GDI Generic"), where the first GL.GenBuffers is an
-        // access violation that kills the test host; ProjectorDisplay needs OpenGL 3.3, so read the version in a hidden window first.
-        static void RequireHardwareGL()
+        // access violation that kills the test host; RequireDisplay refuses it at Start (the test below).
+        internal static void RequireHardwareGL()
         {
-            string version, renderer;
-            using (var window = new GameWindow(1, 1))
-            {
-                window.MakeCurrent();
-                version = GL.GetString(StringName.Version) ?? "";
-                renderer = GL.GetString(StringName.Renderer) ?? "";
-            }
-            var number = System.Text.RegularExpressions.Regex.Match(version, @"^\d+\.\d+");
-            if (renderer == "GDI Generic" || !number.Success
-                || Version.Parse(number.Value) < new Version(3, 3))
-                Assert.Inconclusive($"OpenGL {version} on {renderer} here; ProjectorDisplay needs 3.3 on graphics hardware.");
+            var software = OpenRigs.Vision.RequireDisplay.SoftwareOpenGL();
+            if (software != null) Assert.Inconclusive($"OpenGL {software} here; ProjectorDisplay needs 3.3 on graphics hardware.");
+        }
+
+        // Without hardware OpenGL, RequireDisplay stops the workflow naming the renderer before any window; with it, it passes through.
+        [TestMethod]
+        public void RequireDisplayRefusesSoftwareOpenGL_NamingTheRenderer()
+        {
+            if (DisplayDevice.GetDisplay(DisplayIndex.First) == null) Assert.Inconclusive("No display here.");
+            var software = OpenRigs.Vision.RequireDisplay.SoftwareOpenGL();
+            var check = new OpenRigs.Vision.RequireDisplay { Name = "ProjectorDisplay" };
+            var error = (Exception)null;
+            try { System.Reactive.Linq.Observable.Wait(check.Process(System.Reactive.Linq.Observable.Return(1))); }
+            catch (InvalidOperationException e) { error = e; }
+            if (software == null) Assert.IsNull(error, "refused hardware OpenGL: " + error?.Message);
+            else Assert.AreEqual("ProjectorDisplay cannot draw: this session has no hardware OpenGL (" + software + "). Is it an RDP session?", error?.Message);
         }
 
         // BonVision's mesh: 30 by 30 rows of x, y, u, v, intensity, u fastest; here the identity map.

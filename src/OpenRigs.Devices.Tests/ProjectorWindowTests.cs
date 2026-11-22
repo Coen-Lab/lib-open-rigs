@@ -60,7 +60,35 @@ namespace OpenRigs.Devices.Tests
             Assert.IsNull(error, "The workflow stopped: " + error);
         }
 
-        static XElement TestWorkflow()
+        // DisposeOnRenderThread over a sequence whose disposal holds the render thread past TimeoutSeconds: the stop goes on,
+        // saying so, and the disposal finishes on a background thread.
+        [TestMethod]
+        public void DisposeOnRenderThread_GivesUpOnABusyRenderThread_SayingSo()
+        {
+            ProjectorDisplayTests.RequireHardwareGL();
+            SlowDispose.Disposed.Reset();
+            WorkflowBuilder builder;
+            using (var reader = XmlReader.Create(new StringReader(TestWorkflow(slowDispose: true).ToString())))
+            {
+                builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            }
+            var updated = new ManualResetEventSlim();
+            var subscription = builder.Workflow.BuildObservable().Subscribe(_ => { }, _ => { });
+            using (ShaderManager.WindowSource.Subscribe(w => w.Update(() => updated.Set())))
+            {
+                if (!updated.Wait(TimeSpan.FromSeconds(20))) { subscription.Dispose(); Assert.Inconclusive("No shader window ran here."); }
+            }
+            Thread.Sleep(200);  // the render thread is learnt in the same frame or the next
+            var error = new StringWriter();
+            var console = Console.Error;
+            Console.SetError(error);
+            try { subscription.Dispose(); }
+            finally { Console.SetError(console); }
+            StringAssert.Contains(error.ToString(), "the render thread did not dispose within 0.5 s; disposing on a background thread instead.");
+            Assert.IsTrue(SlowDispose.Disposed.Wait(TimeSpan.FromSeconds(10)), "the slow disposal never finished");
+        }
+
+        static XElement TestWorkflow(bool slowDispose = false)
         {
             var assembly = typeof(OpenRigs.Vision.DisposeOnRenderThread).Assembly;
             XDocument display;
@@ -90,16 +118,22 @@ namespace OpenRigs.Devices.Tests
             settings.Element(Shaders + "Width").Value = "64";
             settings.Element(Shaders + "Height").Value = "64";
 
-            var probe = new XElement(Bonsai + "Expression", new XAttribute(Xsi + "type", "Combinator"),
-                new XElement(Bonsai + "Combinator", new XAttribute(Xsi + "type", "t:" + nameof(WindowLoadOverlap))));
+            XElement Node(string type, params object[] settings) => new XElement(Bonsai + "Expression", new XAttribute(Xsi + "type", "Combinator"),
+                new XElement(Bonsai + "Combinator", new XAttribute(Xsi + "type", type), settings));
+            var probes = slowDispose
+                ? new[] { Node("t:" + nameof(SlowDispose)), Node("vis:DisposeOnRenderThread", new XElement((XNamespace)"clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision" + "TimeoutSeconds", "0.5")) }
+                : new[] { Node("t:" + nameof(WindowLoadOverlap)) };
+            var edgePairs = Enumerable.Range(0, copies.Count - 1).Select(i => Tuple.Create(i, i + 1)).ToList();
+            if (slowDispose) edgePairs.Add(Tuple.Create(copies.Count, copies.Count + 1));
             return new XElement(Bonsai + "WorkflowBuilder",
                 new XAttribute("Version", "2.9.0"),
                 display.Root.Attributes().Where(a => a.IsNamespaceDeclaration),
                 new XAttribute(XNamespace.Xmlns + "t", "clr-namespace:OpenRigs.Devices.Tests;assembly=OpenRigs.Devices.Tests"),
+                new XAttribute(XNamespace.Xmlns + "vis", "clr-namespace:OpenRigs.Vision;assembly=OpenRigs.Vision"),
                 new XElement(Bonsai + "Workflow",
-                    new XElement(Bonsai + "Nodes", copies, probe),
-                    new XElement(Bonsai + "Edges", Enumerable.Range(0, copies.Count - 1).Select(i => new XElement(Bonsai + "Edge",
-                        new XAttribute("From", i), new XAttribute("To", i + 1), new XAttribute("Label", "Source1"))))));
+                    new XElement(Bonsai + "Nodes", copies, probes),
+                    new XElement(Bonsai + "Edges", edgePairs.Select(p => new XElement(Bonsai + "Edge",
+                        new XAttribute("From", p.Item1), new XAttribute("To", p.Item2), new XAttribute("Label", "Source1"))))));
         }
 
         static bool IsCreateWindow(XElement node)
@@ -107,6 +141,23 @@ namespace OpenRigs.Devices.Tests
             var combinator = node.Element(Bonsai + "Combinator");
             return combinator != null && (string)combinator.Attribute(Xsi + "type") is string type
                 && type.EndsWith(":CreateWindow") && combinator.Name.Namespace == Bonsai;
+        }
+    }
+
+    /// <summary>A sequence that never ends and whose disposal takes 2 s, as a render target's might on a busy GPU.</summary>
+    [Combinator(MethodName = nameof(Generate))]
+    [WorkflowElementCategory(ElementCategory.Source)]
+    public class SlowDispose
+    {
+        internal static readonly ManualResetEventSlim Disposed = new ManualResetEventSlim();
+
+        public IObservable<Unit> Generate()
+        {
+            return Observable.Create<Unit>(observer => Disposable.Create(() =>
+            {
+                Thread.Sleep(2000);
+                Disposed.Set();
+            }));
         }
     }
 

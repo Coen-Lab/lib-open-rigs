@@ -39,6 +39,12 @@ namespace OpenRigs.Control.Tests
 
         static bool Ok(JObject reply) { return (bool)reply["ok"]; }
 
+        // Polled, never a fixed sleep: an event from the server's thread is waited for up to a bound.
+        static void WaitFor(Func<bool> done, int ms = 3000)
+        {
+            for (var w = Stopwatch.StartNew(); !done() && w.ElapsedMilliseconds < ms;) Thread.Sleep(10);
+        }
+
         static Exception Catch(Action action)
         {
             try { action(); return null; }
@@ -89,7 +95,7 @@ namespace OpenRigs.Control.Tests
 
                 // A set is an event, for settings the hardware takes live while ready.
                 Console.WriteLine("Live parameters before Go:");
-                Thread.Sleep(200);
+                WaitFor(() => { lock (events) return events.Count(e => e.Kind == ControlEventKind.Set) >= 2; });
                 ControlEvent[] sets;
                 lock (events) sets = events.ToArray();
                 var lengths = new OnParameterSet { Name = "RunLengthMinutes" }.Process(sets.ToObservable()).ToList().Wait();
@@ -129,7 +135,7 @@ namespace OpenRigs.Control.Tests
                 Check("status names them", (string)named["launched_by"]["id"] == "AnnO" && (string)named["go_by"]["name"] == "Jo Bloggs" && named["stopped_by"].Type == JTokenType.Null, named.ToString());
                 Check("... and only once", !Ok(Ask(socket, new { cmd = "go" })), "taken twice");
                 Check("parameters cannot change after Go", !Ok(Ask(socket, new { cmd = "set", name = "Note", value = "x" })), "taken");
-                Thread.Sleep(200);
+                WaitFor(() => { lock (events) return events.Exists(e => e.Kind == ControlEventKind.Go); });
                 ControlEvent go;
                 lock (events) go = events.Find(e => e.Kind == ControlEventKind.Go);
                 Check("the Go event carries the parameters as they stood", go != null && go.Parameters["RunLengthMinutes"] == "45" && go.Parameters["Note"] == "left eye shut", go == null ? "no Go event" : go.ToString());

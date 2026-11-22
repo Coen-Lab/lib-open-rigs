@@ -381,7 +381,7 @@ namespace OpenRigs.Video.Tests
             };
             // PING.EXE given ffmpeg's arguments refuses them and exits at once, non-zero: the error names it.
             var error = Assert.ThrowsException<InvalidOperationException>(() => writer.Process(Frames(30).ToObservable()).Wait());
-            StringAssert.Contains(error.Message, "ffmpeg stopped while recording (exit code 1)");
+            StringAssert.Contains(error.Message, "ffmpeg stopped (exit code 1)");
         }
 
         // Real ffmpeg with an encoder it does not have (as h264_qsv on a machine without Quick

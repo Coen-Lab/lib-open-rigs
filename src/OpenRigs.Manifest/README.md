@@ -2,7 +2,7 @@
 
 One node, `ExperimentManifest`, that writes `manifest.json` into each experiment folder: what ran, from which commit, with which settings and configuration, what it had to leave, how the run ended, and every file it left. A workflow drops it in once, after `LogController`; nothing has to be wired to it.
 
-The format is [`FORMAT.md`](FORMAT.md), version 3. This node is the file's only writer, ever: the overnight copy and the server each write their own file beside it (`sync.json`, `ingest.json`). Every manifest names the package and version that wrote it (`writer`).
+The format is [`FORMAT.md`](FORMAT.md), version 4. This node writes it on a rig; the server's migration converter is its only other writer, for experiments recorded before it. The overnight copy and the server each write their own file beside it (`sync.json`, `ingest.json`). Every manifest names what wrote it (`writer`).
 
 ## What It Finds by Itself
 
@@ -17,8 +17,7 @@ The format is [`FORMAT.md`](FORMAT.md), version 3. This node is the file's only 
 
 ## Expected Files
 
-`files` lists what is in the folder when the run ends, so a device that never wrote anything is simply absent from it. `expected` says what had to be there: each entry with its path, why it is expected, its `condition` and whether it was `required` at that write, and `found`, the number of files matching it at that write. The overnight copy refuses to copy a `completed` experiment whose required entry left no file, and raises an alarm naming it, as it does for a listed file that has gone; a run that ended any other way is copied without what it never wrote, named in `sync.json`'s `unmet` and a note, with an alarm. On a rig a run whose board stopped answering at Start left `BehaviorBoard-Main/` with `found: 0`; its `files` had only the camera's two.
-
+`files` lists what is in the folder when the run ends, so a device that never wrote anything is simply absent from it. `expected` says what had to be there: each entry with its path, why it is expected, its `condition` and whether it was `required` at that write, and `found`, the number of files matching it at that write. The overnight copy refuses to copy a `completed` experiment whose required entry left no file, and raises an alarm naming it, as it does for a listed file that has gone; a run that ended any other way is copied without what it never wrote, named in `sync.json`'s `unmet` and a note, with an alarm.
 ## Settings
 
 | Property | Default | |
@@ -55,5 +54,3 @@ Each write is `manifest.json.<pid>.tmp`, then a rename over the old one, so no r
 ## Tested
 
 `dotnet run --project src\OpenRigs.Manifest.Tests` runs the writer, the recorder and the editor's copy of the node against a temporary folder, with no hardware and no Bonsai editor: exit 0 when every check passes. It also builds each manifest in [`fixtures/manifest/v4/`](../../fixtures/manifest/v4/) from fixed inputs and compares it byte for byte with the file there; readers in other repositories test themselves on those files. `-- --write-fixtures` rewrites them after a deliberate change to the format.
-
-On a rig, in a task (inside `Logging`, the frames recorded as its input) launched by a controller: a 1-min run left `completed`, 3000 items, `control.parameters.RunLengthMinutes` 1, the `--property` values, rig.yml with its hash, and both device folders found; a controller stop at 20 s left `stopped` with the stop's reason; a run whose board did not answer left `ended-early` and `BehaviorBoard-Main/` found 0, which the overnight copy turned into an alarm. Headless with no ExperimentControl and no hardware: a run input completing gave `completed`, none gave `stopped`, a relative config path resolved from the repository, and a missing one was noted.

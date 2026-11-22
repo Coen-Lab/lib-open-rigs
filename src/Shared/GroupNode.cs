@@ -44,7 +44,7 @@ namespace OpenRigs.Shared
             {
                 return (Expression)GetVariableMethod.Invoke(context, new object[] { name });
             }
-            catch (TargetInvocationException)
+            catch (TargetInvocationException)  // Bonsai throws for a subject not built before the node: null, as the summary says
             {
                 return null;
             }

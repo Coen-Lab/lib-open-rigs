@@ -258,7 +258,7 @@ namespace OpenRigs.Control
         /// <summary>The Go event, with every parameter as it stood; null before Go.</summary>
         public ControlEvent Go { get; internal set; }
 
-        /// <summary>The why the controller's stop gave; null unless the controller stopped the experiment.</summary>
+        /// <summary>The reason the controller's stop gave; null unless the controller stopped the experiment.</summary>
         public string StopReason { get; internal set; }
 
         /// <summary>Who launched the experiment, as the controller's Go named them; null if it named nobody.</summary>
@@ -719,8 +719,8 @@ namespace OpenRigs.Control
                     if (refused != null) return Refuse(refused);
                     // Named on Go, the moment the experiment becomes a record: the workflow was
                     // started by whoever launched it, and is released by whoever sends this.
-                    state.LaunchedBy = Person.From(request["launched_by"]);
-                    state.GoBy = Person.From(request["by"]);
+                    var launchedBy = Person.From(request["launched_by"]);
+                    var goBy = Person.From(request["by"]);
                     emit = new ControlEvent
                     {
                         Kind = ControlEventKind.Go,
@@ -731,7 +731,14 @@ namespace OpenRigs.Control
                         Parameters = parameters,
                         Time = DateTime.UtcNow
                     };
-                    state.Go = emit;
+                    var go = emit;
+                    state.Locked(() =>
+                    {
+                        state.LaunchedBy = launchedBy;
+                        state.GoBy = goBy;
+                        state.Go = go;
+                        return true;
+                    });
                     return Ok();
                 }
 
@@ -763,8 +770,13 @@ namespace OpenRigs.Control
                     var why = (string)request["why"] ?? "stopped by the controller";
                     // The person first: the Manifest's stop poll fires on StopReason and
                     // then reads StoppedBy, so the other order could write the stop without them.
-                    state.StoppedBy = Person.From(request["by"]);
-                    state.StopReason = why;
+                    var stoppedBy = Person.From(request["by"]);
+                    state.Locked(() =>
+                    {
+                        state.StoppedBy = stoppedBy;
+                        state.StopReason = why;
+                        return true;
+                    });
                     state.SetPhase(ExperimentPhase.Stopping);
                     stop = new ExperimentStoppedException("Experiment stopped: " + why);
                     return Ok();

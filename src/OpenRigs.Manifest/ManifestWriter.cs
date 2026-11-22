@@ -189,8 +189,8 @@ namespace OpenRigs.Manifest
         /// <summary>
         /// spout_positions: on a rig with a lick spout stage (rig.yml's lickSpoutDefaultPosition), the in positions the
         /// mouse starts from, as OpenRigs.Devices LickSpoutStage reads them: its row of LickSpoutPositions.csv beside
-        /// rig.yml, else rig.yml's default; <c>from</c> says which. Null on a rig without a stage or when rig.yml cannot
-        /// be read; a list that cannot be read is <c>{from, error}</c>.
+        /// rig.yml, else rig.yml's default; <c>from</c> says which. Null on a rig without a stage; a rig.yml or list
+        /// that cannot be read is <c>{mouse, from, error}</c>.
         /// </summary>
         public static JsonObject SpoutPositionsSection(string rigYml, string subject)
         {
@@ -204,7 +204,14 @@ namespace OpenRigs.Manifest
                 if (root == null || !root.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode("lickSpoutDefaultPosition"), out node)) return null;
                 defaults = node as YamlDotNet.RepresentationModel.YamlMappingNode;
             }
-            catch (Exception) { return null; }
+            catch (Exception e)
+            {
+                var unread = new JsonObject();
+                unread.Add("mouse", subject);
+                unread.Add("from", "rig.yml");
+                unread.Add("error", e.Message);
+                return unread;
+            }
             var section = new JsonObject();
             section.Add("mouse", subject);
             var list = Path.Combine(Path.GetDirectoryName(rigYml), SpoutPositionsFile);
@@ -282,7 +289,7 @@ namespace OpenRigs.Manifest
         {
             var expanded = Environment.ExpandEnvironmentVariables(configured);
             try { return Path.GetFullPath(Path.IsPathRooted(expanded) ? expanded : Path.Combine(baseFolder, expanded)); }
-            catch (Exception) { return expanded; }
+            catch (Exception) { return expanded; }  // an illegal path: named as typed, and the file reads missing
         }
 
         /// <summary>The first write, outcome running. Makes the folder if the loggers have not yet: PathPrefix names it before any of them writes and they make the same folder. Throws if the file cannot be written: nothing recorded is the thing to stop for.</summary>
@@ -401,34 +408,10 @@ namespace OpenRigs.Manifest
             return section;
         }
 
-        /// <summary>manifest.json.&lt;pid&gt;.tmp, then the rename, so no reader sees half a file, nor a moment with no manifest. UTF-8 without a BOM. A write that fails takes its .tmp with it.</summary>
+        /// <summary>AtomicFile's write, the .tmp named for this process so two writers never share one.</summary>
         public static void WriteAtomically(string path, string text)
         {
-            var tmp = path + "." + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture) + ".tmp";
-            try
-            {
-                File.WriteAllText(tmp, text, new UTF8Encoding(false));
-                // Windows refuses the rename while a reader holds the file without delete sharing
-                // (Python's open(); a controller polls manifest.json every second): wait it out, about 0.5 s.
-                for (var attempt = 1; ; attempt++)
-                {
-                    try
-                    {
-                        if (File.Exists(path)) File.Replace(tmp, path, null);
-                        else File.Move(tmp, path);
-                        break;
-                    }
-                    catch (IOException) when (attempt < 10)
-                    {
-                        System.Threading.Thread.Sleep(50);
-                    }
-                }
-            }
-            catch
-            {
-                try { File.Delete(tmp); } catch (Exception) { }
-                throw;
-            }
+            AtomicFile.Write(path, text, "." + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture) + ".tmp");
         }
 
         /// <summary>The machine. Its rig.yml is named in config_files only; version 1 also copied it here.</summary>

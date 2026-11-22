@@ -444,6 +444,10 @@ namespace OpenRigs.Manifest.Tests
                 var row = spouts(ManifestWriter.SpoutPositionsSection(tokenRig, "M7"));
                 Check("... and with the mouse's row, its five numbers", row == "mouse=M7,from=LickSpoutPositions.csv,baseTransverse=1,radialLeft=2,radialRight=3,elevationLeft=4,elevationRight=5", row);
                 Check("... and null on a rig without a stage", ManifestWriter.SpoutPositionsSection(cfgPath, "M7") == null, "a section");
+                var notYaml = Path.Combine(root, "notyaml.yml");
+                File.WriteAllText(notYaml, "a: [1\n");
+                var unread = spouts(ManifestWriter.SpoutPositionsSection(notYaml, "M7"));
+                Check("... and an unreadable rig.yml is {mouse, from: rig.yml, error}, not null", unread.StartsWith("mouse=M7,from=rig.yml,error=") && unread.Length > "mouse=M7,from=rig.yml,error=".Length, unread);
                 Check("... and an unreadable rig.yml alone", ManifestWriter.RigFiles(Path.Combine(root, "none.yml")).Count == 1, "more");
                 // A missing file's note names the file looked for, environment variables and {SubjectId} filled in, not the entry as typed.
                 Environment.SetEnvironmentVariable("OPENRIGS_TEST_MACHINE", "TEST-RIG-2");
@@ -722,6 +726,14 @@ namespace OpenRigs.Manifest.Tests
                     reader.Join();
                     Check("a write while a reader holds the file waits for it and succeeds", held == null && File.ReadAllText(file) == "three" && Directory.GetFiles(root, "atomic.json.*.tmp").Length == 0, held != null ? held.Message : File.ReadAllText(file));
                 }
+                using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    // Held past the ten tries (about 0.5 s): the rename's IOException surfaces and the .tmp goes.
+                    Exception held = null;
+                    try { ManifestWriter.WriteAtomically(file, "four"); } catch (Exception e) { held = e; }
+                    Check("a write while a reader holds the file past ten tries fails, leaving no .tmp", held is IOException && Directory.GetFiles(root, "atomic.json.*.tmp").Length == 0, held != null ? held.GetType().Name : "no error");
+                }
+                Check("... and the file it could not replace is unchanged", File.ReadAllText(file) == "three", File.ReadAllText(file));
 
                 Console.WriteLine("Expected files:");
                 var rigYml = Path.Combine(root, "rig.yml");
