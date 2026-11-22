@@ -1136,3 +1136,14 @@ def test_an_installed_lint_takes_the_central_versions_from_the_pinned_packages_d
     assert lint.central_versions(tmp_path, none) == {"yamldotnet": "17.1.0", "bonsai.core": "2.9.0"}
     _csproj(tmp_path / "src" / "Extensions.csproj", "YamlDotNet 16.3.0", "Bonsai.Core 2.9.0")
     assert [p.split(",")[0] for p in lint.central_version_problems(wf, none)] == ["src\\Extensions.csproj pins YamlDotNet 16.3.0"]
+
+
+def test_an_installed_lint_takes_the_highest_version_any_pinned_package_needs(tmp_path):
+    # 22 Nov 2026: Core went to .41 with Logging; Devices, not rebuilt, still listed Core .40, and the lint wanted .40.
+    (tmp_path / ".bonsai").mkdir()
+    (tmp_path / ".bonsai" / "Bonsai.config").write_text('<Package id="L" version="1" />\n<Package id="D" version="1" />', encoding="utf-8")
+    (tmp_path / "local_packages").mkdir()
+    for package, core in (("L", "0.1.1-coen-lab.41"), ("D", "0.1.1-coen-lab.40")):
+        with zipfile.ZipFile(tmp_path / "local_packages" / f"{package}.1.nupkg", "w") as z:
+            z.writestr(f"{package}.nuspec", f'<dependency id="OpenRigs.Core" version="[{core}, )" />')
+    assert lint.central_versions(tmp_path, tmp_path / "no.props") == {"openrigs.core": "0.1.1-coen-lab.41"}

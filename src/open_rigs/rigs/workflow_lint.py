@@ -1195,8 +1195,16 @@ def central_versions(repo: Path, props: Path = CENTRAL_VERSIONS) -> dict[str, st
         with zipfile.ZipFile(nupkg) as z:
             spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode("utf-8-sig")
         for dep, at in re.findall(r'<dependency id="([^"]+)" version="([^"]+)"', spec):
-            versions[dep.lower()] = at.strip("[( )]").split(",")[0]
+            at = at.strip("[( )]").split(",")[0]
+            have = versions.get(dep.lower())
+            if have is None or _version_key(at) > _version_key(have):  # the highest any package needs: NuGet's floor
+                versions[dep.lower()] = at
     return versions
+
+
+def _version_key(version: str) -> tuple:
+    """Order NuGet versions such as 0.1.1-coen-lab.41: numeric parts compare as numbers."""
+    return tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in re.split(r"[.\-]", version))
 
 
 def central_version_problems(wf: Workflow, props: Path = CENTRAL_VERSIONS) -> list[str]:
