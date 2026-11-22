@@ -1143,7 +1143,7 @@ def test_an_installed_lint_takes_the_highest_version_any_pinned_package_needs(tm
     (tmp_path / ".bonsai").mkdir()
     (tmp_path / ".bonsai" / "Bonsai.config").write_text('<Package id="L" version="1" />\n<Package id="D" version="1" />', encoding="utf-8")
     (tmp_path / "local_packages").mkdir()
-    for package, core in (("L", "0.1.1-coen-lab.41"), ("D", "0.1.1-coen-lab.40")):
+    for package, core in (("L", "0.1.1-x.41"), ("D", "0.1.1-x.40")):
         with zipfile.ZipFile(tmp_path / "local_packages" / f"{package}.1.nupkg", "w") as z:
             z.writestr(f"{package}.nuspec", f'<dependency id="OpenRigs.Core" version="[{core}, )" />')
-    assert lint.central_versions(tmp_path, tmp_path / "no.props") == {"openrigs.core": "0.1.1-coen-lab.41"}
+    assert lint.central_versions(tmp_path, tmp_path / "no.props") == {"openrigs.core": "0.1.1-x.41"}

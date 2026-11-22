@@ -22,6 +22,7 @@ LAB_ONLY = re.compile(
 )
 
 NAMES_THE_LAB = {
+    ".github/workflows/records.yml": 3,  # the lab's nightly gate, Coen-Lab/.github ci-gate.yml
     "README.md": 1,
     "build/Common.csproj.targets": 2,
     "fixtures/manifest/v3/completed.json": 10,

@@ -1203,7 +1203,7 @@ def central_versions(repo: Path, props: Path = CENTRAL_VERSIONS) -> dict[str, st
 
 
 def _version_key(version: str) -> tuple:
-    """Order NuGet versions such as 0.1.1-coen-lab.41: numeric parts compare as numbers."""
+    """Order NuGet versions such as 0.1.1-x.41: numeric parts compare as numbers."""
     return tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in re.split(r"[.\-]", version))
 
 

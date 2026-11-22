@@ -14,7 +14,7 @@
 # Note that this is a generic workflow meant for all Bonsai packages. Minor local modifications are fine, see https://github.com/bonsai-rx/prefect for more information.
 # =======================================================================================================================================================================
 name: OpenRigs
-# Lab: no push or pull_request trigger (Pip, 22 Nov 2026, Actions budget). Run it by hand (gh workflow run OpenRigs) or on a release.
+# Lab: no push or pull_request trigger (22 Nov 2026, Actions budget). Run it by hand (gh workflow run OpenRigs) or on a release.
 on:
   release:
     types: [published]
