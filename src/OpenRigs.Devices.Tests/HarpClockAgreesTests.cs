@@ -82,7 +82,7 @@ namespace OpenRigs.Devices.Tests
             StringAssert.StartsWith(run.Item2.Message, "BehaviorBoard-Main's Harp clock is 0.8 s from the rig's clock");
         }
 
-        // P1R-H1, Pip's decision (22 Nov 2026): after Go a session already recording is worth more than its clock, so a
+        // P1R-H1 (audit 22 Nov 2026): after Go a session already recording is worth more than its clock, so a
         // drift warns once each time the device falls out and never stops the workflow.
         [TestMethod]
         public void DriftAfterGo_WarnsOnceAndGoesOn()
