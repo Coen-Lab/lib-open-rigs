@@ -1151,7 +1151,7 @@ def test_an_installed_lint_takes_the_central_versions_from_the_pinned_packages_d
     with zipfile.ZipFile(tmp_path / "local_packages" / "A.Pkg.1.1.0.nupkg", "w") as z:
         z.writestr("A.Pkg.nuspec", '<dependency id="YamlDotNet" version="16.3.0" />')
     none = tmp_path / "no.props"
-    assert lint.central_versions(tmp_path, none) == {"yamldotnet": "17.1.0", "bonsai.core": "2.9.0"}
+    assert lint.central_versions(tmp_path, none) == {"yamldotnet": "17.1.0", "bonsai.core": "2.9.0", "a.pkg": "1.2.0"}
     _csproj(tmp_path / "src" / "Extensions.csproj", "YamlDotNet 16.3.0", "Bonsai.Core 2.9.0")
     assert [p.split(",")[0] for p in lint.central_version_problems(wf, none)] == ["src\\Extensions.csproj pins YamlDotNet 16.3.0"]
 
@@ -1164,4 +1164,16 @@ def test_an_installed_lint_takes_the_highest_version_any_pinned_package_needs(tm
     for package, core in (("L", "0.1.1-x.41"), ("D", "0.1.1-x.40")):
         with zipfile.ZipFile(tmp_path / "local_packages" / f"{package}.1.nupkg", "w") as z:
             z.writestr(f"{package}.nuspec", f'<dependency id="OpenRigs.Core" version="[{core}, )" />')
-    assert lint.central_versions(tmp_path, tmp_path / "no.props") == {"openrigs.core": "0.1.1-x.41"}
+    assert lint.central_versions(tmp_path, tmp_path / "no.props") == {"openrigs.core": "0.1.1-x.41", "l": "1", "d": "1"}
+
+
+def test_an_installed_lint_takes_a_pinned_package_at_its_own_version(tmp_path):
+    # 22 Nov 2026: Devices went to .59 alone; Trials, built before, still listed Devices .58, and the lint wanted .58 of
+    # every workflow whose Extensions.csproj references Devices at the .59 it runs.
+    (tmp_path / ".bonsai").mkdir()
+    (tmp_path / ".bonsai" / "Bonsai.config").write_text('<Package id="OpenRigs.Devices" version="0.1.1-x.59" />\n<Package id="OpenRigs.Trials" version="0.1.1-x.19" />', encoding="utf-8")
+    (tmp_path / "local_packages").mkdir()
+    for package, version, spec in (("OpenRigs.Devices", "0.1.1-x.59", ""), ("OpenRigs.Trials", "0.1.1-x.19", '<dependency id="OpenRigs.Devices" version="[0.1.1-x.58, )" />')):
+        with zipfile.ZipFile(tmp_path / "local_packages" / f"{package}.{version}.nupkg", "w") as z:
+            z.writestr(f"{package}.nuspec", spec)
+    assert lint.central_versions(tmp_path, tmp_path / "no.props")["openrigs.devices"] == "0.1.1-x.59"

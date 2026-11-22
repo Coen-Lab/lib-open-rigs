@@ -1212,6 +1212,8 @@ def central_versions(repo: Path, props: Path = CENTRAL_VERSIONS) -> dict[str, st
             have = versions.get(dep.lower())
             if have is None or _version_key(at) > _version_key(have):  # the highest any package needs: NuGet's floor
                 versions[dep.lower()] = at
+    # A package built here is at its own pinned version, above what one not rebuilt still lists (Devices .59, Trials on .58).
+    versions.update({package.lower(): version for package, version in pins if (Path(repo) / "local_packages" / f"{package}.{version}.nupkg").is_file()})
     return versions
 
 
