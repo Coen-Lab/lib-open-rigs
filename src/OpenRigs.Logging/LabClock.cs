@@ -312,4 +312,26 @@ namespace OpenRigs.Logging
             });
         }
     }
+
+    /// <summary>
+    /// Represents an operator that checks the machine's clock against the lab's rules (LabClock) under each ConfigRoot it
+    /// is given, off the caller's thread (w32tm may take seconds), and passes the ConfigRoot on when the clock agrees.
+    /// ExperimentLogs runs it at Start, so a clock fault stops the workflow before Ready, not at Go.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Combinator)]
+    [System.Xml.Serialization.XmlType(Namespace = "clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging")]
+    [Description("Checks the clock for each ConfigRoot (ReadLabRig's): the time zone and daylight saving against ConfigRoot\\shared\\lab.yml, and Windows' last time sync. Passes the ConfigRoot on when it agrees; stops the workflow, saying what is wrong and how to fix it, when not.")]
+    public class LabClockAgrees
+    {
+        /// <summary>Checks the clock under each ConfigRoot, passing it on when the clock agrees.</summary>
+        public IObservable<string> Process(IObservable<string> source)
+        {
+            return source.SelectMany(configRoot => Observable.Start(() =>
+            {
+                LabClock.Check(configRoot);
+                return configRoot;
+            }));
+        }
+    }
 }

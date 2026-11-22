@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The lab clock as a Ready stage, once in every workflow with ExperimentLogs, after the hardware (after ReadyGate, whose ReadyStages it announces into): at Start, checks the clock against ConfigRoot\shared\lab.yml (LabClockAgrees: the time zone, daylight saving and Windows' last time sync) and announces LabClockChecked, which the workflow names in ReadyGate's WorkflowStages, so a clock fault stops the workflow before Ready, saying what is wrong and how to fix it, not at Go. LogController checks again at Go. Needs ConfigRoot (ReadLabRig) and ReadyStages (ReadyGate).</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ConfigRoot</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orl:LabClockAgrees" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:AnnounceStage">
+          <core:Stage>LabClockChecked</core:Stage>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>ReadyStages</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
