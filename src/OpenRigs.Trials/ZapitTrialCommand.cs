@@ -12,6 +12,10 @@ namespace OpenRigs.Trials
         /// <summary>Gets the trial's condition in the conditions file, 1 to 254.</summary>
         int LaserCondition { get; }
 
+        /// <summary>Gets where the condition aims the laser, its points in the conditions file as the trial log's laserPointsMm
+        /// (ZapitConditionsFile.PointsMm).</summary>
+        string LaserPointsMm { get; }
+
         /// <summary>Gets whether the laser fires on this trial.</summary>
         bool LaserOn { get; }
 

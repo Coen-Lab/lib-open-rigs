@@ -12,6 +12,7 @@ namespace OpenRigs.Trials.Tests
     {
         public int TrialNumber { get; set; }
         public int LaserCondition { get; set; }
+        public string LaserPointsMm { get; set; }
         public bool LaserOn { get; set; }
         public double LaserPowerMw { get; set; }
         public double LaserDurationSeconds { get { return 2.5; } }

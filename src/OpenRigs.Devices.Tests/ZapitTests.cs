@@ -19,8 +19,8 @@ namespace OpenRigs.Devices.Tests
     {
         const string Conditions =
             "stimModulationFreqHz: 40\n" +
-            "stimLocations01:\n  offRampDownDuration_ms: 250\n" +
-            "stimLocations02:\n  offRampDownDuration_ms: 250\n";
+            "stimLocations01:\n  ML: [1.5, -1.5]\n  AP: [-0.7, -0.7]\n  Attributes: {laserPowerInMW: 3.0, offRampDownDuration_ms: 250.0}\n" +
+            "stimLocations02:\n  ML: 0.71\n  AP: 0.8\n  Attributes: {laserPowerInMW: 3.0, offRampDownDuration_ms: 250.0}\n";
 
         static string WriteConditions(string text)
         {
@@ -163,6 +163,11 @@ namespace OpenRigs.Devices.Tests
         [DataRow("stimModulationFreqHz: 5\nstimLocations01:\n  offRampDownDuration_ms: 200\n", "not longer than one 5 Hz cycle")]
         [DataRow("stimLocations01:\n  laserPowerInMW: 2\n", "has no offRampDownDuration_ms")]
         [DataRow("laserPowerInMW: 2\n", "has no conditions")]
+        [DataRow("stimLocations01:\n  AP: -0.7\n  offRampDownDuration_ms: 250\n", "stimLocations01 has no ML")]
+        [DataRow("stimLocations01:\n  offRampDownDuration_ms: 250\n", "stimLocations01 has no ML or AP")]
+        [DataRow("stimLocations01:\n  ML: [1.5, -1.5]\n  AP: -0.7\n  offRampDownDuration_ms: 250\n", "stimLocations01 has 2 ML and 1 AP")]
+        [DataRow("stimLocations01:\n  ML:\n  - 1.5\n  AP: -0.7\n  offRampDownDuration_ms: 250\n", "stimLocations01's ML is '', not a number")]
+        [DataRow("stimLocations01:\n  ML: 1.5, 2\n  AP: -0.7\n  offRampDownDuration_ms: 250\n", "stimLocations01's ML is '1.5, 2', not a number")]
         public void ConditionsFileRefused(string text, string message)
         {
             var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitConditions.Check(WriteConditions(text)));
@@ -172,9 +177,18 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void CheckReturnsTheCountAndTheMaxRampDown()
         {
-            var file = ZapitConditions.Check(WriteConditions("stimLocations01:\n  offRampDownDuration_ms: 250\nstimLocations02:\n  offRampDownDuration_ms: 400\n"));
+            var file = ZapitConditions.Check(WriteConditions("stimLocations01:\n  ML: 1\n  AP: 2\n  offRampDownDuration_ms: 250\nstimLocations02:\n  ML: 1\n  AP: 2\n  offRampDownDuration_ms: 400\n"));
             Assert.AreEqual(2, file.Count);
             Assert.AreEqual(0.4, file.MaxRampDownSeconds, 1e-12);
+        }
+
+        [TestMethod]
+        public void CheckReadsEachConditionsPointsApThenMlAsWritten()
+        {
+            var file = ZapitConditions.Check(WriteConditions(
+                "stimLocations02:\r\n  ML: [2.4, -2.4, 0]\r\n  AP: [-4, -4, 1.50]\r\n  Class: stimulate\r\n  Type: bilateral_points\r\n  Attributes: {laserPowerInMW: 3.0, offRampDownDuration_ms: 250.0}\r\n" +
+                "stimLocations01:\r\n  ML: -2.76\r\n  AP: -3.83\r\n  Attributes: {laserPowerInMW: 3.0, offRampDownDuration_ms: 250.0}\r\nstimModulationFreqHz: 40.0\r\n"));
+            CollectionAssert.AreEqual(new[] { "-3.83 -2.76", "-4 2.4;-4 -2.4;1.50 0" }, file.PointsMm.ToArray(), "condition 1 first, each point AP then ML as written, in the file's order");
         }
 
         [TestMethod]
@@ -379,9 +393,10 @@ namespace OpenRigs.Devices.Tests
             var random = new Random(1);
             for (int trial = 1; trial <= 200; trial++)
             {
-                int condition; bool laserOn; double powerMw;
-                ZapitTrial.Draw(random, trial, 2, 5, 1.0, 3.5, out condition, out laserOn, out powerMw);
+                int condition; string pointsMm; bool laserOn; double powerMw;
+                ZapitTrial.Draw(random, trial, new ZapitConditionsFile(new[] { "1 2", "3 4;5 6" }, 0.25), 5, 1.0, 3.5, out condition, out pointsMm, out laserOn, out powerMw);
                 Assert.IsTrue(condition == 1 || condition == 2);
+                Assert.AreEqual(condition == 1 ? "1 2" : "3 4;5 6", pointsMm, "the drawn condition's points");
                 Assert.AreEqual(trial > 5, laserOn);
                 Assert.AreEqual(laserOn ? 3.5 : 0, powerMw);
             }

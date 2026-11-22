@@ -11,6 +11,7 @@ namespace OpenRigs.Trials
     {
         int ITrial.TrialNumber { get { return trialNumber; } }
         int IZapitTrial.LaserCondition { get { return laserCondition; } }
+        string IZapitTrial.LaserPointsMm { get { return laserPointsMm; } }
         bool IZapitTrial.LaserOn { get { return laserOn; } }
         double IZapitTrial.LaserPowerMw { get { return laserPowerMw; } }
 
@@ -40,6 +41,8 @@ namespace OpenRigs.Trials
         public double auditoryInitialElevationDeg;
         /// <summary>Its Zapit condition, from 1; 0 without optogenetics.</summary>
         public int laserCondition;
+        /// <summary>Its condition's points (ZapitConditionsFile.PointsMm), the trial log's laserPointsMm; null without optogenetics.</summary>
+        public string laserPointsMm;
         /// <summary>Whether the laser fires on it.</summary>
         public bool laserOn;
         /// <summary>The laser power on a laser-on trial, in mW; 0 with the laser off.</summary>

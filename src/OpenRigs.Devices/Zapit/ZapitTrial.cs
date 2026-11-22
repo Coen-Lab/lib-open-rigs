@@ -128,13 +128,15 @@ namespace OpenRigs.Devices.Zapit
         }
 
         /// <summary>
-        /// One optogenetics trial's draw: a condition from the conditions file, each equally likely, then the laser on with
-        /// laserOnProbability once the first trialsBeforeLaser trials are past, and the power with it (0 mW when off).
+        /// One optogenetics trial's draw: a condition from the conditions file, each equally likely, with its points
+        /// (<see cref="ZapitConditionsFile.PointsMm"/>), then the laser on with laserOnProbability once the first
+        /// trialsBeforeLaser trials are past, and the power with it (0 mW when off).
         /// </summary>
-        public static void Draw(Random random, int trialNumber, int conditionCount, int trialsBeforeLaser, double laserOnProbability, double laserPowerMw,
-            out int condition, out bool laserOn, out double powerMw)
+        public static void Draw(Random random, int trialNumber, ZapitConditionsFile conditions, int trialsBeforeLaser, double laserOnProbability, double laserPowerMw,
+            out int condition, out string pointsMm, out bool laserOn, out double powerMw)
         {
-            condition = random.Next(conditionCount) + 1;
+            condition = random.Next(conditions.Count) + 1;
+            pointsMm = conditions.PointsMm[condition - 1];
             laserOn = trialNumber > trialsBeforeLaser && random.NextDouble() < laserOnProbability;
             powerMw = laserOn ? laserPowerMw : 0;
         }

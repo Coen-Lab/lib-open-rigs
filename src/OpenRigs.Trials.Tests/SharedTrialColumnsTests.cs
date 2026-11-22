@@ -25,6 +25,7 @@ namespace OpenRigs.Trials.Tests
             public double penaltyFlashBrightness;
             public bool penalised;
             public int laserCondition;
+            public string laserPointsMm;
             public double laserPowerMw;
             public double laserTriggerTime;
             public string choice;
@@ -73,7 +74,7 @@ namespace OpenRigs.Trials.Tests
             return new TrialTimes { ItiStartTime = 10, ItiSeconds = 2.5, QuietWaitSeconds = 0.25, TrialStartTime = 12.25, StimulusOnsetTime = 12.751, StimulusOffTime = 13.751, LaserTriggerTime = trigger, Now = 13.5 };
         }
 
-        static StubTrial Laser() { return new StubTrial { TrialNumber = 7, LaserCondition = 3, LaserOn = true, LaserPowerMw = 4.5 }; }
+        static StubTrial Laser() { return new StubTrial { TrialNumber = 7, LaserCondition = 3, LaserPointsMm = "-0.7 1.5;-0.7 -1.5", LaserOn = true, LaserPowerMw = 4.5 }; }
 
         [TestMethod]
         public void FillsTheSharedBlockFromTheLoopsTimes()
@@ -93,10 +94,19 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(0.75, row.penaltyFlashBrightness, "the kind's flash brightness, penalised");
             Assert.IsTrue(row.penalised);
             Assert.AreEqual(3, row.laserCondition);
+            Assert.AreEqual("-0.7 1.5;-0.7 -1.5", row.laserPointsMm);
             Assert.AreEqual(4.5, row.laserPowerMw);
             Assert.AreEqual(12.25, row.laserTriggerTime);
             Assert.AreEqual("Left", row.choice, "the task's own columns untouched");
             Assert.IsNull(row.outcome);
+        }
+
+        [TestMethod]
+        public void ATrialWithoutOptogeneticsLogsNoPoints()
+        {
+            var row = SharedTrialColumns.Fill(new OptogeneticsRow(), new StubTrial { TrialNumber = 7, LaserPointsMm = "ignored" }, Times(double.NaN), 3, false, false, 0, 0.75);
+            Assert.AreEqual(0, row.laserCondition);
+            Assert.AreEqual("", row.laserPointsMm, "condition 0: empty");
         }
 
         [TestMethod]
@@ -108,6 +118,7 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(0, row.penaltyTimeoutSeconds);
             Assert.AreEqual(0, row.penaltyFlashBrightness, "not penalised: no flash");
             Assert.AreEqual(0, row.laserPowerMw, "answered before its trigger: no laser");
+            Assert.AreEqual("-0.7 1.5;-0.7 -1.5", row.laserPointsMm, "where it was aimed, laser off or not triggered too");
             Assert.IsTrue(double.IsNaN(row.laserTriggerTime));
 
             var core = SharedTrialColumns.Fill(new CoreRow(), Laser(), Times(1), 3, false, true, 6, 0.75);
@@ -147,7 +158,8 @@ namespace OpenRigs.Trials.Tests
             };
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), 0, false, false, 0, 0.75)), "has no itiStartTime, itiSeconds");
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), 0, false, false, 0, 0.75)), "rewardOfferedUl, rewarded, penaltyTimeoutSeconds, penaltyFlashBrightness, penalised");
-            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOptogenetics(), Laser(), Times(1), 0, false, false, 0, 0.75)), "not all of laserCondition, laserPowerMw, laserTriggerTime");
+            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOptogenetics(), Laser(), Times(1), 0, false, false, 0, 0.75)), "not all of laserCondition, laserPointsMm, laserPowerMw, laserTriggerTime");
+            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new OptogeneticsRow(), new StubTrial { TrialNumber = 7, LaserCondition = 2 }, Times(1), 0, false, false, 0, 0.75)), "Trial 7 has laser condition 2 but no laser points");
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new FloatTimes(), Laser(), Times(1), 0, false, false, 0, 0.75)), "itiSeconds is a Single, not a Double");
         }
 

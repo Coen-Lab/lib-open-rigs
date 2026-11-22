@@ -4,8 +4,8 @@ Every task's schemas/trial-columns.yml starts with the shared block, in order, w
 word for word (each task's own tests hold it to them with shared_block_problems), so one analysis reads every task.
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
 (QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, trialEnd (TRIAL_END_COLUMNS: trialEndTime, for a task whose
-response window always runs in full) after outcomeTime, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPowerMw,
-laserTriggerTime) after penalised, then a conditioned task's conditions (CONDITIONS_COLUMNS), stimulus (STIMULUS_COLUMNS)
+response window always runs in full) after outcomeTime, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPointsMm,
+laserPowerMw, laserTriggerTime) after penalised, then a conditioned task's conditions (CONDITIONS_COLUMNS), stimulus (STIMULUS_COLUMNS)
 and autoReward (AUTO_REWARD_COLUMNS) blocks, in that order. trialType and outcome are in the core by name, type and place,
 each described by its task. A task's own columns follow the block.
 
@@ -145,6 +145,11 @@ OPTOGENETICS_COLUMNS: List[Column] = [
      "The Zapit condition sent to Zapit this trial (its conditions file's number, from 1), laser on or off: every trial "
      "of an optogenetics experiment has one, so laser on is laserPowerMw > 0, not laserCondition > 0. 0 without "
      "optogenetics."),
+    ("laserPointsMm", "string", "mm",
+     "Where Zapit aimed the laser this trial: laserCondition's points in the conditions file (Settings_ZapitConditions), "
+     "in mm as written there, each point its AP then its ML separated by a space, points in the file's order separated "
+     "by ; (stimLocations01 with ML [1.5, -1.5] and AP [-0.7, -0.7] is -0.7 1.5;-0.7 -1.5). Filled whenever "
+     "laserCondition is above 0, laser on or off (at 0 mW the galvos still move there); empty without optogenetics."),
     ("laserPowerMw", "double", "mW",
      "Laser power sent to Zapit for this trial (the task's optogenetics.laserPowerMw), as commanded, not measured. 0 on "
      "laser-off trials, without optogenetics, and on a trial answered before its trigger."),

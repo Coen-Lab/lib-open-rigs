@@ -9,15 +9,21 @@ namespace OpenRigs.Devices.Zapit
     /// <summary>What <see cref="ZapitConditions.Check"/> reads from a conditions file that passes.</summary>
     public sealed class ZapitConditionsFile
     {
-        /// <summary>A conditions file's count and max ramp-down, as Check reads them (or a test's stand-in for a file).</summary>
-        public ZapitConditionsFile(int count, double maxRampDownSeconds)
+        /// <summary>A conditions file's points by condition and its max ramp-down, as Check reads them (or a test's stand-in for a file).</summary>
+        public ZapitConditionsFile(IList<string> pointsMm, double maxRampDownSeconds)
         {
-            Count = count;
+            if (pointsMm == null || pointsMm.Count == 0) throw new ArgumentException("A conditions file has at least one condition.", "pointsMm");
+            PointsMm = new List<string>(pointsMm).AsReadOnly();
             MaxRampDownSeconds = maxRampDownSeconds;
         }
 
         /// <summary>Gets the number of conditions, 1 to N.</summary>
-        public int Count { get; private set; }
+        public int Count { get { return PointsMm.Count; } }
+
+        /// <summary>Gets each condition's points, condition 1 first, as the trial log's laserPointsMm: in mm as the file
+        /// writes them, each point its AP then its ML separated by a space, points in the file's order separated by ;
+        /// (ML [1.5, -1.5] and AP [-0.7, -0.7] is "-0.7 1.5;-0.7 -1.5").</summary>
+        public IList<string> PointsMm { get; private set; }
 
         /// <summary>Gets the highest offRampDownDuration_ms of any condition, in seconds: the masking tail every trial's laser
         /// ends with, so a laser held until the outcome holds its trigger line this long past it (LaserTiming.UntilOutcome).</summary>
@@ -40,10 +46,12 @@ namespace OpenRigs.Devices.Zapit
         static readonly Regex ConditionKey = new Regex(@"^stimLocations(\d+)\s*:", RegexOptions.CultureInvariant);
         static readonly Regex TopLevelKey = new Regex(@"^([A-Za-z_]\w*)\s*:", RegexOptions.Multiline | RegexOptions.CultureInvariant);
         static readonly Regex RampDown = new Regex(@"offRampDownDuration_ms\s*:\s*([0-9.eE+-]+)", RegexOptions.CultureInvariant);
+        static readonly Regex Coordinate = new Regex(@"^[ \t]+(ML|AP)[ \t]*:[ \t]*(.*?)[ \t]*\r?$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
         static readonly Regex ModulationFrequency = new Regex(@"stimModulationFreqHz\s*:\s*([0-9.eE+-]+)", RegexOptions.CultureInvariant);
 
         /// <summary>
-        /// The number of conditions in the file and its max ramp-down, after checking they are numbered 1 to N and
+        /// The conditions in the file, each with its points, and its max ramp-down, after checking they are numbered 1 to N,
+        /// each gives its ML and AP as one number or a [list] of numbers, as many of each, and
         /// each ramps down over <see cref="MinimumRampDownSeconds"/> to <see cref="MaximumRampDownSeconds"/> and over
         /// more than one stimulus cycle. Throws, naming the file and every problem, otherwise.
         /// </summary>
@@ -72,14 +80,74 @@ namespace OpenRigs.Devices.Zapit
                         path, string.Join(", ", numbers), numbers.Count));
                 }
             }
-            return new ZapitConditionsFile(numbers.Count, CheckRampDowns(path, text));
+            var maxRampDownSeconds = CheckRampDowns(path, text);
+            return new ZapitConditionsFile(ReadPoints(path, text, numbers.Count), maxRampDownSeconds);
         }
 
-        // MATLAB Zapit ramps down in whole cycles, and a ramp of one cycle or less writes zeros without stopping
-        // the DAQ, so a hardware-triggered rig's next stimulus would start when armed, not at its trigger.
-        static double CheckRampDowns(string path, string text)
+        // Each condition's points (ZapitConditionsFile.PointsMm), condition 1 first; numbers is 1 to count, checked.
+        static List<string> ReadPoints(string path, string text, int count)
         {
-            var maxMs = 0.0;
+            var points = new string[count];
+            var problems = new List<string>();
+            foreach (var pair in Blocks(text))
+            {
+                var key = ConditionKey.Match(pair.Key + ":");
+                if (!key.Success) continue;
+                string[] ml = null, ap = null;
+                var unreadable = false;
+                foreach (Match line in Coordinate.Matches(pair.Value))
+                {
+                    var values = Numbers(line.Groups[2].Value);
+                    if (values == null)
+                    {
+                        problems.Add(string.Format("{0}'s {1} is '{2}', not a number or a [list] of numbers", pair.Key, line.Groups[1].Value, line.Groups[2].Value));
+                        unreadable = true;
+                    }
+                    else if (line.Groups[1].Value == "ML") ml = values;
+                    else ap = values;
+                }
+                if (unreadable) continue;
+                if (ml == null || ap == null)
+                {
+                    problems.Add(pair.Key + " has no " + (ml == null && ap == null ? "ML or AP" : ml == null ? "ML" : "AP"));
+                    continue;
+                }
+                if (ml.Length != ap.Length)
+                {
+                    problems.Add(string.Format("{0} has {1} ML and {2} AP", pair.Key, ml.Length, ap.Length));
+                    continue;
+                }
+                var each = new string[ml.Length];
+                for (var i = 0; i < ml.Length; i++) each[i] = ap[i] + " " + ml[i];
+                points[int.Parse(key.Groups[1].Value, CultureInfo.InvariantCulture) - 1] = string.Join(";", each);
+            }
+            if (problems.Count > 0)
+            {
+                throw new InvalidOperationException(string.Format(
+                    "The Zapit conditions file '{0}': {1}. Each condition gives where the laser goes as ML and AP, each one number or a [list], as many of each.",
+                    path, string.Join("; ", problems)));
+            }
+            return new List<string>(points);
+        }
+
+        // A coordinate's value as written: one number, or a flow list of them; null for anything else.
+        static string[] Numbers(string value)
+        {
+            var list = value.StartsWith("[", StringComparison.Ordinal) && value.EndsWith("]", StringComparison.Ordinal);
+            var items = (list ? value.Substring(1, value.Length - 2) : value).Split(',');
+            if (!list && items.Length != 1) return null;
+            double parsed;
+            for (var i = 0; i < items.Length; i++)
+            {
+                items[i] = items[i].Trim();
+                if (!double.TryParse(items[i], NumberStyles.Float, CultureInfo.InvariantCulture, out parsed)) return null;
+            }
+            return items;
+        }
+
+        // Each top-level key's text, from its key to the next.
+        static Dictionary<string, string> Blocks(string text)
+        {
             var blocks = new Dictionary<string, string>();
             var keys = TopLevelKey.Matches(text);
             for (var i = 0; i < keys.Count; i++)
@@ -87,6 +155,15 @@ namespace OpenRigs.Devices.Zapit
                 var end = i + 1 < keys.Count ? keys[i + 1].Index : text.Length;
                 blocks[keys[i].Groups[1].Value] = text.Substring(keys[i].Index, end - keys[i].Index);
             }
+            return blocks;
+        }
+
+        // MATLAB Zapit ramps down in whole cycles, and a ramp of one cycle or less writes zeros without stopping
+        // the DAQ, so a hardware-triggered rig's next stimulus would start when armed, not at its trigger.
+        static double CheckRampDowns(string path, string text)
+        {
+            var maxMs = 0.0;
+            var blocks = Blocks(text);
 
             string block;
             var frequency = Match.Empty;
