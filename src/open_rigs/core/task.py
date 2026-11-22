@@ -5,7 +5,7 @@ from pydantic import ConfigDict, Field, WithJsonSchema, model_validator
 
 from swc.aeon.schema import BaseSchema
 
-from open_rigs.components.zapit import ZAPIT_REPLY_MARGIN_SECONDS
+from open_rigs.components.zapit import ZAPIT_ARM_SECONDS
 from open_rigs.core.base import Double
 
 # The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, a RewardValve piece's MaxRewardUl).
@@ -210,9 +210,9 @@ class AutoReward(TaskBlock):
 class Optogenetics(TaskBlock):
     """Zapit optogenetic stimulation: what every task's optogenetics block holds. A task adds its own laser timing.
 
-    Every trial of an optogenetics experiment sends Zapit a condition from the conditions file loaded in Zapit, laser-on
-    trials with the laser on and the others with it off, so galvo noise and masking light are the same on every trial.
-    Zapit's host, port and triggering are rig.yml's zapit block. laserOnProbability, laserToStimulusSeconds and
+    Every trial of an optogenetics experiment arms Zapit's DAQ (OpenRigs.Zapit ZapitDaq) with a condition from the session's
+    bank, built from the conditions file, laser-on trials with the laser on and the others with it off, so galvo noise and
+    masking light are the same on every trial. Zapit's wiring and limits are rig.yml's zapit block. laserOnProbability, laserToStimulusSeconds and
     trialsBeforeLaser have no lab default: each task file gives them.
     """
 
@@ -233,27 +233,27 @@ class Optogenetics(TaskBlock):
 
     enabled: bool = Field(
         default=False,
-        description="Whether this is an optogenetics experiment, Zapit running it: every trial sends it a condition from the conditions file (laser off at 0 mW on laser-off trials: the galvos move and the masking light shows), and the launching app checks Zapit is answering before Go",
+        description="Whether this is an optogenetics experiment: every trial arms Zapit's DAQ with a condition from the session's bank (laser off on laser-off trials: the galvos move and the masking light shows), and the launching app runs Zapit's setup (scanner calibration, sample, bank) before Go",
     )
     zapit_conditions_path: str = Field(
         default="",
-        description="Path to the Zapit conditions file loaded in Zapit. Its top-level stimLocations01, stimLocations02, ... entries are the conditions, numbered 1 to N with no gaps. The launching app keeps a copy beside the task file at Go",
+        description="Path to the Zapit conditions file, inside the rig's mirror of the lab's shared zapit-conditions folder (RigConfigs/shared/zapit-conditions). Its top-level stimLocations01, stimLocations02, ... entries are the conditions, numbered 1 to N with no gaps; the session's bank is built from it. The launching app keeps a copy beside the task file at Go",
     )
     laser_power_mw: float | None = Field(
         default=None,
         gt=0,
-        description="Laser power on laser-on trials, in mW, the same for every condition: sent to Zapit with each StartStimulus (overriding the conditions file's power; Zapit's laser calibration turns it into volts) and logged as laserPowerMw (0 on laser-off trials). Required with optogenetics on",
+        description="Laser power asked for on laser-on trials, in mW, the same for every condition (overriding the conditions file's power): the bank holds it in volts from the laser curve, capped at rig.yml's zapit.ceilingMw, and the power delivered is logged as laserPowerMw (0 on laser-off trials). Required with optogenetics on",
     )
     laser_on_probability: float = Field(
         ge=0,
         le=1,
-        description="Probability that a trial after trialsBeforeLaser is a laser-on trial, shared equally by every condition in the conditions file; all other trials are laser-off trials, sent a condition with the laser off",
+        description="Probability that a trial after trialsBeforeLaser is a laser-on trial, shared equally by every condition in the conditions file; all other trials are laser-off trials, armed with a condition and the laser off",
     )
     laser_to_stimulus_seconds: float = Field(
-        description="Signed, in seconds: the trigger (the ZapitTrigger line) comes this long before the stimulus; 0 with it; negative after it. The trial's start is the end of the interval less the lead, max(this, 0), once the quiet waits hold, and the stimulus comes the lead after the trial's start in every experiment, optogenetics on or off, so timing never reveals Zapit; the trigger only with optogenetics. Zapit is armed during the interval and adds no time. Refused above itiMinSeconds - 0.2 s (Zapit's reply margin); each task adds its own limits",
+        description="Signed, in seconds: the trigger (the ZapitTrigger line) comes this long before the stimulus; 0 with it; negative after it. The trial's start is the end of the interval less the lead, max(this, 0), once the quiet waits hold, and the stimulus comes the lead after the trial's start in every experiment, optogenetics on or off, so timing never reveals Zapit; the trigger only with optogenetics. Zapit is armed during the interval and adds no time. Refused above itiMinSeconds - 0.2 s (ZapitDaq's arm time); each task adds its own limits",
     )
     trials_before_laser: int = Field(
-        ge=0, description="Trials at the experiment's start with no laser-on trial among them (each still sends Zapit a condition, at 0 mW); laserOnProbability applies from the next trial"
+        ge=0, description="Trials at the experiment's start with no laser-on trial among them (each still arms Zapit with a condition, laser off); laserOnProbability applies from the next trial"
     )
 
     @model_validator(mode="after")
@@ -265,12 +265,12 @@ class Optogenetics(TaskBlock):
         return self
 
     def check_lead_fits(self, iti_min_seconds: float) -> None:
-        """Refuses a lead that, with Zapit's reply margin, does not fit in the shortest interval (OpenRigs.Devices
+        """Refuses a lead that, with ZapitDaq's arm time, does not fit in the shortest interval (OpenRigs.Trials
         ZapitTrial.LeadProblem, the same rule). Each task's model calls it with its trial_structure.iti_min_seconds."""
         lead = self.laser_to_stimulus_seconds
-        if lead + ZAPIT_REPLY_MARGIN_SECONDS > iti_min_seconds + 1e-9:
+        if lead + ZAPIT_ARM_SECONDS > iti_min_seconds + 1e-9:
             raise ValueError(
-                f"optogenetics.laser_to_stimulus_seconds ({lead} s) plus Zapit's {ZAPIT_REPLY_MARGIN_SECONDS} s reply margin must be at most "
+                f"optogenetics.laser_to_stimulus_seconds ({lead} s) plus Zapit's {ZAPIT_ARM_SECONDS} s arm time must be at most "
                 f"trial_structure.iti_min_seconds ({iti_min_seconds} s), the shortest interval"
             )
 
@@ -278,34 +278,34 @@ class Optogenetics(TaskBlock):
         self, iti_min_seconds: float, *, laser_duration_seconds: float, ramp_down_seconds: float = 0.0, response_delay_seconds: float = 0.0
     ) -> None:
         """Refuses a laser duration (LaserTiming.ForDuration, each trial's own: call it on every combination) that leaves Zapit
-        busy at the next trial's trigger, less its reply margin (OpenRigs.Trials TrialLoop stops there naming the last laser: the
+        busy at the next trial's trigger, less its arm time (OpenRigs.Trials TrialLoop stops there naming the last laser: the
         same rule). Off unless enabled. response_delay_seconds is the soonest an outcome follows the stimulus; the next trigger
         comes at the soonest iti_min_seconds - laser_to_stimulus_seconds after an outcome. A laser until the outcome holds the
-        line for the conditions file's MaxRampDownSeconds (ZapitConditions.Check), read at connect, so the workflow checks it."""
+        line for the bank's longest ramp-down (ZapitBank.LongestRampSeconds), loaded before Go, so the workflow checks it."""
         if not self.enabled:
             return
-        margin = ZAPIT_REPLY_MARGIN_SECONDS
+        margin = ZAPIT_ARM_SECONDS
         longest = response_delay_seconds + iti_min_seconds - ramp_down_seconds - margin
         if laser_duration_seconds > longest + 1e-9:
             raise ValueError(
                 f"optogenetics.laser_duration_seconds ({laser_duration_seconds} s) must be at most {longest:g} s (response_delay_seconds + "
-                f"trial_structure.iti_min_seconds - the {ramp_down_seconds} s ramp-down - Zapit's {margin} s reply margin): the next trial's "
-                "StartStimulus goes once the laser and its ramp-down are done"
+                f"trial_structure.iti_min_seconds - the {ramp_down_seconds} s ramp-down - Zapit's {margin} s arm time): the next trial is "
+                "armed once the laser and its ramp-down are done"
             )
 
     def check_ramp_down_fits(self, iti_min_seconds: float, ramp_down_seconds: float) -> None:
         """Refuses a ramp-down that leaves Zapit busy at the next trigger when the laser runs until the outcome
         (LaserTiming.UntilOutcome): the trigger line is held the ramp-down past the outcome, and the next trigger comes at the
-        soonest iti_min_seconds - laser_to_stimulus_seconds after it, less the reply margin. Off unless enabled.
-        ramp_down_seconds is the conditions file's largest (ramp_down_from a validation's context; 0 without it)."""
+        soonest iti_min_seconds - laser_to_stimulus_seconds after it, less the arm time. Off unless enabled.
+        ramp_down_seconds is the bank's longest (ramp_down_from a validation's context; 0 without it)."""
         if not self.enabled:
             return
-        margin = ZAPIT_REPLY_MARGIN_SECONDS
+        margin = ZAPIT_ARM_SECONDS
         hold_max = iti_min_seconds - self.laser_to_stimulus_seconds - margin
         if ramp_down_seconds > hold_max + 1e-9:
             raise ValueError(
-                f"the Zapit conditions file's largest ramp-down ({ramp_down_seconds:g} s) must be at most {hold_max:g} s "
-                f"(trial_structure.iti_min_seconds - optogenetics.laser_to_stimulus_seconds - Zapit's {margin} s reply margin): "
+                f"the Zapit bank's longest ramp-down ({ramp_down_seconds:g} s) must be at most {hold_max:g} s "
+                f"(trial_structure.iti_min_seconds - optogenetics.laser_to_stimulus_seconds - Zapit's {margin} s arm time): "
                 "the trigger line is held that long past the outcome and the next trial is armed once it falls"
             )
 

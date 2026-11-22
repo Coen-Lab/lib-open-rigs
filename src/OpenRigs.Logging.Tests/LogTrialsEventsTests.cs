@@ -212,22 +212,6 @@ namespace OpenRigs.Logging.Tests
             Assert.IsFalse(e.Detail.Contains("\n") || e.Detail.Contains("\r"));
             Assert.AreEqual("A;B,x  y,1", e.ToString());
         }
-
-        [TestMethod]
-        public void AZapitReply_IsAZapitReplyRow_ItsResultTheValue()
-        {
-            // ZapitLogs' row: everything the reply carries, in one Events row.
-            var reply = new OpenRigs.Devices.Zapit.ZapitReply
-            {
-                Command = OpenRigs.Devices.Zapit.ZapitCommandType.StartStimulus, Value = 3, LaserOn = 1, ServerDatenum = 739000.5
-            };
-            var e = new CreateEvent { Event = "ZapitReply" }.Process(Observable.Return(reply)).Wait();
-            Assert.AreEqual("ZapitReply", e.Event);
-            Assert.AreEqual(3.0, e.Value);
-            Assert.AreEqual("StartStimulus laserOn=1 serverDatenum=739000.5", e.Detail);
-            reply.IsError = true;
-            Assert.AreEqual("StartStimulus laserOn=1 serverDatenum=739000.5 error", reply.Detail);
-        }
     }
 
     /// <summary>

@@ -33,19 +33,19 @@ NAMES_THE_LAB = {
     "fixtures/manifest/v3/refuse/version-2.json": 10,
     "fixtures/manifest/v3/running.json": 9,
     "fixtures/manifest/v3/stopped-not-final.json": 10,
+    "fixtures/rig-yml/B1.yml": 7,  # four rigs' rig.yml as they are, the zapit block converted or removed: real records
+    "fixtures/rig-yml/B2.yml": 5,
+    "fixtures/rig-yml/G1.yml": 10,
+    "fixtures/rig-yml/G2.yml": 8,
     "fixtures/lab-settings/v1/as-on-k.yml": 1,  # the share's lab.yml as it is, copied byte for byte from its other reader
     "fixtures/lab-settings/v1/extra-key.yml": 1,  # the same set's refused extra key, owner: <a lab member>
     "patches/README.md": 1,
     "src/OpenRigs.Control/OpenRigs.Control.csproj": 1,
     "src/OpenRigs.Audio/OpenRigs.Audio.csproj": 1,
     "src/OpenRigs.Core/OpenRigs.Core.csproj": 1,
-    "src/OpenRigs.Devices/OpenRigs.Devices.csproj": 1,
     "src/OpenRigs.HarpDevices/OpenRigs.HarpDevices.csproj": 1,
-    "src/OpenRigs.LiveView/OpenRigs.LiveView.csproj": 1,
-    "src/OpenRigs.Logging/OpenRigs.Logging.csproj": 1,
     "src/OpenRigs.Manifest/OpenRigs.Manifest.csproj": 1,
     "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj": 1,
-    "src/OpenRigs.Trials/OpenRigs.Trials.csproj": 1,
     "src/OpenRigs.Video/OpenRigs.Video.csproj": 1,
     "src/OpenRigs.Vision/OpenRigs.Vision.csproj": 1,  # the lab's package version, as every lab package's
     "src/open_rigs/rigs/workflow_checks.py": 1,  # the lab's ConfigRoot, which every task's check holds it to

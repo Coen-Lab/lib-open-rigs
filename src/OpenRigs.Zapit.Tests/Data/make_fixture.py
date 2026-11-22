@@ -16,9 +16,9 @@ import numpy as np
 
 LIB = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(LIB / "tests"))
-from test_bank import rig  # noqa: E402  the contract's rig, as lib_zapit's own test builds it
+from test_bank import rig  # noqa: E402  # pyright: ignore[reportMissingImports]  the contract's rig, as lib_zapit's own test builds it
 
-from lib_zapit import bank  # noqa: E402
+from lib_zapit import bank  # noqa: E402  # pyright: ignore[reportMissingImports]
 
 HERE = Path(__file__).parent
 DATA = LIB / "tests" / "data"

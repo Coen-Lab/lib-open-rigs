@@ -16,6 +16,7 @@
     <PackageReference Include="Bonsai.Core" />
     <PackageReference Include="Bonsai.DAQmx" GeneratePathProperty="true" />
     <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="OpenCV.Net" />
     <Reference Include="NationalInstruments.DAQmx">
       <HintPath>$(PkgBonsai_DAQmx)\build\net462\bin\x64\NationalInstruments.DAQmx.dll</HintPath>
       <Private>false</Private>

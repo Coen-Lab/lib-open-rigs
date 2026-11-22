@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -54,6 +55,10 @@ namespace OpenRigs.Zapit
 
         /// <summary>The conditions, condition 1 first.</summary>
         public IReadOnlyList<ZapitBankCondition> Conditions { get; }
+
+        /// <summary>The longest laser ramp-down of any laser-on variant, in seconds: its tail cycles at the bank's sample rate
+        /// (open_rigs.components.zapit max_ramp_down_seconds, the same rule).</summary>
+        public double LongestRampSeconds => Conditions.SelectMany(c => c.Variants.Where(v => v.LaserOn).Select(v => v.TailCycles * c.ScanCycle.Length / SampleRate)).DefaultIfEmpty(0).Max();
 
         /// <summary>Reads and checks the bank whose index is at <paramref name="jsonPath"/>.</summary>
         public static ZapitBank Load(string jsonPath)
@@ -207,6 +212,8 @@ namespace OpenRigs.Zapit
         {
             Condition = (int)c["condition"]!;
             PointsMm = c["points_mm"]!.Select(p => p.Select(v => (double)v).ToArray()).ToArray();
+            StereotaxicMm = c["stereotaxic_mm"]!.Select(p => p.Select(v => (double)v).ToArray()).ToArray();
+            LaserPointsMm = string.Join(";", StereotaxicMm.Select(p => p[1].ToString(CultureInfo.InvariantCulture) + " " + p[0].ToString(CultureInfo.InvariantCulture)));
             PointCount = (int)c["n_points"]!;
             ScanCycle = new ZapitBankBlock(c["scan_cycle"]!);
             ScanEnd = new ZapitBankBlock(c["scan_end"]!);
@@ -218,6 +225,12 @@ namespace OpenRigs.Zapit
 
         /// <summary>The condition's points on the sample, in mm, one pair per point in lib_zapit's order.</summary>
         public double[][] PointsMm { get; }
+
+        /// <summary>The condition's points in the conditions file, in mm from bregma, one [ML, AP] pair per point.</summary>
+        public double[][] StereotaxicMm { get; }
+
+        /// <summary>The condition's points as the trial log's laserPointsMm: "AP ML" per point, joined by ";".</summary>
+        public string LaserPointsMm { get; }
 
         /// <summary>The number of points the beam visits.</summary>
         public int PointCount { get; }

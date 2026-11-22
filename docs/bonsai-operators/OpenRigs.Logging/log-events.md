@@ -1,6 +1,6 @@
 # Log Events
 
-`LogEvents` writes `WorkflowData\WorkflowData_Events_<start>.csv`, one file for the experiment (`LogWorkflowData`, start the experiment folder's): one row per event that does not belong to a trial, such as a manual reward, a flush, a spout move, a button pressed in a GUI or a reply from Zapit (`ZapitReply`, from `ZapitLogs`). It is the one file for all of them, instead of a file per kind of event. Its columns are:
+`LogEvents` writes `WorkflowData\WorkflowData_Events_<start>.csv`, one file for the experiment (`LogWorkflowData`, start the experiment folder's): one row per event that does not belong to a trial, such as a manual reward, a flush, a spout move, a button pressed in a GUI or a ZapitDaq event (`Zapit`, from `TaskLogs`). It is the one file for all of them, instead of a file per kind of event. Its columns are:
 
 | Column | Holds |
 |---|---|

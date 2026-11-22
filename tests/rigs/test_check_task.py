@@ -51,13 +51,17 @@ def test_no_model_says_why(monkeypatch, capsys):
     assert "open_rigs.task entry points" in json.loads(capsys.readouterr().out)["error"]
 
 
-def test_the_zapit_file_s_largest_ramp_down_is_the_context_where_the_file_is(tmp_path):
-    # ZapitTests.cs's CheckReturnsTheCountAndTheMaxRampDown file: 0.4 s.
-    path = tmp_path / "conditions.yml"
-    path.write_text("stimLocations01:\n  offRampDownDuration_ms: 250\nstimLocations02:\n  offRampDownDuration_ms: 400\n", encoding="utf-8")
-    on = {"optogenetics": {"enabled": True, "zapitConditionsPath": str(path)}}
-    assert check_task.context(on) == {"zapit_ramp_down_seconds": 0.4}
-    assert check_task.context({"optogenetics": {**on["optogenetics"], "enabled": False}}) == {}
-    assert check_task.context({"optogenetics": {"enabled": True, "zapitConditionsPath": str(tmp_path / "gone.yml")}}) == {}
-    path.write_text("stimLocations01:\n  laserPowerInMW: 2\n", encoding="utf-8")  # the workflow refuses it at Go
+def test_the_bank_s_longest_ramp_down_is_the_context(tmp_path):
+    # Two conditions of 4000-row cycles at 100 kS/s; the longest laser-on tail is 10 cycles: 0.4 s.
+    bank = tmp_path / "Settings_ZapitBank_x.json"
+    variant = {"laser_on": True, "tail_cycles": 5}
+    conditions = [{"scan_cycle": {"offset": 0, "length": 4000}, "variants": [variant, {"laser_on": False, "tail_cycles": 50}]},
+                  {"scan_cycle": {"offset": 0, "length": 4000}, "variants": [{**variant, "tail_cycles": 10}]}]
+    bank.write_text(json.dumps({"version": 2, "sample_rate": 100000, "conditions": conditions}), encoding="utf-8")
+    on = {"optogenetics": {"enabled": True, "zapitConditionsPath": "x.yml"}}
+    assert check_task.context(on, str(bank)) == {"zapit_ramp_down_seconds": 0.4}
     assert check_task.context(on) == {}
+    assert check_task.context({"optogenetics": {**on["optogenetics"], "enabled": False}}, str(bank)) == {}
+    assert check_task.context(on, str(tmp_path / "gone.json")) == {}
+    bank.write_text(json.dumps({"version": 1}), encoding="utf-8")  # the workflow refuses it at Go
+    assert check_task.context(on, str(bank)) == {}

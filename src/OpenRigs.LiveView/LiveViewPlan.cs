@@ -183,14 +183,21 @@ namespace OpenRigs.LiveView
         /// </summary>
         public const string BalanceInstance = "Balance";
 
+        /// <summary>
+        /// The instance name of the Zapit camera, which OpenRigs.Devices' ZapitCamera opens from rig.yml's zapit block, not
+        /// its camera list: published as Camera-Zapit.Data, it is streamed as the Balance camera is.
+        /// </summary>
+        public const string ZapitInstance = "Zapit";
+
         public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType)
         {
             var plan = new LiveViewPlan();
             foreach (var recipe in DeviceRecipe.All.Where(r => !r.Harp))
+            foreach (var instance in new[] { BalanceInstance, ZapitInstance })
             {
-                var name = char.ToUpperInvariant(recipe.Kind[0]) + recipe.Kind.Substring(1) + "-" + BalanceInstance;
+                var name = char.ToUpperInvariant(recipe.Kind[0]) + recipe.Kind.Substring(1) + "-" + instance;
                 if (publishedType(name + ".Data") == null) continue;  // none: nothing to say
-                plan.Consider(new RigDevice { Kind = recipe.Kind, Instance = BalanceInstance, Name = name, Settings = new YamlMappingNode() },
+                plan.Consider(new RigDevice { Kind = recipe.Kind, Instance = instance, Name = name, Settings = new YamlMappingNode() },
                     publishedType);
             }
             // The machine name, not rig.yml's two-letter rigId, on purpose: the live-view windows

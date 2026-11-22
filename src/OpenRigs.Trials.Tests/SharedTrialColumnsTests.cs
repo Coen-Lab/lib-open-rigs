@@ -71,7 +71,7 @@ namespace OpenRigs.Trials.Tests
 
         static TrialTimes Times(double trigger)
         {
-            return new TrialTimes { ItiStartTime = 10, ItiSeconds = 2.5, QuietWaitSeconds = 0.25, TrialStartTime = 12.25, StimulusOnsetTime = 12.751, StimulusOffTime = 13.751, LaserTriggerTime = trigger, Now = 13.5 };
+            return new TrialTimes { ItiStartTime = 10, ItiSeconds = 2.5, QuietWaitSeconds = 0.25, TrialStartTime = 12.25, StimulusOnsetTime = 12.751, StimulusOffTime = 13.751, LaserTriggerTime = trigger, LaserPowerMw = double.IsNaN(trigger) ? 0 : 4.5, Now = 13.5 };
         }
 
         static StubTrial Laser() { return new StubTrial { TrialNumber = 7, LaserCondition = 3, LaserPointsMm = "-0.7 1.5;-0.7 -1.5", LaserOn = true, LaserPowerMw = 4.5 }; }

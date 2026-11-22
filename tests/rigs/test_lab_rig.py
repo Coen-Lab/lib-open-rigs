@@ -7,6 +7,10 @@ from open_rigs.rigs.lab_rig import LabRig
 
 HARP = {"portName": "COM1", "usbSerial": "X"}
 STAGE = {"baseTransverse": 0, "radialLeft": 0, "radialRight": 0, "elevationLeft": 0, "elevationRight": 0}
+ZAPIT = {"device": "Dev1", "galvoXChannel": "ao0", "galvoYChannel": "ao1", "laserChannel": "ao2", "ledChannel": "ao3",
+         "photodiodeChannel": "ai0", "triggerChannel": "PFI0", "sampleRate": 100000, "laserMinMaxMw": [0, 50],
+         "laserMinMaxControlVolts": [0, 5], "ceilingMw": 30, "maxTrialSeconds": 3, "earlyStopLeadSeconds": 0.02,
+         "micronsPerPixel": 19.3, "voltsPerPixel": 0.001, "safetyGate": {"layer": "software"}, "camera": {"serialNumber": "1"}}
 CAMERA_LINE = {"DO0": {"device": "CameraTrigger", "targets": ["Camera-Face", "Camera-Pupil", "Camera-Body"]}}
 
 RIG = {
@@ -36,7 +40,7 @@ RIG = {
         "penaltySoundChannel": 2,
     },
     "lickSpoutDefaultPosition": STAGE,
-    "zapit": {},
+    "zapit": ZAPIT,
 }
 
 

@@ -25,8 +25,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Logging\OpenRigs.Logging.csproj" />
-    <!-- TaskLogs includes Zapit's logs (OpenRigs.Devices ZapitLogs) -->
-    <ProjectReference Include="..\OpenRigs.Devices\OpenRigs.Devices.csproj" />
+    <!-- TaskLogs logs ZapitDaq's events (OpenRigs.Zapit) -->
+    <ProjectReference Include="..\OpenRigs.Zapit\OpenRigs.Zapit.csproj" />
     <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
   </ItemGroup>
 

@@ -145,6 +145,10 @@ namespace OpenRigs.LiveView.Tests
                 Check("a published Camera-Balance.Data is streamed by the camera recipe, with no rig.yml",
                     extra != null && extra.Name == "Camera-Balance" && extra.Rate == 5 && extra.ImagePath == "it", extra == null ? string.Join(" | ", also.Skipped) : extra.ToString());
                 Check("a balance device not published is not mentioned", !none.Skipped.Any(s => s.Contains("Balance")), string.Join(" | ", none.Skipped));
+                var zapit = LiveViewPlan.Create(Path.Combine(root, "nowhere"),
+                    name => name == "Camera-Zapit.Data" ? typeof(OpenCV.Net.IplImage) : null).Streamed.SingleOrDefault();
+                Check("a published Camera-Zapit.Data (rig.yml's zapit camera) is streamed by the camera recipe",
+                    zapit != null && zapit.Name == "Camera-Zapit", zapit == null ? "none" : zapit.ToString());
                 var withRig = Plan(root, "camera:\n  overhead:\n    serialNumber: '1'\n",
                     name => name == "Camera-Balance.Data" || name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 var both = string.Join(", ", withRig.Streamed.Select(d => d.Stream));

@@ -1,4 +1,3 @@
-using OpenRigs.Devices.Zapit;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -32,7 +31,7 @@ namespace OpenRigs.Trials
         /// delivers it (the same value the task's valve command is made from); penaltyTimeoutSeconds the trial's resolved
         /// timeout (<see cref="Penalties.For"/>: its kind's, penalty.incorrect or penalty.noResponse) when penalised, else 0; penaltyFlashBrightness its kind's
         /// flash.brightness (ResolvedPenalty.Flash) when penalised, else 0 (0: no flash played); penalised itself; with the trialEnd block, trialEndTime (TrialTimes.TrialEndTime), which a trial whose response window always runs in full must have; with the optogenetics block, the trial's laser condition, its points (IZapitTrial.LaserPointsMm,
-        /// required when the condition is above 0; empty at condition 0), its power only if the
+        /// required when the condition is above 0; empty at condition 0), the power ZapitDaq armed it with (TrialTimes.LaserPowerMw, the bank's capped power) only if the
         /// laser was triggered (else 0 mW) and the trigger's time (NaN if none), or 0, empty, 0 and NaN for a trial that is not an
         /// IZapitTrial. Throws naming a missing or mistyped column. Returns the row.
         /// </summary>
@@ -70,9 +69,9 @@ namespace OpenRigs.Trials
                 var laser = trial as IZapitTrial;
                 values["laserCondition"] = laser != null ? laser.LaserCondition : 0;
                 var points = laser != null && laser.LaserCondition > 0 ? laser.LaserPointsMm : "";
-                if (string.IsNullOrEmpty(points) && laser != null && laser.LaserCondition > 0) throw new InvalidOperationException(string.Format("Trial {0} has laser condition {1} but no laser points: its draw sets LaserPointsMm from the conditions file (ZapitTrial.Draw).", trial.TrialNumber, laser.LaserCondition));
+                if (string.IsNullOrEmpty(points) && laser != null && laser.LaserCondition > 0) throw new InvalidOperationException(string.Format("Trial {0} has laser condition {1} but no laser points: its draw sets LaserPointsMm from the bank (ZapitTrial.Draw).", trial.TrialNumber, laser.LaserCondition));
                 values["laserPointsMm"] = points;
-                values["laserPowerMw"] = laser != null && times.LaserFired ? laser.LaserPowerMw : 0.0;   // answered before its trigger: no laser
+                values["laserPowerMw"] = laser != null && times.LaserFired ? times.LaserPowerMw : 0.0;   // ZapitDaq's capped power; answered before its trigger: no laser
                 values["laserTriggerTime"] = times.LaserTriggerTime;
             }
             foreach (var value in values)

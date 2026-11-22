@@ -82,8 +82,8 @@ def test_a_per_trial_multicast_into_a_publish_subject_is_found_and_a_block_s_beh
     per_trial = ('<Expression xsi:type="rx:SelectMany"><Workflow><Nodes>'
                  '<Expression xsi:type="MulticastSubject"><Name>{}</Name></Expression></Nodes><Edges /></Workflow></Expression>')
     wf = workflow(tmp_path, '<Expression xsi:type="rx:PublishSubject"><rx:Name>Trial</rx:Name></Expression>'
-                  f'<Expression xsi:type="IncludeWorkflow" Path="{lint.ZAPIT_INCLUDE}" />'
-                  + per_trial.format("Trial") + per_trial.format("ZapitCommands"))
+                  f'<Expression xsi:type="IncludeWorkflow" Path="{lint.ZAPIT_FOR_TASK}" />'
+                  + per_trial.format("Trial") + per_trial.format("Zapit.Commands"))
     assert lint.subjects_closed_by_a_nested_multicast(wf) == ["Trial"]
 
 
@@ -487,10 +487,10 @@ def manifest_node(expected: str) -> str:
 LOGS = (include("OpenRigs.Logging:LogTrials.bonsai") + include("OpenRigs.Logging:LogEvents.bonsai")
         + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Rig</Name>")
         + include("OpenRigs.Logging:LogWorkflowData.bonsai", "<LogName>WorkflowData_StimulusState</LogName>")
-        + include("OpenRigs.Devices:ZapitLogs.bonsai") + include("OpenRigs.Devices:BehaviorBoard.bonsai")
+        + include(lint.ZAPIT_FOR_TASK) + include("OpenRigs.Devices:BehaviorBoard.bonsai")
         + '<Expression xsi:type="hd:RecordHarpDevices" xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices" />')
 EXPECTED = ("auto;harp;Settings/Settings_Rig_;WorkflowData/WorkflowData_Trials_;WorkflowData/WorkflowData_Events_;WorkflowData/WorkflowData_StimulusState_;"
-            "Settings/Settings_ZapitConditions_?Optogenetics")
+            "Camera-Zapit/?Optogenetics;ZapitScanner/?Optogenetics;Settings/Settings_ZapitBank_?Optogenetics;Settings/Settings_ZapitSample_?Optogenetics;Settings/Settings_ZapitScannerFit_?Optogenetics;Settings/Settings_ZapitAccuracy_?Optogenetics;Settings/Settings_ZapitConditions_?Optogenetics")
 
 
 def test_every_file_a_workflow_writes_is_named_in_expected_files_with_its_condition(tmp_path):
@@ -506,9 +506,9 @@ def test_a_folder_entry_in_place_of_each_log_is_refused(tmp_path):
 
 
 def test_a_log_written_under_a_condition_must_be_named_with_it(tmp_path):
-    unconditional = EXPECTED.replace("Settings/Settings_ZapitConditions_?Optogenetics", "Settings/Settings_ZapitConditions_")
+    unconditional = EXPECTED.replace("Settings/Settings_ZapitBank_?Optogenetics", "Settings/Settings_ZapitBank_")
     assert lint.expected_files_problems(workflow(tmp_path, LOGS + manifest_node(unconditional))) == [
-        "ExpectedFiles names Settings/Settings_ZapitConditions_; its block writes it as Settings/Settings_ZapitConditions_?Optogenetics"]
+        "ExpectedFiles names Settings/Settings_ZapitBank_; its block writes it as Settings/Settings_ZapitBank_?Optogenetics"]
 
 
 def test_an_entry_no_node_writes_and_missing_auto_or_harp_are_refused(tmp_path):
@@ -544,7 +544,7 @@ def block_text(path: str) -> str:
 def test_the_fixed_logs_are_the_names_their_blocks_write():
     for path, logs in lint.FIXED_LOGS.items():
         text = block_text(path)
-        for inner in (lint.TASK_LOGS, "OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai"):
+        for inner in (lint.TASK_LOGS, "OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai"):
             if f'Path="{inner}"' in text:  # a block that includes another writes its logs too
                 text += block_text(inner)
         assert all(f">{name}<" in text for name, _ in logs), path
@@ -572,13 +572,13 @@ def test_the_task_logs_are_the_lab_s_include_given_the_task_file_as_json(tmp_pat
     assert lint.task_logs_problems(workflow(tmp_path, group + serialize + include(lint.TASK_LOGS) + edge)) == []
     # A task's own logs, refused.
     own = (include("OpenRigs.Logging:LogTrials.bonsai") + include("OpenRigs.Logging:LogDataSchema.bonsai", "<Name>Settings_Task</Name>")
-           + include("OpenRigs.Devices:ZapitLogs.bonsai"))
+           )
     assert lint.task_logs_problems(workflow(tmp_path / "b", own)) == [
         "the workflow includes TaskLogs 0 times, not once", "the workflow includes LogTrials itself (TaskLogs does)",
-        "the workflow includes ZapitLogs itself (TaskLogs does)", "the workflow logs Settings_Task itself (TaskLogs does)"]
+        "the workflow logs Settings_Task itself (TaskLogs does)"]
     assert lint.task_logs_problems(workflow(tmp_path / "c", include(lint.TASK_LOGS))) == [
         "TaskLogs is not given the task file as JSON (the task's SerializeToJson)"]
-    expected = "Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;Settings/Settings_ZapitConditions_?Optogenetics"
+    expected = "Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_"
     assert lint.expected_files_problems(workflow(tmp_path / "d", include(lint.TASK_LOGS) + manifest_node(expected))) == []
 
 
@@ -594,7 +594,7 @@ def test_conditioned_task_logs_count_as_task_logs_and_write_settings_combination
         "the workflow logs Settings_Combinations itself (ConditionedTaskLogs does)",
         "ConditionedTaskLogs is not given the task file as JSON (the task's SerializeToJson)",
         "TaskLogs is not given the task file as JSON (the task's SerializeToJson)"]
-    expected = "Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;Settings/Settings_ZapitConditions_?Optogenetics"
+    expected = "Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_"
     assert lint.expected_files_problems(workflow(tmp_path / "c", include(lint.CONDITIONED_TASK_LOGS) + manifest_node(expected))) == [
         "Settings/Settings_Combinations_ is written but not in ExpectedFiles"]
     expected += ";Settings/Settings_Combinations_"
@@ -610,11 +610,11 @@ def test_no_include_ends_its_logs_when_a_one_shot_write_completes():
             assert lint.output_ends_logs_problems(lint.ET.fromstring(path.read_bytes())) == [], path
     # A WorkflowOutput fed by Settings_Task, which completes at Go.
     old = block_text(lint.TASK_LOGS).replace('<Edge From="0" To="1" Label="Source1" />',
-                                            '<Edge From="0" To="1" Label="Source1" /><Edge From="1" To="5" Label="Source1" />')
+                                            '<Edge From="0" To="1" Label="Source1" /><Edge From="1" To="9" Label="Source1" />')
     old = old.replace('\n    </Nodes>', '\n      <Expression xsi:type="WorkflowOutput" />\n    </Nodes>')
     assert lint.output_ends_logs_problems(lint.ET.fromstring(old.encode("utf-8"))) == [
         f"{name} logs beside a WorkflowOutput fed by a one-shot LogDataSchema, which ends it when the write completes"
-        for name in ("TrialLogs", "IncludeWorkflow")]
+        for name in ("TrialLogs",)]
 
 
 def test_the_penalty_sound_is_the_lab_s_include(tmp_path):
@@ -692,10 +692,18 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     assert {name for _, kind, name in lint.control_declarations(wf) if kind == "command"} == {"RewardValve-Left.Reward", "RewardValve-Right.Reward"}
     copy = workflow(tmp_path / "b", include(lint.REWARDS) + VALVES + include(lint.EXPERIMENT_CONTROL, "<Commands><Command><Name>RewardValve-Left.Reward</Name></Command></Commands>"))
     assert lint.declared_twice(copy) == ["the command RewardValve-Left.Reward is declared by ExperimentControl and by RewardValve-Left"]
-    # ConnectZapit declares both of Zapit's subjects: a task's copy of either is refused.
-    replies = '<Expression xsi:type="rx:PublishSubject"><rx:Name>ZapitReplies</rx:Name></Expression>'
-    assert lint.zapit_include_problems(workflow(tmp_path / "c", include(lint.ZAPIT_FOR_TASK) + replies)) == [
-        "the workflow declares ZapitReplies, which ConnectZapit declares"]
+    # ConnectForTask declares Zapit's subjects: a task's copy of one is refused, and so is every legacy Zapit block and node.
+    events = '<Expression xsi:type="rx:PublishSubject"><rx:Name>Zapit.Events</rx:Name></Expression>'
+    legacy = (include("OpenRigs.Devices:ConnectZapit.bonsai") + include("OpenRigs.Devices:ZapitLogs.bonsai") + include(lint.ZAPIT_SETUP)
+              + '<Expression xsi:type="Combinator"><Combinator xsi:type="zap:ZapitClient" xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices" /></Expression>'
+              + '<Expression xsi:type="Combinator"><Combinator xsi:type="z:ZapitDaq" xmlns:z="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit" /></Expression>')
+    assert lint.zapit_include_problems(workflow(tmp_path / "c", include(lint.ZAPIT_FOR_TASK) + events + legacy)) == [
+        "the workflow includes ConnectZapit, a legacy Zapit block: ConnectForTask and TaskLogs replace it",
+        "the workflow includes ZapitLogs, a legacy Zapit block: ConnectForTask and TaskLogs replace it",
+        "the workflow includes ZapitSetup itself (ConnectForTask does)",
+        "the workflow builds zap:ZapitClient, a legacy Zapit node: ConnectForTask and ZapitTrials replace it",
+        "the workflow builds ozap:ZapitDaq itself (ConnectForTask does)",
+        "the workflow declares Zapit.Events, which ConnectForTask declares"]
 
 
 def test_the_shared_experiment_logs_are_the_lab_s_two_includes(tmp_path):

@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:zap="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTask's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the piece Zapit's commands (DeclareDeviceControls): Zapit.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json) loads it into ZapitDaq, which publishes it on Zapit.Bank; Zapit.LaserOff zeroes every line at once, before or after Go. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;"; a refused request leaves the workflow running. A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, Zapit.Commands, Zapit.Events, Zapit.Bank and Camera-Zapit.Data from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>Zapit</orcl:Name>
+          <orcl:Command>Setup</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeUntil" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>Zapit</orcl:Name>
+          <orcl:Command>Still</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeUntil" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Zapit.Events</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Camera-Zapit.Data</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Value.Image</Selector>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigFile</Name>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Name>PendingFolder</scr:Name>
+        <scr:Expression>it.Substring(0, it.LastIndexOf(Convert.ToChar(92)) + 1) + "pending"</scr:Expression>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="PendingFolder" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zap:ZapitSetupCapture">
+          <zap:PendingFolder>UNMAPPED</zap:PendingFolder>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>HasCommand?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>Command != null</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Command</Selector>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>Zapit.Setup</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>Zapit</orcl:Name>
+          <orcl:Command>LoadBank</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeUntil" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zap:CreateZapitDaqCommand">
+          <zap:Kind>LoadBank</zap:Kind>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>Zapit</orcl:Name>
+          <orcl:Command>LaserOff</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zap:CreateZapitDaqCommand">
+          <zap:Kind>Zero</zap:Kind>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Zapit.Events</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>BankLoaded?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>Kind == "BankLoaded"</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Bank</Selector>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Bank</Name>
+      </Expression>
+      <Expression xsi:type="scr:ExpressionTransform">
+        <scr:Expression>"BankLoaded " + JsonPath</scr:Expression>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>Zapit.Setup</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:DeclareDeviceControls">
+          <orcl:Name>Zapit</orcl:Name>
+          <orcl:Parameters />
+          <orcl:Commands>
+            <orcl:Command>
+              <orcl:Name>Setup</orcl:Name>
+              <orcl:Description>Run the scanner grid in the pending folder named (its grid.json): a frame per point, then laser-off backgrounds. Before Go only.</orcl:Description>
+            </orcl:Command>
+            <orcl:Command>
+              <orcl:Name>Still</orcl:Name>
+              <orcl:Description>Save the next Zapit camera frame, laser off, as the pending .png named. Before Go only.</orcl:Description>
+            </orcl:Command>
+            <orcl:Command>
+              <orcl:Name>LoadBank</orcl:Name>
+              <orcl:Description>Load the session's bank (Settings_ZapitBank_&lt;DateTime&gt;.json) into ZapitDaq. Before Go only.</orcl:Description>
+            </orcl:Command>
+            <orcl:Command>
+              <orcl:Name>LaserOff</orcl:Name>
+              <orcl:Description>Stop any Zapit output at once: galvos, laser and LED at 0 V.</orcl:Description>
+            </orcl:Command>
+          </orcl:Commands>
+        </Combinator>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="3" Label="Source1" />
+      <Edge From="2" To="3" Label="Source2" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="7" Label="Source1" />
+      <Edge From="6" To="7" Label="Source2" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="3" To="14" Label="Source1" />
+      <Edge From="7" To="14" Label="Source2" />
+      <Edge From="8" To="14" Label="Source3" />
+      <Edge From="10" To="14" Label="Source4" />
+      <Edge From="13" To="14" Label="Source5" />
+      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="16" To="17" Label="Source1" />
+      <Edge From="14" To="18" Label="Source1" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="20" To="22" Label="Source1" />
+      <Edge From="21" To="22" Label="Source2" />
+      <Edge From="22" To="23" Label="Source1" />
+      <Edge From="23" To="24" Label="Source1" />
+      <Edge From="25" To="26" Label="Source1" />
+      <Edge From="26" To="27" Label="Source1" />
+      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="29" To="30" Label="Source1" />
+      <Edge From="30" To="31" Label="Source1" />
+      <Edge From="31" To="32" Label="Source1" />
+      <Edge From="32" To="33" Label="Source1" />
+      <Edge From="33" To="34" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

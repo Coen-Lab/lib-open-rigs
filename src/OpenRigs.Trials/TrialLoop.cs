@@ -1,6 +1,6 @@
 using Bonsai;
 using OpenRigs.Core;
-using OpenRigs.Devices.Zapit;
+using OpenRigs.Zapit;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -11,11 +11,11 @@ namespace OpenRigs.Trials
 {
     /// <summary>
     /// A task's trials on the Harp clock, the same for every task: each trial drawn at its interval's start (the last
-    /// outcome plus its timeout; trial 1 the first tick), a hardware-triggered Zapit armed during the interval once the
+    /// outcome plus its timeout; trial 1 the first tick), ZapitDaq armed during the interval once the
     /// last laser is done, the trial start at the interval's end less the lead (TrialLoop.Lead: max(laserToStimulusSeconds,
     /// the earliest Stimulus cue's lead, 0)) or later
     /// until the quiet waits hold (QuietWait), the trigger laserToStimulusSeconds before the stimulus (the workflow stops
-    /// if Zapit has not armed the trial by then, naming the last laser when it held Zapit too long, and a trial answered
+    /// if ZapitDaq has not armed the trial by then, naming the last laser when it held Zapit too long, and a trial answered
     /// first gets no laser), the stimulus the lead after the start, the response window, the outcome and its timeout
     /// (from the window's end when the window always runs in full, TrialTiming.ResponseWindowAlwaysFull; cues still to come that are DroppedAtOutcome never come), and with a timed stimulus (TrialTiming.StimulusDurationSeconds)
     /// its StimulusOff, once, at StimulusTiming.Time (rules that are an IStimulusAfterOutcome update it after the outcome until then). What is the task's own (the draw, the stimulus, the
@@ -52,8 +52,9 @@ namespace OpenRigs.Trials
         double itiStart, nextItiStart, start, quietWait, stimulusTime, triggerDue, onset, responseStart, responseEnd, triggerTime, capAt, armAt, armSentAt;
         double laserFreeAt = double.NegativeInfinity;   // the soonest the next trial may be armed
         bool armSent, triggered, stimulated, capped;
-        TTrial awaitingReply;   // the trial whose StartStimulus Zapit has not yet answered
-        TTrial armed;           // the last trial Zapit armed
+        TTrial awaitingReply;   // the trial whose Arm ZapitDaq has not yet answered
+        TTrial armed;           // the last trial ZapitDaq armed
+        double armedPowerMw;    // the power it armed that trial with (its Armed event's CappedPowerMw)
         readonly IStimulusAfterOutcome<TTrial, TUpdate> after;   // the rules' stimulus after the outcome, if they have one
         TTrial onTrial;         // the trial whose timed stimulus is on (StimulusDurationSeconds), until its StimulusOff
         TrialTimes onTimes;     // its times from its outcome
@@ -99,7 +100,7 @@ namespace OpenRigs.Trials
             }
             if (onTrial != null && now >= offDue - TrialLoop.Tolerance) Off(events);
             else if (onTrial != null && afterOutcome) AfterOutcome(events);
-            if (trial != null && timing.Laser && laser.HardwareTriggered && !armSent && (phase == Phase.Iti || phase == Phase.Running)
+            if (trial != null && timing.Laser && !armSent && (phase == Phase.Iti || phase == Phase.Running)
                 && now >= armAt - TrialLoop.Tolerance)
             {
                 if (awaitingReply != null) throw NeverAnswered(awaitingReply);
@@ -145,15 +146,16 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>
-        /// A reply from Zapit: one to StartStimulus while a trial's is unanswered must arm that trial as it asked
-        /// (ZapitTrial.CheckArmed); any other reply is not the loop's.
+        /// An event from ZapitDaq: an Armed while a trial's Arm is unanswered must arm that trial as it asked
+        /// (ZapitTrial.CheckArmed); any other event is not the loop's.
         /// </summary>
-        public void OnZapitReply(ZapitReply reply)
+        public void OnZapitEvent(ZapitDaqEvent zapit)
         {
-            if (reply == null || reply.Command != ZapitCommandType.StartStimulus || awaitingReply == null) return;
+            if (zapit == null || zapit.Kind != ZapitDaqEventKind.Armed || awaitingReply == null) return;
             var asked = (IZapitTrial)awaitingReply;   // Check: every laser trial is one
-            ZapitTrial.CheckArmed(reply, asked.TrialNumber, asked.LaserCondition, asked.LaserOn);
+            ZapitTrial.CheckArmed(zapit, asked.TrialNumber, asked.LaserCondition, asked.LaserOn);
             armed = awaitingReply;
+            armedPowerMw = zapit.LaserOn ? zapit.CappedPowerMw : 0;
             awaitingReply = null;
         }
 
@@ -268,18 +270,9 @@ namespace OpenRigs.Trials
 
         void Trigger(List<TrialEvent<TTrial, TUpdate, TOutcome>> events)
         {
-            if (laser.HardwareTriggered)
-            {
-                if (!armSent) throw ZapitBusy(trial.TrialNumber, now, laserFreeAt);
-                if (armed != trial && now - armSentAt < ZapitTrial.ReplyMarginSeconds - TrialLoop.Tolerance) throw ArmedLate(trial.TrialNumber, now, armSentAt);
-                if (armed != trial) throw ZapitTrial.NotArmedByTrigger(trial.TrialNumber, now);
-            }
-            else
-            {
-                if (now < laserFreeAt - TrialLoop.Tolerance) throw ZapitBusy(trial.TrialNumber, now, laserFreeAt);
-                if (awaitingReply != null) throw NeverAnswered(awaitingReply);
-                awaitingReply = trial;
-            }
+            if (!armSent) throw ZapitBusy(trial.TrialNumber, now, laserFreeAt);
+            if (armed != trial && now - armSentAt < ZapitTrial.ArmSeconds - TrialLoop.Tolerance) throw ArmedLate(trial.TrialNumber, now, armSentAt);
+            if (armed != trial) throw ZapitTrial.NotArmedByTrigger(trial.TrialNumber, now);
             triggered = true;
             triggerTime = now;
             events.Add(Event(TrialEventKind.Trigger, now, trial, null));
@@ -380,6 +373,7 @@ namespace OpenRigs.Trials
                 ResponseStartTime = responseStart,
                 ResponseEndTime = responseEnd,
                 LaserTriggerTime = triggerTime,
+                LaserPowerMw = triggered && armed == trial ? armedPowerMw : 0,
                 StimulusOffTime = StimulusTiming.Time(onset, timing.StimulusDurationSeconds, now, timing.ResponseToStimulusOffSeconds),
                 Now = now,
                 ResponseWindowAlwaysFull = timing.ResponseWindowAlwaysFull,
@@ -396,28 +390,28 @@ namespace OpenRigs.Trials
             return new TrialEvent<TTrial, TUpdate, TOutcome>(kind, seconds, owner, cue, default(TUpdate), null);
         }
 
-        // The task's laser timing, not Zapit: the last laser held Zapit past this trial's trigger (open_rigs.core.task
+        // The task's laser timing, not ZapitDaq: the last laser held ZapitDaq past this trial's trigger (open_rigs.core.task
         // Optogenetics.check_zapit_free_in_time refuses such a task file).
         static InvalidOperationException ZapitBusy(int trialNumber, double triggerSeconds, double freeAt)
         {
             return new InvalidOperationException(string.Format(
-                "Trial {0}'s trigger came at {1} s on the Harp clock, but the last trial's laser frees Zapit only at {2} s, so the trial's StartStimulus " +
-                "could not go in time and the workflow stopped. The task's laser timing leaves too little time between trials: shorten the laser's hold " +
+                "Trial {0}'s trigger came at {1} s on the Harp clock, but the last trial's laser frees ZapitDaq only at {2} s, so the trial could not " +
+                "be armed in time and the workflow stopped. The task's laser timing leaves too little time between trials: shorten the laser's hold " +
                 "or duration, or lengthen the shortest interval.", trialNumber, triggerSeconds, freeAt));
         }
 
         static InvalidOperationException ArmedLate(int trialNumber, double triggerSeconds, double sentSeconds)
         {
             return new InvalidOperationException(string.Format(
-                "Trial {0}'s StartStimulus went at {1} s, once the last trial's laser freed Zapit, only {2:0.###} s before its trigger at {3} s, less than " +
-                "Zapit's {4} s reply margin, so the workflow stopped. The task's laser timing leaves too little time between trials: shorten the laser's " +
-                "hold or duration, or lengthen the shortest interval.", trialNumber, sentSeconds, triggerSeconds - sentSeconds, triggerSeconds, ZapitTrial.ReplyMarginSeconds));
+                "Trial {0}'s Arm went at {1} s, once the last trial's laser freed ZapitDaq, only {2:0.###} s before its trigger at {3} s, less than " +
+                "ZapitDaq's {4} s arm time, so the workflow stopped. The task's laser timing leaves too little time between trials: shorten the laser's " +
+                "hold or duration, or lengthen the shortest interval.", trialNumber, sentSeconds, triggerSeconds - sentSeconds, triggerSeconds, ZapitTrial.ArmSeconds));
         }
 
         static InvalidOperationException NeverAnswered(TTrial unanswered)
         {
             return new InvalidOperationException(string.Format(
-                "Zapit never answered trial {0}'s StartStimulus, so the workflow stopped before the next one was sent. Is Zapit running and answering?",
+                "ZapitDaq never armed trial {0}, so the workflow stopped before the next trial was armed. Is the bank loaded and the NI DAQ answering?",
                 unanswered.TrialNumber));
         }
     }
@@ -443,15 +437,15 @@ namespace OpenRigs.Trials
         /// <summary>
         /// The trials of the first rules to come, as events: the loop is fed the Harp clock (seconds), the wheel (cm),
         /// each spout's lick detector's state (<paramref name="licks"/>, spout 0 the first: a two-spout rig's left, then its
-        /// right), Zapit's replies and, on a rig with one, the wheel (cm; null for none), under one lock; the events leave in
+        /// right), ZapitDaq's events and, on a rig with one, the wheel (cm; null for none), under one lock; the events leave in
         /// order, outside it, one thread at a time (sending under the lock deadlocks a clock that ticks under its own). The
         /// first trial's interval starts at the first tick after the rules come. The clock ending ends the sequence; a lick
-        /// detector or the wheel ending stops it naming the input, as its device has stopped sending; Zapit's replies ending
+        /// detector or the wheel ending stops it naming the input, as its device has stopped sending; ZapitDaq's events ending
         /// is left to the laser trial that waits for one. An error from the loop, the rules or an input stops the sequence.
         /// </summary>
         public static IObservable<TrialEvent<TTrial, TUpdate, TOutcome>> Observe<TTrial, TUpdate, TOutcome>(
             IObservable<ITrialRules<TTrial, TUpdate, TOutcome>> rules, IObservable<double> clock, IObservable<bool>[] licks,
-            IObservable<ZapitReply> zapitReplies, IObservable<double> wheelCm = null)
+            IObservable<ZapitDaqEvent> zapitEvents, IObservable<double> wheelCm = null)
             where TTrial : class, ITrial
             where TOutcome : class, ITrialOutcome
         {
@@ -523,7 +517,7 @@ namespace OpenRigs.Trials
                     var spout = i;
                     subscriptions.Add(licks[i].Subscribe(lick => run(() => loop.OnLick(spout, lick)), fail, ended("lick input " + spout)));
                 }
-                subscriptions.Add(zapitReplies.Subscribe(reply => run(() => { loop.OnZapitReply(reply); return none; }), fail));
+                subscriptions.Add(zapitEvents.Subscribe(zapit => run(() => { loop.OnZapitEvent(zapit); return none; }), fail));
                 subscriptions.Add(clock.Subscribe(seconds => run(() => loop.OnClock(seconds)), fail, () => run(() => null)));
                 return subscriptions;
             }));

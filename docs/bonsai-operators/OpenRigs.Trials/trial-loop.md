@@ -9,9 +9,9 @@
 | Phase | When | Event |
 |---|---|---|
 | Iti | the last outcome plus its timeout (penalised; a reward adds nothing), exactly; with `TrialTiming.ResponseWindowAlwaysFull`, the last window's end plus the timeout, rewarded or not (`TrialTimes.TrialEndTime`); trial 1 the first tick | `Iti` (the trial just drawn) |
-| Arm | a laser trial on a hardware-triggered rig: the interval's start, or once the last laser is done (`LaserTiming`) | `Arm`: send the trial's StartStimulus |
+| Arm | a laser trial (ZapitDaq armed, waiting on the trigger line): the interval's start, or once the last laser is done (`LaserTiming`) | `Arm`: send the trial's StartStimulus |
 | Start | the interval's end less the lead, `max(laserToStimulusSeconds, 0)`, or later until the quiet waits hold (`QuietWait`) | `Start` (exact time) |
-| Trigger | `laserToStimulusSeconds` before the stimulus, if no outcome yet; the workflow stops if Zapit has not armed the trial, naming the last laser when it held Zapit past the trigger or freed it less than the reply margin before it | `Trigger`: raise the trigger line (and, without hardware triggering, send the StartStimulus) |
+| Trigger | `laserToStimulusSeconds` before the stimulus, if no outcome yet; the workflow stops if ZapitDaq has not armed the trial, naming the last laser when it held Zapit past the trigger or freed it less than the reply margin before it | `Trigger`: raise the trigger line (and, without hardware triggering, send the StartStimulus) |
 | Stimulus | the first tick at or after the start plus the lead | `Stimulus`, then the rules' `Update`s |
 | Response | from `ResponseDelaySeconds` after the stimulus for `ResponseWindowSeconds` (infinity: no limit) | the rules' `Update`s; `LaserCap` once the laser has run `LaserCapSeconds` |
 | Outcome | the tick (or lick or wheel sample, timed at the latest tick) the rules return an outcome, or the window's end | `Outcome`; `TriggerOff` when the line falls |
@@ -22,7 +22,7 @@
 
 ## The laser
 
-`LaserTiming.UntilOutcome(hardwareTriggered, triggerHoldSeconds, laserCapSeconds)`: the laser runs until the outcome (the workflow stops Zapit at `Outcome` or `LaserCap`), the trigger line falls `triggerHoldSeconds` after the outcome (the Zapit conditions file's max ramp-down, `ZapitConditions.Check(path).MaxRampDownSeconds`), and the next trial is armed then. `LaserTiming.ForDuration(hardwareTriggered, rampDownSeconds)`: each laser trial is an `ILaserDurationTrial`, and the line falls its own `LaserDurationSeconds` after the trigger, outcome or not, and the next trial is armed `rampDownSeconds` later (a trial answered before its trigger frees Zapit at its trigger's moment). Zapit's reply to each StartStimulus is checked by `ZapitTrial.CheckArmed`; a StartStimulus still unanswered when the next is due stops the workflow. A trigger before the last laser frees Zapit stops it naming that laser and when it frees Zapit; `open_rigs.core.task` `Optogenetics.check_zapit_free_in_time` refuses such a task file first.
+`LaserTiming.UntilOutcome(triggerHoldSeconds, laserCapSeconds)`: the laser runs until the outcome (ZapitTrials sends ZapitDaq an early stop at `Outcome` or `LaserCap`: its ramp, then laser and LED at 0 V), the trigger line falls `triggerHoldSeconds` after the outcome (at least the bank's longest ramp plus rig.yml's `earlyStopLeadSeconds`: `ZapitBank.LongestRampSeconds`), and the next trial is armed then. `LaserTiming.ForDuration(rampDownSeconds)`: each laser trial is an `ILaserDurationTrial`, and the line falls its own `LaserDurationSeconds` after the trigger, outcome or not, and the next trial is armed `rampDownSeconds` later (a trial answered before its trigger frees ZapitDaq at its trigger's moment). Each trial is armed during its interval; ZapitDaq's `Armed` event is checked by `ZapitTrial.CheckArmed`, and a trial not armed by its trigger, or armed less than `ZapitTrial.ArmSeconds` before it, stops the workflow. A trigger before the last laser frees ZapitDaq stops it naming that laser and when it frees ZapitDaq; `open_rigs.core.task` `Optogenetics.check_zapit_free_in_time` refuses such a task file first.
 
 ## In a workflow
 
@@ -30,14 +30,14 @@ A task's `src\Extensions` implements `ITrialRules<Trial, TUpdate, TOutcome>` (it
 
 ```csharp
 [Combinator]
-[Description("Runs the trials (lib-open-rigs TrialLoop). Inputs: the rules, the Harp clock, the wheel in cm, the left and right lick states, Zapit's replies.")]
+[Description("Runs the trials (lib-open-rigs TrialLoop). Inputs: the rules, the Harp clock, the wheel in cm, the left and right lick states, ZapitDaq's events (Zapit.Events).")]
 [WorkflowElementCategory(ElementCategory.Combinator)]
 public class RunTrials
 {
     public IObservable<TrialEvent<Trial, TUpdate, TOutcome>> Process(IObservable<TaskRules> rules, IObservable<double> clock,
-        IObservable<double> wheelCm, IObservable<bool> lickLeft, IObservable<bool> lickRight, IObservable<ZapitReply> zapitReplies)
+        IObservable<double> wheelCm, IObservable<bool> lickLeft, IObservable<bool> lickRight, IObservable<ZapitDaqEvent> zapitEvents)
     {
-        return TrialLoop.Observe(rules, clock, new[] { lickLeft, lickRight }, zapitReplies, wheelCm);
+        return TrialLoop.Observe(rules, clock, new[] { lickLeft, lickRight }, zapitEvents, wheelCm);
     }
 }
 ```
@@ -46,4 +46,4 @@ The lick inputs are one per spout, spout 0 the first (the `spout` the rules' `Li
 
 `TrialOutcome<TRow>` is built from the row `SharedTrialColumns.Fill` filled, with the task's `outcome` one of `TrialOutcomes` (`correct`, `incorrect`, `noResponse`, `probe`, `auto`, open_rigs' `OUTCOMES`), the rewarded valve's `rig.yml` wiring name, the trial's penalty level and its flash's rate (`Penalties.For`'s `Flash.RateHz`): `Row` (stamped with `outcomeTime`, for `LogTrials`), `Rewarded`, `Reward` (valve and microlitres, null unless rewarded, for `RewardRequests`), `Penalised`, `PenaltyLevelDbfs` (NaN when mute), `PenaltyTimeoutSeconds` and `PenaltyFlash` (the row's `penaltyFlashBrightness` at that rate, `PenaltyFlash.None` when none plays, for `OpenRigs.Vision:PlayPenaltyFlash`), so every task sends its outcomes into `TrialOutcomeEffects` the same way.
 
-`TaskLogic` gives `RunTrials` the rules from `OnNextTick`, multicasts its events into `TrialEvents` (a `PublishSubject`), and picks each kind with `PickTrialEvents` (`Kind`, and `Cue` for one cue by name). `ZapitTrialCommand` makes each laser trial's StartStimulus from its `IZapitTrial`, from the `Arm` events on a hardware-triggered rig, else from the `Trigger` events.
+`TaskLogic` gives `RunTrials` the rules from `OnNextTick`, multicasts its events into `TrialEvents` (a `PublishSubject`), and picks each kind with `PickTrialEvents` (`Kind`, and `Cue` for one cue by name). `ZapitTrialCommand` makes each laser trial's ZapitDaq Arm from its `IZapitTrial`, from the `Arm` events.

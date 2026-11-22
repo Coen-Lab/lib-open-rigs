@@ -45,8 +45,8 @@ COMMON_SESSION_FIELDS = {
     "rngSeed": "seeds the one random stream every trial is drawn from, at Go",
     "curriculum": "the stage these values are: one per task file",
     "trialConditions": "the mix the conditions are",
-    "optogenetics.enabled": "Zapit is connected and its conditions file loaded at Go",
-    "optogenetics.zapitConditionsPath": "the conditions file loaded in Zapit and counted at Go",
+    "optogenetics.enabled": "Zapit's setup runs before Go and every trial arms its DAQ from the bank",
+    "optogenetics.zapitConditionsPath": "the conditions file the session's bank is built from, checked against it at Go",
 }
 # One block order for every conditioned task's model (top-level fields by alias): identity, the mix, timing, stimuli,
 # reward, penalty, optogenetics, then the task's own (block_order_problems).
@@ -207,7 +207,7 @@ class ConditionedTask(TaskBlock):
     @classmethod
     def between_trials(cls, tasks: list[dict], context: dict | None = None) -> None:
         """The timing rules between a trial and the next, on every weighted combination's values (by alias, as JSON); raise
-        ValueError on a break. None by default. `context`, the validation's (a Zapit file's ramp-down, RAMP_DOWN_CONTEXT;
+        ValueError on a break. None by default. `context`, the validation's (the Zapit bank's longest ramp-down, RAMP_DOWN_CONTEXT;
         ramp_down_from reads it), is always passed, None without one."""
 
     def derive_trial_type(self, condition: TrialCondition) -> str:

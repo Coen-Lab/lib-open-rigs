@@ -3,10 +3,10 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
-                 xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
+                 xmlns:zap="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit"
                  xmlns:test="clr-namespace:OpenRigs.Trials.Tests;assembly=OpenRigs.Trials.Tests"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>ZapitTrials: the ZapitTrigger line DO1, the rules at 0.1 s with a laser stopping as STOP (HARDWARE triggered, cap LASER_CAP s), then trial 1's Arm, Trigger, Outcome (at OUTCOME_AT s, none at 0) and TriggerOff as TrialEvents. The output describes ZapitCommands and BehaviorBoard-Main.Commands.</Description>
+  <Description>ZapitTrials: the ZapitTrigger line DO1, the rules at 0.1 s with a laser stopping as STOP (cap LASER_CAP s), then trial 1's Arm, Trigger, Outcome (at OUTCOME_AT s, none at 0) and TriggerOff as TrialEvents. The output describes Zapit.Commands and BehaviorBoard-Main.Commands.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="Combinator">
@@ -15,8 +15,8 @@
       <Expression xsi:type="rx:AsyncSubject">
         <Name>ZapitTriggerLine</Name>
       </Expression>
-      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="zap:ZapitCommand">
-        <rx:Name>ZapitCommands</rx:Name>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="zap:ZapitDaqCommand">
+        <rx:Name>Zapit.Commands</rx:Name>
       </Expression>
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
         <rx:Name>BehaviorBoard-Main.Commands</rx:Name>
@@ -33,13 +33,12 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="test:PieceZapitRun">
           <test:Stop>STOP</test:Stop>
-          <test:HardwareTriggered>HARDWARE</test:HardwareTriggered>
           <test:LaserCapSeconds>LASER_CAP</test:LaserCapSeconds>
         </Combinator>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Trials:ZapitTrials.bonsai" />
       <Expression xsi:type="SubscribeSubject">
-        <Name>ZapitCommands</Name>
+        <Name>Zapit.Commands</Name>
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="test:PieceDescribe" />

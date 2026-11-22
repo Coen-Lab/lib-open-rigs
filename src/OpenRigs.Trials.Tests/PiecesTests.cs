@@ -11,7 +11,7 @@ using Harp.Behavior;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenCV.Net;
 using OpenRigs.Audio;
-using OpenRigs.Devices.Zapit;
+using OpenRigs.Zapit;
 using OpenRigs.Tests;
 
 namespace OpenRigs.Trials.Tests
@@ -145,15 +145,14 @@ namespace OpenRigs.Trials.Tests
     public class PieceZapitRun
     {
         public string Stop { get; set; }
-        public bool HardwareTriggered { get; set; }
         public double LaserCapSeconds { get; set; }
 
         public IObservable<PieceRules> Process()
         {
             return Observable.Defer(() =>
             {
-                var laser = Stop == "Duration" ? LaserTiming.ForDuration(HardwareTriggered, 0.5)
-                    : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(HardwareTriggered, 0, LaserCapSeconds) : null;
+                var laser = Stop == "Duration" ? LaserTiming.ForDuration(0.5)
+                    : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(0, LaserCapSeconds) : null;
                 return Observable.Timer(TimeSpan.FromSeconds(0.1)).Select(_ => new PieceRules { Laser = laser });
             });
         }
@@ -221,10 +220,10 @@ namespace OpenRigs.Trials.Tests
 
         public IObservable<string> Process(IObservable<TimeSpan> source) { return source.Select(t => "flash lasts " + t.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
 
-        public IObservable<string> Process(IObservable<ZapitCommand> source)
+        public IObservable<string> Process(IObservable<ZapitDaqCommand> source)
         {
-            return source.Select(c => "zapit " + c.Command + (c.Command == ZapitCommandType.StartStimulus
-                ? " condition " + c.ConditionNumber + " hardware " + c.HardwareTriggered + " duration " + c.StimDuration.GetValueOrDefault().ToString(System.Globalization.CultureInfo.InvariantCulture) : ""));
+            return source.Select(c => "zapit " + c.Kind + " trial " + c.Trial + (c.Kind == ZapitDaqCommandKind.Arm
+                ? " condition " + c.Condition + " duration " + c.DurationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture) : ""));
         }
 
         public IObservable<string> Process(IObservable<HarpMessage> source) { return source.Select(m => m.Address == OutputSet.Address ? "line set" : m.Address == OutputClear.Address ? "line clear" : "board " + m.Address); }
@@ -341,43 +340,42 @@ namespace OpenRigs.Trials.Tests
             StringAssert.Contains(InProcessWorkflow.Innermost(result.Item2), "the penalty sound lasts 0.1 s, longer than penalty.incorrect.timeoutSeconds in the test (0.05 s) with a flash");
         }
 
-        static List<string> RunZapit(string stop, bool hardwareTriggered, double laserCapSeconds, double outcomeAt)
+        static List<string> RunZapit(string stop, double laserCapSeconds, double outcomeAt)
         {
-            return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop == "Duration" ? "true" : "false").Replace("STOP", stop).Replace("HARDWARE", hardwareTriggered ? "true" : "false")
+            return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop == "Duration" ? "true" : "false").Replace("STOP", stop)
                 .Replace("LASER_CAP", laserCapSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("OUTCOME_AT", outcomeAt.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         }
 
-        // ForDuration: the StartStimulus carries the duration, at Arm on a hardware-triggered rig; nothing stops it at the outcome.
+        // ForDuration: the Arm carries the duration, at the Arm event; nothing stops it at the outcome.
         [TestMethod]
         public void ZapitTrialsForDurationSendsTheDurationAndNoStop()
         {
-            CollectionAssert.AreEquivalent(new[] { "zapit StartStimulus condition 3 hardware True duration 0.5", "line set", "line clear" },
-                RunZapit("Duration", true, 0, 0.6));
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0.5", "line set", "line clear" },
+                RunZapit("Duration", 0, 0.6));
         }
 
-        // UntilOutcome on a rig without hardware triggering: the StartStimulus at the trigger, with no duration, and one
-        // StopZapit at the outcome.
+        // UntilOutcome: the Arm with no duration, and one EarlyStop at the outcome.
         [TestMethod]
         public void ZapitTrialsUntilOutcomeStopsAtTheOutcome()
         {
-            CollectionAssert.AreEquivalent(new[] { "line set", "zapit StartStimulus condition 3 hardware False duration 0", "zapit StopStimulus", "line clear" },
-                RunZapit("UntilOutcome", false, 10, 0.6));
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit EarlyStop trial 1", "line clear" },
+                RunZapit("UntilOutcome", 10, 0.6));
         }
 
         // No outcome and no LaserCap: LaserBackstop stops it LaserCapSeconds after the trigger on the computer's clock.
         [TestMethod]
         public void ZapitTrialsUntilOutcomeWithNoOutcomeStopsAtTheBackstop()
         {
-            CollectionAssert.AreEquivalent(new[] { "zapit StartStimulus condition 3 hardware True duration 0", "line set", "zapit StopStimulus", "line clear" },
-                RunZapit("UntilOutcome", true, 0.2, 0));
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit EarlyStop trial 1", "line clear" },
+                RunZapit("UntilOutcome", 0.2, 0));
         }
 
         // Rules with no laser: no Zapit command at all.
         [TestMethod]
         public void ZapitTrialsWithoutALaserSendsNoCommand()
         {
-            CollectionAssert.AreEquivalent(new[] { "line set", "line clear" }, RunZapit("None", true, 0, 0.6));
+            CollectionAssert.AreEquivalent(new[] { "line set", "line clear" }, RunZapit("None", 0, 0.6));
         }
     }
 }

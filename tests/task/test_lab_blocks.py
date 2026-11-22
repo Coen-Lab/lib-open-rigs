@@ -209,7 +209,7 @@ def test_optogenetics_lead_and_reply_margin_fit_in_the_shortest_interval(lead, f
     if fits:
         opto.check_lead_fits(3.4)
     else:
-        with pytest.raises(ValueError, match=r"reply margin must be at most trial_structure.iti_min_seconds \(3.4 s\)"):
+        with pytest.raises(ValueError, match=r"arm time must be at most trial_structure.iti_min_seconds \(3.4 s\)"):
             opto.check_lead_fits(3.4)
 
 
