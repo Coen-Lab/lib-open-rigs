@@ -243,6 +243,9 @@ namespace OpenRigs.Core
         /// <summary>Gets or sets whether the width was raised to the calibrated range's shortest, because the volume per pulse asked for was below it.</summary>
         public bool Clamped { get; set; }
 
+        /// <summary>Gets or sets whether the reward is a manual drop (the valve's Reward command), not a trial's: RewardedAsDelivered never counts it for a trial.</summary>
+        public bool Manual { get; set; }
+
         /// <summary>Gets the volume the pulses deliver, in microlitres.</summary>
         public double DeliveredUl { get { return Pulses * VolumePerPulseUl; } }
 
@@ -263,10 +266,19 @@ namespace OpenRigs.Core
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PlanReward
     {
+        /// <summary>Gets or sets whether these are manual drops (the valve's Reward command), stamped on each plan.</summary>
+        [Description("Whether these are manual drops (the valve's Reward command), not a trial's rewards: each plan says so, and RewardedAsDelivered never counts it for a trial.")]
+        public bool Manual { get; set; }
+
         /// <summary>Plans each (microlitres, line) pair.</summary>
         public IObservable<RewardPlan> Process(IObservable<Tuple<double, RewardLine>> source)
         {
-            return source.Select(input => Plan(input.Item2, input.Item1));
+            return source.Select(input =>
+            {
+                var plan = Plan(input.Item2, input.Item1);
+                plan.Manual = Manual;
+                return plan;
+            });
         }
 
         /// <summary>Plans one reward of <paramref name="requestedUl"/> on <paramref name="line"/>.</summary>

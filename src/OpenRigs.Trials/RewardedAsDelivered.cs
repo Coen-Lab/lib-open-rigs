@@ -15,7 +15,7 @@ namespace OpenRigs.Trials
     /// few ms after the outcome, so a rewarded outcome's row waits for it: it goes out rewarded when it comes, rewarded
     /// false when the next outcome or the end of the outcomes comes first, and not at all when a stop tears the workflow
     /// down first (F12: a row written in the teardown cannot know whether the valve opened). A RewardDelivered that came
-    /// since the previous outcome, before this one, also counts. The outcome's own Rewarded (reward tone, spouts) is untouched.
+    /// since the previous outcome, before this one, also counts; a manual drop (RewardPlan.Manual) never does. The outcome's own Rewarded (reward tone, spouts) is untouched.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Combinator)]
@@ -48,7 +48,7 @@ namespace OpenRigs.Trials
                     done = last;
                     flush();
                 };
-                var plans = delivered.Subscribe(plan =>
+                var plans = delivered.Where(plan => !plan.Manual).Subscribe(plan =>
                 {
                     lock (gate)
                     {

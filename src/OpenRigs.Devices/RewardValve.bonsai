@@ -6,7 +6,7 @@
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>One reward valve, Name (RewardValve-Left for the RewardValve rig.yml's wiring names left), on its Behavior board, Board, included once per valve after Rewards. Loads the valve's line and calibration once at start (LoadRewardLine: the line wiring gives it on Board, its CalibratedPulse and that calibration's linearFit), so a valve with no calibration stops the workflow at start, and publishes it as the AsyncSubject Name; announces the valve's rig.yml name into RewardValves. Each reward for it on RewardRequests ((left, microlitres): a reward asks for its valve by that name) is planned (PlanReward; one above MaxRewardUl, 20 ul by default, or one that is not a number or infinite, stops the workflow) and fired with FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, a reward that comes while one fires starting pulseGapMs after its last pulse closes, into the board's Board.TriggerCalibratedPulse (BoardTriggerCalibratedPulseSubjectName, PulseOutputs). The plan is multicast into RewardDelivered only when the board answers the write that opens the valve (RewardsFired on Board.Data, BoardDataSubjectName), so a reward a stop cut off between the plan and the board is never RewardDelivered. Declares its manual drop, Name.Reward (DeclareDeviceControls), a 2.5 ul reward through its calibration, before and during a run. Writes its calibration file into the experiment under Name\ (LogDataSchema).</Description>
+  <Description>One reward valve, Name (RewardValve-Left for the RewardValve rig.yml's wiring names left), on its Behavior board, Board, included once per valve after Rewards. Loads the valve's line and calibration once at start (LoadRewardLine: the line wiring gives it on Board, its CalibratedPulse and that calibration's linearFit), so a valve with no calibration stops the workflow at start, and publishes it as the AsyncSubject Name; announces the valve's rig.yml name into RewardValves. Each reward for it on RewardRequests ((left, microlitres): a reward asks for its valve by that name) is planned (PlanReward; one above MaxRewardUl, 20 ul by default, or one that is not a number or infinite, stops the workflow) and fired with FirePulses on the Harp clock (Timestamp) at the calibration's pulseGapMs, a reward that comes while one fires starting pulseGapMs after its last pulse closes, into the board's Board.TriggerCalibratedPulse (BoardTriggerCalibratedPulseSubjectName, PulseOutputs). The plan is multicast into RewardDelivered only when the board answers the write that opens the valve (RewardsFired on Board.Data, BoardDataSubjectName), so a reward a stop cut off between the plan and the board is never RewardDelivered. Declares its manual drop, Name.Reward (DeclareDeviceControls), a 2.5 ul reward through its calibration, before and during a run, planned as Manual straight into this valve (not through RewardRequests), so RewardedAsDelivered never counts it for a trial. Writes its calibration file into the experiment under Name\ (LogDataSchema).</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -117,9 +117,6 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="rx:WithLatestFrom" />
       </Expression>
-      <Expression xsi:type="MulticastSubject">
-        <Name>RewardRequests</Name>
-      </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="orcl:DeclareDeviceControls">
           <orcl:Name>UNMAPPED</orcl:Name>
@@ -151,6 +148,23 @@
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="dev:RewardsFired" />
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>UNMAPPED</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:RewardForValve" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:PlanReward">
+          <core:Manual>true</core:Manual>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Merge" />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="3" To="4" Label="Source1" />
@@ -168,8 +182,8 @@
       <Edge From="11" To="12" Label="Source2" />
       <Edge From="12" To="13" Label="Source1" />
       <Edge From="13" To="14" Label="Source1" />
-      <Edge From="14" To="35" Label="Source1" />
-      <Edge From="14" To="16" Label="Source1" />
+      <Edge From="39" To="34" Label="Source1" />
+      <Edge From="39" To="16" Label="Source1" />
       <Edge From="16" To="18" Label="Source1" />
       <Edge From="17" To="18" Label="Source2" />
       <Edge From="18" To="20" Label="Source1" />
@@ -182,15 +196,21 @@
       <Edge From="24" To="25" Label="Source1" />
       <Edge From="25" To="27" Label="Source1" />
       <Edge From="26" To="27" Label="Source2" />
-      <Edge From="27" To="28" Label="Source1" />
+      <Edge From="0" To="28" Label="Source1" />
       <Edge From="0" To="29" Label="Source1" />
-      <Edge From="0" To="30" Label="Source1" />
+      <Edge From="29" To="30" Label="Source1" />
       <Edge From="30" To="31" Label="Source1" />
-      <Edge From="31" To="32" Label="Source1" />
-      <Edge From="0" To="32" Label="Source2" />
-      <Edge From="33" To="34" Label="Source1" />
-      <Edge From="34" To="35" Label="Source2" />
-      <Edge From="35" To="15" Label="Source1" />
+      <Edge From="0" To="31" Label="Source2" />
+      <Edge From="32" To="33" Label="Source1" />
+      <Edge From="33" To="34" Label="Source2" />
+      <Edge From="34" To="15" Label="Source1" />
+      <Edge From="14" To="39" Label="Source1" />
+      <Edge From="38" To="39" Label="Source2" />
+      <Edge From="0" To="35" Label="Source1" />
+      <Edge From="27" To="36" Label="Source1" />
+      <Edge From="35" To="36" Label="Source2" />
+      <Edge From="36" To="37" Label="Source1" />
+      <Edge From="37" To="38" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
