@@ -100,20 +100,30 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
 
 def zapit_daq_for_task_problems(root: ET.Element) -> list[str]:
     """ConnectForTaskZapitDaq opens ZapitDaq, with every channel mapped from rig.yml's zapit block through Rigs.Zapit's full
-    paths, ZapitCamera and ZapitSetup, all in one SelectMany behind a Condition on rig.yml's Zapit naming its device, and
+    paths, and ZapitSetup, in one SelectMany fed from ZapitRig (rig.yml's Zapit behind a Condition on its device, once
+    completed); ZapitCamera at its top
+    level, where its Camera-Zapit.Data reaches StreamDevices (a SelectMany is a subject scope of its own); and
     publishes Optogenetics from optogenetics.enabled and OptogeneticsLaserEnabled. `root` is OpenRigs.Devices' ConnectForTaskZapitDaq.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     problems = []
     groups = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:SelectMany" and _name(n) == "Zapit"]
     if len(groups) != 1:
         return ["ConnectForTaskZapitDaq has no one SelectMany named Zapit"]
-    feed = [nodes[i] for i in upstream(edges, groups[0])]
+    # Fed from the AsyncSubject ZapitRig through a SubscribeSubject of it, so the group starts once it has completed.
+    rigs = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and n.findtext(W + "Name") == "ZapitRig"]
+    fed = [nodes[i] for i in upstream(edges, groups[0])]
+    if len(rigs) != 1 or not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "ZapitRig" for n in fed):
+        problems.append("ConnectForTaskZapitDaq's Zapit group is not fed from a SubscribeSubject of its one AsyncSubject ZapitRig")
+    feed = [nodes[i] for i in upstream(edges, rigs[0])] if len(rigs) == 1 else []
     if not any(n.findtext(W + "Selector") == "Zapit" for n in feed) or not any(
             n.get(XSI) == "rx:Condition" and "it.Device != null" in ET.tostring(n, encoding="unicode") for n in feed):
-        problems.append("ConnectForTaskZapitDaq's Zapit group is not fed rig.yml's Zapit behind a Condition on its device")
+        problems.append("ConnectForTaskZapitDaq's ZapitRig is not rig.yml's Zapit behind a Condition on its device")
     inner = child(nodes[groups[0]], W + "Workflow")
     paths = {n.get("Path") for n in inner.iter(W + "Expression")}
-    problems += [f"ConnectForTaskZapitDaq's Zapit group does not include {path}" for path in (ZAPIT_CAMERA, ZAPIT_SETUP) if path not in paths]
+    if ZAPIT_SETUP not in paths:
+        problems.append(f"ConnectForTaskZapitDaq's Zapit group does not include {ZAPIT_SETUP}")
+    if not any(n.get("Path") == ZAPIT_CAMERA for n in nodes):
+        problems.append(f"ConnectForTaskZapitDaq does not include {ZAPIT_CAMERA} at its top level, where StreamDevices sees Camera-Zapit.Data")
     daq = [n for n in inner.iter(W + "Expression") if kind(n).endswith(":ZapitDaq")]
     mapped = {p.get("Name"): p.get("Selector") for n in inner.iter(W + "Expression") if n.get(XSI) == "PropertyMapping"
               for p in n.iter(W + "Property")}

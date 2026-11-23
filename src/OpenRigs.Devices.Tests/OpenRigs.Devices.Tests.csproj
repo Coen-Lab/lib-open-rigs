@@ -21,6 +21,8 @@
   <ItemGroup>
     <PackageReference Include="Bonsai.Scripting.Expressions" />
     <PackageReference Include="Bonsai.Mixer" />
+    <!-- ZapitLiveViewTests: ConnectForTaskZapitDaq's camera, ZapitDaq and StreamDevices -->
+    <PackageReference Include="Bonsai.Pylon" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +32,9 @@
     <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
     <ProjectReference Include="..\OpenRigs.Vision\OpenRigs.Vision.csproj" />
     <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
+    <ProjectReference Include="..\OpenRigs.Zapit\OpenRigs.Zapit.csproj" />
+    <ProjectReference Include="..\OpenRigs.LiveView\OpenRigs.LiveView.csproj" />
+    <ProjectReference Include="..\OpenRigs.Streaming\OpenRigs.Streaming.csproj" />
   </ItemGroup>
 
 </Project>

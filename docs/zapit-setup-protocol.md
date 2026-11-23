@@ -20,7 +20,7 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
   - `Refused <why>`
 
   The metric keeps only the latest value. The agent sends one request, then polls until that request's terminal stage comes back: `FramesSaved`, `StillSaved`, `BankLoaded` or `Refused`.
-- **Live.** The camera `Camera-Zapit` is streamed by StreamDevices as the camera Zapit. Its frames are on `Camera-Zapit.Data`, and they are the frames the setup phase saves.
+- **Live.** The camera `Camera-Zapit` is streamed by StreamDevices as the camera Zapit, on a rig whose `zapit` block names `zapit.device`. Its frames are on `Camera-Zapit.Data`, published at `ConnectForTaskZapitDaq`'s top level (a subject inside its `Zapit` SelectMany would be out of StreamDevices' reach), and they are the frames the setup phase saves.
 - **Log.** Every ZapitDaq event is a row in `WorkflowData_Events`, with `Event` set to `Zapit` and `Value` set to the trial number.
 
 ## Files

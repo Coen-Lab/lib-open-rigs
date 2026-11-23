@@ -11,6 +11,7 @@
     <PackageVersion Include="Bonsai.Dsp" Version="2.9.0" />
     <PackageVersion Include="Bonsai.Harp" Version="3.6.1" />
     <PackageVersion Include="Bonsai.Mixer" Version="0.2.0" />
+    <PackageVersion Include="Bonsai.Pylon" Version="0.4.0" />
     <PackageVersion Include="Bonsai.Scripting.Expressions" Version="2.10.0" />
     <PackageVersion Include="Bonsai.Spinnaker" Version="0.9.1" />
     <PackageVersion Include="Bonsai.System" Version="2.9.0" />
