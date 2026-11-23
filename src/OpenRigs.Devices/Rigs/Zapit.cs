@@ -32,6 +32,10 @@ namespace OpenRigs.Devices.Rigs
         [JsonIgnore, YamlIgnore]
         public string TriggerTerminal { get { return "/" + Path(TriggerChannel); } }
 
+        /// <summary>Gets the laser ceiling in mW as ZapitDaq takes it: 0 disables the laser, no ceiling is unlimited.</summary>
+        [JsonIgnore, YamlIgnore]
+        public double LaserCeilingMw { get { return CeilingMw ?? double.PositiveInfinity; } }
+
         string Path(string line) { return Device + "/" + line; }
     }
 }

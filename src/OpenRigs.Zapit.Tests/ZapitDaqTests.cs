@@ -54,13 +54,13 @@ namespace OpenRigs.Zapit.Tests
             public readonly SimulatedZapitDevice Device = new SimulatedZapitDevice { AutoTrigger = false };
             public Exception Error;
 
-            public Harness(double sampleRate = 100000, double maxTrialSeconds = 1.0, double earlyStopLeadSeconds = 0.01)
+            public Harness(double sampleRate = 100000, double maxTrialSeconds = 1.0, double earlyStopLeadSeconds = 0.01, double ceilingMw = double.PositiveInfinity)
             {
                 Device.Clock = () => Volatile.Read(ref now);
                 var node = new ZapitDaq
                 {
                     SampleRate = sampleRate, MaxTrialSeconds = maxTrialSeconds, EarlyStopLeadSeconds = earlyStopLeadSeconds,
-                    TriggerTerminal = Trigger, DeviceFactory = () => Device,
+                    TriggerTerminal = Trigger, CeilingMw = ceilingMw, DeviceFactory = () => Device,
                 };
                 subscription = node.Process(commands).Subscribe(events.Add, e => Error = e);
             }
@@ -282,6 +282,31 @@ namespace OpenRigs.Zapit.Tests
             h.Send(Load(Unpack()));
             h.Next(ZapitDaqEventKind.BankLoaded);
             StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 2.0, 1.0)), "longer than maxTrialSeconds (1 s)");
+        }
+
+        [TestMethod]
+        public void AZeroCeilingRefusesAnyLaserSampleAboveZeroVolts()
+        {
+            using var h = new Harness(ceilingMw: 0);
+            StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 }), "ceilingMw is 0");
+        }
+
+        [TestMethod]
+        public void AZeroCeilingRefusesAStaircaseAboveZeroAndAllowsZeros()
+        {
+            using var h = new Harness(ceilingMw: 0);
+            h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, GalvoXVolts = 1, LaserVolts = 0 });
+            h.Next(ZapitDaqEventKind.Pointed);
+            StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Staircase, LaserLevelsVolts = new[] { 0.0, 1 }, SamplesPerLevel = 10 }), "ceilingMw is 0");
+        }
+
+        [TestMethod]
+        public void AZeroCeilingRefusesABankThatDrivesTheLaser()
+        {
+            using var h = new Harness(ceilingMw: 0);
+            h.Send(Load(Unpack()));
+            h.Next(ZapitDaqEventKind.BankLoaded);
+            StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 8.0, 0.05)), "ceilingMw is 0");
         }
 
         [TestMethod]

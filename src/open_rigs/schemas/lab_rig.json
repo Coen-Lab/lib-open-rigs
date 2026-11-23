@@ -1980,7 +1980,7 @@
         "ceilingMw": {
           "anyOf": [
             {
-              "exclusiveMinimum": 0,
+              "minimum": 0,
               "type": "number"
             },
             {
@@ -1988,7 +1988,7 @@
             }
           ],
           "default": null,
-          "description": "This rig's laser ceiling, in mW: lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it.",
+          "description": "This rig's laser ceiling, in mW: lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.",
           "title": "CeilingMw"
         },
         "maxTrialSeconds": {

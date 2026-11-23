@@ -43,6 +43,15 @@ def test_some_of_zapit_daq_s_fields_are_refused():
         LabRig.model_validate(rig)
 
 
+def test_a_zero_ceiling_means_laser_disabled_and_a_negative_one_is_refused():
+    rig = load("B2-both")
+    rig["zapit"]["ceilingMw"] = 0
+    assert LabRig.model_validate(rig).zapit.ceiling_mw == 0
+    rig["zapit"]["ceilingMw"] = -1
+    with pytest.raises(ValidationError):
+        LabRig.model_validate(rig)
+
+
 def test_rising_laser_limits():
     rig = load("B2-both")
     rig["zapit"]["laserMinMaxMw"] = [50, 0]

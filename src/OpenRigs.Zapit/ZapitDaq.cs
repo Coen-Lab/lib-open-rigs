@@ -59,6 +59,10 @@ namespace OpenRigs.Zapit
         [Description("The AO sample rate, in samples per second; a bank built for another is refused.")]
         public double SampleRate { get; set; }
 
+        /// <summary>The rig's laser ceiling, in mW (rig.yml's zapit.ceilingMw). At 0 the laser is disabled and ZapitDaq refuses any laser sample above 0 V. The default is no ceiling here: lib_zapit's bank already holds it.</summary>
+        [Description("The rig's laser ceiling, in mW. At 0 the laser is disabled and ZapitDaq refuses any laser sample above 0 V.")]
+        public double CeilingMw { get; set; } = double.PositiveInfinity;
+
         /// <summary>The longest trial with its ramp, in seconds; until-outcome trials are finite at it.</summary>
         [Description("The longest trial with its ramp, in seconds; until-outcome trials are finite at it.")]
         public double MaxTrialSeconds { get; set; }
@@ -179,6 +183,7 @@ namespace OpenRigs.Zapit
                 var variant = loaded.Variant(command.Condition, command.LaserOn, command.PowerMw);
                 var cycles = loaded.Cycles(command.Condition, variant, command.DurationSeconds, node.MaxTrialSeconds);
                 var samples = loaded.Assemble(command.Condition, variant, cycles);
+                RefuseLaser(Max(samples, 2), $"Trial {command.Trial}'s bank samples");
                 device.WriteOnDemand(Zeros);
                 device.ArmFinite(samples, loaded.SampleRate, node.TriggerTerminal);
                 trial = new Trial { Command = command, Variant = variant, Cycles = cycles, Samples = samples.GetLength(1), StopAt = samples.GetLength(1) };
@@ -214,6 +219,7 @@ namespace OpenRigs.Zapit
             void Point(ZapitDaqCommand command)
             {
                 RefuseWhilePlaying(command);
+                RefuseLaser(command.LaserVolts, "The aiming point");
                 device.WriteOnDemand(new[] { command.GalvoXVolts, command.GalvoYVolts, command.LaserVolts, 0 });
                 Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed });
             }
@@ -224,6 +230,7 @@ namespace OpenRigs.Zapit
                 var levels = command.LaserLevelsVolts;
                 if (levels == null || levels.Length == 0 || command.SamplesPerLevel < 1)
                     throw new InvalidOperationException("A Zapit staircase needs laser levels and at least one sample per level.");
+                RefuseLaser(levels.Max(), "The staircase");
                 var samples = new double[4, levels.Length * command.SamplesPerLevel + 1];   // the last sample: laser at 0 V
                 for (int i = 0; i < samples.GetLength(1); i++)
                 {
@@ -235,6 +242,19 @@ namespace OpenRigs.Zapit
                 var read = device.Staircase(samples, node.SampleRate);
                 device.WriteOnDemand(Zeros);
                 Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.StaircaseRead, Samples = samples.GetLength(1), AnalogIn = read });
+            }
+
+            void RefuseLaser(double maxVolts, string what)
+            {
+                if (node.CeilingMw <= 0 && maxVolts > 0)
+                    throw new InvalidOperationException($"{what} drive the laser to {maxVolts} V, but rig.yml's zapit.ceilingMw is 0 (laser disabled).");
+            }
+
+            static double Max(double[,] samples, int channel)
+            {
+                var max = double.MinValue;
+                for (int i = 0; i < samples.GetLength(1); i++) max = Math.Max(max, samples[channel, i]);
+                return max;
             }
 
             void RefuseWhilePlaying(ZapitDaqCommand command)

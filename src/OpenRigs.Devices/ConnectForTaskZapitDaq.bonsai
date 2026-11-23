@@ -85,6 +85,7 @@
                 <Property Name="SampleRate" Selector="SampleRate" />
                 <Property Name="MaxTrialSeconds" Selector="MaxTrialSeconds" />
                 <Property Name="EarlyStopLeadSeconds" Selector="EarlyStopLeadSeconds" />
+                <Property Name="CeilingMw" Selector="LaserCeilingMw" />
               </PropertyMappings>
             </Expression>
             <Expression xsi:type="Combinator">
@@ -100,6 +101,7 @@
                 <zap:SampleRate>0</zap:SampleRate>
                 <zap:MaxTrialSeconds>0</zap:MaxTrialSeconds>
                 <zap:EarlyStopLeadSeconds>0</zap:EarlyStopLeadSeconds>
+                <zap:CeilingMw>INF</zap:CeilingMw>
               </Combinator>
             </Expression>
             <Expression xsi:type="MulticastSubject">

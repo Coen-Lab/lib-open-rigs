@@ -124,7 +124,7 @@ class Zapit(BaseSchema):
     sample_rate: Optional[float] = Field(default=None, gt=0, examples=[100000], description="AO samples a second, per channel; every bank is built at it.")
     laser_min_max_mw: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.")
     laser_min_max_control_volts: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's control volts at its lowest and highest power.")
-    ceiling_mw: Optional[float] = Field(default=None, gt=0, description="This rig's laser ceiling, in mW: lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it.")
+    ceiling_mw: Optional[float] = Field(default=None, ge=0, description="This rig's laser ceiling, in mW: lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
     max_trial_seconds: Optional[float] = Field(default=None, gt=0, description="The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.")
     early_stop_lead_seconds: Optional[float] = Field(default=None, gt=0, description="How far ahead of the samples generated an early stop writes its ramp, in seconds.")
     microns_per_pixel: Optional[float] = Field(default=None, gt=0, description="The Zapit camera's scale at the sample, in microns a pixel.")
