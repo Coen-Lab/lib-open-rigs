@@ -10,21 +10,23 @@ using System.Reactive.Linq;
 using System.Reflection;
 using System.Security;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 
 namespace OpenRigs.Devices.Tests
 {
     /// <summary>
-    /// A launch's ConfigRoot, a workflow property mapped onto ReadLabRig alone, reaches every node that reads rig.yml:
-    /// ReadLabRig's subjects at run time, and StreamDevices, RecordHarpDevices and ExperimentManifest when the workflow
-    /// is built, over the lab's root written into each (BLUE-OPTO-2, 23 Nov 2026: app-rig-control's scratch root reached
-    /// ReadLabRig only, so the live view and the manifest read the rig's own rig.yml). The written-in root's rig.yml names
-    /// the Behavior board decoy, the launch's main.
+    /// A launch's ConfigRoot, a workflow property mapped onto ReadLabRig alone, is the one root every node that reads
+    /// rig.yml takes: ReadLabRig's subjects at run time, and StreamDevices, RecordHarpDevices and ExperimentManifest when
+    /// the workflow is built (23 Nov 2026: a scratch root reached ReadLabRig only, so the live view and the manifest read
+    /// the rig's own rig.yml from a root written into each). The root written into ReadLabRig is a decoy whose rig.yml
+    /// names the Behavior board decoy; the launch's names main.
     /// </summary>
     [TestClass]
     public class WorkflowConfigRootTests
     {
         static readonly string Folder = Path.Combine(Path.GetDirectoryName(typeof(WorkflowConfigRootTests).Assembly.Location), "Pieces");
+        const string Readers = "hd:RecordHarpDevices|mf:ExperimentManifest|lv:StreamDevices";
 
         string launchRoot;
         string decoyRoot;
@@ -49,11 +51,19 @@ namespace OpenRigs.Devices.Tests
             try { Directory.Delete(Path.GetDirectoryName(launchRoot), true); } catch (IOException) { }
         }
 
+        string Xml()
+        {
+            return File.ReadAllText(Path.Combine(Folder, "ConfigRootEverywhere.bonsai")).Replace("DECOY_ROOT", SecurityElement.Escape(decoyRoot));
+        }
+
+        static WorkflowBuilder Deserialize(string xml)
+        {
+            using (var reader = XmlReader.Create(new StringReader(xml))) return (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+        }
+
         WorkflowBuilder Load()
         {
-            var xml = File.ReadAllText(Path.Combine(Folder, "ConfigRootEverywhere.bonsai")).Replace("DECOY_ROOT", SecurityElement.Escape(decoyRoot));
-            WorkflowBuilder builder;
-            using (var reader = XmlReader.Create(new StringReader(xml))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            var builder = Deserialize(Xml());
             builder.Workflow.SetWorkflowProperty("ConfigRoot", launchRoot);
             return builder;
         }
@@ -71,24 +81,52 @@ namespace OpenRigs.Devices.Tests
             AssertEveryReaderTakesTheLaunchsRoot(new WorkflowBuilder(Load().Workflow.ToInspectableGraph().FromInspectableGraph()));
         }
 
-        void AssertEveryReaderTakesTheLaunchsRoot(WorkflowBuilder builder)
+        // A reader has no root of its own to fall back on: built with no ReadLabRig before it, the build stops, naming it.
+        [DataTestMethod]
+        [DataRow("hd:RecordHarpDevices", "RecordHarpDevices")]
+        [DataRow("mf:ExperimentManifest", "ExperimentManifest")]
+        [DataRow("lv:StreamDevices", "StreamDevices")]
+        public void AReaderWithNoReadLabRigBeforeItStopsTheBuild(string type, string name)
         {
-            var built = builder.Workflow.Build();
+            var xml = Regex.Replace(Xml(), "<Expression xsi:type=\"(ExternalizedMapping|IncludeWorkflow)\".*?</Expression>", "", RegexOptions.Singleline);
+            xml = Regex.Replace(xml, "<Expression xsi:type=\"(" + Readers + ")\"( />|>.*?</Expression>)",
+                m => m.Groups[1].Value == type ? m.Value : "", RegexOptions.Singleline).Replace("<Edge From=\"0\" To=\"1\" Label=\"Source1\" />", "");
+            StringAssert.Contains(xml, type);
+            Assert.IsFalse(xml.Contains("ReadLabRig.bonsai"));
+            var stopped = Assert.ThrowsException<WorkflowBuildException>(() => Deserialize(xml).Workflow.Build());
+            StringAssert.StartsWith(stopped.Message, name + " reads rig.yml from the workflow's ConfigRoot, and none was built before it");
+            StringAssert.Contains(stopped.Message, "include OpenRigs.Devices' ReadLabRig before this node");
+        }
 
-            var streamDevices = Node<OpenRigs.LiveView.StreamDevices>(builder);
-            var streamed = Serialize(streamDevices.Workflow);
-            Assert.IsTrue(streamed.Contains("BehaviorBoard-Main.Data"), "StreamDevices streams the launch's rig.yml's board");
-            Assert.IsFalse(streamed.Contains("BehaviorBoard-Decoy"), "StreamDevices read the written-in root's rig.yml");
+        // The readers and ExperimentRecords have no ConfigRoot of their own: a root a workflow still writes into one (the
+        // decoy, as the lab's workflows did) is no property of it, and the launch's root is the one read.
+        [TestMethod]
+        public void NoReaderHasAConfigRootAndOneStillWrittenInIsNotRead()
+        {
+            var xml = Xml();
+            foreach (var type in Readers.Split('|'))
+            {
+                var prefix = type.Split(':')[0];
+                xml = Regex.Replace(xml, "<Expression xsi:type=\"" + type + "\"( />|>)", m =>
+                    "<Expression xsi:type=\"" + type + "\"><" + prefix + ":ConfigRoot>" + SecurityElement.Escape(decoyRoot) + "</" + prefix + ":ConfigRoot>" +
+                    (m.Groups[1].Value == " />" ? "</Expression>" : ""));
+                StringAssert.Contains(xml, prefix + ":ConfigRoot>");
+            }
+            var builder = Deserialize(xml);
+            builder.Workflow.SetWorkflowProperty("ConfigRoot", launchRoot);
+            foreach (var node in builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).Where(b => Regex.IsMatch(b.GetType().Name, "^(RecordHarpDevices|ExperimentManifest|StreamDevices)$")))
+            {
+                Assert.IsNull(System.ComponentModel.TypeDescriptor.GetProperties(node)["ConfigRoot"], node.GetType().Name + " has a ConfigRoot");
+            }
+            AssertEveryReaderTakesTheLaunchsRoot(builder);
 
-            var recorded = Serialize(Node<OpenRigs.HarpDevices.RecordHarpDevices>(builder).Workflow);
-            Assert.IsTrue(recorded.Contains("BehaviorBoard-Main.Data"), "RecordHarpDevices records the launch's rig.yml's board");
-            Assert.IsFalse(recorded.Contains("BehaviorBoard-Decoy"), "RecordHarpDevices read the written-in root's rig.yml");
-
-            var recorder = Constants(built).Single(value => value != null && value.GetType().FullName == "OpenRigs.Manifest.ManifestRecorder");
-            Assert.AreEqual(launchRoot, Field(recorder, "configRoot"), "the manifest records the launch's rig.yml");
-            var expected = ((System.Collections.IEnumerable)Field(Field(recorder, "expected"), "Entries")).Cast<object>().Select(e => (string)Field(e, "Path")).ToList();
-            CollectionAssert.Contains(expected, "BehaviorBoard-Main/", "the manifest expects the launch's rig.yml's devices: " + string.Join(", ", expected));
-            CollectionAssert.DoesNotContain(expected, "BehaviorBoard-Decoy/");
+            var records = (IncludeWorkflowBuilder)Deserialize(Regex.Replace(xml, "<Expression xsi:type=\"(" + Readers + ")\"( />|>.*?</Expression>)", "", RegexOptions.Singleline)
+                .Replace("</Nodes>", "<Expression xsi:type=\"IncludeWorkflow\" Path=\"OpenRigs.Logging:ExperimentRecords.bonsai\"><ConfigRoot>x</ConfigRoot><IngestScript>test</IngestScript></Expression></Nodes>"))
+                .Workflow.Select(n => n.Value).OfType<IncludeWorkflowBuilder>().Single(b => b.Path.EndsWith("ExperimentRecords.bonsai"));
+            Assert.IsNotNull(records.ArgumentRange);
+            var properties = System.ComponentModel.TypeDescriptor.GetProperties(records);
+            Assert.IsNotNull(properties["IngestScript"], "ExperimentRecords' workflow did not load");
+            Assert.IsNull(properties["ConfigRoot"], "ExperimentRecords has a ConfigRoot");
         }
 
         // ReadLabRig's own subjects, which every reader of rig.yml at run time takes (a camera's video encoder, the clock check).
@@ -110,6 +148,25 @@ namespace OpenRigs.Devices.Tests
             var published = workflow.BuildObservable<Tuple<string, string>>().FirstAsync().Timeout(TimeSpan.FromSeconds(20)).Wait();
             Assert.AreEqual(launchRoot, published.Item1);
             Assert.AreEqual(Path.Combine(launchRoot, Environment.MachineName, "rig.yml"), published.Item2);
+        }
+
+        void AssertEveryReaderTakesTheLaunchsRoot(WorkflowBuilder builder)
+        {
+            var built = builder.Workflow.Build();
+
+            var streamed = Serialize(Node<OpenRigs.LiveView.StreamDevices>(builder).Workflow);
+            Assert.IsTrue(streamed.Contains("BehaviorBoard-Main.Data"), "StreamDevices streams the launch's rig.yml's board");
+            Assert.IsFalse(streamed.Contains("BehaviorBoard-Decoy"), "StreamDevices read the written-in root's rig.yml");
+
+            var recorded = Serialize(Node<OpenRigs.HarpDevices.RecordHarpDevices>(builder).Workflow);
+            Assert.IsTrue(recorded.Contains("BehaviorBoard-Main.Data"), "RecordHarpDevices records the launch's rig.yml's board");
+            Assert.IsFalse(recorded.Contains("BehaviorBoard-Decoy"), "RecordHarpDevices read the written-in root's rig.yml");
+
+            var recorder = Constants(built).Single(value => value != null && value.GetType().FullName == "OpenRigs.Manifest.ManifestRecorder");
+            Assert.AreEqual(launchRoot, Field(recorder, "configRoot"), "the manifest records the launch's rig.yml");
+            var expected = ((System.Collections.IEnumerable)Field(Field(recorder, "expected"), "Entries")).Cast<object>().Select(e => (string)Field(e, "Path")).ToList();
+            CollectionAssert.Contains(expected, "BehaviorBoard-Main/", "the manifest expects the launch's rig.yml's devices: " + string.Join(", ", expected));
+            CollectionAssert.DoesNotContain(expected, "BehaviorBoard-Decoy/");
         }
 
         static T Node<T>(WorkflowBuilder builder) where T : ExpressionBuilder

@@ -383,9 +383,6 @@ namespace OpenRigs.HarpDevices.Tests
                     "behaviorBoard:\n  main:\n    portName: COM3\n    usbSerial: AB0M7PLB\n  spare: none\n" +
                     "licketySplit:\n  left:\n    portName: COM4\n    usbSerial: E664C856C3913E37\n  old: off\n  list: []\n");
                 var sparePlan = HarpDevicePlan.Create(spareConfig, published);
-                var unset = HarpDevicePlan.Create("", published);
-                Check("an unset ConfigRoot stops the workflow at Start, naming it (no lab default)",
-                    unset.StartRefusal != null && unset.StartRefusal.Contains("has no ConfigRoot") && new RecordHarpDevicesSettings().ConfigRoot == null, unset.StartRefusal);
                 Check("an entry holding none, off or [] beside a board stops the workflow at Start, naming it and what it holds",
                     sparePlan.StartRefusal != null && sparePlan.StartRefusal.Contains("the rig.yml entry behaviorBoard: spare: none has no settings, so every behaviorBoard is passed over")
                     && sparePlan.StartRefusal.Contains("the rig.yml entries licketySplit: old: off, licketySplit: list: [] have no settings, so every licketySplit is passed over")
@@ -413,13 +410,15 @@ namespace OpenRigs.HarpDevices.Tests
                 {
                     var xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<WorkflowBuilder Version=\"2.9.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" +
                         " xmlns:rx=\"clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core\" xmlns:harp=\"clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp\" xmlns:sys=\"clr-namespace:System;assembly=mscorlib\"" +
-                        " xmlns:hd=\"clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices\" xmlns=\"https://bonsai-rx.org/2018/workflow\">\n<Workflow><Nodes>" +
+                        " xmlns:hd=\"clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices\" xmlns:core=\"clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core\"" +
+                        " xmlns=\"https://bonsai-rx.org/2018/workflow\">\n<Workflow><Nodes>" +
+                        "<Expression xsi:type=\"core:WorkflowConfigRoot\"><core:ConfigRoot>" + SecurityEscape(config) + "</core:ConfigRoot></Expression>" +
                         "<Expression xsi:type=\"GroupWorkflow\"><Name>Devices</Name><Workflow><Nodes>" +
                         "<Expression xsi:type=\"rx:BehaviorSubject\" TypeArguments=\"harp:HarpMessage\"><rx:Name>BehaviorBoard-Main.Data</rx:Name></Expression>" +
                         "<Expression xsi:type=\"rx:BehaviorSubject\" TypeArguments=\"harp:HarpMessage\"><rx:Name>BehaviorBoard-Main.Commands</rx:Name></Expression>" +
                         "</Nodes><Edges /></Workflow></Expression>" +
                         "<Expression xsi:type=\"rx:BehaviorSubject\" TypeArguments=\"sys:String\"><rx:Name>PathPrefix</rx:Name></Expression>" +
-                        "<Expression xsi:type=\"hd:RecordHarpDevices\"><hd:ConfigRoot>" + SecurityEscape(config) + "</hd:ConfigRoot></Expression>" +
+                        "<Expression xsi:type=\"hd:RecordHarpDevices\" />" +
                         "<Expression xsi:type=\"SubscribeSubject\"><Name>BehaviorBoard-Main.Identity</Name></Expression>" +
                         "</Nodes><Edges /></Workflow>\n</WorkflowBuilder>\n";
                     WorkflowBuilder builder;
@@ -451,27 +450,16 @@ namespace OpenRigs.HarpDevices.Tests
                     using (var writer = XmlWriter.Create(saved, new XmlWriterSettings { Indent = true })) WorkflowBuilder.Serializer.Serialize(writer, copy);
                     using (var reader = XmlReader.Create(new StringReader(saved.ToString()))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
                     node = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<RecordHarpDevices>().Single();
-                    Check("its ConfigRoot survives the editor's copy, a save and a reload", node.ConfigRoot == config, node.ConfigRoot);
                     var rebuilt = Error(() => builder.Workflow.Build());
-                    Check("... and the reloaded workflow builds", rebuilt == null, rebuilt);
+                    Check("the editor's copy, saved and reloaded, builds", rebuilt == null, rebuilt);
 
-                    // A workflow property mapped onto it, as a task maps its ConfigRoot: Bonsai's build
-                    // refuses one unless the generated inner workflow externalizes it.
-                    var mappedXml = xml.Replace("</Nodes><Edges /></Workflow>\n</WorkflowBuilder>",
-                        "<Expression xsi:type=\"ExternalizedMapping\"><Property Name=\"ConfigRoot\" /></Expression>" +
-                        "</Nodes><Edges><Edge From=\"4\" To=\"2\" Label=\"Source1\" /></Edges></Workflow>\n</WorkflowBuilder>");
-                    WorkflowBuilder mapped;
-                    using (var reader = XmlReader.Create(new StringReader(mappedXml))) mapped = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
-                    var mappedBuilt = Error(() => mapped.Workflow.Build());
-                    Check("a workflow property mapped onto it builds", mappedBuilt == null, mappedBuilt);
-                    var moved = Path.Combine(root, "moved");
-                    mapped.Workflow.SetWorkflowProperty("ConfigRoot", moved);
-                    var mappedNode = mapped.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<RecordHarpDevices>().Single();
-                    Check("... and setting it, as --property does, moves the node's ConfigRoot", mappedNode.ConfigRoot == moved, mappedNode.ConfigRoot);
-                    var mappedCopy = new WorkflowBuilder(mapped.Workflow.ToInspectableGraph().FromInspectableGraph());
-                    var mappedCopyNode = mappedCopy.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<RecordHarpDevices>().Single();
-                    var innerMappings = mappedCopyNode.Workflow.Count(n => ExpressionBuilder.Unwrap(n.Value) is ExternalizedMappingBuilder);
-                    Check("... and the editor's copy keeps one inner mapping, not two", innerMappings == 1, innerMappings + " mappings");
+                    // Its only root is the workflow's (ReadLabRig's WorkflowConfigRoot): without one built before it, the build stops.
+                    WorkflowBuilder rootless;
+                    using (var reader = XmlReader.Create(new StringReader(System.Text.RegularExpressions.Regex.Replace(xml, "<Expression xsi:type=\"core:WorkflowConfigRoot\">.*?</Expression>", ""))))
+                        rootless = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+                    var rootlessBuilt = Error(() => rootless.Workflow.Build());
+                    Check("with no ReadLabRig before it, the build stops, saying to include it",
+                        rootlessBuilt != null && rootlessBuilt.Contains("RecordHarpDevices reads rig.yml from the workflow's ConfigRoot") && rootlessBuilt.Contains("include OpenRigs.Devices' ReadLabRig before this node"), rootlessBuilt);
                 }
             }
             finally

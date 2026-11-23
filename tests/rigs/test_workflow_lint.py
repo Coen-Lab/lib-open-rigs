@@ -833,7 +833,7 @@ def test_the_background_noise_plays_from_ready_at_the_lab_s_level_reading_no_tas
         "the noise is not rig.yml's backgroundNoise (ReadBackgroundNoise)"]
 
 
-RECORDS = include(lint.EXPERIMENT_RECORDS, "<ConfigRoot>C:\\Root</ConfigRoot><IngestScript>task</IngestScript><ExpectedFiles>auto;harp;Settings/Settings_Rig_;Settings/Settings_Experiment_;WorkflowData/WorkflowData_Events_</ExpectedFiles>")
+RECORDS = include(lint.EXPERIMENT_RECORDS, "<IngestScript>task</IngestScript><ExpectedFiles>auto;harp;Settings/Settings_Rig_;Settings/Settings_Experiment_;WorkflowData/WorkflowData_Events_</ExpectedFiles>")
 LIVE = '<Expression xsi:type="lv:StreamDevices" xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView" />'
 
 
@@ -879,7 +879,11 @@ def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_pat
                    + include(lint.EXPERIMENT_RECORDS, "<ExpectedFiles>auto</ExpectedFiles>"))
     assert lint.experiment_records_problems(own) == [
         "the workflow has its own ExperimentManifest (ExperimentRecords does)", "the workflow has its own LogControlEvents (ExperimentRecords does)",
-        "ExperimentRecords has no ConfigRoot", "ExperimentRecords has no IngestScript"]
+        "ExperimentRecords has no IngestScript"]
+    # The rig.yml is ReadLabRig's: a ConfigRoot on the include (or on StreamDevices) is one Bonsai stops the build on.
+    rooted = workflow(tmp_path / "f", logs + include(lint.EXPERIMENT_RECORDS, "<ConfigRoot>C:\\Root</ConfigRoot>" + RECORDS.split('.bonsai">', 1)[1].split("</Expression>")[0]) + LIVE)
+    assert lint.experiment_records_problems(rooted) == [
+        "ExperimentRecords sets ConfigRoot, which it no longer takes: the workflow's ConfigRoot reaches it through ReadLabRig"]
     assert lint.experiment_log_problems(own) == ["the workflow does not include LogControlEvents once"]
     # Its manifest's ExpectedFiles is the include's, blank by default, and it records the Harp devices.
     unnamed = workflow(tmp_path / "d", logs + include(lint.EXPERIMENT_RECORDS, "<ExpectedFiles>auto</ExpectedFiles>"))
@@ -1092,6 +1096,9 @@ def test_the_live_view_is_the_last_top_level_node_fed_by_nothing(tmp_path):
     assert lint.live_view_problems(workflow(tmp_path, RECORDS + LIVE)) == []
     assert lint.live_view_problems(workflow(tmp_path / "b", LIVE + RECORDS)) == ["StreamDevices is not the last top-level node"]
     assert lint.live_view_problems(workflow(tmp_path / "c", RECORDS)) == ["the workflow does not have one StreamDevices, at its top level"]
+    rooted = LIVE.replace(" />", "><lv:ConfigRoot>C:\\Root</lv:ConfigRoot></Expression>")
+    assert lint.live_view_problems(workflow(tmp_path / "e", RECORDS + rooted)) == [
+        "StreamDevices sets ConfigRoot, which it no longer takes: the workflow's ConfigRoot reaches it through ReadLabRig"]
     (tmp_path / "d" / "src").mkdir(parents=True)
     (tmp_path / "d" / "src" / "main.bonsai").write_text(HEAD + RECORDS + LIVE + '</Nodes><Edges><Edge From="0" To="1" Label="Source1" /></Edges></Workflow></WorkflowBuilder>', encoding="utf-8")
     assert lint.live_view_problems(lint.Workflow(tmp_path / "d")) == ["StreamDevices has an edge into or out of it"]

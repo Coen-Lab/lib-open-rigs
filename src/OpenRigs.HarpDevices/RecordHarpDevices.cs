@@ -13,7 +13,8 @@ namespace OpenRigs.HarpDevices
 {
     /// <summary>
     /// Every Harp device on a rig checked and recorded, in one node, with nothing typed per
-    /// device. At build it reads this machine's rig.yml and, for each device entry with a
+    /// device. At build it reads this machine's rig.yml under the workflow's ConfigRoot (ReadLabRig's,
+    /// built before it) and, for each device entry with a
     /// portName whose data the workflow publishes as HarpMessage under &lt;Kind-Instance&gt;.Data,
     /// adds to its own inner workflow a RecordHarpDevice (the board's USB serial checked at Start;
     /// its registers and register map written into each experiment) and, when the workflow publishes
@@ -22,9 +23,7 @@ namespace OpenRigs.HarpDevices
     /// found, so it goes after the devices and LogController; with no PathPrefix before it, the workflow
     /// stops at Start saying so. ExperimentManifest expects the two files with harp in its ExpectedFiles.
     /// </summary>
-    [DefaultProperty(nameof(ConfigRoot))]
-    [TypeDescriptionProvider(typeof(RecordHarpDevicesTypeDescriptionProvider))]
-    [Description("Checks every Harp device in this machine's rig.yml at Start (its USB serial, usbSerial in rig.yml) and writes its registers and register map into each experiment folder, as <Name>/<Name>_device.json and <Name>/<Name>.yml. Finds each device as <Kind-Instance>.Data and asks for a register dump on <Kind-Instance>.Commands. Put it after the devices and LogController; give ExperimentManifest's ExpectedFiles harp to expect the files.")]
+    [Description("Checks every Harp device in this machine's rig.yml (under ReadLabRig's ConfigRoot, the workflow's) at Start (its USB serial, usbSerial in rig.yml) and writes its registers and register map into each experiment folder, as <Name>/<Name>_device.json and <Name>/<Name>.yml. Finds each device as <Kind-Instance>.Data and asks for a register dump on <Kind-Instance>.Commands. Put it after the devices and LogController; give ExperimentManifest's ExpectedFiles harp to expect the files.")]
     public class RecordHarpDevices : GroupWorkflowBuilder
     {
         // The plan the inner workflow was last made from. The editor builds on every change, so
@@ -34,34 +33,13 @@ namespace OpenRigs.HarpDevices
         /// <summary>Initializes a new instance of the <see cref="RecordHarpDevices"/> class.</summary>
         public RecordHarpDevices()
         {
-            GroupNode.Externalize(Workflow, Settings, "ConfigRoot");
         }
 
-        /// <summary>
-        /// Initializes a copy with the given inner workflow. Bonsai copies a group by this
-        /// constructor (the editor's working copy, the player's when it shows a layout, every
-        /// save), passing only the Name, Description and inner workflow, so the settings live in
-        /// that workflow (RecordHarpDevicesSettings), as StreamDevices' do.
-        /// </summary>
+        /// <summary>Initializes a copy with the given inner workflow (Bonsai's copies of a group).</summary>
         /// <param name="workflow">The inner workflow to copy.</param>
         public RecordHarpDevices(ExpressionBuilderGraph workflow)
             : base(workflow)
         {
-            GroupNode.Externalize(Workflow, Settings, "ConfigRoot");
-        }
-
-        /// <summary>Gets or sets the root under which each machine has its own configuration directory.</summary>
-        [Category("Config")]
-        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml. Read when the workflow is built; a missing file records no devices, and unset the workflow stops at Start. The workflow's own ConfigRoot (ReadLabRig's, built before this node) is taken over this one, which is the default for a workflow without ReadLabRig.")]
-        public string ConfigRoot
-        {
-            get { return Settings.ConfigRoot; }
-            set { Settings.ConfigRoot = value; }
-        }
-
-        RecordHarpDevicesSettings Settings
-        {
-            get { return GroupNode.Settings<RecordHarpDevicesSettings>(Workflow); }
         }
 
         /// <summary>Remakes the inner workflow if rig.yml or the subjects published have changed, then builds it.</summary>
@@ -69,7 +47,7 @@ namespace OpenRigs.HarpDevices
         /// <returns>The inner workflow's expression.</returns>
         public override Expression Build(IEnumerable<Expression> arguments)
         {
-            var plan = HarpDevicePlan.Create(GroupNode.WorkflowConfigRoot(this) ?? ConfigRoot, name => GroupNode.PublishedType(this, name));
+            var plan = HarpDevicePlan.Create(GroupNode.WorkflowConfigRoot(this, "RecordHarpDevices"), name => GroupNode.PublishedType(this, name));
             var signature = plan.Signature();
             if (signature != generatedFrom)
             {
@@ -95,19 +73,15 @@ namespace OpenRigs.HarpDevices
                 content.Add(Group(device.Name, Summary(device), Device(device)));
             }
             var workflow = Workflow;
-            var settings = Settings;
             var inspectable = workflow.Any(node => node.Value is InspectBuilder);
-            foreach (var node in workflow.ToList())
-            {
-                var kept = GroupNode.Unwrap(node.Value);
-                if (kept != settings && !(kept is ExternalizedMappingBuilder)) workflow.Remove(node);
-            }
+            var old = workflow.ToList();
             var description = "Made from this machine's rig.yml each time the workflow is built; edits here are lost." +
                 (plan.Notes.Count > 0 ? " Notes: " + string.Join("; ", plan.Notes) + "." : "");
             var group = new ExpressionBuilderGraph();
             group.Add(Group("HarpDevices", description, content));
             if (inspectable) group = group.ToInspectableGraph();
             workflow.Add(group.Single().Value);
+            foreach (var node in old) workflow.Remove(node);
         }
 
         static string Summary(PlannedHarpDevice device)
@@ -154,35 +128,6 @@ namespace OpenRigs.HarpDevices
         static GroupWorkflowBuilder Group(string name, string description, ExpressionBuilderGraph workflow)
         {
             return new GroupWorkflowBuilder(workflow) { Name = name, Description = description };
-        }
-    }
-
-    /// <summary>
-    /// RecordHarpDevices' settings, kept as a node in its inner workflow so that they survive
-    /// Bonsai's copies of the group. Set them on RecordHarpDevices; this node builds to nothing.
-    /// </summary>
-    [Description("RecordHarpDevices' settings (ConfigRoot), kept here so Bonsai's copies of the group keep them. Set them on RecordHarpDevices.")]
-    public class RecordHarpDevicesSettings : ZeroArgumentExpressionBuilder
-    {
-        /// <summary>Gets or sets RecordHarpDevices' ConfigRoot.</summary>
-        public string ConfigRoot { get; set; }
-
-        /// <summary>Builds to an empty sequence: the node only holds the settings.</summary>
-        /// <param name="arguments">None.</param>
-        /// <returns>An empty sequence.</returns>
-        public override Expression Build(IEnumerable<Expression> arguments)
-        {
-            return Expression.Constant(Observable.Empty<Unit>(), typeof(IObservable<Unit>));
-        }
-    }
-
-    // RecordHarpDevices' own settings in the Properties panel: its inner workflow is generated and
-    // externalizes only ConfigRoot, for a workflow property to be mapped onto it.
-    class RecordHarpDevicesTypeDescriptionProvider : ShownPropertiesProvider
-    {
-        public RecordHarpDevicesTypeDescriptionProvider()
-            : base("ConfigRoot")
-        {
         }
     }
 }

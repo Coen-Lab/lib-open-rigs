@@ -75,8 +75,8 @@ namespace OpenRigs.Shared
 
         /// <summary>
         /// Makes the workflow's ConfigRoot known to the nodes built after this one that read rig.yml when the
-        /// workflow is built (StreamDevices, RecordHarpDevices, ExperimentManifest), with no edge to them: an edge
-        /// would build them before the subjects they look for.
+        /// workflow is built (StreamDevices, RecordHarpDevices, ExperimentManifest), their only root, with no edge to
+        /// them: an edge would build them before the subjects they look for.
         /// </summary>
         public static void PublishConfigRoot(WorkflowExpressionBuilder node, string configRoot)
         {
@@ -99,14 +99,25 @@ namespace OpenRigs.Shared
         }
 
         /// <summary>
-        /// The workflow's ConfigRoot (ReadLabRig's), when it was built before this node and is set; else null, and
-        /// the node keeps its own.
+        /// The workflow's ConfigRoot, ReadLabRig's (OpenRigs.Core WorkflowConfigRoot), the only root a node that reads
+        /// rig.yml when the workflow is built takes. Stops the build, naming the node, when ReadLabRig is not built
+        /// before it or its ConfigRoot is not set.
         /// </summary>
-        public static string WorkflowConfigRoot(WorkflowExpressionBuilder node)
+        public static string WorkflowConfigRoot(WorkflowExpressionBuilder node, string nodeName)
         {
             var variable = Subject(node, ConfigRootVariable) as ParameterExpression;
             string root;
-            return variable != null && ConfigRoots.TryGetValue(variable, out root) && !string.IsNullOrWhiteSpace(root) ? root : null;
+            if (variable == null || !ConfigRoots.TryGetValue(variable, out root))
+            {
+                throw new InvalidOperationException(nodeName + " reads rig.yml from the workflow's ConfigRoot, and none was built before it: " +
+                    "include OpenRigs.Devices' ReadLabRig before this node, with the workflow's ConfigRoot mapped onto it.");
+            }
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                throw new InvalidOperationException(nodeName + " reads rig.yml from the workflow's ConfigRoot, which is not set: " +
+                    "set ConfigRoot, the folder holding <MACHINE-NAME>\\rig.yml, on ReadLabRig or as the workflow's property.");
+            }
+            return root;
         }
 
         /// <summary>The element type of the subject published under this name, or null if there is none.</summary>

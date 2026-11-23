@@ -761,8 +761,9 @@ def background_noise_problems(wf: Workflow) -> list[str]:
 
 def experiment_records_problems(wf: Workflow) -> list[str]:
     """The experiment's records are OpenRigs.Logging's ExperimentRecords (LogControlEvents, RecordHarpDevices,
-    ExperimentManifest), included once with ConfigRoot, IngestScript and ExpectedFiles set, as the last top-level node
-    but StreamDevices: RecordHarpDevices and ExperimentManifest find each device by the subjects published before them.
+    ExperimentManifest), included once with IngestScript and ExpectedFiles set, as the last top-level node but
+    StreamDevices: RecordHarpDevices and ExperimentManifest find each device by the subjects published before them. Their
+    rig.yml is the workflow's, ReadLabRig's, so the include takes no ConfigRoot (Bonsai stops the build on one).
     The workflow has none of the three of its own. Rewards are not records: Rewards is the workflow's own include."""
     count = wf.text.count(f'Path="{EXPERIMENT_RECORDS}"')
     if count != 1:
@@ -777,7 +778,9 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
         problems.append("ExperimentRecords is not the last top-level node (StreamDevices alone may follow)")
     else:
         props = _properties(top[at])
-        problems += [f"ExperimentRecords has no {p}" for p in ("ConfigRoot", "IngestScript", "ExpectedFiles") if not props.get(p)]
+        problems += [f"ExperimentRecords has no {p}" for p in ("IngestScript", "ExpectedFiles") if not props.get(p)]
+        if "ConfigRoot" in props:
+            problems.append("ExperimentRecords sets ConfigRoot, which it no longer takes: the workflow's ConfigRoot reaches it through ReadLabRig")
     return problems
 
 
@@ -830,12 +833,15 @@ def _top(wf: Workflow) -> tuple[list[ET.Element], list[tuple[int, int, str]]]:
 def live_view_problems(wf: Workflow) -> list[str]:
     """The live view is one OpenRigs.LiveView StreamDevices, the workflow's last top-level node (_top: a thin entry's
     shared include may hold it), with no edge into or out of it: it streams only the subjects built before it, and an
-    edge into it builds it before them, so it streams nothing (a task shipped that way)."""
+    edge into it builds it before them, so it streams nothing (a task shipped that way). Its rig.yml is the workflow's,
+    ReadLabRig's, so it takes no ConfigRoot (Bonsai stops the build on one)."""
     nodes, edges = _top(wf)
     live = [i for i, n in enumerate(nodes) if kind(n).endswith(":StreamDevices")]
     if len(live) != 1 or len([e for e in wf.root.iter(W + "Expression") if kind(e).endswith(":StreamDevices")]) != 1:
         return ["the workflow does not have one StreamDevices, at its top level"]
     problems = [] if live[0] == len(nodes) - 1 else ["StreamDevices is not the last top-level node"]
+    if any(e.tag.rsplit("}", 1)[-1] == "ConfigRoot" for e in nodes[live[0]]):
+        problems.append("StreamDevices sets ConfigRoot, which it no longer takes: the workflow's ConfigRoot reaches it through ReadLabRig")
     return problems + (["StreamDevices has an edge into or out of it"] if any(live[0] in e[:2] for e in edges) else [])
 
 

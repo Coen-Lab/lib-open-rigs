@@ -13,12 +13,13 @@ namespace OpenRigs.Core
     /// <summary>
     /// The workflow's ConfigRoot, once per workflow (in OpenRigs.Devices' ReadLabRig): emits it once, and makes it
     /// known when the workflow is built to every node after it that reads rig.yml then (OpenRigs.LiveView's
-    /// StreamDevices, OpenRigs.HarpDevices' RecordHarpDevices, OpenRigs.Manifest's ExperimentManifest), which take it
-    /// over their own ConfigRoot. So a launch's ConfigRoot reaches every reader of rig.yml with no edge to any of them.
+    /// StreamDevices, OpenRigs.HarpDevices' RecordHarpDevices, OpenRigs.Manifest's ExperimentManifest), their only root:
+    /// with none built before them, they stop the build. So a launch's ConfigRoot reaches every reader of rig.yml with no
+    /// edge to any of them.
     /// </summary>
     [DefaultProperty(nameof(ConfigRoot))]
     [TypeDescriptionProvider(typeof(WorkflowConfigRootTypeDescriptionProvider))]
-    [Description("Emits the workflow's ConfigRoot once, and gives it at build to every node after it that reads rig.yml when the workflow is built (StreamDevices, RecordHarpDevices, ExperimentManifest), over their own ConfigRoot. Once per workflow, in ReadLabRig.")]
+    [Description("Emits the workflow's ConfigRoot once, and gives it at build to every node after it that reads rig.yml when the workflow is built (StreamDevices, RecordHarpDevices, ExperimentManifest), their only root. Once per workflow, in ReadLabRig.")]
     public class WorkflowConfigRoot : GroupWorkflowBuilder
     {
         /// <summary>Initializes a new instance of the <see cref="WorkflowConfigRoot"/> class.</summary>
