@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Devices.Rigs;
 
@@ -41,6 +42,8 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual("Dev1/ao2", zapit.LaserChannelPath);
             Assert.AreEqual("Dev1/ao3", zapit.LedChannelPath);
             Assert.AreEqual("Dev1/ai0", zapit.PhotodiodeChannelPath);
+            Assert.AreEqual("Dev1/ai1", zapit.PhotodiodeTerminalPath);
+            CollectionAssert.AreEqual(new[] { 0.3, -0.12, 0.25 }, zapit.BlankingTimesMs.ToArray());
             Assert.AreEqual("/Dev1/PFI0", zapit.TriggerTerminal);
             Assert.AreEqual(100000.0, zapit.SampleRate);
             Assert.AreEqual("software", zapit.SafetyGate.Layer);

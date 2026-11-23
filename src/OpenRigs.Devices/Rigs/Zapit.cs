@@ -27,6 +27,10 @@ namespace OpenRigs.Devices.Rigs
         [JsonIgnore, YamlIgnore]
         public string PhotodiodeChannelPath { get { return Path(PhotodiodeChannel); } }
 
+        /// <summary>Gets the calibration photodiode's AI channel as ZapitDaq takes it, or null when the rig gives none.</summary>
+        [JsonIgnore, YamlIgnore]
+        public string PhotodiodeTerminalPath { get { return PhotodiodeTerminal == null ? null : Path(PhotodiodeTerminal); } }
+
         /// <summary>Gets the trigger's PFI terminal as ZapitDaq takes it, such as /Dev1/PFI0.</summary>
         [JsonIgnore, YamlIgnore]
         public string TriggerTerminal { get { return "/" + Path(TriggerChannel); } }

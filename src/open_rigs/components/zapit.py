@@ -119,6 +119,8 @@ class Zapit(BaseSchema):
     laser_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao2"], description="The AO line setting the laser's power (its control volts).")
     led_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao3"], description="The AO line driving the masking LED.")
     photodiode_channel: Optional[str] = Field(default=None, pattern=r"^ai\d+$", examples=["ai0"], description="The AI line reading the photodiode, for the laser curve.")
+    photodiode_terminal: Optional[str] = Field(default=None, pattern=r"^ai\d+$", examples=["ai0"], description="The AI line of the calibration photodiode the Zapit calibration workflow reads; optional, and not part of the native fields a block gives together.")
+    blanking_times_ms: Optional[List[float]] = Field(default=None, min_length=3, max_length=3, description="The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the native fields a block gives together.")
     trigger_channel: Optional[str] = Field(default=None, pattern=r"^PFI\d+$", examples=["PFI0"], description="The PFI line the Behavior board's ZapitTrigger line is cabled to; each trial starts on it.")
     sample_rate: Optional[float] = Field(default=None, gt=0, examples=[100000], description="AO samples a second, per channel; every bank is built at it.")
     laser_min_max_mw: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.")

@@ -4481,6 +4481,10 @@ namespace OpenRigs.Devices.Rigs
     
         private string _photodiodeChannel;
     
+        private string _photodiodeTerminal;
+    
+        private System.Collections.Generic.List<double> _blankingTimesMs;
+    
         private string _triggerChannel;
     
         private double? _sampleRate;
@@ -4527,6 +4531,8 @@ namespace OpenRigs.Devices.Rigs
             _laserChannel = other._laserChannel;
             _ledChannel = other._ledChannel;
             _photodiodeChannel = other._photodiodeChannel;
+            _photodiodeTerminal = other._photodiodeTerminal;
+            _blankingTimesMs = other._blankingTimesMs;
             _triggerChannel = other._triggerChannel;
             _sampleRate = other._sampleRate;
             _laserMinMaxMw = other._laserMinMaxMw;
@@ -4703,6 +4709,46 @@ namespace OpenRigs.Devices.Rigs
             set
             {
                 _photodiodeChannel = value;
+            }
+        }
+    
+        /// <summary>
+        /// The AI line of the calibration photodiode the Zapit calibration workflow reads; optional, and not part of the native fields a block gives together.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("photodiodeTerminal")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="photodiodeTerminal")]
+        [System.ComponentModel.DescriptionAttribute("The AI line of the calibration photodiode the Zapit calibration workflow reads; o" +
+            "ptional, and not part of the native fields a block gives together.")]
+        public string PhotodiodeTerminal
+        {
+            get
+            {
+                return _photodiodeTerminal;
+            }
+            set
+            {
+                _photodiodeTerminal = value;
+            }
+        }
+    
+        /// <summary>
+        /// The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the native fields a block gives together.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("blankingTimesMs")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="blankingTimesMs")]
+        [System.ComponentModel.DescriptionAttribute("The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads " +
+            "them. Absent, lib_zapit uses MATLAB\'s 0.3, -0.12, 0.25. Optional, and not part o" +
+            "f the native fields a block gives together.")]
+        public System.Collections.Generic.List<double> BlankingTimesMs
+        {
+            get
+            {
+                return _blankingTimesMs;
+            }
+            set
+            {
+                _blankingTimesMs = value;
             }
         }
     
@@ -4969,6 +5015,8 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("LaserChannel = " + _laserChannel + ", ");
             stringBuilder.Append("LedChannel = " + _ledChannel + ", ");
             stringBuilder.Append("PhotodiodeChannel = " + _photodiodeChannel + ", ");
+            stringBuilder.Append("PhotodiodeTerminal = " + _photodiodeTerminal + ", ");
+            stringBuilder.Append("BlankingTimesMs = " + _blankingTimesMs + ", ");
             stringBuilder.Append("TriggerChannel = " + _triggerChannel + ", ");
             stringBuilder.Append("SampleRate = " + _sampleRate + ", ");
             stringBuilder.Append("LaserMinMaxMw = " + _laserMinMaxMw + ", ");

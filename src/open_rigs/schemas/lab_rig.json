@@ -1889,6 +1889,41 @@
           ],
           "title": "PhotodiodeChannel"
         },
+        "photodiodeTerminal": {
+          "anyOf": [
+            {
+              "pattern": "^ai\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The AI line of the calibration photodiode the Zapit calibration workflow reads; optional, and not part of the native fields a block gives together.",
+          "examples": [
+            "ai0"
+          ],
+          "title": "PhotodiodeTerminal"
+        },
+        "blankingTimesMs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the native fields a block gives together.",
+          "title": "BlankingTimesMs"
+        },
         "triggerChannel": {
           "anyOf": [
             {
