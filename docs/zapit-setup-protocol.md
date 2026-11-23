@@ -4,14 +4,14 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
 
 ## Channels
 
-- **Commands.** The agent sends `{"cmd": "command", "name": <name>, "args": <path>}`. The piece `Zapit` declares four commands, and only on a rig with a `zapit` block:
-  - `Zapit.Setup`
-  - `Zapit.Still`
-  - `Zapit.LoadBank`
-  - `Zapit.LaserOff`
+- **Commands.** The agent sends `{"cmd": "command", "name": <name>, "args": <path>}`. The device `Zapit-Main` declares four commands, and only on a rig with a `zapit` block:
+  - `Zapit-Main.Setup`
+  - `Zapit-Main.Still`
+  - `Zapit-Main.LoadBank`
+  - `Zapit-Main.LaserOff`
 
   A rig without the block declares none of them, so the agent finds out whether the rig has Zapit from `status.commands`.
-- **State.** `status.metrics["Zapit.Setup"]` holds the latest stage as `<Stage> <detail>`. The stages are:
+- **State.** `status.metrics["Zapit-Main.Setup"]` holds the latest stage as `<Stage> <detail>`. The stages are:
   - `Pointing <folder or png>`
   - `FramesSaved <folder>`
   - `StillSaved <png>`
@@ -37,9 +37,9 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
 ## Order
 
-1. **Launch.** The workflow opens ZapitDaq and the Zapit camera, then reports Ready. Before step 2, the agent waits until `Zapit.Setup` appears in `status.commands` and Camera-Zapit frames arrive in live view.
-2. **Still.** The agent sends `Zapit.Still <new png>`. The workflow zeroes the lines, saves the next frame and reports `StillSaved <png>`. The scanner settings come from the still's size, so the still comes first. The agent may take a new still as often as needed.
-3. **Scanner grid.** The agent writes `grid.json` into a new `Frames_<DT>` folder and sends `Zapit.Setup <folder>`.
+1. **Launch.** The workflow opens ZapitDaq and the Zapit camera, then reports Ready. Before step 2, the agent waits until `Zapit-Main.Setup` appears in `status.commands` and Camera-Zapit frames arrive in live view.
+2. **Still.** The agent sends `Zapit-Main.Still <new png>`. The workflow zeroes the lines, saves the next frame and reports `StillSaved <png>`. The scanner settings come from the still's size, so the still comes first. The agent may take a new still as often as needed.
+3. **Scanner grid.** The agent writes `grid.json` into a new `Frames_<DT>` folder and sends `Zapit-Main.Setup <folder>`.
    - For each point, the workflow points the galvos with the laser on (ZapitDaq `Point`), waits for `Pointed`, skips `skipFrames` frames and saves the next one.
    - It then saves `backgrounds` frames with the laser off at the last point.
    - Finally it zeroes every line and reports `FramesSaved <folder>`.
@@ -48,7 +48,7 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
    With `ceilingMw` 0 (laser disabled) there is no beam: the agent sends no grid, takes the nominal scanner mapping as the fit and has no accuracy.
 5. **Sample.** The agent registers the still against the mouse's last reference, or asks for bregma and lambda clicks.
-6. **Bank.** The agent builds the bank into `pending\` and checks it with lib_zapit's `read_bank`. It then sends `Zapit.LoadBank <json>`, and the workflow reports `Loading <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
+6. **Bank.** The agent builds the bank into `pending\` and checks it with lib_zapit's `read_bank`. It then sends `Zapit-Main.LoadBank <json>`, and the workflow reports `Loading <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
 7. **Go.** Readiness requires all of the following:
    - the metric reads `BankLoaded` with the bank the agent built;
    - the fit, accuracy and sample have been accepted;
@@ -76,7 +76,7 @@ The workflow reports `Refused <why>` and keeps running if a request:
 - names a bank that is not a `.json`;
 - arrives while another Setup or Still is in progress.
 
-A bank that ZapitDaq refuses (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit.Setup`, `Zapit.Still` and `Zapit.LoadBank`, and the metric stays where it was, so the agent must not send them. `Zapit.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
+A bank that ZapitDaq refuses (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still` and `Zapit-Main.LoadBank`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
 
 ## Reruns
 
@@ -84,7 +84,7 @@ Before Go, any step can be repeated:
 
 - a new grid folder for the scanner fit or accuracy;
 - a new still for the sample;
-- a new `Zapit.LoadBank`, which replaces the loaded bank.
+- a new `Zapit-Main.LoadBank`, which replaces the loaded bank.
 
 The workflow keeps no setup state of its own beyond the loaded bank.
 

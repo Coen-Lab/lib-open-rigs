@@ -15,7 +15,7 @@ namespace OpenRigs.Zapit
     /// <summary>One step of Zapit's setup phase: a command for ZapitDaq, or a stage to report, or both.</summary>
     public class ZapitSetupStep
     {
-        /// <summary>The stage, as the Zapit.Setup metric reports it: Pointing, FramesSaved, StillSaved, Loading or Refused.</summary>
+        /// <summary>The stage, as the Zapit-Main.Setup metric reports it: Pointing, FramesSaved, StillSaved, Loading or Refused.</summary>
         public string Stage { get; set; } = "";
 
         /// <summary>The run folder or still file the stage is about, or why a request was refused.</summary>
@@ -24,7 +24,7 @@ namespace OpenRigs.Zapit
         /// <summary>The command for ZapitDaq, or null.</summary>
         public ZapitDaqCommand? Command { get; set; }
 
-        /// <summary>The step as the Zapit.Setup metric: the stage, a space, the detail.</summary>
+        /// <summary>The step as the Zapit-Main.Setup metric: the stage, a space, the detail.</summary>
         public override string ToString() => Stage + " " + Detail;
     }
 
@@ -37,7 +37,7 @@ namespace OpenRigs.Zapit
     /// reports FramesSaved. A run with no camera frame within 2 s of Pointed (or of its last frame) is refused and zeroed. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
     /// </summary>
     [Combinator]
-    [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named; each bank .json in pending is loaded (LoadBank). Inputs: grid run folders, still paths, bank paths, ZapitDaq's events, the camera's images. Output: ZapitDaq commands and the stages to report as Zapit.Setup.")]
+    [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named; each bank .json in pending is loaded (LoadBank). Inputs: grid run folders, still paths, bank paths, ZapitDaq's events, the camera's images. Output: ZapitDaq commands and the stages to report as Zapit-Main.Setup.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class ZapitSetupCapture
     {
@@ -244,7 +244,7 @@ namespace OpenRigs.Zapit
         /// <summary>The bank, after checking it was built from <paramref name="conditionsPath"/> and holds <paramref name="laserPowerMw"/> for every condition.</summary>
         public static ZapitBank Check(ZapitBank bank, string conditionsPath, double laserPowerMw)
         {
-            if (bank == null) throw new InvalidOperationException("No Zapit bank was loaded before Go: Zapit's setup (Zapit.LoadBank) must finish first.");
+            if (bank == null) throw new InvalidOperationException("No Zapit bank was loaded before Go: Zapit's setup (Zapit-Main.LoadBank) must finish first.");
             bank.Verify(conditionsPath, null, null, null);
             foreach (var condition in bank.Conditions) bank.Variant(condition.Condition, true, laserPowerMw);
             return bank;
