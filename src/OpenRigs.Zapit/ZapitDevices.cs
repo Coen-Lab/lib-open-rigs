@@ -17,7 +17,7 @@ namespace OpenRigs.Zapit
         public string Photodiode { get; set; } = "";
 
         /// <summary>How the photodiode is wired.</summary>
-        public ZapitInputTerminal PhotodiodeTerminal { get; set; }
+        public ZapitInputTerminal PhotodiodeTerminalConfiguration { get; set; }
 
         /// <summary>The device's AO sample clock terminal, which the photodiode AI follows.</summary>
         public string AnalogOutputClock => "/" + AnalogOutputs[0].Split('/')[0] + "/ao/SampleClock";
@@ -163,7 +163,7 @@ namespace OpenRigs.Zapit
             int count = samples.GetLength(1);
             using var input = new NiTask("ZapitPhotodiode");
             using var output = AnalogOutputTask("ZapitStaircase");
-            var terminal = wiring.PhotodiodeTerminal switch
+            var terminal = wiring.PhotodiodeTerminalConfiguration switch
             {
                 ZapitInputTerminal.Nrse => AITerminalConfiguration.Nrse,
                 ZapitInputTerminal.Differential => AITerminalConfiguration.Differential,

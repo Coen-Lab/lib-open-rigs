@@ -1889,23 +1889,6 @@
           ],
           "title": "PhotodiodeChannel"
         },
-        "photodiodeTerminal": {
-          "anyOf": [
-            {
-              "pattern": "^ai\\d+$",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The AI line of the calibration photodiode the Zapit calibration workflow reads; optional, and not part of the native fields a block gives together.",
-          "examples": [
-            "ai0"
-          ],
-          "title": "PhotodiodeTerminal"
-        },
         "blankingTimesMs": {
           "anyOf": [
             {

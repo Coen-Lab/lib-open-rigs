@@ -144,7 +144,6 @@ zapit:
   laserChannel: ao2
   ledChannel: ao3
   photodiodeChannel: ai0
-  photodiodeTerminal: ai1
   triggerChannel: PFI0
   sampleRate: 100000
   laserMinMaxMw: [0.0, 50.1]

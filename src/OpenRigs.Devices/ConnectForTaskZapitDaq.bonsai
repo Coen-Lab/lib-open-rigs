@@ -95,7 +95,7 @@
                 <zap:LaserChannel>UNMAPPED</zap:LaserChannel>
                 <zap:LedChannel>UNMAPPED</zap:LedChannel>
                 <zap:PhotodiodeChannel>UNMAPPED</zap:PhotodiodeChannel>
-                <zap:PhotodiodeTerminal>Rse</zap:PhotodiodeTerminal>
+                <zap:PhotodiodeTerminalConfiguration>Rse</zap:PhotodiodeTerminalConfiguration>
                 <zap:TriggerTerminal>UNMAPPED</zap:TriggerTerminal>
                 <zap:SampleRate>0</zap:SampleRate>
                 <zap:MaxTrialSeconds>0</zap:MaxTrialSeconds>

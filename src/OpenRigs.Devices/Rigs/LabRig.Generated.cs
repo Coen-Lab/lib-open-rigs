@@ -4481,8 +4481,6 @@ namespace OpenRigs.Devices.Rigs
     
         private string _photodiodeChannel;
     
-        private string _photodiodeTerminal;
-    
         private System.Collections.Generic.List<double> _blankingTimesMs;
     
         private string _triggerChannel;
@@ -4531,7 +4529,6 @@ namespace OpenRigs.Devices.Rigs
             _laserChannel = other._laserChannel;
             _ledChannel = other._ledChannel;
             _photodiodeChannel = other._photodiodeChannel;
-            _photodiodeTerminal = other._photodiodeTerminal;
             _blankingTimesMs = other._blankingTimesMs;
             _triggerChannel = other._triggerChannel;
             _sampleRate = other._sampleRate;
@@ -4709,25 +4706,6 @@ namespace OpenRigs.Devices.Rigs
             set
             {
                 _photodiodeChannel = value;
-            }
-        }
-    
-        /// <summary>
-        /// The AI line of the calibration photodiode the Zapit calibration workflow reads; optional, and not part of the native fields a block gives together.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("photodiodeTerminal")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="photodiodeTerminal")]
-        [System.ComponentModel.DescriptionAttribute("The AI line of the calibration photodiode the Zapit calibration workflow reads; o" +
-            "ptional, and not part of the native fields a block gives together.")]
-        public string PhotodiodeTerminal
-        {
-            get
-            {
-                return _photodiodeTerminal;
-            }
-            set
-            {
-                _photodiodeTerminal = value;
             }
         }
     
@@ -5015,7 +4993,6 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("LaserChannel = " + _laserChannel + ", ");
             stringBuilder.Append("LedChannel = " + _ledChannel + ", ");
             stringBuilder.Append("PhotodiodeChannel = " + _photodiodeChannel + ", ");
-            stringBuilder.Append("PhotodiodeTerminal = " + _photodiodeTerminal + ", ");
             stringBuilder.Append("BlankingTimesMs = " + _blankingTimesMs + ", ");
             stringBuilder.Append("TriggerChannel = " + _triggerChannel + ", ");
             stringBuilder.Append("SampleRate = " + _sampleRate + ", ");

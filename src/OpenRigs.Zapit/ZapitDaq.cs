@@ -49,7 +49,7 @@ namespace OpenRigs.Zapit
 
         /// <summary>How the photodiode is wired.</summary>
         [Description("How the photodiode is wired.")]
-        public ZapitInputTerminal PhotodiodeTerminal { get; set; }
+        public ZapitInputTerminal PhotodiodeTerminalConfiguration { get; set; }
 
         /// <summary>The trigger line trials start on, such as /Dev1/PFI0.</summary>
         [Description("The trigger line trials start on, such as /Dev1/PFI0.")]
@@ -82,7 +82,7 @@ namespace OpenRigs.Zapit
             {
                 AnalogOutputs = new[] { GalvoXChannel, GalvoYChannel, LaserChannel, LedChannel },
                 Photodiode = PhotodiodeChannel,
-                PhotodiodeTerminal = PhotodiodeTerminal,
+                PhotodiodeTerminalConfiguration = PhotodiodeTerminalConfiguration,
             };
             if (DeviceFactory == null && !Simulated && (wiring.AnalogOutputs.Any(string.IsNullOrEmpty) || string.IsNullOrEmpty(PhotodiodeChannel)))
                 throw new InvalidOperationException("ZapitDaq needs its four AO channels and the photodiode channel (rig.yml's zapit block).");
