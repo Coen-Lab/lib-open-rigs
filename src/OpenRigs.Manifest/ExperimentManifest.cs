@@ -61,7 +61,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>Gets or sets the root under which this machine's rig.yml is, which {RigFiles} reads.</summary>
-        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml, the workflow's own (OpenRigs.Logging's ExperimentRecords maps it), which ConfigFiles' {RigFiles} reads. Unset with {RigFiles} in ConfigFiles, the workflow stops at Start.")]
+        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml, the workflow's own (OpenRigs.Logging's ExperimentRecords maps it), which ConfigFiles' {RigFiles} reads. Unset with {RigFiles} in ConfigFiles, the workflow stops at Start. The workflow's own ConfigRoot (ReadLabRig's, built before this node) is taken over this one, which is the default for a workflow without ReadLabRig.")]
         public string ConfigRoot
         {
             get { return Settings.ConfigRoot; }
@@ -130,10 +130,11 @@ namespace OpenRigs.Manifest
             {
                 throw new InvalidOperationException("ExperimentManifest needs " + PathSubject + " to be a string, the experiment folder's path; this workflow's is " + pathType + ".");
             }
-            var refusal = ManifestWriter.ConfigRootRefusal(ConfigFiles, ConfigRoot);
+            var configRoot = GroupNode.WorkflowConfigRoot(this) ?? ConfigRoot;
+            var refusal = ManifestWriter.ConfigRootRefusal(ConfigFiles, configRoot);
             if (refusal != null) throw new InvalidOperationException(refusal);
             Manifest.TrialColumns.Streams(StreamColumns);
-            var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles, ConfigRoot), name => GroupNode.PublishedType(this, name));
+            var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles, configRoot), name => GroupNode.PublishedType(this, name));
             // Each condition (path?Subject) is a bool subject published before this node; one that is not is required always, with a note.
             var names = new List<string>();
             var subjects = new List<Expression>();
@@ -151,7 +152,7 @@ namespace OpenRigs.Manifest
             }
             var conditions = Expression.Call(typeof(ManifestRecorder).GetMethod(nameof(ManifestRecorder.Conditions)),
                 Expression.Constant(names.ToArray()), Expression.NewArrayInit(typeof(IObservable<bool>), subjects));
-            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, ConfigRoot, expected, TrialColumns, StreamColumns));
+            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, configRoot, expected, TrialColumns, StreamColumns));
             var observablePath = Expression.Convert(path, typeof(IObservable<string>));
             var run = arguments.FirstOrDefault();
             if (run == null)

@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices"
+                 xmlns:mf="clr-namespace:OpenRigs.Manifest;assembly=OpenRigs.Manifest"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>A lab workflow's shape: ConfigRoot a workflow property mapped onto ReadLabRig alone, and the nodes that read rig.yml when the workflow is built with the lab's root written in (DECOY_ROOT). WorkflowConfigRootTests sets ConfigRoot to another folder.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="ConfigRoot" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>DECOY_ROOT</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>BehaviorBoard-Main.Data</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>BehaviorBoard-Decoy.Data</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:String">
+        <rx:Name>PathPrefix</rx:Name>
+      </Expression>
+      <Expression xsi:type="hd:RecordHarpDevices">
+        <hd:ConfigRoot>DECOY_ROOT</hd:ConfigRoot>
+      </Expression>
+      <Expression xsi:type="mf:ExperimentManifest">
+        <mf:IngestScript>test</mf:IngestScript>
+        <mf:ConfigRoot>DECOY_ROOT</mf:ConfigRoot>
+        <mf:ExpectedFiles>auto</mf:ExpectedFiles>
+        <mf:TrialColumns />
+        <mf:StreamColumns />
+      </Expression>
+      <Expression xsi:type="lv:StreamDevices">
+        <lv:ConfigRoot>DECOY_ROOT</lv:ConfigRoot>
+        <lv:DataPort>5556</lv:DataPort>
+        <lv:VideoPort>5558</lv:VideoPort>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

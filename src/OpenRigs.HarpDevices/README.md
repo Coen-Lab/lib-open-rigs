@@ -19,7 +19,7 @@ A Harp device is a device entry in rig.yml (`behaviorBoard: main:`, named `Behav
 
 | Property | Default | |
 |----------|---------|-|
-| `ConfigRoot` | none | The root under which each machine has its own `<MACHINE-NAME>\rig.yml`, as `StreamDevices`' setting; unset, the workflow stops at Start naming it (no default). Can be mapped from a workflow property; `check-workflow.ps1` maps it, to a temporary root. Read when the workflow is built. |
+| `ConfigRoot` | none | The root under which each machine has its own `<MACHINE-NAME>\rig.yml`, as `StreamDevices`' setting; unset, the workflow stops at Start naming it (no default). Can be mapped from a workflow property; `check-workflow.ps1` maps it, to a temporary root. Read when the workflow is built. The workflow's own `ConfigRoot`, ReadLabRig's, is taken over this one when ReadLabRig is built before the node (OpenRigs.Core `WorkflowConfigRoot`), so a launch's `--property:ConfigRoot` reaches it with no edge; this one is the default for a workflow without ReadLabRig. |
 
 ## Things to Know
 

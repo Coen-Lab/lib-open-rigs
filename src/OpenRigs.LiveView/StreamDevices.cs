@@ -52,7 +52,7 @@ namespace OpenRigs.LiveView
 
         /// <summary>Gets or sets the root under which each machine has its own configuration directory.</summary>
         [Category("Config")]
-        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml. Read when the workflow is built; a missing file streams no devices, and unset the workflow stops at Start.")]
+        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml. Read when the workflow is built; a missing file streams no devices, and unset the workflow stops at Start. The workflow's own ConfigRoot (ReadLabRig's, built before this node) is taken over this one, which is the default for a workflow without ReadLabRig.")]
         public string ConfigRoot
         {
             get { return Settings.ConfigRoot; }
@@ -89,7 +89,7 @@ namespace OpenRigs.LiveView
         /// <returns>The inner workflow's expression.</returns>
         public override Expression Build(IEnumerable<Expression> arguments)
         {
-            var plan = LiveViewPlan.Create(ConfigRoot, name => GroupNode.PublishedType(this, name));
+            var plan = LiveViewPlan.Create(GroupNode.WorkflowConfigRoot(this) ?? ConfigRoot, name => GroupNode.PublishedType(this, name));
             var signature = plan.Signature(DataPort, VideoPort);
             if (signature != generatedFrom)
             {

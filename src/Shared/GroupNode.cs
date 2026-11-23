@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Bonsai.Dag;
 using Bonsai.Expressions;
 
@@ -19,10 +20,32 @@ namespace OpenRigs.Shared
             "BuildContext", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         static readonly Type BuildContextType = typeof(ExpressionBuilder).Assembly.GetType("Bonsai.Expressions.IBuildContext");
         static readonly MethodInfo GetVariableMethod = BuildContextType == null ? null : BuildContextType.GetMethod("GetVariable");
+        static readonly MethodInfo AddVariableMethod = BuildContextType == null ? null : BuildContextType.GetMethod("AddVariable");
+
+        // The build context variable OpenRigs.Core's WorkflowConfigRoot (in ReadLabRig) adds, and each variable's root.
+        // The table is the AppDomain's, since this file is compiled into each package that reads rig.yml at build.
+        const string ConfigRootVariable = "OpenRigs.WorkflowConfigRoot";
+
+        static ConditionalWeakTable<ParameterExpression, string> ConfigRoots
+        {
+            get
+            {
+                lock (typeof(ConditionalWeakTable<ParameterExpression, string>))
+                {
+                    var table = AppDomain.CurrentDomain.GetData(ConfigRootVariable) as ConditionalWeakTable<ParameterExpression, string>;
+                    if (table == null)
+                    {
+                        table = new ConditionalWeakTable<ParameterExpression, string>();
+                        AppDomain.CurrentDomain.SetData(ConfigRootVariable, table);
+                    }
+                    return table;
+                }
+            }
+        }
 
         static void RequireBuildContext()
         {
-            if (BuildContextProperty != null && GetVariableMethod != null) return;
+            if (BuildContextProperty != null && GetVariableMethod != null && AddVariableMethod != null) return;
             throw new InvalidOperationException(string.Format(
                 "This lab group node reads Bonsai.Core's internal build context (WorkflowExpressionBuilder.BuildContext, IBuildContext.GetVariable), " +
                 "written against Bonsai.Core 2.9.0; Bonsai.Core {0} lacks it. Use Bonsai 2.9, or update OpenRigs' GroupNode for this version.",
@@ -48,6 +71,42 @@ namespace OpenRigs.Shared
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Makes the workflow's ConfigRoot known to the nodes built after this one that read rig.yml when the
+        /// workflow is built (StreamDevices, RecordHarpDevices, ExperimentManifest), with no edge to them: an edge
+        /// would build them before the subjects they look for.
+        /// </summary>
+        public static void PublishConfigRoot(WorkflowExpressionBuilder node, string configRoot)
+        {
+            RequireBuildContext();
+            var context = BuildContextProperty.GetValue(node, null);
+            if (context == null) return;
+            ParameterExpression variable;
+            try
+            {
+                variable = (ParameterExpression)AddVariableMethod.Invoke(context, new object[]
+                {
+                    ConfigRootVariable, Expression.Constant(System.Reactive.Disposables.Disposable.Empty, typeof(IDisposable))
+                });
+            }
+            catch (TargetInvocationException)
+            {
+                throw new InvalidOperationException("The workflow reads its rig.yml twice: include ReadLabRig once.");
+            }
+            ConfigRoots.Add(variable, configRoot ?? "");
+        }
+
+        /// <summary>
+        /// The workflow's ConfigRoot (ReadLabRig's), when it was built before this node and is set; else null, and
+        /// the node keeps its own.
+        /// </summary>
+        public static string WorkflowConfigRoot(WorkflowExpressionBuilder node)
+        {
+            var variable = Subject(node, ConfigRootVariable) as ParameterExpression;
+            string root;
+            return variable != null && ConfigRoots.TryGetValue(variable, out root) && !string.IsNullOrWhiteSpace(root) ? root : null;
         }
 
         /// <summary>The element type of the subject published under this name, or null if there is none.</summary>
