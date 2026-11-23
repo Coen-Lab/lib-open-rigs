@@ -85,6 +85,9 @@ namespace OpenRigs.Logging
                     foreach (var bytes in pending.GetConsumingEnumerable())
                     {
                         stream.Write(bytes, 0, bytes.Length);
+                        // Flushed once nothing waits, so a reader sees a sparse stream (licks) live, not 4 KB at
+                        // a time or only at Stop (23 Nov 2026); a busy stream still writes in batches.
+                        if (pending.Count == 0) stream.Flush();
                     }
                 }
             }
