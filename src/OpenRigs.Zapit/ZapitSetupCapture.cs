@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using Bonsai;
@@ -33,7 +34,7 @@ namespace OpenRigs.Zapit
     /// "skipFrames", "backgrounds"}, volts from lib_zapit's calibration plan): per point it points the galvos with the laser
     /// on, skips skipFrames camera frames and saves the next as <c>point_NNNN.png</c>, then with the laser off saves
     /// backgrounds frames as <c>background_K.png</c> (lossless PNG, as lib_zapit's fit reads them), zeroes the lines and
-    /// reports FramesSaved. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
+    /// reports FramesSaved. A run with no camera frame within 2 s of Pointed (or of its last frame) is refused and zeroed. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
     /// </summary>
     [Combinator]
     [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named; each bank .json in pending is loaded (LoadBank). Inputs: grid run folders, still paths, bank paths, ZapitDaq's events, the camera's images. Output: ZapitDaq commands and the stages to report as Zapit.Setup.")]
@@ -43,6 +44,10 @@ namespace OpenRigs.Zapit
         /// <summary>Gets or sets the folder every run, still and bank must be inside: the rig's pending folder.</summary>
         [Description("The folder every grid run, still and bank must be inside: RigConfigs\\<RIG>\\pending.")]
         public string PendingFolder { get; set; } = "";
+
+        /// <summary>How long a grid run waits for a camera frame after Pointed (or after the last frame) before it is
+        /// refused and the lines zeroed, so a stalled camera never holds the beam on one spot. Tests shorten it.</summary>
+        internal TimeSpan FrameTimeout { get; set; } = TimeSpan.FromSeconds(2);
 
         sealed class Run
         {
@@ -67,10 +72,31 @@ namespace OpenRigs.Zapit
             string? still = null;
             void Emit(ZapitSetupStep step) => observer.OnNext(step);
             void Refuse(string why) => Emit(new ZapitSetupStep { Stage = "Refused", Detail = why });
+            var watchdog = new SerialDisposable();
+            var watch = 0;
             string? Inside(string path)
             {
-                var full = Path.GetFullPath(path.Trim().Trim('"'));
+                string full;
+                try { full = Path.GetFullPath(path.Trim().Trim('"')); }
+                catch (Exception error) when (error is ArgumentException || error is NotSupportedException || error is PathTooLongException) { return null; }
                 return full.StartsWith(pending.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase) ? full : null;
+            }
+            void Watch()
+            {
+                var id = ++watch;
+                watchdog.Disposable = Scheduler.Default.Schedule(FrameTimeout, () => Locked<int>(TimedOut)(id));
+            }
+            void TimedOut(int id)
+            {
+                if (run == null || id != watch) return;
+                var folder = run.Folder;
+                run = null;
+                Emit(new ZapitSetupStep
+                {
+                    Stage = "Refused",
+                    Detail = $"no camera frame came within {FrameTimeout.TotalSeconds} s of Pointed, so the lines are zeroed and the run is refused: {folder}",
+                    Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
+                });
             }
             ZapitDaqCommand PointAt(Run r) => r.Index < r.Volts.Length
                 ? new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, GalvoXVolts = r.Volts[r.Index][0], GalvoYVolts = r.Volts[r.Index][1], LaserVolts = r.LaserVolts }
@@ -132,7 +158,11 @@ namespace OpenRigs.Zapit
 
             void OnEvent(ZapitDaqEvent e)
             {
-                if (run != null && e.Kind == ZapitDaqEventKind.Pointed && run.Skip < 0) run.Skip = run.SkipFrames;
+                if (run != null && e.Kind == ZapitDaqEventKind.Pointed && run.Skip < 0)
+                {
+                    run.Skip = run.SkipFrames;
+                    Watch();
+                }
             }
 
             void OnFrame(IplImage image)
@@ -145,6 +175,7 @@ namespace OpenRigs.Zapit
                     return;
                 }
                 if (run == null || run.Skip < 0) return;
+                Watch();   // a frame came: the next must come within FrameTimeout too
                 if (run.Skip-- > 0) return;
                 var background = run.Index - run.Volts.Length;
                 var name = background < 0 ? string.Format(CultureInfo.InvariantCulture, "point_{0:0000}.png", run.Index) : "background_" + background + ".png";
@@ -163,6 +194,7 @@ namespace OpenRigs.Zapit
                 {
                     var done = run.Folder;
                     run = null;
+                    watchdog.Disposable = Disposable.Empty;
                     Emit(new ZapitSetupStep { Stage = "FramesSaved", Detail = done, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
                 }
             }
@@ -176,6 +208,7 @@ namespace OpenRigs.Zapit
                 }
             };
             return new CompositeDisposable(
+                watchdog,
                 events.Subscribe(Locked<ZapitDaqEvent>(OnEvent), observer.OnError),
                 frames.Subscribe(Locked<IplImage>(OnFrame), observer.OnError),
                 gridRuns.Subscribe(Locked<string>(Start), observer.OnError),
@@ -184,28 +217,15 @@ namespace OpenRigs.Zapit
         });
     }
 
-    /// <summary>A ZapitDaq command of one kind from each input: LoadBank takes the input as the bank's path.</summary>
+    /// <summary>ZapitDaq's Zero command for each input. Only Zero: a bank loads through ZapitSetupCapture, which checks its path.</summary>
     [Combinator]
-    [Description("A ZapitDaq command of Kind for each input: LoadBank with the input as the bank's Path (Settings_ZapitBank_<DateTime>.json), Zero for any input.")]
+    [Description("ZapitDaq's Zero command (every line to 0 V) for any input. A bank loads only through ZapitSetupCapture.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class CreateZapitDaqCommand
     {
-        /// <summary>Gets or sets the command's kind: LoadBank or Zero.</summary>
-        [Description("The command: LoadBank (the input is the bank's path) or Zero.")]
-        public ZapitDaqCommandKind Kind { get; set; } = ZapitDaqCommandKind.Zero;
-
-        /// <summary>A command per input.</summary>
-        public IObservable<ZapitDaqCommand> Process<TSource>(IObservable<TSource> source)
-        {
-            var kind = Kind;
-            if (kind != ZapitDaqCommandKind.LoadBank && kind != ZapitDaqCommandKind.Zero)
-                throw new InvalidOperationException("CreateZapitDaqCommand makes LoadBank or Zero, not " + kind + ".");
-            return source.Select(input => new ZapitDaqCommand
-            {
-                Kind = kind,
-                Path = kind == ZapitDaqCommandKind.LoadBank ? Convert.ToString(input, CultureInfo.InvariantCulture)?.Trim().Trim('"') : null,
-            });
-        }
+        /// <summary>A Zero command per input.</summary>
+        public IObservable<ZapitDaqCommand> Process<TSource>(IObservable<TSource> source) =>
+            source.Select(_ => new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero });
     }
 
     /// <summary>The loaded bank, checked at Go against the task's conditions file and the trials' rules.</summary>

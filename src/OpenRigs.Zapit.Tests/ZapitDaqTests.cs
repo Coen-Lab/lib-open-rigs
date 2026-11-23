@@ -54,13 +54,13 @@ namespace OpenRigs.Zapit.Tests
             public readonly SimulatedZapitDevice Device = new SimulatedZapitDevice { AutoTrigger = false };
             public Exception Error;
 
-            public Harness(double sampleRate = 100000, double maxTrialSeconds = 1.0, double earlyStopLeadSeconds = 0.01, double ceilingMw = double.PositiveInfinity)
+            public Harness(double sampleRate = 100000, double maxTrialSeconds = 1.0, double earlyStopLeadSeconds = 0.01, double ceilingMw = double.PositiveInfinity, double laserMaxVolts = 5)
             {
                 Device.Clock = () => Volatile.Read(ref now);
                 var node = new ZapitDaq
                 {
                     SampleRate = sampleRate, MaxTrialSeconds = maxTrialSeconds, EarlyStopLeadSeconds = earlyStopLeadSeconds,
-                    TriggerTerminal = Trigger, CeilingMw = ceilingMw, DeviceFactory = () => Device,
+                    TriggerTerminal = Trigger, CeilingMw = ceilingMw, LaserMaxVolts = laserMaxVolts, DeviceFactory = () => Device,
                 };
                 subscription = node.Process(commands).Subscribe(events.Add, e => Error = e);
             }
@@ -253,7 +253,7 @@ namespace OpenRigs.Zapit.Tests
         public void UnsubscribingZeroesEveryLineEvenWhenStoppingFails()
         {
             var device = new StopFails();
-            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.01, DeviceFactory = () => device };
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.01, CeilingMw = 1e9, LaserMaxVolts = 5, DeviceFactory = () => device };
             var commands = new Subject<ZapitDaqCommand>();
             var events = new BlockingCollection<ZapitDaqEvent>();
             var subscription = node.Process(commands).Subscribe(events.Add, e => { });
@@ -363,6 +363,40 @@ namespace OpenRigs.Zapit.Tests
             same.Next(ZapitDaqEventKind.BankLoaded);
         }
 
+        // rig.yml's laserMinMaxControlVolts[1] is the hard limit: any laser sample above it or below 0 V is refused.
+        [TestMethod]
+        public void LaserVoltsOutsideZeroToTheRigsMaximumAreRefused()
+        {
+            using (var h = new Harness(laserMaxVolts: 1))
+                StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 1.5 }), "outside 0 to 1 V");
+            using (var h = new Harness(laserMaxVolts: 1))
+                StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = -0.04 }), "outside 0 to 1 V");
+            using (var h = new Harness(laserMaxVolts: 1))
+                StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Staircase, LaserLevelsVolts = new[] { 0.0, 2 }, SamplesPerLevel = 10 }), "outside 0 to 1 V");
+            using (var h = new Harness(laserMaxVolts: 0.01))
+            {
+                h.Send(Load(Unpack()));
+                h.Next(ZapitDaqEventKind.BankLoaded);
+                StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 2.0, 0.05)), "outside 0 to 0.01 V");
+            }
+            using (var h = new Harness(laserMaxVolts: 1))
+            {
+                h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 1 });
+                h.Next(ZapitDaqEventKind.Pointed);
+            }
+        }
+
+        // A ZapitDaq whose mappings were lost (the defaults) drives no laser: CeilingMw 0 and LaserMaxVolts 0.
+        [TestMethod]
+        public void TheDefaultsDisableTheLaser()
+        {
+            var device = new SimulatedZapitDevice { AutoTrigger = false };
+            Exception error = null;
+            var commands = new Subject<ZapitDaqCommand>();
+            using (new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.01, DeviceFactory = () => device }.Process(commands).Subscribe(_ => { }, e => error = e))
+                commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 });
+            StringAssert.Contains(error?.Message, "ceilingMw is 0");
+        }
         [TestMethod]
         public void CalibrationWritesPointsAndReadsTheStaircaseOnTheAoClock()
         {

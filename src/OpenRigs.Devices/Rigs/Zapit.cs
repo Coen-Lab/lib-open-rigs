@@ -32,9 +32,13 @@ namespace OpenRigs.Devices.Rigs
         [JsonIgnore, YamlIgnore]
         public string TriggerTerminal { get { return "/" + Path(TriggerChannel); } }
 
-        /// <summary>Gets the laser ceiling in mW as ZapitDaq takes it: 0 disables the laser, no ceiling is unlimited.</summary>
+        /// <summary>Gets the laser ceiling in mW as ZapitDaq takes it: 0 disables the laser, and so does a missing ceilingMw.</summary>
         [JsonIgnore, YamlIgnore]
-        public double LaserCeilingMw { get { return CeilingMw ?? double.PositiveInfinity; } }
+        public double LaserCeilingMw { get { return CeilingMw ?? 0; } }
+
+        /// <summary>Gets the highest laser control volts as ZapitDaq takes it (laserMinMaxControlVolts[1]): 0, refusing any laser volts, when missing.</summary>
+        [JsonIgnore, YamlIgnore]
+        public double LaserMaxControlVolts { get { return LaserMinMaxControlVolts != null && LaserMinMaxControlVolts.Count == 2 ? LaserMinMaxControlVolts[1] : 0; } }
 
         string Path(string line) { return Device + "/" + line; }
     }

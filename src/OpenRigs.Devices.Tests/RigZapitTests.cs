@@ -47,6 +47,18 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual(100000.0, zapit.SampleRate);
             Assert.AreEqual("software", zapit.SafetyGate.Layer);
             Assert.AreEqual("calibration/Zapit-Session.pfs", zapit.Camera.SessionPfsPath);
+            Assert.AreEqual(5.0, zapit.LaserMaxControlVolts);
+        }
+
+        // A lost ceilingMw or laserMinMaxControlVolts fails safe: the laser disabled, no laser volts allowed.
+        [TestMethod]
+        public void AMissingCeilingOrControlRangeDisablesTheLaser()
+        {
+            var zapit = Fixture("B2-both").Zapit;
+            zapit.CeilingMw = null;
+            zapit.LaserMinMaxControlVolts = null;
+            Assert.AreEqual(0.0, zapit.LaserCeilingMw);
+            Assert.AreEqual(0.0, zapit.LaserMaxControlVolts);
         }
     }
 }

@@ -127,6 +127,10 @@ def zapit_daq_for_task_problems(root: ET.Element) -> list[str]:
             problems.append(f"ZapitDaq's {name} is not mapped from rig.yml's zapit block")
     if mapped.get("CeilingMw") != "LaserCeilingMw":
         problems.append("ZapitDaq's CeilingMw is not mapped from LaserCeilingMw")
+    if mapped.get("LaserMaxVolts") != "LaserMaxControlVolts":
+        problems.append("ZapitDaq's LaserMaxVolts is not mapped from LaserMaxControlVolts")
+    if any(e.tag.endswith("}CeilingMw") and e.text != "0" for e in inner.iter()):
+        problems.append("ZapitDaq's CeilingMw default is not 0 (a lost mapping must fail safe)")
     flags = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and _name(n) == "Optogenetics"]
     if len(flags) != 1 or "TaskParameters.Optogenetics.Enabled" not in {nodes[a].findtext(W + "Selector") for a in upstream(edges, flags[0])}:
         problems.append("ConnectForTaskZapitDaq does not publish Optogenetics from Optogenetics.Enabled")

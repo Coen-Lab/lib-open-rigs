@@ -22,10 +22,10 @@ namespace OpenRigs.Zapit.Tests
             readonly IDisposable subscription;
             byte shade;
 
-            public Rig()
+            public Rig(TimeSpan? frameTimeout = null)
             {
                 Directory.CreateDirectory(Pending);
-                subscription = new ZapitSetupCapture { PendingFolder = Pending }.Process(Grids, Stills, Banks, Events, Frames)
+                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2) }.Process(Grids, Stills, Banks, Events, Frames)
                     .Subscribe(step => { Steps.Add(step); if (step.Command?.Kind == ZapitDaqCommandKind.Point) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed }); }, e => Error = e);
             }
 
@@ -117,13 +117,61 @@ namespace OpenRigs.Zapit.Tests
             Assert.IsTrue(rig.Steps.Skip(1).All(s => s.Stage == "Refused" && s.Command == null && s.Detail.Contains("inside " + rig.Pending)), string.Join("; ", rig.Steps));
         }
 
+        // A stalled camera never holds the beam: no frame within FrameTimeout of Pointed refuses the run and zeroes the lines.
         [TestMethod]
-        public void LoadBankAndZeroCommands()
+        public void ARunWithNoFrameAfterPointedIsRefusedAndZeroed()
+        {
+            using var rig = new Rig(TimeSpan.FromMilliseconds(100));
+            var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2], [-1, 0.5]], \"laserVolts\": 0.3, \"skipFrames\": 1}");
+            rig.Grids.OnNext(folder);
+            rig.Frame();   // the skipped frame: the next must come within the timeout too
+            var until = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < until && !rig.Steps.Any(s => s.Stage == "Refused")) System.Threading.Thread.Sleep(10);
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            var refused = rig.Steps.Last();
+            Assert.AreEqual("Refused", refused.Stage, string.Join("; ", rig.Steps));
+            StringAssert.Contains(refused.Detail, "no camera frame came within 0.1 s");
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, refused.Command.Kind);
+            rig.Frame();
+            Assert.AreEqual(0, Directory.GetFiles(folder, "*.png").Length, "the refused run saves nothing more");
+            rig.Grids.OnNext(rig.Run("Frames_U", "{\"volts\": [[1, 0]], \"laserVolts\": 0.3}"));
+            Assert.AreEqual("Pointing", rig.Steps.Last(s => s.Command?.Kind == ZapitDaqCommandKind.Point || s.Stage == "Refused").Stage, "a new run may start");
+        }
+
+        // A run whose frames come in time is never refused, however long it lasts in all.
+        [TestMethod]
+        public void FramesInTimeKeepTheRunGoing()
+        {
+            using var rig = new Rig(TimeSpan.FromMilliseconds(300));
+            var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2], [-1, 0.5]], \"laserVolts\": 0.3, \"skipFrames\": 1, \"backgrounds\": 2}");
+            rig.Grids.OnNext(folder);
+            for (int i = 0; i < 8; i++) { System.Threading.Thread.Sleep(100); rig.Frame(); }
+            System.Threading.Thread.Sleep(500);
+            Assert.IsFalse(rig.Steps.Any(s => s.Stage == "Refused"), string.Join("; ", rig.Steps));
+            Assert.AreEqual("FramesSaved " + folder, rig.Steps.Last().ToString());
+        }
+
+        // A path Windows cannot parse is refused, not an error that stops the workflow.
+        [TestMethod]
+        public void AnIllegalPathIsRefusedNotFatal()
+        {
+            using var rig = new Rig();
+            rig.Banks.OnNext(rig.Pending + "\\a<b>|.json");
+            rig.Stills.OnNext(rig.Pending + "\\a:b:c.png");
+            rig.Grids.OnNext("\0");
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            Assert.AreEqual(3, rig.Steps.Count(s => s.Stage == "Refused" && s.Command == null), string.Join("; ", rig.Steps));
+        }
+
+        // Only Zero: nothing can send ZapitDaq an unchecked LoadBank.
+        [TestMethod]
+        public void CreateZapitDaqCommandMakesOnlyZero()
         {
             var commands = new List<ZapitDaqCommand>();
-            using (new CreateZapitDaqCommand { Kind = ZapitDaqCommandKind.LoadBank }.Process(System.Reactive.Linq.Observable.Return("\"C:\\p\\Settings_ZapitBank_T.json\"")).Subscribe(commands.Add)) { }
-            Assert.AreEqual(@"C:\p\Settings_ZapitBank_T.json", commands.Single().Path);
-            Assert.ThrowsException<InvalidOperationException>(() => new CreateZapitDaqCommand { Kind = ZapitDaqCommandKind.Arm }.Process(System.Reactive.Linq.Observable.Return(1)));
+            using (new CreateZapitDaqCommand().Process(System.Reactive.Linq.Observable.Return("C:\\p\\Settings_ZapitBank_T.json")).Subscribe(commands.Add)) { }
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, commands.Single().Kind);
+            Assert.IsNull(commands.Single().Path);
+            Assert.IsNull(typeof(CreateZapitDaqCommand).GetProperty("Kind"));
         }
     }
 }

@@ -119,9 +119,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="zap:CreateZapitDaqCommand">
-          <zap:Kind>Zero</zap:Kind>
-        </Combinator>
+        <Combinator xsi:type="zap:CreateZapitDaqCommand" />
       </Expression>
       <Expression xsi:type="MulticastSubject">
         <Name>Zapit.Commands</Name>

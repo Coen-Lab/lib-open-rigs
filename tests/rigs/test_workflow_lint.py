@@ -706,6 +706,11 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
         return lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
     assert rules.zapit_for_task_problems(root("ConnectForTask.bonsai")) == []
     assert rules.zapit_daq_for_task_problems(root("ConnectForTaskZapitDaq.bonsai")) == []
+    # A lost mapping fails safe: ZapitDaq's CeilingMw default must be 0, and LaserMaxVolts is mapped.
+    text = (ROOT / "src" / "OpenRigs.Devices" / "ConnectForTaskZapitDaq.bonsai").read_text(encoding="utf-8-sig")
+    lost = text.replace("<zap:CeilingMw>0<", "<zap:CeilingMw>INF<").replace(' Selector="LaserMaxControlVolts"', ' Selector="X"')
+    assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(lost)) == [
+        "ZapitDaq's LaserMaxVolts is not mapped from LaserMaxControlVolts", "ZapitDaq's CeilingMw default is not 0 (a lost mapping must fail safe)"]
     assert rules.manual_rewards_drop_problems(root("RewardValve.bonsai")) == []
     group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
     wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.REWARDS) + VALVES + group)
