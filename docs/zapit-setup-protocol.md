@@ -56,11 +56,11 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
    At Go, if optogenetics is on, the workflow checks the loaded bank against the task: its conditions SHA-256 must match `optogenetics.zapitConditionsPath`, and every condition must hold `laserPowerMw`. If the rig has no `zapit` block, or the check fails, the workflow stops and names the reason. With no bank loaded, the first Arm stops it.
 8. **After Go.** Once the workflow's experiment folder exists, the agent moves the session's files into it, before the first trial:
-   - `pending\Settings_ZapitBank_<DT>.*` and the conditions copy go to `Settings\`.
+   - `pending\Settings_ZapitBank_<DT>.*`, the laser curve it was built from (`Settings_ZapitLaserCurve_<DT>.json`) and the conditions copy go to `Settings\`.
    - The agent writes `Settings\Settings_ZapitSample_<DT>.json` and `.png`, `Settings_ZapitScannerFit_<DT>.json` and `Settings_ZapitAccuracy_<DT>.json`.
    - `pending\ZapitScanner\Frames_<DT>\` and `Accuracy_<DT>\` go to `ZapitScanner\`, each with its `grid.json`.
 
-   With `ceilingMw` 0 there is no `ZapitScanner\` and no accuracy file. ExperimentManifest expects those two under `OptogeneticsLaserEnabled`, the rest of Zapit's files under `Optogenetics`.
+   With `ceilingMw` 0 there is no `ZapitScanner\`, no accuracy file and no laser curve. ExperimentManifest expects those three under `OptogeneticsLaserEnabled`, the rest of Zapit's files under `Optogenetics`.
 
    ZapitDaq holds the bank in memory, so moving the files does not affect trials.
 
@@ -97,4 +97,4 @@ The workflow keeps no setup state of its own beyond the loaded bank.
 | `Zapit.Bank` | ConnectForTaskZapitDaq | BehaviorSubject of ZapitBank; the task's draw takes it at Go (`ZapitDaqTrial.Draw`) |
 | `Camera-Zapit.Data` | ZapitCamera | PublishSubject of Harp-timestamped frames |
 | `Optogenetics` | ConnectForTaskZapitDaq | AsyncSubject of bool; the condition of Zapit's ExpectedFiles |
-| `OptogeneticsLaserEnabled` | ConnectForTaskZapitDaq | AsyncSubject of bool, Optogenetics with rig.yml's `zapit.ceilingMw` above 0; the condition of `ZapitScanner/` and `Settings_ZapitAccuracy_` |
+| `OptogeneticsLaserEnabled` | ConnectForTaskZapitDaq | AsyncSubject of bool, Optogenetics with rig.yml's `zapit.ceilingMw` above 0; the condition of `ZapitScanner/`, `Settings_ZapitAccuracy_` and `Settings_ZapitLaserCurve_` |

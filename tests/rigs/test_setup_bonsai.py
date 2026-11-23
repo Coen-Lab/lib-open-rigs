@@ -73,3 +73,56 @@ def test_a_failed_restore_removes_nothing(tmp_path):
     run, left = run_setup(tmp_path, 1)
     assert run.returncode != 0
     assert left == set(FOLDERS)
+
+
+# A stand-in restore: Bonsai.config is first replaced by next.config when there is one (kept when `always` is there, as
+# a restore that drops a package every time), then a folder is made for each package it names.
+RESTORE = r"""using System.IO; using System.Text.RegularExpressions;
+class Restore { static int Main() {
+    if (File.Exists("next.config")) { File.Copy("next.config", "Bonsai.config", true); if (!File.Exists("always")) File.Delete("next.config"); }
+    foreach (Match m in Regex.Matches(File.ReadAllText("Bonsai.config"), "id=\"([^\"]+)\" version=\"([^\"]+)\""))
+        Directory.CreateDirectory(Path.Combine("Packages", m.Groups[1].Value + "." + m.Groups[2].Value));
+    return 0; } }
+"""
+CSC = Path(r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe")
+DAQMX = '    <Package id="Bonsai.DAQmx" version="0.5.0" />\n'
+
+
+@pytest.fixture(scope="module")
+def restore_exe(tmp_path_factory):
+    if not CSC.exists():
+        pytest.skip("no .NET Framework C# compiler to build the stand-in restore")
+    folder = tmp_path_factory.mktemp("restore")
+    (folder / "Restore.cs").write_text(RESTORE, encoding="utf-8")
+    subprocess.run([str(CSC), "/nologo", f"/out:{folder / 'Bonsai.exe'}", str(folder / "Restore.cs")], check=True,
+                   capture_output=True)
+    return folder / "Bonsai.exe"
+
+
+def run_dropping_restore(tmp_path: Path, exe: Path, always: bool) -> tuple[subprocess.CompletedProcess, Path]:
+    env = tmp_path / ".bonsai"
+    (env / "Packages").mkdir(parents=True)
+    committed = CONFIG.replace("  </Packages>", DAQMX + "  </Packages>")
+    (env / "Bonsai.config").write_text(committed, encoding="utf-8")
+    (env / "next.config").write_text(CONFIG, encoding="utf-8")  # the update's rewrite, without Bonsai.DAQmx
+    if always:
+        (env / "always").write_text("")
+    shutil.copy(exe, env / "Bonsai.exe")
+    run = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(SCRIPT),
+                          "-Environment", str(env)], stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    assert (env / "Bonsai.config").read_text(encoding="utf-8") == committed  # the committed file, whatever happened
+    return run, env / "Packages"
+
+
+def test_a_restore_that_drops_a_package_is_put_back_and_restored_again(tmp_path, restore_exe):
+    run, packages = run_dropping_restore(tmp_path, restore_exe, always=False)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "putting it back and restoring again" in run.stdout
+    assert (packages / "Bonsai.DAQmx.0.5.0").is_dir()
+
+
+def test_a_package_still_missing_after_the_second_restore_fails_the_setup_naming_it(tmp_path, restore_exe):
+    run, packages = run_dropping_restore(tmp_path, restore_exe, always=True)
+    assert run.returncode == 1
+    assert "Bonsai.config names packages the restore did not install: Bonsai.DAQmx 0.5.0" in run.stderr
+    assert not (packages / "Bonsai.DAQmx.0.5.0").exists()

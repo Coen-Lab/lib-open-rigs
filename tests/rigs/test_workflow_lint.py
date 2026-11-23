@@ -1226,7 +1226,7 @@ def test_a_zapit_daq_workflow_expects_zapit_s_files_under_optogenetics(tmp_path)
     # OptogeneticsLaserEnabled, the rest under Optogenetics.
     expected = ("Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;"
                 + ";".join(f"{f}?{'OptogeneticsLaserEnabled' if f in lint.ZAPIT_LASER_FILES else 'Optogenetics'}" for f in lint.ZAPIT_FILES))
-    assert set(lint.ZAPIT_LASER_FILES) == {"ZapitScanner/", "Settings/Settings_ZapitAccuracy_"}
+    assert set(lint.ZAPIT_LASER_FILES) == {"ZapitScanner/", "Settings/Settings_ZapitAccuracy_", "Settings/Settings_ZapitLaserCurve_"}
     blocks = include(lint.ZAPIT_DAQ_FOR_TASK) + include(lint.TASK_LOGS_ZAPIT_DAQ)
     assert lint.expected_files_problems(workflow(tmp_path, blocks + manifest_node(expected))) == []
     assert lint.expected_files_problems(workflow(tmp_path / "b", blocks + manifest_node(expected.replace("Settings/Settings_ZapitBank_?Optogenetics", "Settings/Settings_ZapitBank_")))) == [
