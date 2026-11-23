@@ -99,18 +99,21 @@ def restore_exe(tmp_path_factory):
     return folder / "Bonsai.exe"
 
 
-def run_dropping_restore(tmp_path: Path, exe: Path, always: bool) -> tuple[subprocess.CompletedProcess, Path]:
+def run_dropping_restore(tmp_path: Path, exe: Path, always: bool, adds: bool = False) -> tuple[subprocess.CompletedProcess, Path]:
     env = tmp_path / ".bonsai"
     (env / "Packages").mkdir(parents=True)
-    committed = CONFIG.replace("  </Packages>", DAQMX + "  </Packages>")
+    with_daqmx = CONFIG.replace("  </Packages>", DAQMX + "  </Packages>")
+    # The update's rewrite: without Bonsai.DAQmx, or (adds) with it beside the committed file's packages.
+    committed, rewrite = (CONFIG, with_daqmx) if adds else (with_daqmx, CONFIG)
     (env / "Bonsai.config").write_text(committed, encoding="utf-8")
-    (env / "next.config").write_text(CONFIG, encoding="utf-8")  # the update's rewrite, without Bonsai.DAQmx
+    (env / "next.config").write_text(rewrite, encoding="utf-8")
     if always:
         (env / "always").write_text("")
     shutil.copy(exe, env / "Bonsai.exe")
     run = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(SCRIPT),
                           "-Environment", str(env)], stdin=subprocess.DEVNULL, capture_output=True, text=True)
-    assert (env / "Bonsai.config").read_text(encoding="utf-8") == committed  # the committed file, whatever happened
+    # The committed file, whatever happened; a rewrite that only adds is kept.
+    assert (env / "Bonsai.config").read_text(encoding="utf-8") == (rewrite if adds else committed)
     return run, env / "Packages"
 
 
@@ -126,3 +129,9 @@ def test_a_package_still_missing_after_the_second_restore_fails_the_setup_naming
     assert run.returncode == 1
     assert "Bonsai.config names packages the restore did not install: Bonsai.DAQmx 0.5.0" in run.stderr
     assert not (packages / "Bonsai.DAQmx.0.5.0").exists()
+
+
+def test_a_package_the_restore_adds_to_bonsai_config_keeps_its_folder(tmp_path, restore_exe):
+    run, packages = run_dropping_restore(tmp_path, restore_exe, always=False, adds=True)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert (packages / "Bonsai.DAQmx.0.5.0").is_dir()  # Bonsai.config names it: removing it broke the workflow
