@@ -78,6 +78,10 @@ class MotorLine(WiredLine):
         ge=1,
         description="The farthest the motor may go from its home switch, in steps: the driver moves it no further (its Motor<n>MaxPosition, set each time the motor is homed). Left out, no limit.",
     )
+    reversed: Optional[bool] = Field(
+        default=None,
+        description="The motor's nudges swapped: each of its axis's nudge commands moves it the way the other one would, for a stage whose motor and home switch are mounted at the other end (BaseLeft then moves the base right as seen on another rig). Left out, not swapped.",
+    )
 
 
 class StepperWiring(BaseSchema):

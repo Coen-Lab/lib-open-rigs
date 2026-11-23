@@ -2433,6 +2433,8 @@ namespace OpenRigs.Devices.Rigs
     
         private int? _maxSteps;
     
+        private bool? _reversed;
+    
         public MotorLine()
         {
         }
@@ -2446,6 +2448,7 @@ namespace OpenRigs.Devices.Rigs
             _part = other._part;
             _note = other._note;
             _maxSteps = other._maxSteps;
+            _reversed = other._reversed;
         }
     
         /// <summary>
@@ -2581,6 +2584,27 @@ namespace OpenRigs.Devices.Rigs
             }
         }
     
+        /// <summary>
+        /// The motor's nudges swapped: each of its axis's nudge commands moves it the way the other one would, for a stage whose motor and home switch are mounted at the other end (BaseLeft then moves the base right as seen on another rig). Left out, not swapped.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("reversed")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="reversed")]
+        [System.ComponentModel.DescriptionAttribute("The motor\'s nudges swapped: each of its axis\'s nudge commands moves it the way th" +
+            "e other one would, for a stage whose motor and home switch are mounted at the ot" +
+            "her end (BaseLeft then moves the base right as seen on another rig). Left out, n" +
+            "ot swapped.")]
+        public bool? Reversed
+        {
+            get
+            {
+                return _reversed;
+            }
+            set
+            {
+                _reversed = value;
+            }
+        }
+    
         public System.IObservable<MotorLine> Generate()
         {
             return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new MotorLine(this)));
@@ -2599,7 +2623,8 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("Targets = " + _targets + ", ");
             stringBuilder.Append("Part = " + _part + ", ");
             stringBuilder.Append("Note = " + _note + ", ");
-            stringBuilder.Append("MaxSteps = " + _maxSteps);
+            stringBuilder.Append("MaxSteps = " + _maxSteps + ", ");
+            stringBuilder.Append("Reversed = " + _reversed);
             return true;
         }
     
