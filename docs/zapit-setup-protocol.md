@@ -37,24 +37,29 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 ## Order
 
 1. **Launch.** The workflow opens ZapitDaq and the Zapit camera, then reports Ready. Before step 2, the agent waits until `Zapit.Setup` appears in `status.commands` and Camera-Zapit frames arrive in live view.
-2. **Scanner grid.** The agent writes `grid.json` into a new `Frames_<DT>` folder and sends `Zapit.Setup <folder>`.
+2. **Still.** The agent sends `Zapit.Still <new png>`. The workflow zeroes the lines, saves the next frame and reports `StillSaved <png>`. The scanner settings come from the still's size, so the still comes first. The agent may take a new still as often as needed.
+3. **Scanner grid.** The agent writes `grid.json` into a new `Frames_<DT>` folder and sends `Zapit.Setup <folder>`.
    - For each point, the workflow points the galvos with the laser on (ZapitDaq `Point`), waits for `Pointed`, skips `skipFrames` frames and saves the next one.
    - It then saves `backgrounds` frames with the laser off at the last point.
    - Finally it zeroes every line and reports `FramesSaved <folder>`.
    - The agent fits the frames (`fit_scanner_run`). If the fit is refused, the agent says why and reruns with a new folder.
-3. **Accuracy.** The same steps, in an `Accuracy_<DT>` folder (`measure_accuracy_run`).
-4. **Sample.** The agent sends `Zapit.Still <new png>`. The workflow zeroes the lines, saves the next frame and reports `StillSaved <png>`. The agent then registers the still against the mouse's last reference, or asks for bregma and lambda clicks. It may take a new still as often as needed.
-5. **Bank.** The agent builds the bank into `pending\` and checks it with lib_zapit's `read_bank`. It then sends `Zapit.LoadBank <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
-6. **Go.** Readiness requires all of the following:
+4. **Accuracy.** The same steps, in an `Accuracy_<DT>` folder (`measure_accuracy_run`).
+
+   With `ceilingMw` 0 (laser disabled) there is no beam: the agent sends no grid, takes the nominal scanner mapping as the fit and has no accuracy.
+5. **Sample.** The agent registers the still against the mouse's last reference, or asks for bregma and lambda clicks.
+6. **Bank.** The agent builds the bank into `pending\` and checks it with lib_zapit's `read_bank`. It then sends `Zapit.LoadBank <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
+7. **Go.** Readiness requires all of the following:
    - the metric reads `BankLoaded` with the bank the agent built;
    - the fit, accuracy and sample have been accepted;
    - nothing was refused after them.
 
    At Go, if optogenetics is on, the workflow checks the loaded bank against the task: its conditions SHA-256 must match `optogenetics.zapitConditionsPath`, and every condition must hold `laserPowerMw`. If the rig has no `zapit` block, or the check fails, the workflow stops and names the reason. With no bank loaded, the first Arm stops it.
-7. **After Go.** Once the workflow's experiment folder exists, the agent moves the session's files into it, before the first trial:
-   - `pending\Settings_ZapitBank_<DT>.*` goes to `Settings\`.
-   - The agent writes `Settings\Settings_ZapitSample_<DT>.json` and `.png`, `Settings_ZapitScannerFit_<DT>.json`, `Settings_ZapitAccuracy_<DT>.json` and the conditions copy.
-   - `pending\ZapitScanner\Frames_<DT>\` goes to `ZapitScanner\Frames_<DT>\`, with its `grid.json`.
+8. **After Go.** Once the workflow's experiment folder exists, the agent moves the session's files into it, before the first trial:
+   - `pending\Settings_ZapitBank_<DT>.*` and the conditions copy go to `Settings\`.
+   - The agent writes `Settings\Settings_ZapitSample_<DT>.json` and `.png`, `Settings_ZapitScannerFit_<DT>.json` and `Settings_ZapitAccuracy_<DT>.json`.
+   - `pending\ZapitScanner\Frames_<DT>\` and `Accuracy_<DT>\` go to `ZapitScanner\`, each with its `grid.json`.
+
+   With `ceilingMw` 0 there is no `ZapitScanner\` and no accuracy file. ExperimentManifest expects those two under `OptogeneticsLaserEnabled`, the rest of Zapit's files under `Optogenetics`.
 
    ZapitDaq holds the bank in memory, so moving the files does not affect trials.
 
@@ -90,3 +95,4 @@ The workflow keeps no setup state of its own beyond the loaded bank.
 | `Zapit.Bank` | ConnectForTaskZapitDaq | BehaviorSubject of ZapitBank; the task's draw takes it at Go (`ZapitDaqTrial.Draw`) |
 | `Camera-Zapit.Data` | ZapitCamera | PublishSubject of Harp-timestamped frames |
 | `Optogenetics` | ConnectForTaskZapitDaq | AsyncSubject of bool; the condition of Zapit's ExpectedFiles |
+| `OptogeneticsLaserEnabled` | ConnectForTaskZapitDaq | AsyncSubject of bool, Optogenetics with rig.yml's `zapit.ceilingMw` above 0; the condition of `ZapitScanner/` and `Settings_ZapitAccuracy_` |

@@ -1222,8 +1222,14 @@ def test_a_zapit_daq_workflow_takes_its_own_blocks_and_none_of_matlab_zapit_s(tm
 
 
 def test_a_zapit_daq_workflow_expects_zapit_s_files_under_optogenetics(tmp_path):
-    expected = ("Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;" + ";".join(f"{f}?Optogenetics" for f in lint.ZAPIT_FILES))
+    # The scanner frames and the accuracy need the beam: at ceilingMw 0 the agent makes neither, so they are under
+    # OptogeneticsLaserEnabled, the rest under Optogenetics.
+    expected = ("Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;"
+                + ";".join(f"{f}?{'OptogeneticsLaserEnabled' if f in lint.ZAPIT_LASER_FILES else 'Optogenetics'}" for f in lint.ZAPIT_FILES))
+    assert set(lint.ZAPIT_LASER_FILES) == {"ZapitScanner/", "Settings/Settings_ZapitAccuracy_"}
     blocks = include(lint.ZAPIT_DAQ_FOR_TASK) + include(lint.TASK_LOGS_ZAPIT_DAQ)
     assert lint.expected_files_problems(workflow(tmp_path, blocks + manifest_node(expected))) == []
     assert lint.expected_files_problems(workflow(tmp_path / "b", blocks + manifest_node(expected.replace("Settings/Settings_ZapitBank_?Optogenetics", "Settings/Settings_ZapitBank_")))) == [
         "ExpectedFiles names Settings/Settings_ZapitBank_; its block writes it as Settings/Settings_ZapitBank_?Optogenetics"]
+    assert lint.expected_files_problems(workflow(tmp_path / "c", blocks + manifest_node(expected.replace("ZapitScanner/?OptogeneticsLaserEnabled", "ZapitScanner/?Optogenetics")))) == [
+        "ExpectedFiles names ZapitScanner/?Optogenetics; its block writes it as ZapitScanner/?OptogeneticsLaserEnabled"]

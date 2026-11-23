@@ -50,9 +50,12 @@ CONDITIONED_TASK_LOGS_ZAPIT_DAQ = "OpenRigs.Logging:ConditionedTaskLogsZapitDaq.
 MATLAB_ZAPIT_INCLUDES = (ZAPIT_FOR_TASK, "OpenRigs.Devices:ConnectZapit.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai",
                          "OpenRigs.Trials:ZapitTrials.bonsai", "OpenRigs.Logging:TaskLogs.bonsai", "OpenRigs.Logging:ConditionedTaskLogs.bonsai")
 # Zapit's files in a ZapitDaq experiment, each written only in an optogenetics experiment (the ingest names the same): the
-# Zapit camera's video (ZapitCamera), the scanner frames, and the agent's settings files.
-ZAPIT_FILES = ("Camera-Zapit/", "ZapitScanner/", "Settings/Settings_ZapitBank_", "Settings/Settings_ZapitSample_",
-               "Settings/Settings_ZapitScannerFit_", "Settings/Settings_ZapitAccuracy_", "Settings/Settings_ZapitConditions_")
+# Zapit camera's video (ZapitCamera), the scanner frames, and the agent's settings files. The scanner frames and the
+# accuracy need the beam, so at ceilingMw 0 (laser disabled) the agent makes neither: their condition is
+# ConnectForTaskZapitDaq's OptogeneticsLaserEnabled.
+ZAPIT_LASER_FILES = ("ZapitScanner/", "Settings/Settings_ZapitAccuracy_")
+ZAPIT_FILES = ("Camera-Zapit/", *ZAPIT_LASER_FILES, "Settings/Settings_ZapitBank_", "Settings/Settings_ZapitSample_",
+               "Settings/Settings_ZapitScannerFit_", "Settings/Settings_ZapitConditions_")
 REWARDS = "OpenRigs.Devices:Rewards.bonsai"
 MANUAL_PULSES = "OpenRigs.Devices:ManualPulses.bonsai"
 BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
@@ -1216,7 +1219,7 @@ def expected_files_problems(wf: Workflow) -> list[str]:
         elif include in FIXED_LOGS:
             writes.update({log_prefix(name): condition for name, condition in FIXED_LOGS[include]})
         elif include == ZAPIT_DAQ_FOR_TASK:
-            writes.update({prefix: "Optogenetics" for prefix in ZAPIT_FILES})
+            writes.update({prefix: "OptogeneticsLaserEnabled" if prefix in ZAPIT_LASER_FILES else "Optogenetics" for prefix in ZAPIT_FILES})
         elif include in DEVICE_LOGS:
             devices = True
         elif local == "RecordHarpDevices" or include == EXPERIMENT_RECORDS:
