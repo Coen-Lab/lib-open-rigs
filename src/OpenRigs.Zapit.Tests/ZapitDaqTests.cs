@@ -229,6 +229,43 @@ namespace OpenRigs.Zapit.Tests
             AssertZeros(h.Device.OnDemandWrites.Last());
         }
 
+        // NI reports a generation error at Stop: the twin, its clocked task stopping with an error, as NI's does.
+        sealed class StopFails : IZapitDevice
+        {
+            public readonly SimulatedZapitDevice Twin = new SimulatedZapitDevice();
+            public void WriteOnDemand(double[] volts) => Twin.WriteOnDemand(volts);
+            public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal) => Twin.ArmFinite(samples, sampleRate, triggerTerminal);
+            public void WriteAt(double[,] samples, long firstSample) => Twin.WriteAt(samples, firstSample);
+            public long SamplesGenerated => Twin.SamplesGenerated;
+            public bool HasClockedTask => Twin.HasClockedTask;
+            public bool IsDone => false;
+            public void StopClocked()
+            {
+                var had = Twin.HasClockedTask;
+                Twin.StopClocked();
+                if (had) throw new InvalidOperationException("DAQmx: the generation failed.");
+            }
+            public double[] Staircase(double[,] samples, double sampleRate) => Twin.Staircase(samples, sampleRate);
+            public void Dispose() => Twin.Dispose();
+        }
+
+        [TestMethod]
+        public void UnsubscribingZeroesEveryLineEvenWhenStoppingFails()
+        {
+            var device = new StopFails();
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.01, DeviceFactory = () => device };
+            var commands = new Subject<ZapitDaqCommand>();
+            var events = new BlockingCollection<ZapitDaqEvent>();
+            var subscription = node.Process(commands).Subscribe(events.Add, e => { });
+            commands.OnNext(Load(Unpack()));
+            commands.OnNext(Arm(1, 1, true, 40.0, 0));
+            Assert.IsTrue(device.Twin.HasClockedTask);
+            var writes = device.Twin.OnDemandWrites.Count;
+            try { subscription.Dispose(); } catch (InvalidOperationException) { }
+            Assert.AreEqual(writes + 1, device.Twin.OnDemandWrites.Count, "No zero was written after Stop failed.");
+            AssertZeros(device.Twin.OnDemandWrites.Last());
+        }
+
         [TestMethod]
         public void ABankIsRefusedUnlessEveryHashMatches()
         {

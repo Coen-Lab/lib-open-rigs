@@ -336,14 +336,11 @@ namespace OpenRigs.Zapit
                     disposed = true;
                 }
                 if (Thread.CurrentThread != monitor) monitor.Join();
-                try
-                {
-                    device.StopClocked();
-                    device.WriteOnDemand(Zeros);
-                }
+                try { device.StopClocked(); }   // NI reports a failed generation here: the lines are zeroed all the same
                 finally
                 {
-                    device.Dispose();
+                    try { device.WriteOnDemand(Zeros); }
+                    finally { device.Dispose(); }
                 }
             }
         }
