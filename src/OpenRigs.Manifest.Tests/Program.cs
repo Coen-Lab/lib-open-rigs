@@ -813,9 +813,6 @@ namespace OpenRigs.Manifest.Tests
                 Console.WriteLine("ConfigRoot:");
                 Check("a ConfigRoot that is not where rig.yml was read is noted", ManifestWriter.ConfigRootNote(@"D:\Test\config", @"D:\Rigs\RIG\rig.yml") != null, "no note");
                 Check("... and one that is, is not", ManifestWriter.ConfigRootNote(@"D:\Rigs", @"D:\Rigs\RIG\rig.yml") == null, "noted");
-                Check("{RigFiles} with no ConfigRoot stops the workflow at Start (no lab default)", ManifestWriter.ConfigRootRefusal(ManifestWriter.RigFilesToken, " ") != null, "no refusal");
-                Check("... and neither a ConfigRoot nor ConfigFiles without {RigFiles} does", ManifestWriter.ConfigRootRefusal(ManifestWriter.RigFilesToken, @"D:\Rigs") == null && ManifestWriter.ConfigRootRefusal("a.yml", null) == null, "refused");
-                Check("ConfigRoot has no default", new ExperimentManifestSettings().ConfigRoot == null, new ExperimentManifestSettings().ConfigRoot);
 
                 Console.WriteLine("The editor's copy:");
                 {

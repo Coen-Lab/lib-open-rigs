@@ -4,7 +4,7 @@
     <Description>A package providing common classes and types for OpenRigs experiments.</Description>
     <PackageTags>$(PackageTags) Core</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.42</Version>
+    <Version>0.1.1-coen-lab.45</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\RigDevices.cs" Link="Shared\RigDevices.cs" />
+    <!-- WorkflowConfigRoot: the build context, as the packages that read rig.yml at build use it. -->
+    <Compile Include="..\Shared\GroupNode.cs" Link="Shared\GroupNode.cs" />
   </ItemGroup>
 
   <ItemGroup>

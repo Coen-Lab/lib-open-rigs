@@ -16,14 +16,13 @@ namespace OpenRigs.LiveView
 {
     /// <summary>
     /// The live view of every device on a rig, in one node. At build it reads this machine's
-    /// rig.yml and, for each device entry (kind: instance:) whose data the workflow publishes as
+    /// rig.yml under the workflow's ConfigRoot (ReadLabRig's, built before it) and, for each device entry (kind: instance:) whose data the workflow publishes as
     /// a subject named &lt;Kind-Instance&gt;.Data, adds its kind's recipe to its own inner workflow,
     /// beside a StreamController that opens OpenRigs.Streaming's two ports. Only subjects built
     /// before this node can be found, so it goes last in the workflow.
     /// </summary>
-    [DefaultProperty(nameof(ConfigRoot))]
     [TypeDescriptionProvider(typeof(StreamDevicesTypeDescriptionProvider))]
-    [Description("Streams every device in this machine's rig.yml that the workflow publishes as <Kind-Instance>.Data, at its kind's rate, over OpenRigs.Streaming. Put it last in the workflow: only subjects built before it are found.")]
+    [Description("Streams every device in this machine's rig.yml that the workflow publishes as <Kind-Instance>.Data, at its kind's rate, over OpenRigs.Streaming. Reads rig.yml under ReadLabRig's ConfigRoot, the workflow's. Put it last in the workflow: only subjects built before it are found.")]
     public class StreamDevices : GroupWorkflowBuilder
     {
         // The plan the inner workflow was last made from. The editor builds on every change, so
@@ -33,7 +32,6 @@ namespace OpenRigs.LiveView
         /// <summary>Initializes a new instance of the <see cref="StreamDevices"/> class.</summary>
         public StreamDevices()
         {
-            GroupNode.Externalize(Workflow, Settings, "ConfigRoot");
         }
 
         /// <summary>
@@ -47,16 +45,6 @@ namespace OpenRigs.LiveView
         public StreamDevices(ExpressionBuilderGraph workflow)
             : base(workflow)
         {
-            GroupNode.Externalize(Workflow, Settings, "ConfigRoot");
-        }
-
-        /// <summary>Gets or sets the root under which each machine has its own configuration directory.</summary>
-        [Category("Config")]
-        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml. Read when the workflow is built; a missing file streams no devices, and unset the workflow stops at Start.")]
-        public string ConfigRoot
-        {
-            get { return Settings.ConfigRoot; }
-            set { Settings.ConfigRoot = value; }
         }
 
         /// <summary>Gets or sets the TCP port of the data publisher.</summary>
@@ -78,7 +66,7 @@ namespace OpenRigs.LiveView
         }
 
         // The settings node in the inner workflow, added on first use. A workflow saved before
-        // the node existed gets it when its ConfigRoot is read back, after the inner workflow.
+        // the node existed gets it when its ports are read back, after the inner workflow.
         StreamDevicesSettings Settings
         {
             get { return GroupNode.Settings<StreamDevicesSettings>(Workflow); }
@@ -89,18 +77,14 @@ namespace OpenRigs.LiveView
         /// <returns>The inner workflow's expression.</returns>
         public override Expression Build(IEnumerable<Expression> arguments)
         {
-            var plan = LiveViewPlan.Create(ConfigRoot, name => GroupNode.PublishedType(this, name));
+            var plan = LiveViewPlan.Create(GroupNode.WorkflowConfigRoot(this, "StreamDevices"), name => GroupNode.PublishedType(this, name));
             var signature = plan.Signature(DataPort, VideoPort);
             if (signature != generatedFrom)
             {
                 Generate(plan);
                 generatedFrom = signature;
             }
-            var built = base.Build(arguments);
-            if (plan.StartRefusal == null) return built;
-            // Built, so the editor opens the workflow on any desk; it stops when the workflow starts.
-            return Expression.Call(typeof(Observable), nameof(Observable.Throw), built.Type.GetGenericArguments(),
-                Expression.Constant(new InvalidOperationException(plan.StartRefusal), typeof(Exception)));
+            return base.Build(arguments);
         }
 
         // Loads every include in the generated workflow, however deep, before it is built. A
@@ -246,12 +230,9 @@ namespace OpenRigs.LiveView
     /// StreamDevices' settings, kept as a node in its inner workflow so that they survive Bonsai's
     /// copies of the group. Set them on StreamDevices; this node builds to nothing.
     /// </summary>
-    [Description("StreamDevices' settings (ConfigRoot, DataPort, VideoPort), kept here so Bonsai's copies of the group keep them. Set them on StreamDevices.")]
+    [Description("StreamDevices' settings (DataPort, VideoPort), kept here so Bonsai's copies of the group keep them. Set them on StreamDevices.")]
     public class StreamDevicesSettings : ZeroArgumentExpressionBuilder
     {
-        /// <summary>Gets or sets StreamDevices' ConfigRoot.</summary>
-        public string ConfigRoot { get; set; }
-
         /// <summary>Gets or sets StreamDevices' DataPort.</summary>
         public int DataPort { get; set; } = 5556;
 
@@ -267,12 +248,11 @@ namespace OpenRigs.LiveView
         }
     }
 
-    // StreamDevices' own settings in the Properties panel and to an ExternalizedMapping: its inner
-    // workflow is generated and externalizes only ConfigRoot, for a workflow property to be mapped onto it.
+    // StreamDevices' own settings in the Properties panel: its inner workflow is generated and externalizes none.
     class StreamDevicesTypeDescriptionProvider : ShownPropertiesProvider
     {
         public StreamDevicesTypeDescriptionProvider()
-            : base("ConfigRoot", "DataPort", "VideoPort")
+            : base("DataPort", "VideoPort")
         {
         }
     }

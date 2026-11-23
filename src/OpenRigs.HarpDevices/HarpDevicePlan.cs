@@ -54,12 +54,6 @@ namespace OpenRigs.HarpDevices
                 plan.StartRefusal = "RecordHarpDevices records nothing: " + plan.Notes[0] + ". Put it after LogController and the devices.";
                 return plan;
             }
-            if (string.IsNullOrWhiteSpace(configRoot))
-            {
-                plan.Notes.Add("ConfigRoot is not set, so no rig.yml was read");
-                plan.StartRefusal = "RecordHarpDevices has no ConfigRoot, the folder holding <MACHINE-NAME>\\rig.yml: set it, as ReadLabRig's.";
-                return plan;
-            }
             string problem;
             var devices = RigDevices.Read(RigDevices.PathFor(configRoot), out problem);
             if (devices == null)

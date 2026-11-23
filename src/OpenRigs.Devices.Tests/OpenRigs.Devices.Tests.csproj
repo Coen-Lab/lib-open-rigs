@@ -30,6 +30,11 @@
     <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
     <ProjectReference Include="..\OpenRigs.Vision\OpenRigs.Vision.csproj" />
     <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
+    <!-- WorkflowConfigRootTests: the nodes that read rig.yml when the workflow is built -->
+    <ProjectReference Include="..\OpenRigs.LiveView\OpenRigs.LiveView.csproj" />
+    <ProjectReference Include="..\OpenRigs.Streaming\OpenRigs.Streaming.csproj" />
+    <ProjectReference Include="..\OpenRigs.HarpDevices\OpenRigs.HarpDevices.csproj" />
+    <ProjectReference Include="..\OpenRigs.Manifest\OpenRigs.Manifest.csproj" />
   </ItemGroup>
 
 </Project>

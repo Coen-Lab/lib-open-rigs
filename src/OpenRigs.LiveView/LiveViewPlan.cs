@@ -166,9 +166,6 @@ namespace OpenRigs.LiveView
         // a workflow with an experiment folder.
         public bool StreamsLoggedRows;
 
-        // Why the node stops the workflow at Start, or null: no ConfigRoot.
-        public string StartRefusal;
-
         public const string LoggedRowsType = "OpenRigs.Logging.LoggedRows";
         public const string LoggedRowsStream = "logs";
         public readonly List<PlannedDevice> Streamed = new List<PlannedDevice>();
@@ -203,12 +200,6 @@ namespace OpenRigs.LiveView
             // An experiment folder is OpenRigs.Logging's ExperimentLogs, whose logs publish their rows (LoggedRows).
             plan.StreamsLoggedRows = plan.HasExperimentFolder;
 
-            if (string.IsNullOrWhiteSpace(configRoot))
-            {
-                plan.Notes.Add("ConfigRoot is not set, so no rig.yml was read");
-                plan.StartRefusal = "StreamDevices has no ConfigRoot, the folder holding <MACHINE-NAME>\\rig.yml: set it, as ReadLabRig's.";
-                return plan;
-            }
             string problem;
             var devices = RigDevices.Read(RigDevices.PathFor(configRoot), out problem);
             if (devices == null)

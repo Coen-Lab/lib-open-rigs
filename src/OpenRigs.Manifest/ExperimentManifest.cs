@@ -37,7 +37,7 @@ namespace OpenRigs.Manifest
 
         // Its settings, externalized in its inner workflow so an include can map a property onto them
         // (OpenRigs.Logging's ExperimentRecords: IngestScript, ExpectedFiles).
-        static readonly string[] Externalized = { "IngestScript", "ConfigRoot", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns" };
+        static readonly string[] Externalized = { "IngestScript", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns" };
 
         /// <summary>
         /// Initializes a copy with the given inner workflow. Bonsai copies a group by this
@@ -60,16 +60,8 @@ namespace OpenRigs.Manifest
             set { Settings.IngestScript = value; }
         }
 
-        /// <summary>Gets or sets the root under which this machine's rig.yml is, which {RigFiles} reads.</summary>
-        [Description("The root under which each machine has its own configuration directory, <ConfigRoot>\\<MACHINE-NAME>\\rig.yml, the workflow's own (OpenRigs.Logging's ExperimentRecords maps it), which ConfigFiles' {RigFiles} reads. Unset with {RigFiles} in ConfigFiles, the workflow stops at Start.")]
-        public string ConfigRoot
-        {
-            get { return Settings.ConfigRoot; }
-            set { Settings.ConfigRoot = value; }
-        }
-
         /// <summary>Gets or sets the configuration files the workflow runs with, separated by ;.</summary>
-        [Description("The configuration files the workflow runs with, separated by ;. Each is read once at Start and recorded in the manifest with its sha256, so the manifest has them as loaded. Environment variables are expanded (%COMPUTERNAME%), and {SubjectId} is the launch's --property:SubjectId (a mouse's own file); a folder is every file in it; a relative path is from the workflow's repository; {RigFiles} (the default) is this machine's rig.yml under ConfigRoot and every file it names (calibrations, speaker filters, mesh map, gamma table) and, on a rig with a lick spout stage, the mouse's spout positions. A missing file is noted, not an error.")]
+        [Description("The configuration files the workflow runs with, separated by ;. Each is read once at Start and recorded in the manifest with its sha256, so the manifest has them as loaded. Environment variables are expanded (%COMPUTERNAME%), and {SubjectId} is the launch's --property:SubjectId (a mouse's own file); a folder is every file in it; a relative path is from the workflow's repository; {RigFiles} (the default) is this machine's rig.yml under the workflow's ConfigRoot (ReadLabRig's, which must be built before this node) and every file it names (calibrations, speaker filters, mesh map, gamma table) and, on a rig with a lick spout stage, the mouse's spout positions. A missing file is noted, not an error.")]
         public string ConfigFiles
         {
             get { return Settings.ConfigFiles; }
@@ -130,10 +122,9 @@ namespace OpenRigs.Manifest
             {
                 throw new InvalidOperationException("ExperimentManifest needs " + PathSubject + " to be a string, the experiment folder's path; this workflow's is " + pathType + ".");
             }
-            var refusal = ManifestWriter.ConfigRootRefusal(ConfigFiles, ConfigRoot);
-            if (refusal != null) throw new InvalidOperationException(refusal);
+            var configRoot = GroupNode.WorkflowConfigRoot(this, "ExperimentManifest");
             Manifest.TrialColumns.Streams(StreamColumns);
-            var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles, ConfigRoot), name => GroupNode.PublishedType(this, name));
+            var expected = ExpectedPlan.Create(ExpectedFiles, ManifestWriter.RigConfigPath(ConfigFiles, configRoot), name => GroupNode.PublishedType(this, name));
             // Each condition (path?Subject) is a bool subject published before this node; one that is not is required always, with a note.
             var names = new List<string>();
             var subjects = new List<Expression>();
@@ -151,7 +142,7 @@ namespace OpenRigs.Manifest
             }
             var conditions = Expression.Call(typeof(ManifestRecorder).GetMethod(nameof(ManifestRecorder.Conditions)),
                 Expression.Constant(names.ToArray()), Expression.NewArrayInit(typeof(IObservable<bool>), subjects));
-            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, ConfigRoot, expected, TrialColumns, StreamColumns));
+            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, configRoot, expected, TrialColumns, StreamColumns));
             var observablePath = Expression.Convert(path, typeof(IObservable<string>));
             var run = arguments.FirstOrDefault();
             if (run == null)
@@ -168,14 +159,11 @@ namespace OpenRigs.Manifest
     /// ExperimentManifest's settings, kept as a node in its inner workflow so that they survive
     /// Bonsai's copies of the group. Set them on ExperimentManifest; this node builds to nothing.
     /// </summary>
-    [Description("ExperimentManifest's settings (IngestScript, ConfigRoot, ConfigFiles, ExpectedFiles, TrialColumns, StreamColumns), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
+    [Description("ExperimentManifest's settings (IngestScript, ConfigFiles, ExpectedFiles, TrialColumns, StreamColumns), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
     public class ExperimentManifestSettings : ZeroArgumentExpressionBuilder
     {
         /// <summary>Gets or sets ExperimentManifest's IngestScript.</summary>
         public string IngestScript { get; set; }
-
-        /// <summary>Gets or sets ExperimentManifest's ConfigRoot.</summary>
-        public string ConfigRoot { get; set; }
 
         /// <summary>Gets or sets ExperimentManifest's ConfigFiles.</summary>
         public string ConfigFiles { get; set; } = ManifestWriter.RigFilesToken;
@@ -202,7 +190,7 @@ namespace OpenRigs.Manifest
     class ExperimentManifestTypeDescriptionProvider : ShownPropertiesProvider
     {
         public ExperimentManifestTypeDescriptionProvider()
-            : base("IngestScript", "ConfigRoot", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns")
+            : base("IngestScript", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns")
         {
         }
     }
