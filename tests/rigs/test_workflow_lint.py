@@ -345,6 +345,25 @@ def test_a_stage_the_workflow_announces_itself_is_one_of_ready_gate_s_workflow_s
         "ReadyGate's WorkflowStages is CalibrationReady, not the stages the workflow announces itself (none)"]
 
 
+def test_a_recording_workflow_waits_for_the_lab_clock_at_start(tmp_path):
+    # P1R-L4 (audit 22 Nov 2026): LabClockReady checks the clock at Start and announces LabClockChecked, so a clock
+    # fault stops the workflow before Ready, not at Go; a rig list's PieceStages is fixed, so it is a WorkflowStage.
+    logs, ready = include(lint.LOG_LAB_EXPERIMENT), include(lint.LAB_CLOCK_READY)
+    once = "the workflow includes LabClockReady {} times: once, outside any per-element operator, with ExperimentLogs, else none"
+    assert lint.hardware_problems(workflow(tmp_path, logs + MIXED)) == [once.format(0)]
+    assert lint.hardware_problems(workflow(tmp_path / "b", logs + MIXED + ready)) == [
+        "ReadyGate's WorkflowStages is not set, not the stages the workflow announces itself (LabClockChecked)"]
+    gate = piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead")
+    waits = MIXED.replace(gate, piece(lint.READY_GATE, PieceStages="HarpClockSet, SpoutsHomed, Camera-Overhead",
+                                      WorkflowStages="LabClockChecked"))
+    assert lint.hardware_problems(workflow(tmp_path / "c", logs + waits + ready)) == []
+    # Before ReadyGate it would announce into a ReadyStages not yet built; without ExperimentLogs nothing is recorded.
+    assert lint.hardware_problems(workflow(tmp_path / "d", logs + ready + waits)) == ["LabClockReady comes before ReadyGate"]
+    assert lint.hardware_problems(workflow(tmp_path / "e", waits + ready)) == [once.format(1)]
+    listed = include(lint.READ_LAB_RIG) + include(next(iter(lint.RIG_LISTS)), "<WorkflowStages>LabClockChecked</WorkflowStages>")
+    assert lint.hardware_problems(workflow(tmp_path / "f", logs + listed + ready)) == []
+
+
 CALIBRATION_READY = ('<Expression xsi:type="Combinator"><Combinator xsi:type="orc:AnnounceStage"><orc:Stage>CalibrationReady</orc:Stage>'
                      '</Combinator></Expression><Expression xsi:type="MulticastSubject"><Name>ReadyStages</Name></Expression>')
 ANNOUNCED = '<Edge From="0" To="1" Label="Source1" />'
@@ -495,6 +514,8 @@ EXPECTED = ("auto;harp;Settings/Settings_Rig_;WorkflowData/WorkflowData_Trials_;
 
 def test_every_file_a_workflow_writes_is_named_in_expected_files_with_its_condition(tmp_path):
     assert lint.expected_files_problems(workflow(tmp_path, LOGS + manifest_node(EXPECTED))) == []
+    # LabClockReady checks the clock and writes nothing (P1R-L4).
+    assert lint.expected_files_problems(workflow(tmp_path / "b", LOGS + include(lint.LAB_CLOCK_READY) + manifest_node(EXPECTED))) == []
 
 
 def test_a_folder_entry_in_place_of_each_log_is_refused(tmp_path):

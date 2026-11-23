@@ -27,6 +27,8 @@ namespace OpenRigs.Logging.Tests
         string SourceVideo => Path.Combine(TestDirectory, "source.avi");
 
         // Frame sizes are kept at 160x120 or above, since the FMP4 encoder writes unreadable videos at e.g. 64x48.
+        // The workflow starts the file only once PathPrefix and TimeBase exist: frames before either are dropped by
+        // design, and a loaded machine lost the first 2 of 10 frames to that race.
         [DataTestMethod]
         [DataRow("TestVideo", 10, 320, 240)]
         [DataRow("Video", 25, 160, 120)]

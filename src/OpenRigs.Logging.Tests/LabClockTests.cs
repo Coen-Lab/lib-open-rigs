@@ -8,8 +8,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace OpenRigs.Logging.Tests
 {
     /// <summary>
-    /// LogController's start check (LabClock): lab.yml, the zone and the last time sync, each state judged from what
-    /// was read, so none needs this machine's clock changed.
+    /// The lab clock check (LabClock), at Start (LabClockReady) and at Go (LogController): lab.yml, the zone and the
+    /// last time sync, each state judged from what was read, so none needs this machine's clock changed.
     /// </summary>
     [TestClass]
     public class LabClockTests
@@ -117,6 +117,9 @@ namespace OpenRigs.Logging.Tests
                 var missing = Assert.ThrowsException<InvalidOperationException>(() => LabClock.ReadSettings(root));
                 StringAssert.Contains(missing.Message, Path.Combine(root, "shared", "lab.yml"));
                 StringAssert.Contains(missing.Message, @"comes from the share's config\shared when the rig is idle");
+                var missingAtStart = Assert.ThrowsException<InvalidOperationException>(() =>
+                    new LabClockAgrees().Process(Observable.Return(root)).ToEnumerable().ToList());
+                StringAssert.StartsWith(missingAtStart.Message, "Recording refused: the lab settings");
                 File.WriteAllText(Path.Combine(root, "shared", "lab.yml"), "# lab\ntimeZone: GMT Standard Time   # the zone\nmaxSyncAgeDays: 7   # days\n");
                 var settings = LabClock.ReadSettings(root);
                 Assert.AreEqual("GMT Standard Time", settings.TimeZone);
@@ -124,6 +127,24 @@ namespace OpenRigs.Logging.Tests
                 File.WriteAllText(Path.Combine(root, "shared", "lab.yml"), "timeZone: GMT Standard Time\nmaxSyncAgeDays: 7\nrigs:\n  timeZone: UTC\n");
                 var refused = Assert.ThrowsException<InvalidOperationException>(() => LabClock.ReadSettings(root));
                 StringAssert.Contains(refused.Message, "are refused: line 3 sets 'rigs'; lab.yml takes only timeZone and maxSyncAgeDays.");
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
+        }
+
+        // P1R-L4: LabClockReady, run headless as a workflow has it, stops the workflow at Start, before Ready and Go.
+        [TestMethod]
+        public void LabClockReady_StopsTheWorkflowAtStart()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "LabClockTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(root, "shared"));
+            try
+            {
+                var result = OpenRigs.Tests.BonsaiWorkflowRunner.Run("LabClockReadyTest.bonsai",
+                    new System.Collections.Generic.Dictionary<string, string> { { "ConfigRoot", root } }, TimeSpan.FromSeconds(60));
+                StringAssert.Contains(result.StandardError + result.StandardOutput, "Recording refused: the lab settings", result.Describe());
             }
             finally
             {
@@ -147,6 +168,9 @@ namespace OpenRigs.Logging.Tests
                     new CheckLabClock { ConfigRoot = root }.Process(System.Reactive.Linq.Observable.Return(1)).ToEnumerable().ToList());
                 StringAssert.StartsWith(operatorRefused.Message, "Recording refused");
                 Assert.AreEqual(1, new CheckLabClock().Process(System.Reactive.Linq.Observable.Return(1)).ToEnumerable().Single(), "no ConfigRoot: nothing checked");
+                var atStart = Assert.ThrowsException<InvalidOperationException>(() =>
+                    new LabClockAgrees().Process(Observable.Return(root)).ToEnumerable().ToList());
+                StringAssert.Contains(atStart.Message, "set the time zone to 'No Such Zone'");
             }
             finally
             {

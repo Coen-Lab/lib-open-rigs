@@ -121,7 +121,7 @@ namespace OpenRigs.Logging.Tests
     {
         protected override string WorkflowFileName => "LogHarpLookBackTest.bonsai";
 
-        // PathPrefix 2 s after the device starts (LogController subscribed late): the log still holds the
+        // PathPrefix late (LogController subscribed at the device's 150th message, Harp time 1.5 s): the log still holds the
         // messages of the half second before it, and no more, as a camera frame reaches its log about 75 ms after the trigger it
         // is stamped with and every trigger must be in the board's log (on a rig, the first 4
         // triggers of every camera CSV were missing from the board's log).
@@ -138,11 +138,11 @@ namespace OpenRigs.Logging.Tests
                 .SelectMany(HarpBinaryLog.ReadMessages)
                 .Where(message => message.Timestamp.HasValue)
                 .Min(message => message.Timestamp.Value);
-            // PathPrefix's Harp time is only about 1.5 s: a slow runner's simulated device falls behind the
-            // wall clock that delays PathPrefix (on CI, 0.56 s logged first, so PathPrefix at about
-            // 1.06 s). So this checks the wiring, held messages dropped and the log started before PathPrefix;
-            // HarpLookBackTests checks the window itself.
-            Assert.IsTrue(first > 0.1 && first < 1.4, $"The first logged message is at {first} s; PathPrefix came about 1.5 s in (2 s after the device started) and the log should start half a second (HarpLookBack) before it.{result.Describe()}");
+            // Gated by the device's own messages, not the wall clock: a 2 s wall-clock delay let a loaded
+            // machine's simulated device fall so far behind that PathPrefix came under 0.5 s of Harp time
+            // in, and every message was logged (0.01 s first). Held messages before 1.0 s dropped, and the
+            // log starts before the 1.5 s message; HarpLookBackTests checks the window itself.
+            Assert.IsTrue(first > 0.95 && first < 1.5, $"The first logged message is at {first} s; PathPrefix came at the 1.5 s message and the log should start half a second (HarpLookBack) before it.{result.Describe()}");
         }
     }
 }

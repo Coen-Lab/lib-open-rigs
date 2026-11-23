@@ -82,6 +82,9 @@ PULSE_OUTPUTS = DEVICES + "PulseOutputs.bonsai"
 RUNNING_WHEEL = DEVICES + "RunningWheel.bonsai"
 REWARD_VALVE = DEVICES + "RewardValve.bonsai"
 HARP_CLOCK_AGREES = DEVICES + "HarpClockAgrees.bonsai"
+# The lab clock checked at Start, a Ready stage: after ReadyGate, as ExperimentLogs (before the hardware) announcing
+# into ReadyStages would make Bonsai build the hardware, whose logs wait for its PathPrefix, in terms of itself.
+LAB_CLOCK_READY = "OpenRigs.Logging:LabClockReady.bonsai"
 # What each piece takes: Name, Board and Camera name a device; X.Commands / X.Data are the subject properties
 # (CommandsSubjectName, BoardDataSubjectName, ...) that must equal that device's name plus the suffix.
 PIECES = {
@@ -102,6 +105,7 @@ PIECES = {
     PROJECTOR_DISPLAY: (),
     HARP_CLOCK_AGREES: ("Device", "Device.Data"),
     RAW_PROJECTOR_DISPLAY: (),
+    LAB_CLOCK_READY: (),
 }
 # The Kind each named piece's Name starts with (Kind-Instance): RigDevice finds the entry by the Instance alone, in the
 # piece's own rig.yml group, so a BehaviorBoard piece named Camera-Main would open the board main and log as a camera.
@@ -117,7 +121,9 @@ DEVICE_DECLARERS = {CAMERA_LIVE_CONTROLS: "Camera", REWARD_VALVE: "Name"}
 # The stage each piece announces into ReadyStages (its AnnounceStage's Stage), which ReadyGate must wait for; a camera
 # announces its own Name, HarpClockAgrees its Device. test_ready_stages checks each piece's file (or the file it announces from) says the same.
 READY_STAGES = {CLOCK_FROM_GENERATOR: "HarpClockSet", CLOCK_FROM_BOARD: "HarpClockSet", LICK_SPOUT_STAGE: "SpoutsHomed",
-                PULSE_OUTPUTS: "PulsesEnabled", SPEAKER_MIXER: "MixerStarted"}
+                PULSE_OUTPUTS: "PulsesEnabled", SPEAKER_MIXER: "MixerStarted", LAB_CLOCK_READY: "LabClockChecked"}
+# LabClockReady's stage goes in ReadyGate's WorkflowStages, not PieceStages: a rig list fixes its PieceStages, and the
+# same rig list serves workflows that record nothing (NoExperimentFolder), which have no LabClockReady.
 # A lick detector's lick state subject is LickState<Instance> (LicketySplit-Left: LickStateLeft), the name TrialLoop's tasks read.
 LICK_STATE = "LickState"
 # Upstream's video logs, kept for upstream merges: a lab camera logs itself (SpinnakerCamera, LogVideoFfmpeg).
@@ -502,7 +508,8 @@ def hardware_problems(wf: Workflow) -> list[str]:
     Split and lick spout stage driver, and none without; ReadyGate's PieceStages exactly the stages the pieces announce (HarpClockSet, or
     HarpClockRead for a ClockFromBoard with SetClock false, which only a NoExperimentFolder workflow may have,
     SpoutsHomed for the lick spout stage, each camera's Name, each HarpClockAgrees' Device, MixerStarted for SpeakerMixer) and its WorkflowStages
-    exactly those the workflow announces itself (its own AnnounceStage nodes, such as a calibration's CalibrationReady);
+    exactly those the workflow announces itself (its own AnnounceStage nodes, such as a calibration's CalibrationReady,
+    and LabClockReady's LabClockChecked, which a workflow with ExperimentLogs includes once, after ReadyGate);
     and the workflow makes no Ready report or StartCameras of its own. A named piece's Name starts with its Kind
     (KINDS); CameraLiveControls' Board is its camera's, and CameraTriggers' every camera's. The workflow's own included
     files count as the workflow; a piece behind a per-element operator (a SelectMany that runs it only on a rig with its
@@ -594,7 +601,11 @@ def hardware_problems(wf: Workflow) -> list[str]:
     if READY_GATE in paths and set(_stages(waits)) != set(announced):
         problems.append(f"ReadyGate's PieceStages is {waits or 'not set'}, not {', '.join(announced)}")
     own = [child(n, W + "Combinator").findtext(CORE + "Stage") or "" for n in wf.root.iter(W + "Expression")
-           if kind(n) == "core:AnnounceStage"]
+           if kind(n) == "core:AnnounceStage"] + ([READY_STAGES[LAB_CLOCK_READY]] if LAB_CLOCK_READY in always else [])
+    records = f'Path="{LOG_LAB_EXPERIMENT}"' in wf.text
+    if paths.count(LAB_CLOCK_READY) != records or LAB_CLOCK_READY in paths and LAB_CLOCK_READY not in always:
+        problems.append(f"the workflow includes LabClockReady {paths.count(LAB_CLOCK_READY)} times: once, outside any "
+                        "per-element operator, with ExperimentLogs, else none")
     workflow_stages = gate_props.get("WorkflowStages")
     if READY_GATE in paths and set(_stages(workflow_stages)) != set(own):
         problems.append(f"ReadyGate's WorkflowStages is {workflow_stages or 'not set'}, not the stages the workflow announces "
@@ -1136,7 +1147,7 @@ DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHar
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
                *DEVICE_GROUPS, LICK_SPOUT_STAGE, REWARD_VALVE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)
 NO_FILES = ("OpenRigs.Logging:LogController.bonsai", "OpenRigs.Logging:FormatFileName.bonsai", "OpenRigs.Logging:LogControlEvents.bonsai",
-            LOG_RNG_SEED)
+            LOG_RNG_SEED, LAB_CLOCK_READY)
 # Writers whose file the workflow's XML cannot name: a workflow logs through the blocks above instead.
 OTHER_WRITERS = {"CsvWriter", "MatrixWriter", "VideoWriter", "ImageWriter", "TextWriter", "BinaryWriter", "FileCapture",
                  "MessageWriter", "ObjectWriter", "JsonWriter", "BinaryLogWriter", "FfmpegVideoWriter"}
