@@ -7,9 +7,9 @@ name = "{{ python_package_name }}"
 description = "A library that defines a open-rigs data schema for the {{ project_name }} experiment."
 authors = [ {name = "{{ author_name }}", email = "{{author_email}}"}]
 license = "MIT"
-requires-python = ">=3.11, <3.12"
+requires-python = ">=3.13, <3.14"
 classifiers = [
-    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: Microsoft :: Windows",
 ]
 version = "0.0.0-rc1"
@@ -32,7 +32,7 @@ regenerate-schemas = "{{ python_folder_name }}.regenerate:main"
 
 [tool.ruff]
 line-length = 120
-target-version = 'py311'
+target-version = 'py313'
 
 [tool.ruff.lint]
 extend-select = ['Q', 'RUF100', 'C90', 'I']
