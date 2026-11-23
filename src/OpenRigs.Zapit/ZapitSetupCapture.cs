@@ -14,7 +14,7 @@ namespace OpenRigs.Zapit
     /// <summary>One step of Zapit's setup phase: a command for ZapitDaq, or a stage to report, or both.</summary>
     public class ZapitSetupStep
     {
-        /// <summary>The stage, as the Zapit.Setup metric reports it: Pointing, FramesSaved, StillSaved or Refused.</summary>
+        /// <summary>The stage, as the Zapit.Setup metric reports it: Pointing, FramesSaved, StillSaved, Loading or Refused.</summary>
         public string Stage { get; set; } = "";
 
         /// <summary>The run folder or still file the stage is about, or why a request was refused.</summary>
@@ -36,12 +36,12 @@ namespace OpenRigs.Zapit
     /// reports FramesSaved. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
     /// </summary>
     [Combinator]
-    [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named. Inputs: grid run folders, still paths, ZapitDaq's events, the camera's images. Output: ZapitDaq commands and the stages to report as Zapit.Setup.")]
+    [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named; each bank .json in pending is loaded (LoadBank). Inputs: grid run folders, still paths, bank paths, ZapitDaq's events, the camera's images. Output: ZapitDaq commands and the stages to report as Zapit.Setup.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class ZapitSetupCapture
     {
-        /// <summary>Gets or sets the folder every run and still must be inside: the rig's pending folder.</summary>
-        [Description("The folder every grid run and still must be inside: RigConfigs\\<RIG>\\pending.")]
+        /// <summary>Gets or sets the folder every run, still and bank must be inside: the rig's pending folder.</summary>
+        [Description("The folder every grid run, still and bank must be inside: RigConfigs\\<RIG>\\pending.")]
         public string PendingFolder { get; set; } = "";
 
         sealed class Run
@@ -55,8 +55,10 @@ namespace OpenRigs.Zapit
             public int Skip = -1;      // frames still to skip; -1 while waiting for Pointed
         }
 
-        /// <summary>The setup steps for the requests, as frames and ZapitDaq's events come.</summary>
-        public IObservable<ZapitSetupStep> Process(IObservable<string> gridRuns, IObservable<string> stills,
+        /// <summary>The setup steps for the requests, as frames and ZapitDaq's events come. A bank request (its
+        /// Settings_ZapitBank_&lt;DateTime&gt;.json) inside the pending folder becomes ZapitDaq's LoadBank (stage Loading);
+        /// one outside it is refused.</summary>
+        public IObservable<ZapitSetupStep> Process(IObservable<string> gridRuns, IObservable<string> stills, IObservable<string> banks,
             IObservable<ZapitDaqEvent> events, IObservable<IplImage> frames) => Observable.Create<ZapitSetupStep>(observer =>
         {
             var pending = Path.GetFullPath(PendingFolder);
@@ -117,6 +119,17 @@ namespace OpenRigs.Zapit
                 Emit(new ZapitSetupStep { Stage = "Pointing", Detail = still, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
             }
 
+            void Bank(string request)
+            {
+                var path = request.Trim().Trim('"');
+                if (Inside(path) == null || !path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    Refuse("a bank is a .json inside " + pending + ": " + request);
+                    return;
+                }
+                Emit(new ZapitSetupStep { Stage = "Loading", Detail = path, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.LoadBank, Path = path } });
+            }
+
             void OnEvent(ZapitDaqEvent e)
             {
                 if (run != null && e.Kind == ZapitDaqEventKind.Pointed && run.Skip < 0) run.Skip = run.SkipFrames;
@@ -166,7 +179,8 @@ namespace OpenRigs.Zapit
                 events.Subscribe(Locked<ZapitDaqEvent>(OnEvent), observer.OnError),
                 frames.Subscribe(Locked<IplImage>(OnFrame), observer.OnError),
                 gridRuns.Subscribe(Locked<string>(Start), observer.OnError),
-                stills.Subscribe(Locked<string>(Still), observer.OnError));
+                stills.Subscribe(Locked<string>(Still), observer.OnError),
+                banks.Subscribe(Locked<string>(Bank), observer.OnError));
         });
     }
 

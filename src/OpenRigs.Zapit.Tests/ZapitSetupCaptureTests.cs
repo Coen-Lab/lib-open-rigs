@@ -14,7 +14,7 @@ namespace OpenRigs.Zapit.Tests
         sealed class Rig : IDisposable
         {
             public readonly string Pending = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), "pending");
-            public readonly Subject<string> Grids = new Subject<string>(), Stills = new Subject<string>();
+            public readonly Subject<string> Grids = new Subject<string>(), Stills = new Subject<string>(), Banks = new Subject<string>();
             public readonly Subject<ZapitDaqEvent> Events = new Subject<ZapitDaqEvent>();
             public readonly Subject<IplImage> Frames = new Subject<IplImage>();
             public readonly List<ZapitSetupStep> Steps = new List<ZapitSetupStep>();
@@ -25,7 +25,7 @@ namespace OpenRigs.Zapit.Tests
             public Rig()
             {
                 Directory.CreateDirectory(Pending);
-                subscription = new ZapitSetupCapture { PendingFolder = Pending }.Process(Grids, Stills, Events, Frames)
+                subscription = new ZapitSetupCapture { PendingFolder = Pending }.Process(Grids, Stills, Banks, Events, Frames)
                     .Subscribe(step => { Steps.Add(step); if (step.Command?.Kind == ZapitDaqCommandKind.Point) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed }); }, e => Error = e);
             }
 
@@ -99,6 +99,22 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual(4, refused.Count, string.Join("; ", refused));
             StringAssert.Contains(refused[2], "within +/-10 V");
             StringAssert.Contains(refused[3], "in progress");
+        }
+
+        [TestMethod]
+        public void ABankInsidePendingIsLoadedOneOutsideIsRefusedNotFatal()
+        {
+            using var rig = new Rig();
+            var bank = Path.Combine(rig.Pending, "Settings_ZapitBank_T.json");
+            rig.Banks.OnNext("\"" + bank + "\"");
+            rig.Banks.OnNext(Path.Combine(rig.Pending, "..", "Settings_ZapitBank_T.json"));
+            rig.Banks.OnNext(Path.Combine(rig.Pending, "Settings_ZapitBank_T.bin"));
+            Assert.IsNull(rig.Error);
+            Assert.AreEqual(3, rig.Steps.Count, string.Join("; ", rig.Steps));
+            Assert.AreEqual("Loading " + bank, rig.Steps[0].ToString());
+            Assert.AreEqual(ZapitDaqCommandKind.LoadBank, rig.Steps[0].Command.Kind);
+            Assert.AreEqual(bank, rig.Steps[0].Command.Path);
+            Assert.IsTrue(rig.Steps.Skip(1).All(s => s.Stage == "Refused" && s.Command == null && s.Detail.Contains("inside " + rig.Pending)), string.Join("; ", rig.Steps));
         }
 
         [TestMethod]

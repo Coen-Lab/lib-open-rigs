@@ -15,6 +15,7 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
   - `Pointing <folder or png>`
   - `FramesSaved <folder>`
   - `StillSaved <png>`
+  - `Loading <json>`
   - `BankLoaded <json>`
   - `Refused <why>`
 
@@ -47,7 +48,7 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
    With `ceilingMw` 0 (laser disabled) there is no beam: the agent sends no grid, takes the nominal scanner mapping as the fit and has no accuracy.
 5. **Sample.** The agent registers the still against the mouse's last reference, or asks for bregma and lambda clicks.
-6. **Bank.** The agent builds the bank into `pending\` and checks it with lib_zapit's `read_bank`. It then sends `Zapit.LoadBank <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
+6. **Bank.** The agent builds the bank into `pending\` and checks it with lib_zapit's `read_bank`. It then sends `Zapit.LoadBank <json>`, and the workflow reports `Loading <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
 7. **Go.** Readiness requires all of the following:
    - the metric reads `BankLoaded` with the bank the agent built;
    - the fit, accuracy and sample have been accepted;
@@ -72,6 +73,7 @@ The workflow reports `Refused <why>` and keeps running if a request:
 - has a `grid.json` that is malformed, has volts outside ±10 V, has `skipFrames` below 0 or has `backgrounds` below 1;
 - names a folder that already holds PNGs;
 - names a still that is not a new `.png` in an existing folder;
+- names a bank that is not a `.json`;
 - arrives while another Setup or Still is in progress.
 
 A bank that ZapitDaq refuses (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit.Setup`, `Zapit.Still` and `Zapit.LoadBank`, and the metric stays where it was, so the agent must not send them. `Zapit.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
