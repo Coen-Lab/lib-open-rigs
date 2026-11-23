@@ -265,12 +265,14 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Zapit's NI DAQ, laser limits and camera; a rig without Zapit has none.
+        /// Zapit: MATLAB Zapit's server endpoint (contacted only when the task enables optogenetics), ZapitDaq's NI DAQ, laser limits and camera, or both; a rig without Zapit has none.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("zapit")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="zapit")]
-        [System.ComponentModel.DescriptionAttribute("Zapit\'s NI DAQ, laser limits and camera; a rig without Zapit has none.")]
+        [System.ComponentModel.DescriptionAttribute("Zapit: MATLAB Zapit\'s server endpoint (contacted only when the task enables optog" +
+            "enetics), ZapitDaq\'s NI DAQ, laser limits and camera, or both; a rig without Zap" +
+            "it has none.")]
         public Zapit Zapit
         {
             get
@@ -4446,17 +4448,26 @@ namespace OpenRigs.Devices.Rigs
 
 
     /// <summary>
-    /// Zapit's NI DAQ wiring and laser limits. A channel is named on its own (ao0, PFI0) beside the device; OpenRigs.Devices
-    ///Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).
+    /// Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings
+    ///file; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the
+    ///native fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
+    ///beside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("Zapit\'s NI DAQ wiring and laser limits. A channel is named on its own (ao0, PFI0)" +
-        " beside the device; OpenRigs.Devices\nRigs.Zapit gives the full paths ZapitDaq ta" +
-        "kes (Dev1/ao0, /Dev1/PFI0).")]
+    [System.ComponentModel.DescriptionAttribute(@"Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings
+    file; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the
+    native fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
+    beside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
     public partial class Zapit
     {
+    
+        private string _host;
+    
+        private int _port;
+    
+        private bool _hardwareTriggered;
     
         private string _device;
     
@@ -4472,21 +4483,21 @@ namespace OpenRigs.Devices.Rigs
     
         private string _triggerChannel;
     
-        private double _sampleRate;
+        private double? _sampleRate;
     
         private System.Collections.Generic.List<double> _laserMinMaxMw;
     
         private System.Collections.Generic.List<double> _laserMinMaxControlVolts;
     
-        private double _ceilingMw;
+        private double? _ceilingMw;
     
-        private double _maxTrialSeconds;
+        private double? _maxTrialSeconds;
     
-        private double _earlyStopLeadSeconds;
+        private double? _earlyStopLeadSeconds;
     
-        private double _micronsPerPixel;
+        private double? _micronsPerPixel;
     
-        private double _voltsPerPixel;
+        private double? _voltsPerPixel;
     
         private bool _invertXScanner;
     
@@ -4498,16 +4509,18 @@ namespace OpenRigs.Devices.Rigs
     
         public Zapit()
         {
-            _laserMinMaxMw = new System.Collections.Generic.List<double>();
-            _laserMinMaxControlVolts = new System.Collections.Generic.List<double>();
+            _host = "127.0.0.1";
+            _port = 1488;
+            _hardwareTriggered = false;
             _invertXScanner = false;
             _invertYScanner = false;
-            _safetyGate = new SafetyGate();
-            _camera = new ZapitCamera();
         }
     
         protected Zapit(Zapit other)
         {
+            _host = other._host;
+            _port = other._port;
+            _hardwareTriggered = other._hardwareTriggered;
             _device = other._device;
             _galvoXChannel = other._galvoXChannel;
             _galvoYChannel = other._galvoYChannel;
@@ -4530,11 +4543,67 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The NI device, as NI MAX names it.
+        /// Host name or IP address of the PC running Zapit.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("device", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("host")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="host")]
+        [System.ComponentModel.DescriptionAttribute("Host name or IP address of the PC running Zapit.")]
+        public string Host
+        {
+            get
+            {
+                return _host;
+            }
+            set
+            {
+                _host = value;
+            }
+        }
+    
+        /// <summary>
+        /// TCP port the Zapit server listens on.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("port")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="port")]
+        [System.ComponentModel.DescriptionAttribute("TCP port the Zapit server listens on.")]
+        public int Port
+        {
+            get
+            {
+                return _port;
+            }
+            set
+            {
+                _port = value;
+            }
+        }
+    
+        /// <summary>
+        /// True: Zapit arms its DAQ on the TCP command and the ZapitTrigger line starts the stimulus. False: Zapit starts the stimulus on receipt of the command.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("hardwareTriggered")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="hardwareTriggered")]
+        [System.ComponentModel.DescriptionAttribute("True: Zapit arms its DAQ on the TCP command and the ZapitTrigger line starts the " +
+            "stimulus. False: Zapit starts the stimulus on receipt of the command.")]
+        public bool HardwareTriggered
+        {
+            get
+            {
+                return _hardwareTriggered;
+            }
+            set
+            {
+                _hardwareTriggered = value;
+            }
+        }
+    
+        /// <summary>
+        /// ZapitDaq's NI device, as NI MAX names it; with it, every native field below is given.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("device")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="device")]
-        [System.ComponentModel.DescriptionAttribute("The NI device, as NI MAX names it.")]
+        [System.ComponentModel.DescriptionAttribute("ZapitDaq\'s NI device, as NI MAX names it; with it, every native field below is gi" +
+            "ven.")]
         public string Device
         {
             get
@@ -4550,7 +4619,7 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The AO line driving the X galvo.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("galvoXChannel", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("galvoXChannel")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="galvoXChannel")]
         [System.ComponentModel.DescriptionAttribute("The AO line driving the X galvo.")]
         public string GalvoXChannel
@@ -4568,7 +4637,7 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The AO line driving the Y galvo.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("galvoYChannel", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("galvoYChannel")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="galvoYChannel")]
         [System.ComponentModel.DescriptionAttribute("The AO line driving the Y galvo.")]
         public string GalvoYChannel
@@ -4586,7 +4655,7 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The AO line setting the laser's power (its control volts).
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("laserChannel", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("laserChannel")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="laserChannel")]
         [System.ComponentModel.DescriptionAttribute("The AO line setting the laser\'s power (its control volts).")]
         public string LaserChannel
@@ -4604,7 +4673,7 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The AO line driving the masking LED.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("ledChannel", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("ledChannel")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="ledChannel")]
         [System.ComponentModel.DescriptionAttribute("The AO line driving the masking LED.")]
         public string LedChannel
@@ -4622,7 +4691,7 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The AI line reading the photodiode, for the laser curve.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("photodiodeChannel", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("photodiodeChannel")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="photodiodeChannel")]
         [System.ComponentModel.DescriptionAttribute("The AI line reading the photodiode, for the laser curve.")]
         public string PhotodiodeChannel
@@ -4640,7 +4709,7 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The PFI line the Behavior board's ZapitTrigger line is cabled to; each trial starts on it.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("triggerChannel", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("triggerChannel")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="triggerChannel")]
         [System.ComponentModel.DescriptionAttribute("The PFI line the Behavior board\'s ZapitTrigger line is cabled to; each trial star" +
             "ts on it.")]
@@ -4659,10 +4728,10 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// AO samples a second, per channel; every bank is built at it.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("sampleRate", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("sampleRate")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="sampleRate")]
         [System.ComponentModel.DescriptionAttribute("AO samples a second, per channel; every bank is built at it.")]
-        public double SampleRate
+        public double? SampleRate
         {
             get
             {
@@ -4678,7 +4747,7 @@ namespace OpenRigs.Devices.Rigs
         /// The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("laserMinMaxMw", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("laserMinMaxMw")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="laserMinMaxMw")]
         [System.ComponentModel.DescriptionAttribute("The laser\'s lowest and highest power, in mW, at laserMinMaxControlVolts.")]
         public System.Collections.Generic.List<double> LaserMinMaxMw
@@ -4697,7 +4766,7 @@ namespace OpenRigs.Devices.Rigs
         /// The laser's control volts at its lowest and highest power.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("laserMinMaxControlVolts", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("laserMinMaxControlVolts")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="laserMinMaxControlVolts")]
         [System.ComponentModel.DescriptionAttribute("The laser\'s control volts at its lowest and highest power.")]
         public System.Collections.Generic.List<double> LaserMinMaxControlVolts
@@ -4715,11 +4784,11 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// This rig's laser ceiling, in mW: lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("ceilingMw", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("ceilingMw")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="ceilingMw")]
         [System.ComponentModel.DescriptionAttribute("This rig\'s laser ceiling, in mW: lib_zapit caps every volts value it hands out (b" +
             "ank, aiming, scanner calibration) at it.")]
-        public double CeilingMw
+        public double? CeilingMw
         {
             get
             {
@@ -4734,11 +4803,11 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("maxTrialSeconds", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("maxTrialSeconds")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="maxTrialSeconds")]
         [System.ComponentModel.DescriptionAttribute("The longest trial buffer, in seconds: a task\'s laserCapSeconds above it is refuse" +
             "d at Go, and a trial until the outcome is finite at it.")]
-        public double MaxTrialSeconds
+        public double? MaxTrialSeconds
         {
             get
             {
@@ -4753,11 +4822,11 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// How far ahead of the samples generated an early stop writes its ramp, in seconds.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("earlyStopLeadSeconds", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("earlyStopLeadSeconds")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="earlyStopLeadSeconds")]
         [System.ComponentModel.DescriptionAttribute("How far ahead of the samples generated an early stop writes its ramp, in seconds." +
             "")]
-        public double EarlyStopLeadSeconds
+        public double? EarlyStopLeadSeconds
         {
             get
             {
@@ -4772,10 +4841,10 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The Zapit camera's scale at the sample, in microns a pixel.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("micronsPerPixel", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("micronsPerPixel")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="micronsPerPixel")]
         [System.ComponentModel.DescriptionAttribute("The Zapit camera\'s scale at the sample, in microns a pixel.")]
-        public double MicronsPerPixel
+        public double? MicronsPerPixel
         {
             get
             {
@@ -4790,10 +4859,10 @@ namespace OpenRigs.Devices.Rigs
         /// <summary>
         /// The galvos' volts a camera pixel, the scanner calibration's starting guess.
         /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("voltsPerPixel", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("voltsPerPixel")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="voltsPerPixel")]
         [System.ComponentModel.DescriptionAttribute("The galvos\' volts a camera pixel, the scanner calibration\'s starting guess.")]
-        public double VoltsPerPixel
+        public double? VoltsPerPixel
         {
             get
             {
@@ -4845,7 +4914,7 @@ namespace OpenRigs.Devices.Rigs
         /// The laser safety layers this rig was scope-checked with.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("safetyGate", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("safetyGate")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="safetyGate")]
         [System.ComponentModel.DescriptionAttribute("The laser safety layers this rig was scope-checked with.")]
         public SafetyGate SafetyGate
@@ -4864,7 +4933,7 @@ namespace OpenRigs.Devices.Rigs
         /// Zapit's Basler camera, Camera-Zapit in the data and live view.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("camera", Required=Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonPropertyAttribute("camera")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="camera")]
         [System.ComponentModel.DescriptionAttribute("Zapit\'s Basler camera, Camera-Zapit in the data and live view.")]
         public ZapitCamera Camera
@@ -4891,6 +4960,9 @@ namespace OpenRigs.Devices.Rigs
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
+            stringBuilder.Append("Host = " + _host + ", ");
+            stringBuilder.Append("Port = " + _port + ", ");
+            stringBuilder.Append("HardwareTriggered = " + _hardwareTriggered + ", ");
             stringBuilder.Append("Device = " + _device + ", ");
             stringBuilder.Append("GalvoXChannel = " + _galvoXChannel + ", ");
             stringBuilder.Append("GalvoYChannel = " + _galvoYChannel + ", ");

@@ -33,7 +33,8 @@ NAMES_THE_LAB = {
     "fixtures/manifest/v3/refuse/version-2.json": 10,
     "fixtures/manifest/v3/running.json": 9,
     "fixtures/manifest/v3/stopped-not-final.json": 10,
-    "fixtures/rig-yml/B1.yml": 7,  # four rigs' rig.yml as they are, the zapit block converted or removed: real records
+    "fixtures/rig-yml/B1.yml": 7,  # four rigs' rig.yml as they are on the share, byte for byte: real records
+    "fixtures/rig-yml/B2-both.yml": 6,  # B2 with ZapitDaq's fields beside MATLAB Zapit's
     "fixtures/rig-yml/B2.yml": 5,
     "fixtures/rig-yml/G1.yml": 10,
     "fixtures/rig-yml/G2.yml": 8,

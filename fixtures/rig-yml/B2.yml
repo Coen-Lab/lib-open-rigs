@@ -1,4 +1,3 @@
-# A copy of a rig's rig.yml as it is on the share, its zapit block converted to the native block (open_rigs.components.zapit) and Camera-Zapit added to the camera trigger.
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Coen-Lab/lib-open-rigs/main/src/open_rigs/schemas/lab_rig.json
 # BLUE-OPTO-2, in the lab rig model (lib-open-rigs open_rigs.rigs.lab_rig, laid out as its rig-template.yml).
 # Production (ActiveExperiments) does not read this file.
@@ -18,7 +17,7 @@ behaviorBoard:
     # What each line drives: one RewardValve per spout, named left and right, and one ZapitTrigger (lab rig model).
     wiring:
       DIPort0: { device: Photodiode }
-      DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body, Camera-Zapit] }
+      DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
       DO1: { device: RewardValve, name: left }
       DO2: { device: RewardValve, name: right }
       DO3: { device: ZapitTrigger, note: also the masking light }
@@ -134,27 +133,10 @@ speakerArray:
       channel: 2
       filter: calibration/Speaker-Centre.json
 
-# Zapit's NI DAQ (MATLAB Zapit's channels, laser values from its zapitSystemSettings.yml); safetyGate and the
-# camera's serial are this fixture's, recorded on the rig at cutover.
 zapit:
-  device: Dev1
-  galvoXChannel: ao0
-  galvoYChannel: ao1
-  laserChannel: ao2
-  ledChannel: ao3
-  photodiodeChannel: ai0
-  triggerChannel: PFI0
-  sampleRate: 100000
-  laserMinMaxMw: [0.0, 50.1]
-  laserMinMaxControlVolts: [-0.04, 5.0]
-  ceilingMw: 30
-  maxTrialSeconds: 3
-  earlyStopLeadSeconds: 0.02
-  micronsPerPixel: 19.3
-  voltsPerPixel: 0.001
-  safetyGate: { layer: software, date: 2026-11-23 }
-  camera:
-    serialNumber: "00000000"
+  host: 127.0.0.1
+  port: 1488
+  hardwareTriggered: true
 
 # Default absolute stage position at session start (steps)
 lickSpoutDefaultPosition:   # mean of the two-spout mice on this rig

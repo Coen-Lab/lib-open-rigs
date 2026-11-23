@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>ConditionedTaskLogs on ZapitDaq (TaskLogsZapitDaq in place of TaskLogs). A conditioned task's logs (its trials drawn from weighted trial conditions, OpenRigs.Trials IConditionedTask): Settings_Combinations, its one writer, every combination the conditions built at Go, each a row the trial log's trialCombinationId names (TrialRules.CombinationsJson, through LogDataSchema); and TaskLogsZapitDaq (Settings_Task from the input, WorkflowData_Trials, ZapitDaq's events), last, so the include's output is TaskLogsZapitDaq's and the combinations' write completing ends nothing. Needs what TaskLogsZapitDaq needs and TrialRules, the task's rules published at Go with a CombinationsJson member.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TrialRules</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>CombinationsJson</Selector>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogDataSchema.bonsai">
+        <Name>Settings_Combinations</Name>
+      </Expression>
+      <Expression xsi:type="WorkflowInput">
+        <Name>Source1</Name>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:TaskLogsZapitDaq.bonsai" />
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

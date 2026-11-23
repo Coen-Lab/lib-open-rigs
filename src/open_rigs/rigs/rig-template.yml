@@ -158,28 +158,12 @@ speakerArray:
       channel: 2
       filter: calibration/Speaker-Centre.json
 
+# Zapit optogenetics server (tcpServer section of the Zapit settings file). Contacted only when the
+# task sets optogenetics.enabled: true. The trigger is the board's ZapitTrigger line in wiring.
 zapit:
-  # Zapit's NI DAQ, laser limits and camera (OpenRigs.Zapit ZapitDaq, Bonsai.Pylon). Delete the block on a rig
-  # without Zapit. Channels as MATLAB Zapit wired them (ao0-ao3, ai0); laser values from its settings file. The
-  # board's ZapitTrigger line is cabled to triggerChannel, and its camera trigger line names Camera-Zapit in targets.
-  device: Dev1
-  galvoXChannel: ao0
-  galvoYChannel: ao1
-  laserChannel: ao2
-  ledChannel: ao3
-  photodiodeChannel: ai0
-  triggerChannel: PFI0
-  sampleRate: 100000          # AO samples a second
-  laserMinMaxMw: [0.0, 50.0]
-  laserMinMaxControlVolts: [0.0, 5.0]
-  ceilingMw: 30               # this rig's laser ceiling
-  maxTrialSeconds: 3          # no task's laserCapSeconds may exceed it
-  earlyStopLeadSeconds: 0.02
-  micronsPerPixel: 19.3
-  voltsPerPixel: 0.001
-  safetyGate: { layer: software }   # record the scope check: software once layers 1 and 2 pass it, hardware once layer 3 does
-  camera:
-    serialNumber: CHANGE-ME
+  host: 127.0.0.1           # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
+  port: 1488
+  hardwareTriggered: false  # true once the ZapitTrigger line is cabled to the Zapit DAQ trigger input
 
 # The stage's in position, in steps, for a mouse with no row in LickSpoutPositions.csv beside this file
 lickSpoutDefaultPosition:

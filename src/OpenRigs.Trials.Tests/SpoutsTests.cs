@@ -304,7 +304,7 @@ namespace OpenRigs.Trials.Tests
         {
             var rules = new StubRules
             {
-                Laser = laser ? LaserTiming.UntilOutcome(0, double.PositiveInfinity) : null,
+                Laser = laser ? LaserTiming.UntilOutcome(false, 0, double.PositiveInfinity) : null,
                 Plan = n => new TrialTiming { ItiSeconds = 2, LaserToStimulusSeconds = laserLead, Laser = laser, LickQuietSeconds = lickQuiet, ResponseWindowSeconds = 1.5, Cues = Spouts.Cues(-0.3, alwaysIn, 1.5) },
             };
             return new LoopRig(rules);

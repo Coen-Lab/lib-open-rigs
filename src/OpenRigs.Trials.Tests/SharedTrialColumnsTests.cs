@@ -71,7 +71,7 @@ namespace OpenRigs.Trials.Tests
 
         static TrialTimes Times(double trigger)
         {
-            return new TrialTimes { ItiStartTime = 10, ItiSeconds = 2.5, QuietWaitSeconds = 0.25, TrialStartTime = 12.25, StimulusOnsetTime = 12.751, StimulusOffTime = 13.751, LaserTriggerTime = trigger, LaserPowerMw = double.IsNaN(trigger) ? 0 : 4.5, Now = 13.5 };
+            return new TrialTimes { ItiStartTime = 10, ItiSeconds = 2.5, QuietWaitSeconds = 0.25, TrialStartTime = 12.25, StimulusOnsetTime = 12.751, StimulusOffTime = 13.751, LaserTriggerTime = trigger, Now = 13.5 };
         }
 
         static StubTrial Laser() { return new StubTrial { TrialNumber = 7, LaserCondition = 3, LaserPointsMm = "-0.7 1.5;-0.7 -1.5", LaserOn = true, LaserPowerMw = 4.5 }; }
@@ -99,6 +99,14 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(12.25, row.laserTriggerTime);
             Assert.AreEqual("Left", row.choice, "the task's own columns untouched");
             Assert.IsNull(row.outcome);
+        }
+
+        [TestMethod]
+        public void ZapitDaqsArmedPowerIsLoggedInPlaceOfTheTrials()
+        {
+            var times = Times(12.25);
+            times.LaserPowerMw = 3.2;   // ZapitDaq capped the trial's 4.5 mW
+            Assert.AreEqual(3.2, SharedTrialColumns.Fill(new OptogeneticsRow(), Laser(), times, 3, false, true, 6, 0.75).laserPowerMw);
         }
 
         [TestMethod]

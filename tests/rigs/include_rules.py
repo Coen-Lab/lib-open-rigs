@@ -10,6 +10,7 @@ from open_rigs.rigs.workflow_lint import (
     SPEAKER_MIXER_SOUNDS,
     XSI,
     ZAPIT_CAMERA,
+    ZAPIT_INCLUDE,
     ZAPIT_SETUP,
     W,
     _name,  # pyright: ignore[reportPrivateUsage]
@@ -97,32 +98,52 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
     return problems
 
 
-def zapit_for_task_problems(root: ET.Element) -> list[str]:
-    """ConnectForTask opens ZapitDaq, with every channel mapped from rig.yml's zapit block through Rigs.Zapit's full paths,
-    ZapitCamera and ZapitSetup, all in one SelectMany behind a Condition on rig.yml's Zapit, and publishes Optogenetics
-    from optogenetics.enabled. `root` is OpenRigs.Devices' ConnectForTask.bonsai."""
+def zapit_daq_for_task_problems(root: ET.Element) -> list[str]:
+    """ConnectForTaskZapitDaq opens ZapitDaq, with every channel mapped from rig.yml's zapit block through Rigs.Zapit's full
+    paths, ZapitCamera and ZapitSetup, all in one SelectMany behind a Condition on rig.yml's Zapit naming its device, and
+    publishes Optogenetics from optogenetics.enabled. `root` is OpenRigs.Devices' ConnectForTaskZapitDaq.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     problems = []
     groups = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:SelectMany" and _name(n) == "Zapit"]
     if len(groups) != 1:
-        return ["ConnectForTask has no one SelectMany named Zapit"]
+        return ["ConnectForTaskZapitDaq has no one SelectMany named Zapit"]
     feed = [nodes[i] for i in upstream(edges, groups[0])]
-    if not any(n.findtext(W + "Selector") == "Zapit" for n in feed) or not any(n.get(XSI) == "rx:Condition" for n in feed):
-        problems.append("ConnectForTask's Zapit group is not fed rig.yml's Zapit behind a Condition")
+    if not any(n.findtext(W + "Selector") == "Zapit" for n in feed) or not any(
+            n.get(XSI) == "rx:Condition" and "it.Device != null" in ET.tostring(n, encoding="unicode") for n in feed):
+        problems.append("ConnectForTaskZapitDaq's Zapit group is not fed rig.yml's Zapit behind a Condition on its device")
     inner = child(nodes[groups[0]], W + "Workflow")
     paths = {n.get("Path") for n in inner.iter(W + "Expression")}
-    problems += [f"ConnectForTask's Zapit group does not include {path}" for path in (ZAPIT_CAMERA, ZAPIT_SETUP) if path not in paths]
+    problems += [f"ConnectForTaskZapitDaq's Zapit group does not include {path}" for path in (ZAPIT_CAMERA, ZAPIT_SETUP) if path not in paths]
     daq = [n for n in inner.iter(W + "Expression") if kind(n).endswith(":ZapitDaq")]
     mapped = {p.get("Name"): p.get("Selector") for n in inner.iter(W + "Expression") if n.get(XSI) == "PropertyMapping"
               for p in n.iter(W + "Property")}
     if len(daq) != 1:
-        problems.append("ConnectForTask's Zapit group does not open one ZapitDaq")
+        problems.append("ConnectForTaskZapitDaq's Zapit group does not open one ZapitDaq")
     for channel in ("GalvoXChannel", "GalvoYChannel", "LaserChannel", "LedChannel", "PhotodiodeChannel"):
         if mapped.get(channel) != channel + "Path":
             problems.append(f"ZapitDaq's {channel} is not mapped from {channel}Path")
     for name in ("TriggerTerminal", "SampleRate", "MaxTrialSeconds", "EarlyStopLeadSeconds"):
         if mapped.get(name) != name:
             problems.append(f"ZapitDaq's {name} is not mapped from rig.yml's zapit block")
+    flags = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and _name(n) == "Optogenetics"]
+    if len(flags) != 1 or "TaskParameters.Optogenetics.Enabled" not in {nodes[a].findtext(W + "Selector") for a in upstream(edges, flags[0])}:
+        problems.append("ConnectForTaskZapitDaq does not publish Optogenetics from Optogenetics.Enabled")
+    return problems
+
+
+def zapit_for_task_problems(root: ET.Element) -> list[str]:
+    """ConnectForTask gives ConnectZapit the task file's optogenetics.zapitConditionsPath behind a Condition on
+    optogenetics.enabled. `root` is OpenRigs.Devices' ConnectForTask.bonsai."""
+    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+    includes = [i for i, n in enumerate(nodes) if n.get("Path") == ZAPIT_INCLUDE]
+    if len(includes) != 1:
+        return ["ConnectForTask does not include ConnectZapit once"]
+    path = [nodes[i] for i in upstream(edges, includes[0])]
+    problems = []
+    if not any(n.findtext(W + "Selector") == "TaskParameters.Optogenetics.ZapitConditionsPath" for n in path):
+        problems.append("ConnectZapit is not given TaskParameters.Optogenetics.ZapitConditionsPath")
+    if not any(n.get(XSI) == "rx:Condition" and "Optogenetics.Enabled" in ET.tostring(n, encoding="unicode") for n in path):
+        problems.append("ConnectZapit is not behind a Condition on Optogenetics.Enabled")
     flags = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and _name(n) == "Optogenetics"]
     if len(flags) != 1 or "TaskParameters.Optogenetics.Enabled" not in {nodes[a].findtext(W + "Selector") for a in upstream(edges, flags[0])}:
         problems.append("ConnectForTask does not publish Optogenetics from Optogenetics.Enabled")

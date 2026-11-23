@@ -1,3 +1,4 @@
+using OpenRigs.Devices.Zapit;
 using System;
 using System.Collections.Generic;
 
@@ -8,11 +9,11 @@ namespace OpenRigs.Trials
     {
         /// <summary>The trial was drawn and its inter-trial interval began; Seconds is the interval's start (itiStartTime), exactly.</summary>
         Iti,
-        /// <summary>A laser trial is armed now, during its interval: ZapitDaq builds its buffer and waits on the trigger line.</summary>
+        /// <summary>On a hardware-triggered rig, a laser trial's StartStimulus goes now, during its interval.</summary>
         Arm,
         /// <summary>The trial starts; Seconds is the start, exactly: the interval's end less the lead, or later until the quiet waits hold.</summary>
         Start,
-        /// <summary>A laser trial's trigger: the trigger line rises and ZapitDaq starts the armed trial.</summary>
+        /// <summary>A laser trial's trigger: the trigger line rises; on a rig without hardware triggering its StartStimulus goes now.</summary>
         Trigger,
         /// <summary>The stimulus goes on, at the first tick at or after the trial start plus the lead.</summary>
         Stimulus,
@@ -22,7 +23,7 @@ namespace OpenRigs.Trials
         Cue,
         /// <summary>The trial ended, its outcome in Outcome.</summary>
         Outcome,
-        /// <summary>The laser has run to its cap (LaserTiming.LaserCapSeconds from the trigger) with no outcome yet: stop it early.</summary>
+        /// <summary>The laser has run to its cap (LaserTiming.LaserCapSeconds from the trigger) with no outcome yet: stop it.</summary>
         LaserCap,
         /// <summary>The trigger line falls.</summary>
         TriggerOff,
@@ -31,7 +32,7 @@ namespace OpenRigs.Trials
         StimulusOff
     }
 
-    /// <summary>When a trial's laser ends, and so when the next trial may be armed.</summary>
+    /// <summary>When a trial's laser ends, and so when the next trial's StartStimulus may go.</summary>
     public enum LaserEnd
     {
         /// <summary>The laser runs until the outcome (or LaserCap); the trigger line falls TriggerHoldSeconds after the outcome.</summary>
@@ -42,8 +43,7 @@ namespace OpenRigs.Trials
 
     /// <summary>
     /// An experiment's laser timing: the triggering, when the laser and its trigger line end, and when the next trial
-    /// may be armed (the line fallen, plus any ramp-down ZapitDaq plays before it takes another trial). Every trial is armed
-    /// during its interval and started by the trigger line.
+    /// may be armed (the line fallen, plus any ramp-down Zapit plays before it takes another StartStimulus).
     /// </summary>
     public sealed class LaserTiming
     {
@@ -51,37 +51,57 @@ namespace OpenRigs.Trials
         {
         }
 
+        /// <summary>Gets whether the Zapit DAQ waits for the trigger line: its StartStimulus goes during the interval (Arm), else at the trigger.</summary>
+        public bool HardwareTriggered { get; private set; }
+
         /// <summary>Gets when the laser ends.</summary>
         public LaserEnd End { get; private set; }
 
         /// <summary>Gets how long the trigger line stays up past the outcome, in seconds (AtOutcome).</summary>
         public double TriggerHoldSeconds { get; private set; }
 
-        /// <summary>Gets how long after the line falls ZapitDaq takes the next trial, in seconds (AfterDuration): the bank's longest ramp.</summary>
+        /// <summary>Gets how long after the line falls Zapit takes the next StartStimulus, in seconds (AfterDuration).</summary>
         public double RampDownSeconds { get; private set; }
 
         /// <summary>Gets how long after the trigger LaserCap comes with no outcome yet, in seconds (AtOutcome); infinity for none.</summary>
         public double LaserCapSeconds { get; private set; }
 
-        /// <summary>The laser on until the outcome, stopped by LaserCap laserCapSeconds after the trigger; the line held triggerHoldSeconds past the outcome (at least the bank's longest ramp plus rig.yml's earlyStopLeadSeconds: ZapitBank.LongestRampSeconds).</summary>
-        public static LaserTiming UntilOutcome(double triggerHoldSeconds, double laserCapSeconds)
+        /// <summary>The laser on until the outcome, stopped by LaserCap laserCapSeconds after the trigger; the line held triggerHoldSeconds past the outcome (the conditions file's MaxRampDownSeconds, ZapitConditions.Check).</summary>
+        public static LaserTiming UntilOutcome(bool hardwareTriggered, double triggerHoldSeconds, double laserCapSeconds)
         {
             Check("triggerHoldSeconds", triggerHoldSeconds, false);
             if (!(laserCapSeconds > 0)) throw new ArgumentException(string.Format("LaserTiming: laserCapSeconds is {0}; it must be above 0 (infinity for no cap).", laserCapSeconds));
             return new LaserTiming
             {
+                HardwareTriggered = hardwareTriggered,
                 End = LaserEnd.AtOutcome,
                 TriggerHoldSeconds = triggerHoldSeconds,
                 LaserCapSeconds = laserCapSeconds,
             };
         }
 
-        /// <summary>The laser on for each trial's own duration from the trigger (every laser trial an ILaserDurationTrial); the next trial armed rampDownSeconds after the line falls.</summary>
+        /// <summary>ZapitDaq's (OpenRigs.Zapit) laser on until the outcome, as <see cref="UntilOutcome(bool, double, double)"/> with every trial
+        /// armed during its interval and started by the trigger line; triggerHoldSeconds at least the bank's longest ramp plus rig.yml's
+        /// earlyStopLeadSeconds (ZapitBank.LongestRampSeconds).</summary>
+        public static LaserTiming UntilOutcome(double triggerHoldSeconds, double laserCapSeconds)
+        {
+            return UntilOutcome(true, triggerHoldSeconds, laserCapSeconds);
+        }
+
+        /// <summary>ZapitDaq's (OpenRigs.Zapit) laser on for each trial's own duration, as <see cref="ForDuration(bool, double)"/> with every
+        /// trial armed during its interval and started by the trigger line; rampDownSeconds the bank's longest ramp.</summary>
         public static LaserTiming ForDuration(double rampDownSeconds)
+        {
+            return ForDuration(true, rampDownSeconds);
+        }
+
+        /// <summary>The laser on for each trial's own duration from the trigger (every laser trial an ILaserDurationTrial); the next trial armed rampDownSeconds after the line falls.</summary>
+        public static LaserTiming ForDuration(bool hardwareTriggered, double rampDownSeconds)
         {
             Check("rampDownSeconds", rampDownSeconds, false);
             return new LaserTiming
             {
+                HardwareTriggered = hardwareTriggered,
                 End = LaserEnd.AfterDuration,
                 RampDownSeconds = rampDownSeconds,
                 LaserCapSeconds = double.PositiveInfinity,
@@ -244,9 +264,9 @@ namespace OpenRigs.Trials
         /// <summary>Gets or sets the tick the trigger line rose (laserTriggerTime); NaN if it has not.</summary>
         public double LaserTriggerTime { get; set; }
 
-        /// <summary>Gets or sets the power ZapitDaq armed the trial with, in mW: the bank's capped power (its Armed event's
-        /// CappedPowerMw), 0 with the laser off.</summary>
-        public double LaserPowerMw { get; set; }
+        /// <summary>Gets or sets the power ZapitDaq armed the trial with, in mW (its Armed event's CappedPowerMw; 0 with the laser
+        /// off); NaN on MATLAB Zapit, whose trial row logs the trial's own LaserPowerMw.</summary>
+        public double LaserPowerMw { get; set; } = double.NaN;
 
         /// <summary>Gets or sets the Harp clock's latest tick: an outcome given now is timed then (outcomeTime).</summary>
         public double Now { get; set; }

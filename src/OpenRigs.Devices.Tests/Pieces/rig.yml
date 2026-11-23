@@ -158,6 +158,14 @@ speakerArray:
       channel: 2
       filter: calibration/Speaker-Centre.json
 
+# Zapit optogenetics server (tcpServer section of the Zapit settings file). Contacted only when the
+# task sets optogenetics.enabled: true. The trigger is the board's ZapitTrigger line in wiring.
+zapit:
+  host: 127.0.0.1           # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
+  port: 1488
+  hardwareTriggered: false  # true once the ZapitTrigger line is cabled to the Zapit DAQ trigger input
+
+# The stage's in position, in steps, for a mouse with no row in LickSpoutPositions.csv beside this file
 lickSpoutDefaultPosition:
   baseTransverse: 0
   radialLeft: 0

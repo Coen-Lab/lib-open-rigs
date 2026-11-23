@@ -9,7 +9,7 @@ A task names its parameters model in its pyproject.toml:
 
 `python -m open_rigs.rigs.check_task <task file>` prints the file's problems (exit 1 on any). With no file it serves:
 its first line says {"model": ...} (or {"error": ...} and it exits), then each stdin line {"taskParameters": {...}} gets
-one stdout line {"problems": [...]}, [] when the values fit (a line may add "zapitBank", the session's
+one stdout line {"problems": [...]}, [] when the values fit (a line may add "zapitBank", a ZapitDaq session's
 Settings_ZapitBank_<DateTime>.json once built, for its longest ramp-down), so one process answers every check (importing a model
 takes seconds, a check milliseconds)."""
 
@@ -22,7 +22,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ValidationError
 
-from open_rigs.components.zapit import RAMP_DOWN_CONTEXT, max_ramp_down_seconds
+from open_rigs.components.zapit import RAMP_DOWN_CONTEXT, bank_ramp_down_seconds, max_ramp_down_seconds
 
 GROUP = "open_rigs.task"
 
@@ -36,14 +36,23 @@ def model() -> type[BaseModel]:
 
 
 def context(parameters: dict, bank: str | None = None) -> dict:
-    """The validation context from the session's files, where they are (the rig): with optogenetics on, its Zapit bank's
-    longest ramp-down (RAMP_DOWN_CONTEXT). No bank, or none readable: {}, and the workflow checks the bank at Go."""
+    """The validation context from files the task names, where they are (the rig): with optogenetics on, the largest
+    ramp-down (RAMP_DOWN_CONTEXT) of the ZapitDaq session's bank when given, else of its Zapit conditions file. None
+    readable: {}, and the workflow checks at Go."""
     opto = parameters.get("optogenetics") or {}
-    if not opto.get("enabled") or not bank or not Path(bank).is_file():
+    if not opto.get("enabled"):
+        return {}
+    if bank:
+        try:
+            return {RAMP_DOWN_CONTEXT: bank_ramp_down_seconds(bank)} if Path(bank).is_file() else {}
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+            return {}
+    path = str(opto.get("zapitConditionsPath") or "")
+    if not path or not Path(path).is_file():
         return {}
     try:
-        return {RAMP_DOWN_CONTEXT: max_ramp_down_seconds(bank)}
-    except (OSError, ValueError, KeyError, json.JSONDecodeError):
+        return {RAMP_DOWN_CONTEXT: max_ramp_down_seconds(path)}
+    except (OSError, ValueError, yaml.YAMLError):
         return {}
 
 

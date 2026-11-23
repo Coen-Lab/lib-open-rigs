@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Zapit's logs for every workflow using it: each reply on ZapitReplies as an Events row (Event ZapitReply, Detail the command, laser state, Zapit PC datenum and any error, Value the condition or the query's answer), on the Harp clock, into WorkflowData_Events (LogEvents, which keeps rows sent before the experiment folder exists); and Settings_ZapitConditions, a copy of the task's conditions file, in an optogenetics experiment (TaskParameters.Optogenetics.Enabled), written once the experiment folder exists. Needs ZapitReplies, Events, TaskConfig, Timestamp and PathPrefix from the workflow.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ZapitReplies</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orl:CreateEvent">
+          <orl:Event>ZapitReply</orl:Event>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="Bonsai.Harp:WithLatestTimestamp.bonsai">
+        <Name>Timestamp</Name>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Events</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>TaskConfig</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>OptogeneticsExperiment?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>TaskParameters.Optogenetics.Enabled</Selector>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>TaskParameters.Optogenetics.ZapitConditionsPath</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zap:ZapitConditionsSnapshot" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogDataSchema.bonsai">
+        <Name>Settings_ZapitConditions</Name>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

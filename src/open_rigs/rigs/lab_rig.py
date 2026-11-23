@@ -36,7 +36,7 @@ INPUT_LINES = ("DIPort0", "DIPort1", "DIPort2", "DI3", "DIO0", "DIO1", "DIO2")
 WHERE = "(lab rig model, open_rigs.rigs.lab_rig)"
 PLACEHOLDER = "CHANGE-ME"  # rig-template.yml's mark on each value a rig fills in
 # The rig.yml kinds a preflight lists, in its order (OpenRigs.Devices PreflightDevices.AllKinds, held equal by a test): each
-# device whose data the preflight counts. Not zapit: its DAQ sends nothing unless commanded, so a preflight has no data to count.
+# device whose data the preflight counts. Not zapit: Zapit answers only when commanded, so a preflight has no data to count.
 # The device kinds are maps of named entries; the single sections are one entry each, which a person confirms.
 PREFLIGHT_DEVICE_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera")
 PREFLIGHT_SINGLE_SECTIONS = ("speakerArray", "projector")
@@ -74,7 +74,7 @@ class LabRig(Rig):
         default=None, description="The lick spout stage's in position, in steps, for a mouse with no row in LickSpoutPositions.csv beside rig.yml."
     )
     zapit: Optional[Zapit] = Field(
-        default=None, description="Zapit's NI DAQ, laser limits and camera; a rig without Zapit has none."
+        default=None, description="Zapit: MATLAB Zapit's server endpoint (contacted only when the task enables optogenetics), ZapitDaq's NI DAQ, laser limits and camera, or both; a rig without Zapit has none."
     )
     video_encoder: Optional[VideoEncoder] = Field(default=None, description="How the cameras' video is encoded; left out: libx264 and the ffmpeg.exe on PATH.")
 

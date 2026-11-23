@@ -39,9 +39,9 @@ namespace OpenRigs.Trials
         public double auditoryInitialAzimuthDeg;
         /// <summary>That speaker's elevation as the trial starts, in degrees; NaN when mute or at "all".</summary>
         public double auditoryInitialElevationDeg;
-        /// <summary>Its Zapit condition in the bank, from 1; 0 without optogenetics.</summary>
+        /// <summary>Its Zapit condition, from 1; 0 without optogenetics.</summary>
         public int laserCondition;
-        /// <summary>Its condition's points (ZapitBankCondition.LaserPointsMm), the trial log's laserPointsMm; null without optogenetics.</summary>
+        /// <summary>Its condition's points (ZapitConditionsFile.PointsMm), the trial log's laserPointsMm; null without optogenetics.</summary>
         public string laserPointsMm;
         /// <summary>Whether the laser fires on it.</summary>
         public bool laserOn;

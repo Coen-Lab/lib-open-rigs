@@ -185,8 +185,8 @@ public class BuiltObjects : System.Linq.Expressions.ExpressionVisitor {
     if ($dumps -eq $want.Count) { "  ok    ... and asks each for its dump on <Name>.Commands" } else { "  FAIL  $dumps dump request(s), not $($want.Count): is every board's command subject <Name>.Commands?"; $failed++ }
     $recorder = @($objects.Found | Where-Object { $_.GetType().Name -eq 'ManifestRecorder' })
     $planField = if ($recorder.Count) { $recorder[0].GetType().GetFields([Reflection.BindingFlags]'Instance,NonPublic,Public') | Where-Object { $_.FieldType.Name -eq 'ExpectedPlan' } | Select-Object -First 1 }
-    # The devices' folders and the Harp records, from rig.yml; each log's entry (ending _) is workflow_lint.expected_files_problems' to check.
-    $expected = if ($planField) { @($planField.GetValue($recorder[0]).Entries | ForEach-Object { $_.Path } | Where-Object { -not $_.EndsWith('_') }) } else { @() }
+    # The devices' folders and the Harp records, from rig.yml; each log's entry (ending _) and each conditional entry (Camera-Zapit/?Optogenetics) is workflow_lint.expected_files_problems' to check.
+    $expected = if ($planField) { @($planField.GetValue($recorder[0]).Entries | Where-Object { -not $_.Condition } | ForEach-Object { $_.Path } | Where-Object { -not $_.EndsWith('_') }) } else { @() }
     $wantFiles = @($script:plan.files)
     $missing = @($wantFiles | Where-Object { $expected -notcontains $_ })
     $extra = @($expected | Where-Object { $wantFiles -notcontains $_ })

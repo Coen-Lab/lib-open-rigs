@@ -1,5 +1,5 @@
-"""Four rigs' rig.yml files under the native Zapit block (fixtures/rig-yml): B1 and B2 converted, G1 and G2 with no
-zapit block, everything else as the rigs have it."""
+"""The four rigs' rig.yml as they are on the share (fixtures/rig-yml, byte copies: MATLAB Zapit's block on all four) load
+unchanged, and so does a blue rig carrying ZapitDaq's fields beside MATLAB Zapit's (B2-both)."""
 from pathlib import Path
 
 import pytest
@@ -16,23 +16,35 @@ def load(rig: str) -> dict:
 
 
 @pytest.mark.parametrize("rig", ["B1", "B2", "G1", "G2"])
-def test_fixture_loads(rig):
+def test_the_domes_rig_yml_load_unchanged(rig):
     loaded = LabRig.model_validate(load(rig))
-    assert (loaded.zapit is not None) == rig.startswith("B")
-    if loaded.zapit:
-        assert loaded.zapit.camera.session_pfs_path == "calibration/Zapit-Session.pfs"
+    assert loaded.zapit is not None and loaded.zapit.port == 1488 and not loaded.zapit.has_daq
+    assert loaded.zapit.model_dump(by_alias=True, exclude_defaults=True).keys() <= {"host", "port", "hardwareTriggered"}
 
 
-@pytest.mark.parametrize("rig", ["B2", "G1"])
-def test_old_server_block_refused(rig):
-    old = load(rig)
-    old["zapit"] = {"host": "127.0.0.1", "port": 1488, "hardwareTriggered": True}
-    with pytest.raises(ValidationError, match="zapit"):
-        LabRig.model_validate(old)
+def test_a_blue_rig_carries_both():
+    zapit = LabRig.model_validate(load("B2-both")).zapit
+    assert zapit is not None and zapit.has_daq
+    assert (zapit.host, zapit.port, zapit.hardware_triggered) == ("127.0.0.1", 1488, True)
+    assert (zapit.device, zapit.trigger_channel, zapit.camera.session_pfs_path) == ("Dev1", "PFI0", "calibration/Zapit-Session.pfs")
+
+
+def test_zapit_daq_s_fields_alone_load():
+    rig = load("B2-both")
+    for key in ("host", "port", "hardwareTriggered"):
+        del rig["zapit"][key]
+    assert LabRig.model_validate(rig).zapit.has_daq
+
+
+def test_some_of_zapit_daq_s_fields_are_refused():
+    rig = load("B2-both")
+    del rig["zapit"]["ceilingMw"], rig["zapit"]["camera"]
+    with pytest.raises(ValidationError, match="but not ceilingMw, camera"):
+        LabRig.model_validate(rig)
 
 
 def test_rising_laser_limits():
-    rig = load("B2")
+    rig = load("B2-both")
     rig["zapit"]["laserMinMaxMw"] = [50, 0]
     with pytest.raises(ValidationError, match="laserMinMaxMw must rise"):
         LabRig.model_validate(rig)
