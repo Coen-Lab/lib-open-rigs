@@ -304,9 +304,26 @@ namespace OpenRigs.Zapit.Tests
         public void AZeroCeilingRefusesABankThatDrivesTheLaser()
         {
             using var h = new Harness(ceilingMw: 0);
-            h.Send(Load(Unpack()));
+            var path = Unpack();
+            var index = JObject.Parse(File.ReadAllText(path));
+            index["ceiling_mw"] = 0.0;   // a bank claiming the disabled ceiling but driving the laser
+            File.WriteAllText(path, index.ToString());
+            h.Send(Load(path));
             h.Next(ZapitDaqEventKind.BankLoaded);
             StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 8.0, 0.05)), "ceilingMw is 0");
+        }
+
+        // rig.yml's ceiling lowered after the bank was built: the bank's powers are not capped at it, so it is refused.
+        [TestMethod]
+        public void ABankBuiltUnderAHigherCeilingIsRefused()
+        {
+            using var h = new Harness(ceilingMw: 5);
+            StringAssert.Contains(h.ErrorMessage(Load(Unpack())), "rebuild the bank");
+            using var zero = new Harness(ceilingMw: 0);
+            StringAssert.Contains(zero.ErrorMessage(Load(Unpack())), "rebuild the bank");
+            using var same = new Harness(ceilingMw: 1e9);
+            same.Send(Load(Unpack()));
+            same.Next(ZapitDaqEventKind.BankLoaded);
         }
 
         [TestMethod]

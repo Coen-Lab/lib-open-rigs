@@ -34,6 +34,7 @@ namespace OpenRigs.Zapit
             ConditionsName = (string)index["conditions_name"]!;
             ConditionsSha256 = (string)index["conditions_sha256"]!;
             SampleRate = (double)index["sample_rate"]!;
+            CeilingMw = (double)index["ceiling_mw"]!;
             Hashes = ((JObject)index["hashes"]!).Properties().ToDictionary(p => p.Name, p => (string)p.Value!);
             Conditions = index["conditions"]!.Select(c => new ZapitBankCondition(c)).ToList();
         }
@@ -49,6 +50,9 @@ namespace OpenRigs.Zapit
 
         /// <summary>The AO sample rate the bank was built for, in samples per second.</summary>
         public double SampleRate { get; }
+
+        /// <summary>The laser ceiling the bank was built under, in mW (rig.yml's zapit.ceilingMw then; 0 is laser disabled).</summary>
+        public double CeilingMw { get; }
 
         /// <summary>The index's hashes: <c>scanner_fit</c>, <c>laser_curve</c>, <c>sample</c> and <c>bin</c>.</summary>
         public IReadOnlyDictionary<string, string> Hashes { get; }
