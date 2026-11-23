@@ -154,6 +154,8 @@ namespace OpenRigs.Devices
             public SpoutPositions Apply(LickSpoutCommand command, int stepSize, int retractSteps)
             {
                 var values = In.ToArray();
+                var nudged = Nudged(command);
+                if (nudged >= 0 && Wiring.Axes[nudged].Reversed) stepSize = -stepSize;
                 switch (command)
                 {
                     case LickSpoutCommand.SpoutsHome:
@@ -181,6 +183,20 @@ namespace OpenRigs.Devices
                 }
                 In = Wiring.Limit(SpoutPositions.FromArray(values));
                 return Placement == LickSpoutCommand.SpoutsHome ? null : Target(retractSteps);
+            }
+
+            // The axis a nudge moves, in SpoutPositions.AxisNames order, or -1 for a placement.
+            static int Nudged(LickSpoutCommand command)
+            {
+                switch (command)
+                {
+                    case LickSpoutCommand.BaseLeft: case LickSpoutCommand.BaseRight: return 0;
+                    case LickSpoutCommand.LeftIn: case LickSpoutCommand.LeftOut: return 1;
+                    case LickSpoutCommand.RightIn: case LickSpoutCommand.RightOut: return 2;
+                    case LickSpoutCommand.LeftUp: case LickSpoutCommand.LeftDown: return 3;
+                    case LickSpoutCommand.RightUp: case LickSpoutCommand.RightDown: return 4;
+                    default: return -1;
+                }
             }
 
             SpoutPositions Target(int retractSteps)
