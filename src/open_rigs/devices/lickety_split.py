@@ -13,11 +13,11 @@ class LicketySplit(HarpDevice):
     # Byte: the board's registers 33 and 34 are U8, so a larger value would be written truncated.
     channel0_trigger_threshold: Optional[data_types.Byte] = Field(
         default=None,
-        description="ADC threshold (0-255) above which Channel 0 triggers a lick, written to the board at start; left out, the board keeps its own.",
+        description="Percent of the board's running baseline signal below which Channel 0 starts a lick (board default 90), written to the board at start; left out, the board keeps its own.",
     )
     channel0_untrigger_threshold: Optional[data_types.Byte] = Field(
         default=None,
-        description="ADC threshold (0-255) below which Channel 0 untriggers a lick, written to the board at start; left out, the board keeps its own.",
+        description="Percent of the board's running baseline signal above which Channel 0 ends a lick (board default 98), written to the board at start; left out, the board keeps its own.",
     )
 
     def threshold_problem(self) -> Optional[str]:
@@ -27,8 +27,8 @@ class LicketySplit(HarpDevice):
             return f"channel0UntriggerThreshold is {untrigger} with no channel0TriggerThreshold. {KEEP_BOARDS_OWN}"
         if trigger is not None and trigger <= 0:
             return f"channel0TriggerThreshold is {trigger}, and it must be above 0 (0 hangs the board). {KEEP_BOARDS_OWN}"
-        if trigger is not None and untrigger is not None and trigger <= untrigger:
+        if trigger is not None and untrigger is not None and trigger >= untrigger:
             return (
-                f"channel0TriggerThreshold {trigger} must be above channel0UntriggerThreshold {untrigger}. {KEEP_BOARDS_OWN}"
+                f"channel0TriggerThreshold {trigger} must be below channel0UntriggerThreshold {untrigger}. {KEEP_BOARDS_OWN}"
             )
         return None
