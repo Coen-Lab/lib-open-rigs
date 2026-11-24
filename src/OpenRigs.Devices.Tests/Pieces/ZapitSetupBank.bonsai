@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:zap="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit"
+                 xmlns:t="clr-namespace:OpenRigs.Devices.Tests;assembly=OpenRigs.Devices.Tests"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>ZapitSetup with a simulated ZapitDaq and the controller, as ConnectForTaskZapitDaq has them: ZapitSetupTests sets CONFIG_ROOT, sends Zapit-Main.LoadBank and reads the Zapit-Main.Setup metric.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>CONFIG_ROOT</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Control:ExperimentControl.bonsai">
+        <SubjectId>test</SubjectId>
+        <SessionId>001</SessionId>
+        <ControlEndpoint>@tcp://127.0.0.1:55763</ControlEndpoint>
+        <Parameters />
+        <Commands />
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="zap:ZapitDaqCommand">
+        <rx:Name>Zapit.Commands</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="zap:ZapitDaqEvent">
+        <rx:Name>Zapit.Events</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="zap:ZapitBank">
+        <rx:Name>Zapit.Bank</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="t:ZapitCameraFrame">
+        <rx:Name>Camera-Zapit.Data</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zap:ZapitDaq">
+          <zap:Simulated>true</zap:Simulated>
+          <zap:SampleRate>100000</zap:SampleRate>
+          <zap:MaxTrialSeconds>10</zap:MaxTrialSeconds>
+          <zap:EarlyStopLeadSeconds>0.1</zap:EarlyStopLeadSeconds>
+          <zap:CeilingMw>1000000000</zap:CeilingMw>
+          <zap:LaserMaxVolts>5</zap:LaserMaxVolts>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Events</Name>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitSetup.bonsai" />
+    </Nodes>
+    <Edges>
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>

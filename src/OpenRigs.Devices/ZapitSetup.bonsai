@@ -6,7 +6,7 @@
                  xmlns:zap="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTaskZapitDaq's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the device Zapit-Main's commands (DeclareDeviceControls): Zapit-Main.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit-Main.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit-Main.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json in pending) loads it into ZapitDaq (ZapitSetupCapture checks the path), which publishes it on Zapit.Bank; Zapit-Main.LaserOff zeroes every line at once, before or after Go. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit-Main.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "Loading &lt;json&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;"; a refused request leaves the workflow running. A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, Zapit.Commands, Zapit.Events, Zapit.Bank and Camera-Zapit.Data from the workflow.</Description>
+  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTaskZapitDaq's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the device Zapit-Main's commands (DeclareDeviceControls): Zapit-Main.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit-Main.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit-Main.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json in pending) loads it into ZapitDaq (ZapitSetupCapture checks the path), which publishes it on Zapit.Bank; Zapit-Main.LaserOff zeroes every line at once, before or after Go. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit-Main.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "Loading &lt;json&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;", each stage before its command goes to ZapitDaq, whose answer (BankLoaded comes back inside LoadBank) must not be overwritten by it; a refused request leaves the workflow running. A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, Zapit.Commands, Zapit.Events, Zapit.Bank and Camera-Zapit.Data from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -200,10 +200,10 @@
       <Edge From="8" To="14" Label="Source4" />
       <Edge From="10" To="14" Label="Source5" />
       <Edge From="13" To="14" Label="Source6" />
-      <Edge From="14" To="15" Label="Source1" />
+      <Edge From="14" To="18" Label="Source1" />
+      <Edge From="18" To="15" Label="Source1" />
       <Edge From="15" To="16" Label="Source1" />
       <Edge From="16" To="17" Label="Source1" />
-      <Edge From="14" To="18" Label="Source1" />
       <Edge From="19" To="20" Label="Source1" />
       <Edge From="20" To="22" Label="Source1" />
       <Edge From="21" To="22" Label="Source2" />

@@ -16,6 +16,8 @@
   <!-- PiecesSubscribeTests: each piece built and subscribed here, so every assembly its workflow names -->
   <ItemGroup>
     <None Update="Pieces\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- ZapitSetupTests: OpenRigs.Zapit.Tests' contract bank -->
+    <None Include="..\OpenRigs.Zapit.Tests\Data\Settings_ZapitBank_T.json;..\OpenRigs.Zapit.Tests\Data\Settings_ZapitBank_T.bin.gz" Link="Pieces\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
