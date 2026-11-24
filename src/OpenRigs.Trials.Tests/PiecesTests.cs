@@ -348,7 +348,7 @@ namespace OpenRigs.Trials.Tests
 
         static List<string> RunZapit(string stop, bool hardwareTriggered, double laserCapSeconds, double outcomeAt, double laserOffAt = 0)
         {
-            return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop == "Duration" ? "true" : "false").Replace("STOP", stop).Replace("HARDWARE", hardwareTriggered ? "true" : "false")
+            return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop == "Duration" || stop == "UntilStimulusOff" ? "true" : "false").Replace("STOP", stop).Replace("HARDWARE", hardwareTriggered ? "true" : "false")
                 .Replace("LASER_CAP", laserCapSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("OUTCOME_AT", outcomeAt.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("LASER_OFF_AT", laserOffAt.ToString(System.Globalization.CultureInfo.InvariantCulture)));
@@ -379,7 +379,7 @@ namespace OpenRigs.Trials.Tests
                 RunZapit("UntilOutcome", true, 0.2, 0));
         }
 
-        // UntilStimulusOff: the StartStimulus with no duration; the outcome does not stop it, its LaserOff does.
+        // UntilStimulusOff: the StartStimulus with no duration, though the trial has its own; the outcome does not stop it, its LaserOff does.
         [TestMethod]
         public void ZapitTrialsUntilStimulusOffStopsAtLaserOffNotTheOutcome()
         {

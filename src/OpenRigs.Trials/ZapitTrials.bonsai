@@ -73,11 +73,12 @@
             <Expression xsi:type="PropertyMapping">
               <PropertyMappings>
                 <Property Name="HardwareTriggered" Selector="HardwareTriggered" />
+                <Property Name="UntilStopped" Selector="UntilStopped" />
               </PropertyMappings>
             </Expression>
             <Expression xsi:type="Combinator">
               <Name>ArmZapit</Name>
-              <Description>Each trial's StartStimulus (its condition, laser on with the trial's power or off at 0 mW, for the trial's own laser duration (an ILaserDurationTrial), or until StopZapit). On a hardware-triggered rig sent at Arm, during the interval; without, Zapit starts the laser on receipt, so it is sent at the Trigger.</Description>
+              <Description>Each trial's StartStimulus (its condition, laser on with the trial's power or off at 0 mW, for the trial's own laser duration (an ILaserDurationTrial) unless the rules' laser plays until stopped (UntilStopped), else until StopZapit). On a hardware-triggered rig sent at Arm, during the interval; without, Zapit starts the laser on receipt, so it is sent at the Trigger.</Description>
               <Combinator xsi:type="trl:ZapitTrialCommand">
                 <trl:HardwareTriggered>false</trl:HardwareTriggered>
               </Combinator>

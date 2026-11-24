@@ -63,6 +63,10 @@ namespace OpenRigs.Trials
         /// <summary>Gets when the laser ends.</summary>
         public LaserEnd End { get; private set; }
 
+        /// <summary>Gets whether the laser plays until StopStimulus (AtOutcome, AtStimulusOff), its StartStimulus with no duration
+        /// (ZapitTrialCommand.UntilStopped), even for a trial with its own laser duration.</summary>
+        public bool UntilStopped { get { return End != LaserEnd.AfterDuration; } }
+
         /// <summary>Gets how long the trigger line stays up past the laser's end, in seconds (AtOutcome: the outcome; AtStimulusOff).</summary>
         public double TriggerHoldSeconds { get; private set; }
 
