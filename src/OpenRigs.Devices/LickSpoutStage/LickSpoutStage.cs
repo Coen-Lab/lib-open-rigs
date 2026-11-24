@@ -79,7 +79,7 @@ namespace OpenRigs.Devices
     /// LickSpoutPositions.csv (or rig.yml's lickSpoutDefaultPosition when it has none), and the placement
     /// last asked for. Each placement command outputs the stage's new target; each nudge or <see cref="SpoutMove"/>
     /// changes the in positions and outputs the current placement's target again (a move from the second input
-    /// also a SpoutMoved event); SpoutsDefault sets the in positions back to rig.yml's default and places the
+    /// also a SpoutPositionsMoved event); SpoutsDefault sets the in positions back to rig.yml's default and places the
     /// spouts in; SaveSpoutPositions writes the mouse's row and outputs the positions saved. The first output is
     /// the positions the stage started from.
     /// </summary>
@@ -270,7 +270,7 @@ namespace OpenRigs.Devices
         public const string Saved = "SpoutPositionsSaved";
 
         /// <summary>The event of a task's move (LickSpoutStage.Moves): the new in positions after <see cref="Move"/>.</summary>
-        public const string Moved = "SpoutMoved";
+        public const string Moved = "SpoutPositionsMoved";
 
         /// <summary>Gets or sets the stage's new target, or null when the step is an event.</summary>
         public SpoutPositions Target { get; set; }
