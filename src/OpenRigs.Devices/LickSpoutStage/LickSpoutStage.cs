@@ -73,7 +73,7 @@ namespace OpenRigs.Devices
     /// command outputs the stage's new target, made from the in positions with the bias offset added; each nudge
     /// changes the in positions and outputs the current placement's target again; each bias move changes the
     /// offset and outputs the target again with a SpoutBiasMoved event; SpoutsDefault sets the in positions back
-    /// to rig.yml's default, the offset to 0, and places the spouts in; SaveSpoutPositions writes the mouse's row
+    /// to rig.yml's default, keeping the offset (only BiasReset, or a new run, sets it to 0), and places the spouts in; SaveSpoutPositions writes the mouse's row
     /// (without the offset) and outputs the positions saved. The first output is the positions the stage started from.
     /// </summary>
     [Combinator]
@@ -210,7 +210,6 @@ namespace OpenRigs.Devices
                         return Target(retractSteps);
                     case LickSpoutCommand.SpoutsDefault:
                         In = Wiring.Limit(SpoutPositions.FromRigFile(RigFile));
-                        BiasSteps = 0;
                         Placement = LickSpoutCommand.SpoutsIn;
                         return Target(retractSteps);
                     case LickSpoutCommand.BiasLeft:
@@ -295,7 +294,7 @@ namespace OpenRigs.Devices
         /// <summary>The event of the positions SaveSpoutPositions wrote as the mouse's row.</summary>
         public const string Saved = "SpoutPositionsSaved";
 
-        /// <summary>The event of a change of the bias offset: a bias move, or SpoutsDefault setting it back to 0.</summary>
+        /// <summary>The event of a change of the bias offset: BiasLeft, BiasRight or BiasReset.</summary>
         public const string BiasMoved = "SpoutBiasMoved";
 
         /// <summary>Gets or sets the stage's new target, or null when the step is an event.</summary>

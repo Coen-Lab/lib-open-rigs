@@ -326,7 +326,7 @@ namespace OpenRigs.Devices.Tests
         }
 
         [TestMethod]
-        public void SpoutsDefaultAndBiasResetSetTheOffsetBackTo0()
+        public void BiasResetSetsTheOffsetBackTo0AndSpoutsDefaultLeavesIt()
         {
             var state = Biased();
             state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
@@ -336,10 +336,11 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual("M1 biasSteps=0", reset.Detail);
             Assert.IsNull(state.Step(LickSpoutCommand.BiasReset, 150, 1500), "already 0");
             state.Step(LickSpoutCommand.BiasRight, 150, 1500);
+            state.Apply(LickSpoutCommand.BaseLeft, 40, 1500);
             var spoutsDefault = state.Step(LickSpoutCommand.SpoutsDefault, 150, 1500);
-            Assert.AreEqual("10,2000,2100,3000,3100", spoutsDefault.Target.ToString());
-            Assert.AreEqual(LickSpoutStep.BiasMoved, spoutsDefault.Event, "the change to 0 is logged");
-            Assert.IsNull(state.Step(LickSpoutCommand.SpoutsDefault, 150, 1500).Event, "no change, no event");
+            Assert.AreEqual("-90,2000,2100,3000,3100", spoutsDefault.Target.ToString(), "the in position back to rig.yml's, the offset kept (the task's SpoutBias holds the same)");
+            Assert.IsNull(spoutsDefault.Event, "no bias change, no event");
+            Assert.AreEqual(-100, state.BiasSteps);
         }
 
         [TestMethod]
