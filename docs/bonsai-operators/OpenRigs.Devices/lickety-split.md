@@ -43,3 +43,9 @@ In Python it is `LabRig(lickety_split={"left": LicketySplit(port_name="COM5", ..
 :::
 
 `LicketySplit` is a device piece (see [Building Blocks](../../articles/building-blocks.md)): `Name` (`LicketySplit-<Entry>`) picks its entry under `licketySplit` in `rig.yml`, published as the `AsyncSubject` `<Name>`. It opens the device on its `portName` behind `<Name>.Data` and `<Name>.Commands`, writes each channel 0 threshold its entry sets at its first message (none it leaves out, so the board keeps its own), publishes the lick state (true while a lick is detected) on `LickStateSubjectName`, and logs the device as `<Name>` once the experiment folder exists and the Harp clock is set. Stops the workflow at Start, naming the entries `rig.yml` has, if it has none by that name.
+
+### A board that doesn't answer
+
+The board's firmware, the Harp Pico core, reads commands with no resync or timeout. A command cut short, such as a write cut off as a workflow stops, can leave it waiting for the rest of a frame of up to 255 bytes, reading every later command as part of it. The board still sends heartbeats, but never answers WhoAmI, so the device never opens and the workflow waits at ReadyGate, across any number of restarts.
+
+Before the device opens, `FlushPicoHarp` asks the board WhoAmI. A board that answers is left alone. A silent one gets 320 zero bytes, then 5 twice: they complete the pending frame and are message type 0, which the core ignores. If the board then answers, standard error gets `FlushPicoHarp: flushed LicketySplit-Left (COM7)`; if not, the workflow stops with "does not answer WhoAmI even after a flush: power-cycle it". Power-cycling also clears a stuck board by hand.

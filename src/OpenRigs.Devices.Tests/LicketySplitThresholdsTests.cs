@@ -73,7 +73,8 @@ namespace OpenRigs.Devices.Tests
                 var source = Path.Combine(PiecesSubscribeTestsSolution(), "src", "OpenRigs.Devices", "LicketySplit.bonsai");
                 var piece = File.ReadAllText(source);
                 var silent = Regex.Replace(piece, @"<Combinator xsi:type=""p1:Device"">.*?</Combinator>", @"<Combinator xsi:type=""rx:IgnoreElements"" />", RegexOptions.Singleline)
-                    .Replace(@"<Property Name=""PortName"" Selector=""Settings.PortName"" />", "");
+                    .Replace(@"<Property Name=""PortName"" Selector=""Settings.PortName"" />", "")
+                    .Replace(@"<Combinator xsi:type=""dev:FlushPicoHarp"" />", @"<Combinator xsi:type=""rx:Skip""><rx:Count>0</rx:Count></Combinator>");
                 Assert.AreNotEqual(piece, silent);
                 var piecePath = Path.Combine(root, "LicketySplit.bonsai");
                 File.WriteAllText(piecePath, silent);

@@ -4,9 +4,10 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:p1="clr-namespace:AllenNeuralDynamics.LicketySplit;assembly=AllenNeuralDynamics.LicketySplit"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>One Lickety Split lick detector, Name (LicketySplit-&lt;Entry&gt;), from its entry under licketySplit in rig.yml (RigConfigs): publishes the entry as the AsyncSubject Name, opens the device on its portName behind Name.Data and Name.Commands, writes each channel 0 threshold its entry sets (channel0TriggerThreshold, channel0UntriggerThreshold) at its first message, and none the entry leaves out, so the board keeps its own, publishes the lick state (true while a lick is detected) on LickStateSubjectName, and logs the device as Name once the experiment folder exists and the Harp clock is set. Stops the workflow at start, naming the entries rig.yml has, if rig.yml has no entry by that name.</Description>
+  <Description>One Lickety Split lick detector, Name (LicketySplit-&lt;Entry&gt;), from its entry under licketySplit in rig.yml (RigConfigs): asks the board WhoAmI and, if it is silent, flushes its stuck command parser (FlushPicoHarp; the workflow stops if it is still silent), publishes the entry as the AsyncSubject Name, opens the device on its portName behind Name.Data and Name.Commands, writes each channel 0 threshold its entry sets (channel0TriggerThreshold, channel0UntriggerThreshold) at its first message, and none the entry leaves out, so the board keeps its own, publishes the lick state (true while a lick is detected) on LickStateSubjectName, and logs the device as Name once the experiment folder exists and the Harp clock is set. Stops the workflow at start, naming the entries rig.yml has, if rig.yml has no entry by that name.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -167,6 +168,9 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogHarpDevice.bonsai">
         <Name />
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dev:FlushPicoHarp" />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="3" Label="Source2" />
@@ -177,7 +181,7 @@
       <Edge From="0" To="33" Label="Source2" />
       <Edge From="1" To="2" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
-      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="3" To="34" Label="Source1" />
       <Edge From="5" To="6" Label="Source1" />
       <Edge From="5" To="9" Label="Source1" />
       <Edge From="5" To="26" Label="Source2" />
@@ -210,6 +214,7 @@
       <Edge From="29" To="31" Label="Source1" />
       <Edge From="30" To="31" Label="Source2" />
       <Edge From="32" To="33" Label="Source1" />
+      <Edge From="34" To="4" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
