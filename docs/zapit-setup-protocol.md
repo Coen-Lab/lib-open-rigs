@@ -4,11 +4,12 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
 
 ## Channels
 
-- **Commands.** The agent sends `{"cmd": "command", "name": <name>, "args": <path>}`. The device `Zapit-Main` declares four commands, and only on a rig with a `zapit` block:
+- **Commands.** The agent sends `{"cmd": "command", "name": <name>, "args": <path>}`. The device `Zapit-Main` declares five commands, and only on a rig with a `zapit` block:
   - `Zapit-Main.Setup`
   - `Zapit-Main.Still`
   - `Zapit-Main.LoadBank`
   - `Zapit-Main.LaserOff`
+  - `Zapit-Main.Aim`
 
   A rig without the block declares none of them, so the agent finds out whether the rig has Zapit from `status.commands`.
 - **State.** `status.metrics["Zapit-Main.Setup"]` holds the latest stage as `<Stage> <detail>`. The stages are:
@@ -18,6 +19,8 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
   - `Loading <json>`
   - `BankLoaded <json>`
   - `Refused <why>`
+
+  Hand aiming has its own metric, `status.metrics["Zapit-Main.Aim"]`: `Aiming <xVolts>,<yVolts>,<laserVolts>`, `Off Go` or `Refused <why>`, so an aim never overwrites `BankLoaded`.
 
   The metric keeps only the latest value. The agent sends one request, then polls until that request's terminal stage comes back: `FramesSaved`, `StillSaved`, `BankLoaded` or `Refused`.
 - **Live.** The camera `Camera-Zapit` is streamed by StreamDevices as the camera Zapit, on a rig whose `zapit` block names `zapit.device`. Its frames are on `Camera-Zapit.Data`, published at `ConnectForTaskZapitDaq`'s top level (a subject inside its `Zapit` SelectMany would be out of StreamDevices' reach), and they are the frames the setup phase saves.
@@ -64,6 +67,19 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
    ZapitDaq holds the bank in memory, so moving the files does not affect trials.
 
+## Hand aiming
+
+Between a passed scanner fit and Go, the agent can point the beam by hand (app-rig-control's Point and Cat & Mouse). It sends `Zapit-Main.Aim <xVolts>,<yVolts>,<laserVolts>`: the galvo volts come from the sample mm through the scanner fit, and the laser volts from the scanner grid's power (2 mW by default, never above `ceilingMw`) through the laser curve, as `calibration_plan` makes them. The workflow points the galvos with the laser on (ZapitDaq `Point`) and reports `Aiming`. The beam stays there until the next aim, `Zapit-Main.LaserOff`, a grid run or a still.
+
+The workflow refuses an aim, and keeps running, when:
+
+- `ceilingMw` is 0;
+- the laser volts are outside 0 to `laserMinMaxControlVolts[1]`;
+- the galvo volts are outside ±10 V, or the args are not three numbers;
+- a grid run or still is in progress.
+
+After Go it ignores aims. If the beam is still aimed at Go, it zeroes the lines (`Off Go`).
+
 ## Refusals
 
 The workflow reports `Refused <why>` and keeps running if a request:
@@ -76,7 +92,7 @@ The workflow reports `Refused <why>` and keeps running if a request:
 - names a bank that is not a `.json`;
 - arrives while another Setup or Still is in progress.
 
-A bank that ZapitDaq refuses (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still` and `Zapit-Main.LoadBank`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
+A bank that ZapitDaq refuses (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still`, `Zapit-Main.LoadBank` and `Zapit-Main.Aim`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
 
 ## Reruns
 

@@ -27,6 +27,9 @@ namespace OpenRigs.Zapit
         /// <summary>The Zapit camera's exposure and gain for a grid run, or its own put back after one (Restore), or null.</summary>
         public ZapitCameraSettings? Camera { get; set; }
 
+        /// <summary>Whether the step answers Zapit-Main.Aim, reported as the metric Zapit-Main.Aim (Aiming, Off or Refused) so the Setup metric keeps its stage.</summary>
+        public bool Aim { get; set; }
+
         /// <summary>The step as the Zapit-Main.Setup metric: the stage, a space, the detail.</summary>
         public override string ToString() => Stage + " " + Detail;
     }
@@ -42,13 +45,21 @@ namespace OpenRigs.Zapit
     /// reports FramesSaved. A run with no camera frame within 2 s of Pointed (or of its last frame) is refused and zeroed. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
     /// </summary>
     [Combinator]
-    [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named; each bank .json in pending is loaded (LoadBank). Inputs: grid run folders, still paths, bank paths, ZapitDaq's events, the camera's images. Output: ZapitDaq commands and the stages to report as Zapit-Main.Setup.")]
+    [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named; each bank .json in pending is loaded (LoadBank); each aim (xVolts,yVolts,laserVolts) points the beam there. Inputs: grid run folders, still paths, bank paths, ZapitDaq's events, the camera's images, aims. Output: ZapitDaq commands and the stages to report as Zapit-Main.Setup.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class ZapitSetupCapture
     {
         /// <summary>Gets or sets the folder every run, still and bank must be inside: the rig's pending folder.</summary>
         [Description("The folder every grid run, still and bank must be inside: RigConfigs\\<RIG>\\pending.")]
         public string PendingFolder { get; set; } = "";
+
+        /// <summary>Gets or sets rig.yml's zapit.ceilingMw: at 0 (the laser disabled) every aim is refused.</summary>
+        [Description("rig.yml's zapit.ceilingMw: at 0, the laser disabled, every aim is refused.")]
+        public double CeilingMw { get; set; }
+
+        /// <summary>Gets or sets the highest laser control volts (rig.yml's zapit.laserMinMaxControlVolts[1]): an aim above it is refused.</summary>
+        [Description("The highest laser control volts (rig.yml's zapit.laserMinMaxControlVolts[1]): an aim above it is refused.")]
+        public double LaserMaxVolts { get; set; }
 
         /// <summary>How long a grid run waits for a camera frame after Pointed (or after the last frame) before it is
         /// refused and the lines zeroed, so a stalled camera never holds the beam on one spot. Tests shorten it.</summary>
@@ -71,14 +82,17 @@ namespace OpenRigs.Zapit
 
         /// <summary>The setup steps for the requests, as frames and ZapitDaq's events come. A bank request (its
         /// Settings_ZapitBank_&lt;DateTime&gt;.json) inside the pending folder becomes ZapitDaq's LoadBank (stage Loading);
-        /// one outside it is refused.</summary>
+        /// one outside it is refused. An aim ("xVolts,yVolts,laserVolts", the agent's volts through the scanner fit and laser
+        /// curve) points the galvos with the laser on until the next aim, LaserOff or setup step; it is refused at ceilingMw 0,
+        /// above LaserMaxVolts, outside +/-10 V or during a grid run or still. When the aims end (Go) with the beam on, the lines are zeroed.</summary>
         public IObservable<ZapitSetupStep> Process(IObservable<string> gridRuns, IObservable<string> stills, IObservable<string> banks,
-            IObservable<ZapitDaqEvent> events, IObservable<IplImage> frames) => Observable.Create<ZapitSetupStep>(observer =>
+            IObservable<ZapitDaqEvent> events, IObservable<IplImage> frames, IObservable<string> aims) => Observable.Create<ZapitSetupStep>(observer =>
         {
             var pending = Path.GetFullPath(PendingFolder);
             var gate = new object();
             Run? run = null;
             string? still = null;
+            var aiming = false;
             void Emit(ZapitSetupStep step) => observer.OnNext(step);
             void Refuse(string why) => Emit(new ZapitSetupStep { Stage = "Refused", Detail = why });
             var watchdog = new SerialDisposable();
@@ -140,6 +154,7 @@ namespace OpenRigs.Zapit
                         throw new InvalidDataException("its volts must be [x, y] pairs within +/-10 V, with skipFrames from 0 and backgrounds from 1");
                     if (Directory.EnumerateFiles(folder!, "*.png").Any()) throw new InvalidDataException("the folder already holds frames");
                     run = r;
+                    aiming = false;
                 }
                 catch (Exception error) when (error is IOException || error is InvalidDataException || error is Newtonsoft.Json.JsonException || error is NullReferenceException || error is FormatException || error is ArgumentException)
                 {
@@ -159,6 +174,7 @@ namespace OpenRigs.Zapit
                     return;
                 }
                 still = path;
+                aiming = false;
                 Emit(new ZapitSetupStep { Stage = "Pointing", Detail = still, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
             }
 
@@ -171,6 +187,44 @@ namespace OpenRigs.Zapit
                     return;
                 }
                 Emit(new ZapitSetupStep { Stage = "Loading", Detail = path, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.LoadBank, Path = path } });
+            }
+
+            void Aim(string request)
+            {
+                void No(string why) => Emit(new ZapitSetupStep { Aim = true, Stage = "Refused", Detail = why });
+                if (!(CeilingMw > 0)) { No("rig.yml's zapit.ceilingMw is 0 (laser disabled), so there is no beam to aim"); return; }
+                if (run != null || still != null) { No("a setup step is in progress: " + (run?.Folder ?? still)); return; }
+                var parts = request.Trim().Trim('"').Split(',');
+                var volts = new double[3];
+                if (parts.Length != 3 || Enumerable.Range(0, 3).Any(i => !double.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out volts[i])))
+                {
+                    No("an aim is xVolts,yVolts,laserVolts: " + request);
+                    return;
+                }
+                if (!(Math.Abs(volts[0]) <= ZapitBank.RangeVolts) || !(Math.Abs(volts[1]) <= ZapitBank.RangeVolts)) { No("the galvo volts must be within +/-10 V: " + request); return; }
+                if (!(volts[2] >= 0 && volts[2] <= LaserMaxVolts))
+                {
+                    No(string.Format(CultureInfo.InvariantCulture, "the laser volts must be 0 to {0} V (rig.yml's zapit.laserMinMaxControlVolts[1]): {1}", LaserMaxVolts, request));
+                    return;
+                }
+                aiming = true;
+                Emit(new ZapitSetupStep
+                {
+                    Aim = true,
+                    Stage = "Aiming",
+                    Detail = string.Format(CultureInfo.InvariantCulture, "{0},{1},{2}", volts[0], volts[1], volts[2]),
+                    Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, GalvoXVolts = volts[0], GalvoYVolts = volts[1], LaserVolts = volts[2] },
+                });
+            }
+
+            void AimsEnded()
+            {
+                lock (gate)
+                {
+                    if (!aiming) return;
+                    aiming = false;
+                    Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Go", Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
+                }
             }
 
             void OnEvent(ZapitDaqEvent e)
@@ -230,7 +284,8 @@ namespace OpenRigs.Zapit
                 frames.Subscribe(Locked<IplImage>(OnFrame), observer.OnError),
                 gridRuns.Subscribe(Locked<string>(Start), observer.OnError),
                 stills.Subscribe(Locked<string>(Still), observer.OnError),
-                banks.Subscribe(Locked<string>(Bank), observer.OnError));
+                banks.Subscribe(Locked<string>(Bank), observer.OnError),
+                aims.Subscribe(Locked<string>(Aim), observer.OnError, AimsEnded));
         });
     }
 

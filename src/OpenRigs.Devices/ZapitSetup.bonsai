@@ -6,7 +6,7 @@
                  xmlns:zap="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTaskZapitDaq's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the device Zapit-Main's commands (DeclareDeviceControls): Zapit-Main.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit-Main.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit-Main.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json in pending) loads it into ZapitDaq (ZapitSetupCapture checks the path), which publishes it on Zapit.Bank; Zapit-Main.LaserOff zeroes every line at once, before or after Go. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit-Main.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "Loading &lt;json&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;", each stage before its command goes to ZapitDaq, whose answer (BankLoaded comes back inside LoadBank) must not be overwritten by it; a refused request leaves the workflow running. A grid.json camera block's exposure and gain go to the Zapit camera with the run's first point, and its session settings back with the run's end, on Camera-Zapit.Settings (ZapitCamera's ZapitPylonCapture). A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, Zapit.Commands, Zapit.Events, Zapit.Bank, Camera-Zapit.Settings and Camera-Zapit.Data from the workflow.</Description>
+  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTaskZapitDaq's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the device Zapit-Main's commands (DeclareDeviceControls): Zapit-Main.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit-Main.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit-Main.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json in pending) loads it into ZapitDaq (ZapitSetupCapture checks the path), which publishes it on Zapit.Bank; Zapit-Main.LaserOff zeroes every line at once, before or after Go. Zapit-Main.Aim (args: xVolts,yVolts,laserVolts) points the beam by hand, reported on its own metric Zapit-Main.Aim ("Aiming &lt;volts&gt;", "Off Go" or "Refused &lt;why&gt;") so the Setup metric keeps BankLoaded; refused at rig.yml zapit.ceilingMw 0, above laserMinMaxControlVolts[1] (both from ZapitRig) or during a grid run or still; at Go a beam still aimed is zeroed. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit-Main.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "Loading &lt;json&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;", each stage before its command goes to ZapitDaq, whose answer (BankLoaded comes back inside LoadBank) must not be overwritten by it; a refused request leaves the workflow running. A grid.json camera block's exposure and gain go to the Zapit camera with the run's first point, and its session settings back with the run's end, on Camera-Zapit.Settings (ZapitCamera's ZapitPylonCapture). A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, ZapitRig, Zapit.Commands, Zapit.Events, Zapit.Bank, Camera-Zapit.Settings and Camera-Zapit.Data from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -180,6 +180,10 @@
               <orcl:Name>LaserOff</orcl:Name>
               <orcl:Description>Stop any Zapit output at once: galvos, laser and LED at 0 V.</orcl:Description>
             </orcl:Command>
+            <orcl:Command>
+              <orcl:Name>Aim</orcl:Name>
+              <orcl:Description>Point the beam by hand: args xVolts,yVolts,laserVolts (the agent's, through the scanner fit and laser curve). Refused at ceilingMw 0, above laserMinMaxControlVolts[1] or during a grid run or still; LaserOff ends it. Before Go only.</orcl:Description>
+            </orcl:Command>
           </orcl:Commands>
         </Combinator>
       </Expression>
@@ -207,6 +211,95 @@
       <Expression xsi:type="MulticastSubject">
         <Name>Camera-Zapit.Settings</Name>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>Zapit-Main</orcl:Name>
+          <orcl:Command>Aim</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeUntil" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ZapitRig</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="CeilingMw" Selector="LaserCeilingMw" />
+          <Property Name="LaserMaxVolts" Selector="LaserMaxControlVolts" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>Aim?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>Aim</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>Zapit-Main.Aim</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>HasCommand?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>Command != null</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Command</Selector>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>SetupStep?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>!Aim</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -224,7 +317,8 @@
       <Edge From="8" To="14" Label="Source4" />
       <Edge From="10" To="14" Label="Source5" />
       <Edge From="13" To="14" Label="Source6" />
-      <Edge From="14" To="18" Label="Source1" />
+      <Edge From="14" To="48" Label="Source1" />
+      <Edge From="48" To="18" Label="Source1" />
       <Edge From="18" To="15" Label="Source1" />
       <Edge From="15" To="16" Label="Source1" />
       <Edge From="16" To="17" Label="Source1" />
@@ -242,6 +336,17 @@
       <Edge From="18" To="34" Label="Source1" />
       <Edge From="34" To="35" Label="Source1" />
       <Edge From="35" To="36" Label="Source1" />
+      <Edge From="37" To="38" Label="Source1" />
+      <Edge From="38" To="40" Label="Source1" />
+      <Edge From="39" To="40" Label="Source2" />
+      <Edge From="40" To="14" Label="Source7" />
+      <Edge From="41" To="42" Label="Source1" />
+      <Edge From="42" To="14" Label="Source8" />
+      <Edge From="14" To="43" Label="Source1" />
+      <Edge From="43" To="44" Label="Source1" />
+      <Edge From="44" To="45" Label="Source1" />
+      <Edge From="45" To="46" Label="Source1" />
+      <Edge From="46" To="47" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

@@ -33,7 +33,8 @@ namespace OpenRigs.Devices.Tests
             var root = Path.Combine(Path.GetTempPath(), "ZapitSetupTests", Guid.NewGuid().ToString("N"));
             var pending = Path.Combine(root, Environment.MachineName, "pending");
             Directory.CreateDirectory(pending);
-            File.WriteAllText(Path.Combine(root, Environment.MachineName, "rig.yml"), "rootPath: C:\\nowhere\nrigId: D1\nbehaviorBoard:\n  main:\n    portName: COM97\n");
+            File.WriteAllText(Path.Combine(root, Environment.MachineName, "rig.yml"), "rootPath: C:\\nowhere\nrigId: D1\nbehaviorBoard:\n  main:\n    portName: COM97\n" +
+                "zapit:\n  device: Dev1\n  ceilingMw: 30\n  laserMinMaxControlVolts: [0.0, 5.0]\n");
             var bank = Path.Combine(pending, "Settings_ZapitBank_T.json");
             File.Copy(Path.Combine(Folder, "Settings_ZapitBank_T.json"), bank);
             using (var input = new GZipStream(File.OpenRead(Path.Combine(Folder, "Settings_ZapitBank_T.bin.gz")), CompressionMode.Decompress))
@@ -68,6 +69,11 @@ namespace OpenRigs.Devices.Tests
                         if (metric != null && !metric.StartsWith("Loading ", StringComparison.Ordinal)) break;
                     }
                     Assert.AreEqual("BankLoaded " + bank, metric);
+
+                    // Hand aiming reports on its own metric, so the Setup metric keeps BankLoaded; rig.yml's laser maximum refuses 6 V.
+                    Assert.AreEqual("Aiming 1,-2,0.5", Command(socket, "Zapit-Main.Aim", "1,-2,0.5", "Zapit-Main.Aim", "Aiming 1,-2"));
+                    StringAssert.StartsWith(Command(socket, "Zapit-Main.Aim", "1,-2,6", "Zapit-Main.Aim", "Refused "), "Refused the laser volts must be 0 to 5 V");
+                    Assert.AreEqual("BankLoaded " + bank, (string)Ask(socket, new { cmd = "status" })["metrics"]["Zapit-Main.Setup"]);
                 }
             }
             finally
@@ -76,6 +82,20 @@ namespace OpenRigs.Devices.Tests
                 try { Directory.Delete(root, true); } catch (IOException) { }
             }
             Assert.IsNull(error, error == null ? "" : error.ToString());
+        }
+
+        // Sends a command, then reads the metric until it starts as expected (5 s at most).
+        static string Command(RequestSocket socket, string name, string args, string metricName, string expected)
+        {
+            var sent = Ask(socket, new { cmd = "command", name, args });
+            Assert.IsTrue((bool)sent["ok"], name + " refused: " + sent);
+            string metric = null;
+            for (var waited = Stopwatch.StartNew(); waited.Elapsed < TimeSpan.FromSeconds(5); Thread.Sleep(100))
+            {
+                metric = (string)Ask(socket, new { cmd = "status" })["metrics"]?[metricName];
+                if (metric != null && metric.StartsWith(expected, StringComparison.Ordinal)) break;
+            }
+            return metric;
         }
 
         static JObject Ask(RequestSocket socket, object request)

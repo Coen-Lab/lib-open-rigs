@@ -14,7 +14,7 @@ namespace OpenRigs.Zapit.Tests
         sealed class Rig : IDisposable
         {
             public readonly string Pending = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), "pending");
-            public readonly Subject<string> Grids = new Subject<string>(), Stills = new Subject<string>(), Banks = new Subject<string>();
+            public readonly Subject<string> Grids = new Subject<string>(), Stills = new Subject<string>(), Banks = new Subject<string>(), Aims = new Subject<string>();
             public readonly Subject<ZapitDaqEvent> Events = new Subject<ZapitDaqEvent>();
             public readonly Subject<IplImage> Frames = new Subject<IplImage>();
             public readonly List<ZapitSetupStep> Steps = new List<ZapitSetupStep>();
@@ -22,10 +22,11 @@ namespace OpenRigs.Zapit.Tests
             readonly IDisposable subscription;
             byte shade;
 
-            public Rig(TimeSpan? frameTimeout = null)
+            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10)
             {
                 Directory.CreateDirectory(Pending);
-                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2) }.Process(Grids, Stills, Banks, Events, Frames)
+                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2), CeilingMw = ceilingMw, LaserMaxVolts = 5 }
+                    .Process(Grids, Stills, Banks, Events, Frames, Aims)
                     .Subscribe(step => { Steps.Add(step); if (step.Command?.Kind == ZapitDaqCommandKind.Point) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed }); }, e => Error = e);
             }
 
@@ -249,6 +250,51 @@ namespace OpenRigs.Zapit.Tests
             var none = new CameraExposure(new Features(new Dictionary<string, object> { ["Gain"] = 0.0 }));
             var error = Assert.ThrowsException<InvalidOperationException>(() => none.Apply(new ZapitCameraSettings { ExposureUs = 2000 }));
             StringAssert.Contains(error.Message, "ExposureTime, ExposureTimeAbs");
+        }
+
+        // Hand aiming: each aim points the beam; bad volts, a busy setup step and a disabled laser are refused, not fatal;
+        // Go (the aims ending) with the beam on zeroes the lines.
+        [TestMethod]
+        public void AnAimPointsTheBeamAndGoZeroesIt()
+        {
+            using var rig = new Rig();
+            rig.Aims.OnNext("1.5,-2,0.4");
+            rig.Aims.OnNext("11,0,0.4");
+            rig.Aims.OnNext("1,0,5.5");
+            rig.Aims.OnNext("1;0");
+            var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2]], \"laserVolts\": 0.3}");
+            rig.Grids.OnNext(folder);
+            rig.Aims.OnNext("0,0,0.4");
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            var aims = rig.Steps.Where(s => s.Aim).ToList();
+            Assert.AreEqual("Aiming 1.5,-2,0.4", aims[0].ToString());
+            Assert.AreEqual("Point(1.5, -2, laser=0.4)", aims[0].Command.ToString());
+            CollectionAssert.AreEqual(new[] { "Aiming", "Refused", "Refused", "Refused", "Refused" }, aims.Select(s => s.Stage).ToArray(), string.Join("; ", aims));
+            StringAssert.Contains(aims[1].Detail, "+/-10 V");
+            StringAssert.Contains(aims[2].Detail, "0 to 5 V");
+            StringAssert.Contains(aims[4].Detail, "in progress");
+            Assert.IsTrue(aims.Skip(1).All(s => s.Command == null));
+            Assert.IsFalse(rig.Steps.Where(s => !s.Aim).Any(s => s.Stage == "Refused"), "the grid run took the aim's Pointed as its own? " + string.Join("; ", rig.Steps));
+            rig.Aims.OnCompleted();
+            Assert.IsFalse(rig.Steps.Any(s => s.Stage == "Off"), "the grid run ended the aim: no Zero at Go");
+
+            using var other = new Rig();
+            other.Aims.OnNext("0,0,0.4");
+            other.Aims.OnCompleted();
+            Assert.AreEqual("Off Go", other.Steps.Last().ToString());
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, other.Steps.Last().Command.Kind);
+        }
+
+        [TestMethod]
+        public void AnAimIsRefusedWithTheLaserDisabled()
+        {
+            using var rig = new Rig(ceilingMw: 0);
+            rig.Aims.OnNext("0,0,0");
+            var step = rig.Steps.Single();
+            Assert.IsTrue(step.Aim);
+            Assert.AreEqual("Refused", step.Stage);
+            StringAssert.Contains(step.Detail, "laser disabled");
+            Assert.IsNull(step.Command);
         }
 
         // Only Zero: nothing can send ZapitDaq an unchecked LoadBank.

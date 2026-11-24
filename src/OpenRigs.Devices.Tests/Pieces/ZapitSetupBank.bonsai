@@ -5,7 +5,7 @@
                  xmlns:zap="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit"
                  xmlns:t="clr-namespace:OpenRigs.Devices.Tests;assembly=OpenRigs.Devices.Tests"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>ZapitSetup with a simulated ZapitDaq and the controller, as ConnectForTaskZapitDaq has them: ZapitSetupTests sets CONFIG_ROOT, sends Zapit-Main.LoadBank and reads the Zapit-Main.Setup metric.</Description>
+  <Description>ZapitSetup with a simulated ZapitDaq and the controller, as ConnectForTaskZapitDaq has them: ZapitSetupTests sets CONFIG_ROOT, sends Zapit-Main.LoadBank and Zapit-Main.Aim and reads the Zapit-Main.Setup and Zapit-Main.Aim metrics; ZapitRig is the test rig.yml's zapit block.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
@@ -49,11 +49,22 @@
       <Expression xsi:type="MulticastSubject">
         <Name>Zapit.Events</Name>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Zapit</Selector>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>ZapitRig</Name>
+      </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitSetup.bonsai" />
     </Nodes>
     <Edges>
       <Edge From="7" To="8" Label="Source1" />
       <Edge From="8" To="9" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
