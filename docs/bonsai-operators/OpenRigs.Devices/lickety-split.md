@@ -11,8 +11,10 @@ The LicketySplit (`who_am_i = 1400`) is a Harp lick detector. It samples one or 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `port_name` | `str` | - | Serial port the device is connected to (e.g. `COM3`) |
-| `channel0_trigger_threshold` | `UShort` | `0` | ADC threshold above which Channel 0 triggers a lick |
-| `channel0_untrigger_threshold` | `UShort` | `0` | ADC threshold below which Channel 0 untriggers a lick |
+| `channel0_trigger_threshold` | `Byte` | `0` | Channel 0 trigger threshold (% of baseline, board default 90), written at start; 0 writes nothing |
+| `channel0_untrigger_threshold` | `Byte` | `0` | Channel 0 untrigger threshold (% of baseline, board default 98), written at start; 0 writes nothing |
+
+Both registers are 8-bit percentages of the board's running baseline signal. A lick starts when the signal falls below the trigger threshold and ends when it rises above the untrigger threshold, so trigger must be below untrigger. A threshold of 0 is not written and the device keeps its own: writing 0 hangs the device about a second after start, with no events until it is power cycled. Set them only from readings taken on the rig.
 
 ### Configuration example
 
@@ -25,8 +27,6 @@ class Rig(...):
     ...
     lick_detector: LicketySplit = LicketySplit(
         port_name="COM7",
-        channel0_trigger_threshold=1200,
-        channel0_untrigger_threshold=900,
     )
 ```
 
@@ -35,8 +35,6 @@ Or as YAML:
 ```yaml
 lick_detector:
   port_name: COM7
-  channel0_trigger_threshold: 1200
-  channel0_untrigger_threshold: 900
 ```
 
 ---
@@ -47,4 +45,4 @@ lick_detector:
 ![LicketySplit](~/assets/workflows/devices/LicketySplit.svg){data-bonsai="~/src/OpenRigs.Devices/LicketySplit.bonsai"}
 :::
 
-The workflow opens the Harp serial connection, writes the configured thresholds at startup, and publishes the device event stream on a named `PublishSubject`. Downstream nodes can subscribe to that subject to extract the lick trigger events stamped against the Harp hardware clock.
+The workflow opens the Harp serial connection, writes each threshold above 0 at its first event, and publishes the device event stream on a named `PublishSubject`. Downstream nodes can subscribe to that subject to extract the lick trigger events stamped against the Harp hardware clock.
