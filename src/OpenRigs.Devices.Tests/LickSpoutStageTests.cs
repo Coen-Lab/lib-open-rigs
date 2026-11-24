@@ -263,6 +263,143 @@ namespace OpenRigs.Devices.Tests
             StringAssert.Contains(Assert.ThrowsException<InvalidDataException>(() => LickSpoutWiring.FromRigFile(wrong)).Message, "Motor1.reversed must be true or false");
         }
 
+        static LickSpoutStage.StageState Biased(string wiring = null, int stepSteps = 100, int maxSteps = 250)
+        {
+            var folder = TempFolder();
+            var state = LickSpoutStage.Start(RigFile(folder, wiring), Path.Combine(folder, "LickSpoutPositions.csv"), "M1");
+            state.BiasSettings = new SpoutBiasSettings { StepSteps = stepSteps, MaxSteps = maxSteps };
+            return state;
+        }
+
+        [TestMethod]
+        public void ABiasMoveShiftsTheBaseOfThePlacementAtOnceAndIsAnEvent()
+        {
+            var state = Biased();
+            state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
+            var step = state.Step(LickSpoutCommand.BiasLeft, 150, 1500);
+            Assert.AreEqual("110,2000,2100,3000,3100", step.Target.ToString(), "the in position, the base a bias step toward the mouse's left");
+            Assert.AreEqual(LickSpoutStep.BiasMoved, step.Event);
+            Assert.AreEqual("M1 biasSteps=100", step.Detail);
+            Assert.AreEqual("10,2000,2100,3000,3100", state.In.ToString(), "the in position is the person's, without the offset");
+            Assert.AreEqual("M1 biasSteps=0", state.Step(LickSpoutCommand.BiasRight, 150, 1500).Detail);
+            Assert.AreEqual("-90,2000,2100,3000,3100", state.Step(LickSpoutCommand.BiasRight, 150, 1500).Target.ToString());
+            Assert.IsNull(state.Step(LickSpoutCommand.SpoutsIn, 150, 1500).Event, "a placement is no bias event");
+        }
+
+        [TestMethod]
+        public void EveryPlacementButHomeCarriesTheOffsetSoTheOutPositionFollows()
+        {
+            var state = Biased();
+            state.Apply(LickSpoutCommand.SpoutsOut, 150, 1500);
+            Assert.AreEqual("110,500,600,1500,1600", state.Step(LickSpoutCommand.BiasLeft, 150, 1500).Target.ToString(), "drawn out: the retracted position shifted");
+            Assert.AreEqual("110,2000,2100,3000,3100", state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500).ToString());
+            Assert.AreEqual("110,2000,600,3000,1600", state.Apply(LickSpoutCommand.LeftOnly, 150, 1500).ToString());
+            Assert.AreEqual("110,500,2100,1500,3100", state.Apply(LickSpoutCommand.RightOnly, 150, 1500).ToString());
+            Assert.AreEqual("0,0,0,0,0", state.Apply(LickSpoutCommand.SpoutsHome, 150, 1500).ToString(), "home ignores the offset");
+            var atHome = state.Step(LickSpoutCommand.BiasLeft, 150, 1500);
+            Assert.IsNull(atHome.Target, "a bias move at home moves nothing");
+            Assert.AreEqual("M1 biasSteps=200", atHome.Detail);
+            Assert.AreEqual("210,2000,2100,3000,3100", state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500).ToString());
+        }
+
+        [TestMethod]
+        public void TheOffsetIsHeldToTheTasksLimitEachWay()
+        {
+            var state = Biased(stepSteps: 100, maxSteps: 250);
+            state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
+            var lefts = Enumerable.Range(0, 4).Select(_ => state.Step(LickSpoutCommand.BiasLeft, 150, 1500)).ToArray();
+            CollectionAssert.AreEqual(new[] { "M1 biasSteps=100", "M1 biasSteps=200", "M1 biasSteps=250" }, lefts.Take(3).Select(s => s.Detail).ToArray());
+            Assert.IsNull(lefts[3], "at the limit a move that way changes nothing: no move, no event");
+            for (var i = 0; i < 6; i++) state.Step(LickSpoutCommand.BiasRight, 150, 1500);
+            Assert.AreEqual(-250, state.BiasSteps);
+            Assert.AreEqual(-240, state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500).BaseTransverse);
+        }
+
+        [TestMethod]
+        public void WithoutSettingsABiasMoveDoesNothing()
+        {
+            var folder = TempFolder();
+            var state = LickSpoutStage.Start(RigFile(folder), Path.Combine(folder, "none.csv"), "M1");
+            state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
+            Assert.IsNull(state.Step(LickSpoutCommand.BiasLeft, 150, 1500));
+            Assert.AreEqual(0, state.BiasSteps);
+        }
+
+        [TestMethod]
+        public void SpoutsDefaultAndBiasResetSetTheOffsetBackTo0()
+        {
+            var state = Biased();
+            state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
+            state.Step(LickSpoutCommand.BiasLeft, 150, 1500);
+            var reset = state.Step(LickSpoutCommand.BiasReset, 150, 1500);
+            Assert.AreEqual("10,2000,2100,3000,3100", reset.Target.ToString());
+            Assert.AreEqual("M1 biasSteps=0", reset.Detail);
+            Assert.IsNull(state.Step(LickSpoutCommand.BiasReset, 150, 1500), "already 0");
+            state.Step(LickSpoutCommand.BiasRight, 150, 1500);
+            var spoutsDefault = state.Step(LickSpoutCommand.SpoutsDefault, 150, 1500);
+            Assert.AreEqual("10,2000,2100,3000,3100", spoutsDefault.Target.ToString());
+            Assert.AreEqual(LickSpoutStep.BiasMoved, spoutsDefault.Event, "the change to 0 is logged");
+            Assert.IsNull(state.Step(LickSpoutCommand.SpoutsDefault, 150, 1500).Event, "no change, no event");
+        }
+
+        [TestMethod]
+        public void NudgesMoveTheInPositionAndTheOffsetRidesOnTopNeverSaved()
+        {
+            var folder = TempFolder();
+            var list = Path.Combine(folder, "LickSpoutPositions.csv");
+            var state = LickSpoutStage.Start(RigFile(folder), list, "M1");
+            state.BiasSettings = new SpoutBiasSettings { StepSteps = 100, MaxSteps = 500 };
+            state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
+            state.Step(LickSpoutCommand.BiasRight, 150, 1500);
+            Assert.AreEqual("-140,2000,2100,3000,3100", state.Apply(LickSpoutCommand.BaseRight, 50, 1500).ToString());
+            Assert.AreEqual("-40,2000,2100,3000,3100", state.In.ToString());
+            var saved = state.Step(LickSpoutCommand.SaveSpoutPositions, 150, 1500);
+            Assert.AreEqual("M1 baseTransverse=-40 radialLeft=2000 radialRight=2100 elevationLeft=3000 elevationRight=3100", saved.Detail);
+            Assert.AreEqual("M1,-40,2000,2100,3000,3100", File.ReadAllLines(list)[1], "the person's position, not the correction");
+        }
+
+        [TestMethod]
+        public void AReversedBaseTakesABiasMoveTheOtherWayAsItsNudges()
+        {
+            var reversed = Wiring.Replace("{0}", "").Replace("Motor0: { device: BaseTransverse }", "Motor0: { device: BaseTransverse, reversed: true }");
+            var state = Biased(reversed);
+            state.Apply(LickSpoutCommand.SpoutsIn, 1000, 1500);
+            var nudged = state.Apply(LickSpoutCommand.BaseLeft, 1000, 1500).BaseTransverse;
+            var step = state.Step(LickSpoutCommand.BiasLeft, 150, 1500);
+            Assert.AreEqual(-990, nudged, "BaseLeft takes steps off a reversed base");
+            Assert.AreEqual(-1090, step.Target.BaseTransverse, "and so does BiasLeft: the mouse's left on every rig");
+            Assert.AreEqual("M1 biasSteps=100", step.Detail, "the offset is logged the mouse's way, the same on every rig");
+        }
+
+        [TestMethod]
+        public void TheCorrectedPositionIsHeldToTheBaseLimit()
+        {
+            var limited = Wiring.Replace("{0}", "").Replace("Motor0: { device: BaseTransverse }", "Motor0: { device: BaseTransverse, maxSteps: 150 }");
+            var state = Biased(limited);
+            state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
+            state.Step(LickSpoutCommand.BiasLeft, 150, 1500);
+            Assert.AreEqual(150, state.Step(LickSpoutCommand.BiasLeft, 150, 1500).Target.BaseTransverse);
+            Assert.AreEqual(200, state.BiasSteps, "the offset is the task's; the axis limit holds the target");
+        }
+
+        [TestMethod]
+        public void OperatorTakesTheBiasSettingsOnItsSecondInput()
+        {
+            var folder = TempFolder();
+            var stage = new LickSpoutStage { RigFile = RigFile(folder), PositionsFile = Path.Combine(folder, "LickSpoutPositions.csv"), SubjectId = "M2" };
+            var commands = new Subject<LickSpoutCommand>();
+            var settings = new Subject<SpoutBiasSettings>();
+            var steps = new List<string>();
+            using (stage.Process(commands, settings).Subscribe(t => steps.Add(t.Target != null ? t.Target.ToString() : t.Event)))
+            {
+                commands.OnNext(LickSpoutCommand.SpoutsIn);
+                commands.OnNext(LickSpoutCommand.BiasLeft);
+                settings.OnNext(new SpoutBiasSettings { StepSteps = 50, MaxSteps = 500 });
+                commands.OnNext(LickSpoutCommand.BiasLeft);
+            }
+            CollectionAssert.AreEqual(new[] { LickSpoutStep.FromDefault, "10,2000,2100,3000,3100", "60,2000,2100,3000,3100" }, steps.ToArray(), "no move before the settings came");
+        }
+
         static HarpMessage Switches(params int[] away)
         {
             return DigitalInputState.FromPayload(MessageType.Event, (DigitalInputStates)away.Sum(m => 1 << m));
