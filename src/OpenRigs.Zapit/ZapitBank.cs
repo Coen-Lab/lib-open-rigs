@@ -64,6 +64,12 @@ namespace OpenRigs.Zapit
         /// (open_rigs.components.zapit max_ramp_down_seconds, the same rule).</summary>
         public double LongestRampSeconds => Conditions.SelectMany(c => c.Variants.Where(v => v.LaserOn).Select(v => v.TailCycles * c.ScanCycle.Length / SampleRate)).DefaultIfEmpty(0).Max();
 
+        /// <summary>The lowest laser volts any variant holds (0 for a bank with no laser rows).</summary>
+        public double MinLaserVolts => laser.DefaultIfEmpty().Min();
+
+        /// <summary>The highest laser volts any variant holds (0 for a bank with no laser rows).</summary>
+        public double MaxLaserVolts => laser.DefaultIfEmpty().Max();
+
         /// <summary>Reads and checks the bank whose index is at <paramref name="jsonPath"/>.</summary>
         public static ZapitBank Load(string jsonPath)
         {

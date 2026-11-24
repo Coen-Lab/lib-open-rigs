@@ -108,6 +108,12 @@ namespace OpenRigs.Trials.Tests
         {
             Loop.OnZapitEvent(new OpenRigs.Zapit.ZapitDaqEvent { Kind = OpenRigs.Zapit.ZapitDaqEventKind.Armed, Trial = trial.TrialNumber, Condition = trial.LaserCondition, LaserOn = trial.LaserOn, CappedPowerMw = cappedPowerMw });
         }
+
+        /// <summary>ZapitDaq's Started for the trial: the trigger came and its samples were generated.</summary>
+        public void Started(StubTrial trial)
+        {
+            Loop.OnZapitEvent(new OpenRigs.Zapit.ZapitDaqEvent { Kind = OpenRigs.Zapit.ZapitDaqEventKind.Started, Trial = trial.TrialNumber });
+        }
     }
 
     [TestClass]

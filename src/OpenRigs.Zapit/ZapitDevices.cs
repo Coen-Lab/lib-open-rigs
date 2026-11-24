@@ -46,7 +46,9 @@ namespace OpenRigs.Zapit
         /// clocked task exists.</summary>
         void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal);
 
-        /// <summary>Overwrites the clocked task's buffer from sample <paramref name="firstSample"/>, which must not yet be generated.</summary>
+        /// <summary>Overwrites the clocked task's buffer from sample <paramref name="firstSample"/>, which must not yet be
+        /// generated nor already in the device's onboard FIFO (whose samples cannot be overwritten): one too late is refused
+        /// with an error, never written in part.</summary>
         void WriteAt(double[,] samples, long firstSample);
 
         /// <summary>The clocked task's samples per channel generated so far (0 before its trigger).</summary>
@@ -78,6 +80,13 @@ namespace OpenRigs.Zapit
         {
             if (samples.GetLength(0) != 4 || samples.GetLength(1) < 1) throw new InvalidOperationException("Zapit clocked samples need 4 rows (galvo X, galvo Y, laser, LED) and at least one column.");
             foreach (var v in samples) if (!(Math.Abs(v) <= ZapitBank.RangeVolts)) throw new InvalidOperationException($"Zapit clocked samples exceed +/-{ZapitBank.RangeVolts} V.");
+        }
+
+        public static void InTime(long firstSample, long generated, long onboard)
+        {
+            if (firstSample < generated + onboard)
+                throw new InvalidOperationException($"A Zapit early stop wrote its ramp from sample {firstSample}, but {generated} were generated and the next {onboard} already sit in the device's onboard buffer, " +
+                    "so the ramp could not be kept: raise rig.yml's zapit.earlyStopLeadSeconds above the onboard buffer's length (its samples per channel over the sample rate).");
         }
 
         public static InvalidOperationException Reserved() =>
@@ -134,6 +143,7 @@ namespace OpenRigs.Zapit
         {
             ZapitDeviceChecks.Range(samples);
             if (clocked == null) throw new InvalidOperationException("No Zapit clocked task to write into.");
+            ZapitDeviceChecks.InTime(firstSample, clocked.Stream.TotalSamplesGeneratedPerChannel, clocked.Stream.Buffer.OutputOnBoardBufferSize);
             clocked.Stream.WriteRelativeTo = WriteRelativeTo.FirstSample;
             clocked.Stream.WriteOffset = checked((int)firstSample);
             new AnalogMultiChannelWriter(clocked.Stream).WriteMultiSample(false, samples);
@@ -216,6 +226,9 @@ namespace OpenRigs.Zapit
         /// <summary>The samples the last clocked task had generated when it was stopped.</summary>
         public long LastSamplesGenerated { get; private set; }
 
+        /// <summary>The onboard FIFO's samples per channel, already beyond reach of <see cref="WriteAt"/>, as NI's; 0 by default.</summary>
+        public long OnboardSamples { get; set; }
+
         /// <summary>The last clocked task's trigger terminal.</summary>
         public string? LastTriggerTerminal { get; private set; }
 
@@ -260,6 +273,7 @@ namespace OpenRigs.Zapit
             if (!HasClockedTask) throw new InvalidOperationException("No Zapit clocked task to write into.");
             var buffer = LastBuffer!;
             if (firstSample < SamplesGenerated) throw new InvalidOperationException($"Zapit sample {firstSample} was already generated.");
+            ZapitDeviceChecks.InTime(firstSample, SamplesGenerated, OnboardSamples);
             if (firstSample + samples.GetLength(1) > buffer.GetLength(1)) throw new InvalidOperationException("A Zapit write runs past the end of the buffer.");
             for (int channel = 0; channel < 4; channel++)
                 for (int i = 0; i < samples.GetLength(1); i++) buffer[channel, firstSample + i] = samples[channel, i];

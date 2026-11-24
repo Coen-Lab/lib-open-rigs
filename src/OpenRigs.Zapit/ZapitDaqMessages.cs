@@ -101,6 +101,8 @@ namespace OpenRigs.Zapit
         Pointed,
         /// <summary>A staircase played; <see cref="ZapitDaqEvent.AnalogIn"/> holds the photodiode, one value per AO sample.</summary>
         StaircaseRead,
+        /// <summary>A command was refused and nothing written; the session runs on (<see cref="ZapitDaqEvent.Detail"/> says why).</summary>
+        Refused,
     }
 
     /// <summary>One event from <see cref="ZapitDaq"/>.</summary>
@@ -144,6 +146,9 @@ namespace OpenRigs.Zapit
 
         /// <summary>StaircaseRead: the photodiode volts, one per AO sample.</summary>
         public double[]? AnalogIn { get; set; }
+
+        /// <summary>Refused: why.</summary>
+        public string? Detail { get; set; }
 
         /// <inheritdoc/>
         public override string ToString() => $"{Kind}(trial={Trial}, samples={SamplesGenerated}/{Samples})";

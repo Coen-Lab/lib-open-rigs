@@ -54,13 +54,13 @@ namespace OpenRigs.Zapit.Tests
             public readonly SimulatedZapitDevice Device = new SimulatedZapitDevice { AutoTrigger = false };
             public Exception Error;
 
-            public Harness(double sampleRate = 100000, double maxTrialSeconds = 1.0, double earlyStopLeadSeconds = 0.01, double ceilingMw = double.PositiveInfinity, double laserMaxVolts = 5)
+            public Harness(double sampleRate = 100000, double maxTrialSeconds = 1.0, double earlyStopLeadSeconds = 0.01, double ceilingMw = double.PositiveInfinity, double laserMaxVolts = 5, double? laserCeilingVolts = null)
             {
                 Device.Clock = () => Volatile.Read(ref now);
                 var node = new ZapitDaq
                 {
                     SampleRate = sampleRate, MaxTrialSeconds = maxTrialSeconds, EarlyStopLeadSeconds = earlyStopLeadSeconds,
-                    TriggerTerminal = Trigger, CeilingMw = ceilingMw, LaserMaxVolts = laserMaxVolts, DeviceFactory = () => Device,
+                    TriggerTerminal = Trigger, CeilingMw = ceilingMw, LaserMaxVolts = laserMaxVolts, LaserCeilingVolts = laserCeilingVolts ?? laserMaxVolts, DeviceFactory = () => Device,
                 };
                 subscription = node.Process(commands).Subscribe(events.Add, e => Error = e);
             }
@@ -253,7 +253,7 @@ namespace OpenRigs.Zapit.Tests
         public void UnsubscribingZeroesEveryLineEvenWhenStoppingFails()
         {
             var device = new StopFails();
-            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.01, CeilingMw = 1e9, LaserMaxVolts = 5, DeviceFactory = () => device };
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.01, CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
             var commands = new Subject<ZapitDaqCommand>();
             var events = new BlockingCollection<ZapitDaqEvent>();
             var subscription = node.Process(commands).Subscribe(events.Add, e => { });
@@ -345,9 +345,7 @@ namespace OpenRigs.Zapit.Tests
             var index = JObject.Parse(File.ReadAllText(path));
             index["ceiling_mw"] = 0.0;   // a bank claiming the disabled ceiling but driving the laser
             File.WriteAllText(path, index.ToString());
-            h.Send(Load(path));
-            h.Next(ZapitDaqEventKind.BankLoaded);
-            StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 8.0, 0.05)), "ceilingMw is 0");
+            StringAssert.Contains(h.ErrorMessage(Load(path)), "above rig.yml's zapit.ceilingMw (0 mW)");
         }
 
         // rig.yml's ceiling lowered after the bank was built: the bank's powers are not capped at it, so it is refused.
@@ -374,11 +372,7 @@ namespace OpenRigs.Zapit.Tests
             using (var h = new Harness(laserMaxVolts: 1))
                 StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Staircase, LaserLevelsVolts = new[] { 0.0, 2 }, SamplesPerLevel = 10 }), "outside 0 to 1 V");
             using (var h = new Harness(laserMaxVolts: 0.01))
-            {
-                h.Send(Load(Unpack()));
-                h.Next(ZapitDaqEventKind.BankLoaded);
-                StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 2.0, 0.05)), "outside 0 to 0.01 V");
-            }
+                StringAssert.Contains(h.ErrorMessage(Load(Unpack())), "The Zapit bank's samples drive the laser from");
             using (var h = new Harness(laserMaxVolts: 1))
             {
                 h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 1 });
@@ -417,7 +411,72 @@ namespace OpenRigs.Zapit.Tests
             h.Next(ZapitDaqEventKind.BankLoaded);
             h.Send(Arm(1, 1, true, 2.0, 0.05));
             h.Next(ZapitDaqEventKind.Armed);
-            StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point }), "cannot Point while trial 1 is armed");
+            h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 });
+            StringAssert.Contains(h.Next(ZapitDaqEventKind.Refused).Detail, "no Point once trials are armed");
+            Assert.IsNull(h.Error);
+        }
+
+        // Audit 24 Nov 2026 L1: rig.yml's ceilingMw as volts (LaserCeilingVolts) is the DAQ's limit, below laserMaxVolts.
+        [TestMethod]
+        public void LaserVoltsAboveTheCeilingsVoltsAreRefused()
+        {
+            using (var h = new Harness(ceilingMw: 1, laserCeilingVolts: 0.5))
+                StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, GalvoXVolts = 1, LaserVolts = 5 }), "above the ceiling's 0.5 V");
+            using (var h = new Harness(laserCeilingVolts: 0.5))
+                StringAssert.Contains(h.ErrorMessage(Load(Unpack())), "above the ceiling's 0.5 V");
+            using (var h = new Harness(laserCeilingVolts: 0.5))
+            {
+                h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.5 });
+                h.Next(ZapitDaqEventKind.Pointed);
+            }
+        }
+
+        // Audit 24 Nov 2026 L1: a bank's ceiling_mw is its own claim; a json edited to claim a lower one (the bin untouched)
+        // still delivers its powers, which the rig's ceiling refuses.
+        [TestMethod]
+        public void ABankClaimingALowerCeilingThanItDeliversIsRefused()
+        {
+            var path = Unpack();
+            var index = JObject.Parse(File.ReadAllText(path));
+            index["ceiling_mw"] = 0.5;
+            File.WriteAllText(path, index.ToString());
+            using var h = new Harness(ceilingMw: 0.5);
+            StringAssert.Contains(h.ErrorMessage(Load(path)), "above rig.yml's zapit.ceilingMw (0.5 mW)");
+        }
+
+        // Audit 24 Nov 2026 L3: a subscriber that disposes the node inside an event (Take(1) on BankLoaded) must not
+        // deadlock against the monitor thread, and the lines are zeroed.
+        [TestMethod]
+        public void DisposingInsideAnEventNeitherHangsNorLeavesTheLinesOn()
+        {
+            var path = Unpack();
+            for (int i = 0; i < 5; i++)
+            {
+                var device = new SimulatedZapitDevice();
+                var commands = new Subject<ZapitDaqCommand>();
+                var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.01, CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
+                System.Reactive.Linq.Observable.Take(node.Process(commands), 1).Subscribe(_ => { }, _ => { });
+                var send = System.Threading.Tasks.Task.Run(() => commands.OnNext(Load(path)));
+                Assert.IsTrue(send.Wait(3000), $"Run {i}: LoadBank never returned.");
+                AssertZeros(device.OnDemandWrites.Last());
+            }
+        }
+
+        // Audit 24 Nov 2026 L4: an early stop whose ramp would start inside the onboard FIFO (samples NI cannot overwrite)
+        // is an error naming the setting, never a ramp cut short in silence.
+        [TestMethod]
+        public void AnEarlyStopTooLateForTheOnboardBufferIsAnError()
+        {
+            using var h = new Harness();
+            h.Device.OnboardSamples = 2047;   // an X-series AO FIFO shared by 4 lines; the lead is 1000 samples
+            h.Send(Load(Unpack()));
+            h.Next(ZapitDaqEventKind.BankLoaded);
+            h.Send(Arm(1, 1, true, 8.0, 0));
+            h.Next(ZapitDaqEventKind.Armed);
+            h.Device.Trigger();
+            h.Now = 0.01;
+            h.Next(ZapitDaqEventKind.Started);
+            StringAssert.Contains(h.ErrorMessage(EarlyStop(1)), "earlyStopLeadSeconds");
         }
 
         [TestMethod]

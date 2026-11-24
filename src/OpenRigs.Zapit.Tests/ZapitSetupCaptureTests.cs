@@ -22,10 +22,10 @@ namespace OpenRigs.Zapit.Tests
             readonly IDisposable subscription;
             byte shade;
 
-            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10)
+            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10, double laserCeilingVolts = 5)
             {
                 Directory.CreateDirectory(Pending);
-                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2), CeilingMw = ceilingMw, LaserMaxVolts = 5 }
+                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2), CeilingMw = ceilingMw, LaserMaxVolts = 5, LaserCeilingVolts = laserCeilingVolts }
                     .Process(Grids, Stills, Banks, Events, Frames, Aims)
                     .Subscribe(step => { Steps.Add(step); if (step.Command?.Kind == ZapitDaqCommandKind.Point) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed }); }, e => Error = e);
             }
@@ -50,6 +50,60 @@ namespace OpenRigs.Zapit.Tests
                 subscription.Dispose();
                 Directory.Delete(Path.GetDirectoryName(Pending), true);
             }
+        }
+
+        // Audit 24 Nov 2026 L2: Go (the aims ending) during a grid run ends it, zeroed; no laser-on Point follows.
+        [TestMethod]
+        public void GoDuringAGridRunEndsItWithTheLinesZeroed()
+        {
+            using var rig = new Rig();
+            var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2], [-1, 0.5], [2, 2]], \"laserVolts\": 0.3, \"skipFrames\": 0, \"backgrounds\": 1}");
+            rig.Grids.OnNext(folder);
+            var before = rig.Steps.Count;
+            rig.Grids.OnCompleted(); rig.Stills.OnCompleted(); rig.Banks.OnCompleted(); rig.Aims.OnCompleted();
+            for (int i = 0; i < 6; i++) rig.Frame();
+            var after = rig.Steps.Skip(before).ToList();
+            Assert.AreEqual(1, after.Count, string.Join("; ", after));
+            StringAssert.StartsWith(after[0].ToString(), "Refused Go came during a setup step");
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, after[0].Command.Kind);
+        }
+
+        // Audit 24 Nov 2026 L6: a grid's laserVolts is held to the aim's rules and refused, never sent to ZapitDaq.
+        [TestMethod]
+        public void AGridsLaserVoltsOutsideTheRigsLimitsAreRefused()
+        {
+            foreach (var (laser, ceilingMw, ceilingVolts, why) in new[] { ("7", 10.0, 5.0, "0 to 5 V"), ("-0.1", 10.0, 5.0, "0 to 5 V"), ("0.3", 0.0, 5.0, "ceilingMw is 0"), ("0.6", 10.0, 0.5, "ceiling's 0.5 V") })
+            {
+                using var rig = new Rig(ceilingMw: ceilingMw, laserCeilingVolts: ceilingVolts);
+                rig.Grids.OnNext(rig.Run("Frames_T", "{\"volts\": [[1, 2]], \"laserVolts\": " + laser + "}"));
+                Assert.IsNull(rig.Error);
+                Assert.AreEqual("Refused", rig.Steps.Single().Stage);
+                StringAssert.Contains(rig.Steps.Single().Detail, why);
+                Assert.IsNull(rig.Steps.Single().Command);
+            }
+        }
+
+        // Audit 24 Nov 2026 C3: a still with no camera frame is refused after FrameTimeout, and the next setup step is taken.
+        [TestMethod]
+        public void AStillWithNoFrameIsRefusedAndTheNextStepTaken()
+        {
+            using var rig = new Rig(frameTimeout: TimeSpan.FromMilliseconds(50));
+            rig.Stills.OnNext(Path.Combine(rig.Pending, "still.png"));
+            for (int i = 0; i < 100 && rig.Steps.Count < 2; i++) System.Threading.Thread.Sleep(10);
+            StringAssert.StartsWith(rig.Steps.Last().ToString(), "Refused no camera frame came");
+            rig.Stills.OnNext(Path.Combine(rig.Pending, "still2.png"));
+            Assert.AreEqual("Pointing", rig.Steps.Last().Stage);
+        }
+
+        // Audit 24 Nov 2026 L1: an aim above the ceiling's volts (LaserCeilingVolts) is refused, below laserMaxVolts.
+        [TestMethod]
+        public void AnAimAboveTheCeilingsVoltsIsRefused()
+        {
+            using var rig = new Rig(laserCeilingVolts: 0.5);
+            rig.Aims.OnNext("1,1,0.6");
+            StringAssert.Contains(rig.Steps.Single().Detail, "ceiling's 0.5 V");
+            rig.Aims.OnNext("1,1,0.5");
+            Assert.AreEqual("Aiming", rig.Steps.Last().Stage);
         }
 
         // Two points with one frame skipped, two backgrounds: each point's frame after the skip, the backgrounds laser off.

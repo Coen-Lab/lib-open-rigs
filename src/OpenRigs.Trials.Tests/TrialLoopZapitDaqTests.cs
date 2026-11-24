@@ -38,10 +38,28 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(100.001, arm.Seconds, 1e-9, "armed at the interval's start");
             rig.Armed(arm.Trial, 1.5);
             rig.RunTo(TrialEventKind.Trigger);
+            rig.Started(arm.Trial);
             rig.RunTo(TrialEventKind.Stimulus);
             rig.Lick(0);
             var times = rig.Of(TrialEventKind.Outcome).Single().Outcome.Times;
             Assert.AreEqual(1.5, times.LaserPowerMw, "the Armed event's CappedPowerMw, not the trial's 2 mW");
+        }
+
+        // Audit 24 Nov 2026 C1: the trigger line went up but ZapitDaq never generated the trial (no Started; it ends Stopped
+        // or Zeroed with 0 samples), so the row must not claim the laser fired.
+        [TestMethod]
+        public void ATrialZapitDaqNeverStartedLogsNoPower()
+        {
+            var rig = new LoopRig(Rules(), zapitDaq: true);
+            var arm = rig.RunTo(TrialEventKind.Arm);
+            rig.Armed(arm.Trial, 1.5);
+            rig.RunTo(TrialEventKind.Trigger);
+            rig.Loop.OnZapitEvent(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Zeroed, Trial = arm.Trial.TrialNumber });
+            rig.RunTo(TrialEventKind.Stimulus);
+            rig.Lick(0);
+            var times = rig.Of(TrialEventKind.Outcome).Single().Outcome.Times;
+            Assert.IsTrue(times.LaserFired, "the trigger line went up");
+            Assert.AreEqual(0, times.LaserPowerMw);
         }
 
         [TestMethod]

@@ -18,7 +18,9 @@ namespace OpenRigs.Zapit
     /// and LED at 0 V; an early stop writes the ramp <see cref="EarlyStopLeadSeconds"/> ahead of the generated samples, then
     /// stops. Between trials the clocked task is stopped and deleted and every line zeroed on a short-lived on-demand task.
     /// Calibration: on-demand points, and a laser staircase read back through the photodiode on the AO clock. Every line is
-    /// zeroed on subscribe and on unsubscribe, however the workflow stops; any refusal or DAQ error is an error.
+    /// zeroed on subscribe and on unsubscribe, however the workflow stops. A Point once trials are armed is Refused (an event;
+    /// the session runs on); any other refusal or DAQ error is an error. No laser sample above <see cref="LaserCeilingVolts"/>
+    /// is written, and a bank holding one, or a power above <see cref="CeilingMw"/>, is refused at LoadBank.
     /// </summary>
     [Description("Runs Zapit trials and calibration steps on the rig's NI DAQ, or its simulated twin.")]
     public class ZapitDaq : Combinator<ZapitDaqCommand, ZapitDaqEvent>
@@ -67,6 +69,12 @@ namespace OpenRigs.Zapit
         [Description("The highest laser control volts (rig.yml's laserMinMaxControlVolts[1]). Any laser sample above it or below 0 V is refused.")]
         public double LaserMaxVolts { get; set; }
 
+        /// <summary>The laser ceiling as control volts: rig.yml's zapit.ceilingMw through the rig's laser curve (lib_zapit's
+        /// max_control_volts, passed at launch). ZapitDaq refuses any laser sample above it, and any bank holding one. The
+        /// default, 0, refuses any laser sample above 0 V, so a lost mapping fails safe.</summary>
+        [Description("The laser ceiling as control volts (ceilingMw through the laser curve, from the launch). Any laser sample above it is refused; 0, the default, refuses any above 0 V.")]
+        public double LaserCeilingVolts { get; set; }
+
         /// <summary>The longest trial with its ramp, in seconds; until-outcome trials are finite at it.</summary>
         [Description("The longest trial with its ramp, in seconds; until-outcome trials are finite at it.")]
         public double MaxTrialSeconds { get; set; }
@@ -84,6 +92,7 @@ namespace OpenRigs.Zapit
         // The bank stores float32 volts from lib_zapit's float maths: some rows come out a few microvolts below 0 (-2e-6 V
         // in the contract bank), and a maximum such as 4.9 V reads back 1e-7 V above it. The laser limits allow that rounding and no more.
         const double FloatSlackVolts = 1e-4;
+        const double FloatSlackMw = 1e-3;   // the bank's powers come from the same float maths
 
         /// <summary>Runs each command in order and reports what the DAQ did.</summary>
         public override IObservable<ZapitDaqEvent> Process(IObservable<ZapitDaqCommand> source) => Observable.Create<ZapitDaqEvent>(observer =>
@@ -100,13 +109,13 @@ namespace OpenRigs.Zapit
                 throw new InvalidOperationException("ZapitDaq needs its four AO channels and the photodiode channel (rig.yml's zapit block).");
             var device = DeviceFactory?.Invoke() ?? (Simulated ? new SimulatedZapitDevice() : CreateNi(wiring));
             Session session;
-            try { session = new Session(this, device, Observer.Synchronize(observer)); }
+            try { session = new Session(this, device, observer); }
             catch
             {
                 device.Dispose();
                 throw;
             }
-            var commands = source.Subscribe(session.Handle, observer.OnError, observer.OnCompleted);
+            var commands = source.Subscribe(session.Handle, session.Fail, session.Complete);
             return new CompositeDisposable(commands, session);
         });
 
@@ -128,12 +137,13 @@ namespace OpenRigs.Zapit
         {
             readonly ZapitDaq node;
             readonly IZapitDevice device;
-            readonly IObserver<ZapitDaqEvent> observer;
+            readonly IObserver<ZapitDaqEvent> observer;   // called only under the gate, so the commands' and the monitor's calls never race
             readonly object gate = new object();
             readonly Thread monitor;
             volatile bool disposed;
             ZapitBank? bank;
             Trial? trial;
+            bool trialsArmed;   // a trial was armed: Point is refused for the rest of the session
 
             public Session(ZapitDaq node, IZapitDevice device, IObserver<ZapitDaqEvent> observer)
             {
@@ -147,11 +157,11 @@ namespace OpenRigs.Zapit
 
             public void Handle(ZapitDaqCommand command)
             {
-                try
+                lock (gate)
                 {
-                    lock (gate)
+                    if (disposed) return;
+                    try
                     {
-                        if (disposed) return;
                         switch (command.Kind)
                         {
                             case ZapitDaqCommandKind.LoadBank: LoadBank(command); break;
@@ -163,11 +173,21 @@ namespace OpenRigs.Zapit
                             default: throw new InvalidOperationException($"ZapitDaq has no command {command.Kind}.");
                         }
                     }
+                    catch (Exception error)
+                    {
+                        if (!disposed) observer.OnError(error);
+                    }
                 }
-                catch (Exception error)
-                {
-                    observer.OnError(error);
-                }
+            }
+
+            public void Fail(Exception error)
+            {
+                lock (gate) observer.OnError(error);
+            }
+
+            public void Complete()
+            {
+                lock (gate) observer.OnCompleted();
             }
 
             void LoadBank(ZapitDaqCommand command)
@@ -178,6 +198,11 @@ namespace OpenRigs.Zapit
                     throw new InvalidOperationException($"The Zapit bank was built for {loaded.SampleRate} samples/s; the rig runs {node.SampleRate}.");
                 if (!(loaded.CeilingMw <= node.CeilingMw))
                     throw new InvalidOperationException($"The Zapit bank was built under a {loaded.CeilingMw} mW ceiling, above rig.yml's zapit.ceilingMw ({node.CeilingMw} mW): rebuild the bank.");
+                // The bank's ceiling_mw is its own claim: its powers and volts are held to the rig's ceiling too.
+                var over = loaded.Conditions.SelectMany(c => c.Variants).Where(v => v.LaserOn && !(v.CappedPowerMw <= node.CeilingMw + FloatSlackMw)).Select(v => v.CappedPowerMw).DefaultIfEmpty().Max();
+                if (over > 0)
+                    throw new InvalidOperationException($"The Zapit bank delivers {over} mW, above rig.yml's zapit.ceilingMw ({node.CeilingMw} mW): rebuild the bank.");
+                RefuseLaser(new[] { loaded.MinLaserVolts, loaded.MaxLaserVolts }, "The Zapit bank's samples");
                 loaded.Verify(command.ConditionsPath, command.ScannerFitHash, command.LaserCurveHash, command.SampleHash);
                 bank = loaded;
                 Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.BankLoaded, Bank = loaded });
@@ -189,6 +214,8 @@ namespace OpenRigs.Zapit
                 if (trial != null && trial.Started)
                     throw new InvalidOperationException($"Trial {command.Trial} cannot arm while trial {trial.Command.Trial} still plays.");
                 if (trial != null) Finish(ZapitDaqEventKind.Stopped);   // armed but never triggered
+                if (disposed) return;   // a subscriber disposed the node inside that event: the lines are zeroed
+                trialsArmed = true;
                 var watch = Stopwatch.StartNew();
                 var variant = loaded.Variant(command.Condition, command.LaserOn, command.PowerMw);
                 var cycles = loaded.Cycles(command.Condition, variant, command.DurationSeconds, node.MaxTrialSeconds);
@@ -228,6 +255,11 @@ namespace OpenRigs.Zapit
 
             void Point(ZapitDaqCommand command)
             {
+                if (trialsArmed)
+                {
+                    Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "ZapitDaq takes no Point once trials are armed (after Go)." });
+                    return;
+                }
                 RefuseWhilePlaying(command);
                 RefuseLaser(new[] { command.LaserVolts }, "The aiming point");
                 device.WriteOnDemand(new[] { command.GalvoXVolts, command.GalvoYVolts, command.LaserVolts, 0 });
@@ -261,6 +293,8 @@ namespace OpenRigs.Zapit
                     throw new InvalidOperationException($"{what} drive the laser to {max} V, but rig.yml's zapit.ceilingMw is 0 (laser disabled).");
                 if (!(max <= node.LaserMaxVolts + FloatSlackVolts) || !(min >= -FloatSlackVolts))
                     throw new InvalidOperationException($"{what} drive the laser from {min} to {max} V, outside 0 to {node.LaserMaxVolts} V (rig.yml's zapit.laserMinMaxControlVolts[1]).");
+                if (!(max <= node.LaserCeilingVolts + FloatSlackVolts))
+                    throw new InvalidOperationException($"{what} drive the laser to {max} V, above the ceiling's {node.LaserCeilingVolts} V (LaserCeilingVolts: rig.yml's zapit.ceilingMw through the laser curve).");
             }
 
             static double[] Laser(double[,] samples) => Enumerable.Range(0, samples.GetLength(1)).Select(i => samples[2, i]).ToArray();
@@ -309,6 +343,7 @@ namespace OpenRigs.Zapit
                 {
                     current.Started = true;
                     Emit(TrialEvent(ZapitDaqEventKind.Started, generated, 0));
+                    if (disposed) return;
                 }
                 if (trial == current && (device.IsDone || generated >= current.StopAt))
                     Finish(current.Stopping ? ZapitDaqEventKind.Stopped : ZapitDaqEventKind.Ended);
@@ -327,27 +362,33 @@ namespace OpenRigs.Zapit
                     }
                     catch (Exception error)
                     {
-                        observer.OnError(error);
+                        lock (gate)
+                        {
+                            if (!disposed) observer.OnError(error);
+                        }
                         return;
                     }
                     Thread.Sleep(1);
                 }
             }
 
+            // Zeroes first, under the gate: the monitor touches the device only under it and stops once it sees disposed. A
+            // dispose from inside an event (the gate already held, or on the monitor's own thread) never joins the monitor,
+            // which would wait on that gate for ever.
             public void Dispose()
             {
                 lock (gate)
                 {
                     if (disposed) return;
                     disposed = true;
+                    try { device.StopClocked(); }   // NI reports a failed generation here: the lines are zeroed all the same
+                    finally
+                    {
+                        try { device.WriteOnDemand(Zeros); }
+                        finally { device.Dispose(); }
+                    }
                 }
-                if (Thread.CurrentThread != monitor) monitor.Join();
-                try { device.StopClocked(); }   // NI reports a failed generation here: the lines are zeroed all the same
-                finally
-                {
-                    try { device.WriteOnDemand(Zeros); }
-                    finally { device.Dispose(); }
-                }
+                if (Thread.CurrentThread != monitor && !System.Threading.Monitor.IsEntered(gate)) monitor.Join();
             }
         }
     }

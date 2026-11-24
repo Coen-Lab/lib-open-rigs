@@ -69,7 +69,7 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
 ## Hand aiming
 
-Between a passed scanner fit and Go, the agent can point the beam by hand (app-rig-control's Point and Cat & Mouse). It sends `Zapit-Main.Aim <xVolts>,<yVolts>,<laserVolts>`: the galvo volts come from the sample mm through the scanner fit, and the laser volts from the scanner grid's power (2 mW by default, never above `ceilingMw`) through the laser curve, as `calibration_plan` makes them. The workflow points the galvos with the laser on (ZapitDaq `Point`) and reports `Aiming`. The beam stays there until the next aim, `Zapit-Main.LaserOff`, a grid run or a still.
+Between a passed scanner fit and Go, the agent can point the beam by hand (its Point and Cat & Mouse). It sends `Zapit-Main.Aim <xVolts>,<yVolts>,<laserVolts>`: the galvo volts come from the sample mm through the scanner fit, and the laser volts from the scanner grid's power (2 mW by default, never above `ceilingMw`) through the laser curve, as `calibration_plan` makes them. The workflow points the galvos with the laser on (ZapitDaq `Point`) and reports `Aiming`. The beam stays there until the next aim, `Zapit-Main.LaserOff`, a grid run or a still. An aim or grid above the ceiling as volts (the launch property `LaserCeilingVolts`: `ceilingMw` through the laser curve) is refused, and ZapitDaq refuses any laser sample above it. Go ends a grid run or still still in progress (`Refused`, the lines zeroed), and once a trial is armed ZapitDaq answers any `Point` with `Refused`.
 
 The workflow refuses an aim, and keeps running, when:
 

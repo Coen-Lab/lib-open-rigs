@@ -1,4 +1,4 @@
-using Bonsai;
+﻿using Bonsai;
 using Bonsai.Expressions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
@@ -32,6 +32,40 @@ namespace OpenRigs.Devices.Tests
         public void NoZapitCameraIsStreamedWithoutZapitDaq()
         {
             CollectionAssert.DoesNotContain(Streams("zapit:\n  host: 127.0.0.1\n  port: 1488\n"), "Camera-Zapit.video");
+        }
+
+        // Audit 24 Nov 2026 L1 and C6: the include's Simulated (false by default) reaches ZapitDaq, so the wiring can run the
+        // twin, and its LaserCeilingVolts (0 by default, refusing any laser) reaches ZapitDaq and ZapitSetupCapture.
+        [TestMethod]
+        public void SimulatedAndTheCeilingsVoltsReachZapitDaqAndTheSetup()
+        {
+            WorkflowBuilder builder;
+            using (var reader = XmlReader.Create(Path.Combine(Folder, "ZapitLiveView.bonsai")))
+            {
+                builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            }
+            var include = Included(builder.Workflow, "OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai");
+            var properties = System.ComponentModel.TypeDescriptor.GetProperties(include);
+            var daq = Nested(include.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<OpenRigs.Zapit.ZapitDaq>().Single();
+            var ceiling = Nested(include.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<DoubleProperty>().Single();
+            Assert.IsFalse(daq.Simulated);
+            Assert.AreEqual(0.0, ceiling.Value);
+            properties["Simulated"].SetValue(include, true);
+            properties["LaserCeilingVolts"].SetValue(include, 1.25);
+            Assert.IsTrue(daq.Simulated);
+            Assert.AreEqual(1.25, ceiling.Value);
+            Included(include.Workflow, "OpenRigs.Devices:ZapitSetup.bonsai");
+            Assert.IsTrue(MappedFrom(include.Workflow, typeof(OpenRigs.Zapit.ZapitDaq), "LaserCeilingVolts", "Zapit.LaserCeilingVolts"));
+            Assert.IsTrue(MappedFrom(include.Workflow, typeof(OpenRigs.Zapit.ZapitSetupCapture), "LaserCeilingVolts", "Zapit.LaserCeilingVolts"));
+        }
+
+        // Whether the combinator's property is mapped from the subject (SubscribeSubject, PropertyMapping, the combinator), at any depth.
+        static bool MappedFrom(ExpressionBuilderGraph workflow, Type combinator, string property, string subject)
+        {
+            var graphs = new[] { workflow }.Concat(Nested(workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<IWorkflowExpressionBuilder>().Where(b => b.Workflow != null).Select(b => b.Workflow));
+            return graphs.Any(graph => graph.Any(target => ExpressionBuilder.Unwrap(target.Value) is CombinatorBuilder c && c.Combinator.GetType() == combinator
+                && graph.Any(mapping => mapping.Successors.Any(s => s.Target == target) && ExpressionBuilder.Unwrap(mapping.Value) is PropertyMappingBuilder m && m.PropertyMappings.Any(p => p.Name == property)
+                    && graph.Any(source => source.Successors.Any(s => s.Target == mapping) && ExpressionBuilder.Unwrap(source.Value) is SubscribeSubject named && named.Name == subject))));
         }
 
         // The streams StreamDevices plans from a rig.yml whose zapit block is this one.

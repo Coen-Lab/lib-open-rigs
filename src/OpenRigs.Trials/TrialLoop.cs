@@ -57,6 +57,7 @@ namespace OpenRigs.Trials
         TTrial awaitingReply;   // the trial whose StartStimulus Zapit has not yet answered
         TTrial armed;           // the last trial Zapit armed
         double armedPowerMw;    // ZapitDaq's power for it (its Armed event's CappedPowerMw)
+        int laserStarted;       // the last trial ZapitDaq reported Started: its samples were generated
         readonly IStimulusAfterOutcome<TTrial, TUpdate> after;   // the rules' stimulus after the outcome, if they have one
         TTrial onTrial;         // the trial whose timed stimulus is on (StimulusDurationSeconds), until its StimulusOff
         TrialTimes onTimes;     // its times from its outcome
@@ -172,10 +173,12 @@ namespace OpenRigs.Trials
 
         /// <summary>
         /// An event from ZapitDaq: an Armed while a trial's Arm is unanswered must arm that trial as it asked
-        /// (ZapitDaqTrial.CheckArmed); any other event is not the loop's.
+        /// (ZapitDaqTrial.CheckArmed); a Started marks its samples generated, so only then does the trial log its power
+        /// (a missed trigger ends Stopped or Zeroed with none generated, and logs 0 mW); any other event is not the loop's.
         /// </summary>
         public void OnZapitEvent(ZapitDaqEvent zapit)
         {
+            if (zapit != null && zapit.Kind == ZapitDaqEventKind.Started) laserStarted = zapit.Trial;
             if (zapit == null || zapit.Kind != ZapitDaqEventKind.Armed || awaitingReply == null) return;
             var asked = (IZapitTrial)awaitingReply;   // Check: every laser trial is one
             ZapitDaqTrial.CheckArmed(zapit, asked.TrialNumber, asked.LaserCondition, asked.LaserOn);
@@ -407,7 +410,7 @@ namespace OpenRigs.Trials
                 ResponseStartTime = responseStart,
                 ResponseEndTime = responseEnd,
                 LaserTriggerTime = triggerTime,
-                LaserPowerMw = !zapitDaq ? double.NaN : triggered && armed == trial ? armedPowerMw : 0,
+                LaserPowerMw = !zapitDaq ? double.NaN : triggered && armed == trial && laserStarted == ((IZapitTrial)trial).TrialNumber ? armedPowerMw : 0,
                 StimulusOffTime = StimulusTiming.Time(onset, timing.StimulusDurationSeconds, now, timing.ResponseToStimulusOffSeconds),
                 Now = now,
                 ResponseWindowAlwaysFull = timing.ResponseWindowAlwaysFull,
