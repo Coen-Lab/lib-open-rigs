@@ -31,6 +31,7 @@ For full hardware specs and configuration details, see the [official repository]
 | `PortName`              | Input            | Serial port used to communicate with the device (e.g., COM14).            |
 | `DumpRegisters`         | Input            | Whether to dump register values from the device at startup.               |
 | `Heartbeat`             | Input            | Whether to enable heartbeat messages from the device.                     |
+| `ClearOnStop`           | Input            | Output lines cleared when the workflow stops, however it stops.           |
 ## Dependencies
 ### Bonsai:
 
