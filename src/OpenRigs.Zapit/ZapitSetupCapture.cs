@@ -24,6 +24,9 @@ namespace OpenRigs.Zapit
         /// <summary>The command for ZapitDaq, or null.</summary>
         public ZapitDaqCommand? Command { get; set; }
 
+        /// <summary>The Zapit camera's exposure and gain for a grid run, or its own put back after one (Restore), or null.</summary>
+        public ZapitCameraSettings? Camera { get; set; }
+
         /// <summary>The step as the Zapit-Main.Setup metric: the stage, a space, the detail.</summary>
         public override string ToString() => Stage + " " + Detail;
     }
@@ -31,7 +34,9 @@ namespace OpenRigs.Zapit
     /// <summary>
     /// The per-session scanner grid and sample still of Zapit's setup phase (docs/zapit-setup-protocol.md). A grid run is a
     /// folder in the rig's pending folder holding the agent's <c>grid.json</c> ({"volts": [[x, y], ...], "laserVolts",
-    /// "skipFrames", "backgrounds"}, volts from lib_zapit's calibration plan): per point it points the galvos with the laser
+    /// "skipFrames", "backgrounds", and optionally "camera": {"exposureUs", "gainDb"}}, volts from lib_zapit's calibration plan):
+    /// with a camera block the run's first step carries those settings for ZapitPylonCapture (auto exposure and gain off)
+    /// and its last (FramesSaved, or a refusal) puts the camera's own back; per point it points the galvos with the laser
     /// on, skips skipFrames camera frames and saves the next as <c>point_NNNN.png</c>, then with the laser off saves
     /// backgrounds frames as <c>background_K.png</c> (lossless PNG, as lib_zapit's fit reads them), zeroes the lines and
     /// reports FramesSaved. A run with no camera frame within 2 s of Pointed (or of its last frame) is refused and zeroed. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
@@ -58,7 +63,11 @@ namespace OpenRigs.Zapit
             public int Backgrounds;
             public int Index;          // the point being saved; Volts.Length onwards the backgrounds
             public int Skip = -1;      // frames still to skip; -1 while waiting for Pointed
+            public ZapitCameraSettings? Camera;   // the grid's exposure and gain, or null to keep the session's
         }
+
+        /// <summary>The camera put back after a run that set it, else null.</summary>
+        static ZapitCameraSettings? Restore(Run r) => r.Camera == null ? null : new ZapitCameraSettings { Restore = true };
 
         /// <summary>The setup steps for the requests, as frames and ZapitDaq's events come. A bank request (its
         /// Settings_ZapitBank_&lt;DateTime&gt;.json) inside the pending folder becomes ZapitDaq's LoadBank (stage Loading);
@@ -90,12 +99,14 @@ namespace OpenRigs.Zapit
             {
                 if (run == null || id != watch) return;
                 var folder = run.Folder;
+                var run0 = run;
                 run = null;
                 Emit(new ZapitSetupStep
                 {
                     Stage = "Refused",
                     Detail = $"no camera frame came within {FrameTimeout.TotalSeconds} s of Pointed, so the lines are zeroed and the run is refused: {folder}",
                     Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
+                    Camera = Restore(run0),
                 });
             }
             ZapitDaqCommand PointAt(Run r) => r.Index < r.Volts.Length
@@ -119,6 +130,12 @@ namespace OpenRigs.Zapit
                         SkipFrames = (int?)json["skipFrames"] ?? 3,
                         Backgrounds = (int?)json["backgrounds"] ?? 4,
                     };
+                    if (json["camera"] is JObject camera)
+                    {
+                        r.Camera = new ZapitCameraSettings { ExposureUs = (double)camera["exposureUs"]!, GainDb = (double)camera["gainDb"]! };
+                        if (!(r.Camera.ExposureUs >= 10 && r.Camera.ExposureUs <= 1e6) || !(r.Camera.GainDb >= 0 && r.Camera.GainDb <= 48))
+                            throw new InvalidDataException("its camera exposureUs must be 10 to 1000000 and gainDb 0 to 48");
+                    }
                     if (r.Volts.Length == 0 || r.Volts.Any(p => p.Length != 2 || p.Any(v => !(Math.Abs(v) <= ZapitBank.RangeVolts))) || !(Math.Abs(r.LaserVolts) <= ZapitBank.RangeVolts) || r.SkipFrames < 0 || r.Backgrounds < 1)
                         throw new InvalidDataException("its volts must be [x, y] pairs within +/-10 V, with skipFrames from 0 and backgrounds from 1");
                     if (Directory.EnumerateFiles(folder!, "*.png").Any()) throw new InvalidDataException("the folder already holds frames");
@@ -129,7 +146,7 @@ namespace OpenRigs.Zapit
                     Refuse(grid + " is refused: " + error.Message);
                     return;
                 }
-                Emit(new ZapitSetupStep { Stage = "Pointing", Detail = run.Folder, Command = PointAt(run) });
+                Emit(new ZapitSetupStep { Stage = "Pointing", Detail = run.Folder, Command = PointAt(run), Camera = run.Camera });
             }
 
             void Still(string request)
@@ -192,10 +209,10 @@ namespace OpenRigs.Zapit
                 }
                 else
                 {
-                    var done = run.Folder;
+                    var done = run;
                     run = null;
                     watchdog.Disposable = Disposable.Empty;
-                    Emit(new ZapitSetupStep { Stage = "FramesSaved", Detail = done, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
+                    Emit(new ZapitSetupStep { Stage = "FramesSaved", Detail = done.Folder, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero }, Camera = Restore(done) });
                 }
             }
 

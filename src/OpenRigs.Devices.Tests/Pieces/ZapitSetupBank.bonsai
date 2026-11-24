@@ -30,6 +30,9 @@
       <Expression xsi:type="rx:PublishSubject" TypeArguments="t:ZapitCameraFrame">
         <rx:Name>Camera-Zapit.Data</rx:Name>
       </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="zap:ZapitCameraSettings">
+        <rx:Name>Camera-Zapit.Settings</rx:Name>
+      </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>Zapit.Commands</Name>
       </Expression>
@@ -49,8 +52,8 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitSetup.bonsai" />
     </Nodes>
     <Edges>
-      <Edge From="6" To="7" Label="Source1" />
       <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

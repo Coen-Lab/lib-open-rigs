@@ -163,6 +163,94 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual(3, rig.Steps.Count(s => s.Stage == "Refused" && s.Command == null), string.Join("; ", rig.Steps));
         }
 
+        // A grid.json camera block: the run's first step sets the grid's exposure and gain, its last puts the camera's own back.
+        [TestMethod]
+        public void AGridRunWithACameraBlockSetsItsExposureThenPutsTheCamerasBack()
+        {
+            using var rig = new Rig();
+            var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2], [-1, 0.5]], \"laserVolts\": 0.3, \"skipFrames\": 0, \"backgrounds\": 1, \"camera\": {\"exposureUs\": 2000, \"gainDb\": 0}}");
+            rig.Grids.OnNext(folder);
+            for (int i = 0; i < 4; i++) rig.Frame();
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            var camera = rig.Steps.Where(s => s.Camera != null).ToList();
+            Assert.AreEqual(2, camera.Count, string.Join("; ", rig.Steps));
+            Assert.AreSame(rig.Steps[0], camera[0], "set with the first point, before its frames");
+            Assert.AreEqual(2000.0, camera[0].Camera.ExposureUs);
+            Assert.AreEqual(0.0, camera[0].Camera.GainDb);
+            Assert.IsFalse(camera[0].Camera.Restore);
+            Assert.AreEqual("FramesSaved " + folder, camera[1].ToString());
+            Assert.IsTrue(camera[1].Camera.Restore);
+        }
+
+        // No camera block: the session's settings are left alone, as before.
+        [TestMethod]
+        public void AGridRunWithoutACameraBlockLeavesTheCameraAlone()
+        {
+            using var rig = new Rig();
+            rig.Grids.OnNext(rig.Run("Frames_T", "{\"volts\": [[1, 2]], \"laserVolts\": 0.3, \"skipFrames\": 0, \"backgrounds\": 1}"));
+            for (int i = 0; i < 3; i++) rig.Frame();
+            Assert.AreEqual("FramesSaved", rig.Steps.Last().Stage);
+            Assert.IsTrue(rig.Steps.All(s => s.Camera == null));
+        }
+
+        // A camera block out of range is refused; a run refused for a stalled camera puts the camera's settings back.
+        [TestMethod]
+        public void ABadCameraBlockIsRefusedAndAStalledRunPutsTheCameraBack()
+        {
+            using var rig = new Rig(TimeSpan.FromMilliseconds(100));
+            rig.Grids.OnNext(rig.Run("Frames_T", "{\"volts\": [[1, 2]], \"laserVolts\": 0.3, \"camera\": {\"exposureUs\": 0, \"gainDb\": 0}}"));
+            StringAssert.Contains(rig.Steps.Single().Detail, "exposureUs must be");
+            rig.Grids.OnNext(rig.Run("Frames_U", "{\"volts\": [[1, 2]], \"laserVolts\": 0.3, \"camera\": {\"exposureUs\": 2000, \"gainDb\": 0}}"));
+            var until = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < until && rig.Steps.Count(s => s.Stage == "Refused") < 2) System.Threading.Thread.Sleep(10);
+            var refused = rig.Steps.Last();
+            Assert.AreEqual("Refused", refused.Stage, string.Join("; ", rig.Steps));
+            Assert.IsTrue(refused.Camera.Restore);
+        }
+
+        sealed class Features : ICameraFeatures
+        {
+            public readonly Dictionary<string, object> Values;
+            public readonly List<string> Writes = new List<string>();
+            public Features(Dictionary<string, object> values) => Values = values;
+            public bool Has(string name) => Values.ContainsKey(name);
+            public string GetEnum(string name) => (string)Values[name];
+            public void SetEnum(string name, string value) { Writes.Add(name + "=" + value); Values[name] = value; }
+            public double GetFloat(string name) => (double)Values[name];
+            public void SetFloat(string name, double value) { Writes.Add(name + "=" + value); Values[name] = value; }
+        }
+
+        // Auto off before the fixed values; the camera's own values back, then its auto modes; a second grid keeps the first saved.
+        [TestMethod]
+        public void CameraExposureSetsFixedValuesAutoOffAndPutsBackTheSessions()
+        {
+            var camera = new Features(new Dictionary<string, object> { ["ExposureTime"] = 31000.0, ["Gain"] = 2.0, ["ExposureAuto"] = "Continuous", ["GainAuto"] = "Off" });
+            var exposure = new CameraExposure(camera);
+            exposure.Apply(new ZapitCameraSettings { ExposureUs = 2000, GainDb = 0 });
+            CollectionAssert.AreEqual(new[] { "ExposureAuto=Off", "GainAuto=Off", "ExposureTime=2000", "Gain=0" }, camera.Writes);
+            exposure.Apply(new ZapitCameraSettings { ExposureUs = 1500, GainDb = 1 });
+            exposure.Apply(new ZapitCameraSettings { Restore = true });
+            Assert.AreEqual(31000.0, camera.Values["ExposureTime"]);
+            Assert.AreEqual(2.0, camera.Values["Gain"]);
+            Assert.AreEqual("Continuous", camera.Values["ExposureAuto"]);
+            CollectionAssert.AreEqual(new[] { "ExposureTime=31000", "Gain=2", "ExposureAuto=Continuous", "GainAuto=Off" }, camera.Writes.Skip(8).ToArray());
+            camera.Writes.Clear();
+            exposure.Apply(new ZapitCameraSettings { Restore = true });
+            Assert.AreEqual(0, camera.Writes.Count, "nothing to put back twice");
+        }
+
+        // An older GigE camera's names; a camera with neither stops the workflow naming them.
+        [TestMethod]
+        public void CameraExposureTakesGigENamesAndRefusesACameraWithNone()
+        {
+            var gige = new Features(new Dictionary<string, object> { ["ExposureTimeAbs"] = 9000.0, ["GainAbs"] = 1.0 });
+            new CameraExposure(gige).Apply(new ZapitCameraSettings { ExposureUs = 2000, GainDb = 0 });
+            Assert.AreEqual(2000.0, gige.Values["ExposureTimeAbs"]);
+            var none = new CameraExposure(new Features(new Dictionary<string, object> { ["Gain"] = 0.0 }));
+            var error = Assert.ThrowsException<InvalidOperationException>(() => none.Apply(new ZapitCameraSettings { ExposureUs = 2000 }));
+            StringAssert.Contains(error.Message, "ExposureTime, ExposureTimeAbs");
+        }
+
         // Only Zero: nothing can send ZapitDaq an unchecked LoadBank.
         [TestMethod]
         public void CreateZapitDaqCommandMakesOnlyZero()

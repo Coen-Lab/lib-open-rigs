@@ -29,7 +29,7 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
 | File | Writer | Content |
 | --- | --- | --- |
-| `pending\ZapitScanner\Frames_<DT>\grid.json` | agent | `{"volts": [[x, y], ...], "laserVolts": v, "skipFrames": 3, "backgrounds": 4}`. The values come from lib_zapit `calibration_plan` (volts, and laser volts capped at `ceilingMw`). |
+| `pending\ZapitScanner\Frames_<DT>\grid.json` | agent | `{"volts": [[x, y], ...], "laserVolts": v, "skipFrames": 3, "backgrounds": 4, "camera": {"exposureUs": 2000, "gainDb": 0}}`. The values come from lib_zapit `calibration_plan` (volts, and laser volts capped at `ceilingMw`). `camera` is optional: the Zapit camera takes that exposure and gain, auto exposure and auto gain off, from the run's first point, and its session settings back once the run ends or is refused; without it the session's settings stay. |
 | `pending\ZapitScanner\Frames_<DT>\point_NNNN.png`, `background_K.png` | workflow | One lossless frame per plan point (a 4-digit, 0-based index), then the laser-off backgrounds. This is lib_zapit's frame folder. |
 | `pending\ZapitScanner\Accuracy_<DT>\` | both | The same layout, from `accuracy_plan`, for Measure Accuracy. |
 | `pending\<any>.png` | workflow | A sample still, taken with the laser off. |

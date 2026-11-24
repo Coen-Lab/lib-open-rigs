@@ -1,0 +1,126 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
+using Basler.Pylon;
+using Bonsai;
+using Bonsai.Pylon;
+
+namespace OpenRigs.Zapit
+{
+    /// <summary>The Zapit camera's exposure and gain for a grid run (auto exposure and auto gain off), or the camera's
+    /// own settings put back once the run ends.</summary>
+    public class ZapitCameraSettings
+    {
+        /// <summary>The exposure for the grid's frames, in microseconds.</summary>
+        public double ExposureUs { get; set; }
+
+        /// <summary>The gain for the grid's frames, in dB.</summary>
+        public double GainDb { get; set; }
+
+        /// <summary>True to put back the settings the camera had before the grid run (its session .pfs), not apply these.</summary>
+        public bool Restore { get; set; }
+
+        /// <summary>The settings as text, for the Zapit-Main.Setup metric's readers.</summary>
+        public override string ToString() => Restore ? "restore" : $"exposure {ExposureUs} us, gain {GainDb} dB";
+    }
+
+    /// <summary>The camera features a grid run sets, by GenICam name: a Basler camera's, or a test's.</summary>
+    internal interface ICameraFeatures
+    {
+        bool Has(string name);
+        string GetEnum(string name);
+        void SetEnum(string name, string value);
+        double GetFloat(string name);
+        void SetFloat(string name, double value);
+    }
+
+    /// <summary>Applies a grid run's exposure and gain, auto exposure and auto gain off, and puts back what the camera had.</summary>
+    internal sealed class CameraExposure
+    {
+        readonly ICameraFeatures camera;
+        Dictionary<string, object>? saved;
+
+        public CameraExposure(ICameraFeatures camera) => this.camera = camera;
+
+        /// <summary>The first of the names the camera has (USB3 cameras name it ExposureTime, older GigE ones ExposureTimeAbs).</summary>
+        string Feature(params string[] names)
+        {
+            foreach (var name in names) if (camera.Has(name)) return name;
+            throw new InvalidOperationException("The Zapit camera has none of " + string.Join(", ", names) + ", so the grid's exposure cannot be set.");
+        }
+
+        public void Apply(ZapitCameraSettings settings)
+        {
+            if (settings.Restore) { Restore(); return; }
+            var exposure = Feature("ExposureTime", "ExposureTimeAbs");
+            var gain = Feature("Gain", "GainAbs");
+            if (saved == null)
+            {
+                saved = new Dictionary<string, object> { [exposure] = camera.GetFloat(exposure), [gain] = camera.GetFloat(gain) };
+                foreach (var auto in new[] { "ExposureAuto", "GainAuto" })
+                    if (camera.Has(auto)) saved[auto] = camera.GetEnum(auto);
+            }
+            foreach (var auto in new[] { "ExposureAuto", "GainAuto" })
+                if (camera.Has(auto)) camera.SetEnum(auto, "Off");   // an auto mode left on overrides a fixed value
+            camera.SetFloat(exposure, settings.ExposureUs);
+            camera.SetFloat(gain, settings.GainDb);
+        }
+
+        void Restore()
+        {
+            if (saved == null) return;
+            foreach (var kv in saved) if (kv.Value is double value) camera.SetFloat(kv.Key, value);
+            foreach (var kv in saved) if (kv.Value is string mode) camera.SetEnum(kv.Key, mode);   // the auto modes last
+            saved = null;
+        }
+    }
+
+    /// <summary>
+    /// The Zapit camera: Bonsai.Pylon's PylonCapture (its serial number and session .pfs), whose exposure and gain the
+    /// setup phase sets for a grid run's frames while it grabs, and puts back after. PylonCapture loads its .pfs only as
+    /// the camera opens and has no exposure or gain property; its Configure hands over the opened camera, kept here.
+    /// </summary>
+    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), or the camera's own put back (Restore).")]
+    public class ZapitPylonCapture : PylonCapture
+    {
+        readonly object cameraLock = new object();
+        CameraExposure? exposure;
+
+        /// <summary>Loads the .pfs as PylonCapture does and keeps the opened camera for the settings.</summary>
+        protected override void Configure(Camera camera)
+        {
+            base.Configure(camera);
+            lock (cameraLock) exposure = new CameraExposure(new BaslerFeatures(camera.Parameters));
+        }
+
+        /// <summary>The camera's frames, with each of <paramref name="settings"/> applied to it while it grabs.</summary>
+        public IObservable<PylonDataFrame> Generate(IObservable<ZapitCameraSettings> settings) => Observable.Create<PylonDataFrame>(observer =>
+            new CompositeDisposable(
+                Generate().Finally(() => { lock (cameraLock) exposure = null; }).Subscribe(observer),
+                settings.Subscribe(s =>
+                {
+                    lock (cameraLock)
+                    {
+                        try
+                        {
+                            if (exposure == null) throw new InvalidOperationException("The Zapit camera is not open, so the grid's exposure cannot be set.");
+                            exposure.Apply(s);
+                        }
+                        catch (Exception error) { observer.OnError(error); }   // stops the workflow naming it
+                    }
+                }, observer.OnError)));
+
+        sealed class BaslerFeatures : ICameraFeatures
+        {
+            readonly IParameterCollection parameters;
+            public BaslerFeatures(IParameterCollection parameters) => this.parameters = parameters;
+            public bool Has(string name) => parameters.Contains(name) && parameters[name].IsWritable;
+            public string GetEnum(string name) => parameters[new EnumName(name)].GetValue();
+            public void SetEnum(string name, string value) => parameters[new EnumName(name)].SetValue(value);
+            public double GetFloat(string name) => parameters[new FloatName(name)].GetValue();
+            public void SetFloat(string name, double value) => parameters[new FloatName(name)].SetValue(value);
+        }
+    }
+}

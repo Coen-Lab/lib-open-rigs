@@ -53,7 +53,7 @@ namespace OpenRigs.Devices.Tests
                     builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
                 }
                 var camera = Included(Included(builder.Workflow, "OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai").Workflow, "OpenRigs.Devices:ZapitCamera.bonsai").Workflow;
-                var pylon = Nested(camera).Select(n => n.Value).OfType<CombinatorBuilder>().Single(c => c.Combinator.GetType().FullName == "Bonsai.Pylon.PylonCapture");
+                var pylon = Nested(camera).Select(n => n.Value).OfType<CombinatorBuilder>().Single(c => c.Combinator.GetType().FullName == "OpenRigs.Zapit.ZapitPylonCapture");
                 pylon.Combinator = new StandInPylonCapture();
                 builder.Workflow.Build();
                 var liveView = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<OpenRigs.LiveView.StreamDevices>().Single();
@@ -97,6 +97,14 @@ namespace OpenRigs.Devices.Tests
 
         /// <summary>Mapped from rig.yml's zapit.camera.sessionPfsPath.</summary>
         public string ParameterFile { get; set; }
+
+        /// <summary>No frames: the workflow is only built, with the grid's camera settings as its input as ZapitPylonCapture takes them.</summary>
+        /// <param name="settings">Camera-Zapit.Settings.</param>
+        /// <returns>A sequence that never produces a frame.</returns>
+        public IObservable<StandInGrab> Generate(IObservable<OpenRigs.Zapit.ZapitCameraSettings> settings)
+        {
+            return System.Reactive.Linq.Observable.Never<StandInGrab>();
+        }
 
         /// <summary>No frames: the workflow is only built.</summary>
         /// <returns>A sequence that never produces a frame.</returns>

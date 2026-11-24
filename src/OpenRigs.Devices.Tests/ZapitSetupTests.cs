@@ -17,9 +17,9 @@ using System.Xml;
 namespace OpenRigs.Devices.Tests
 {
     /// <summary>
-    /// ZapitSetup's bank load through the controller, as app-rig-control drives it (Pieces\ZapitSetupBank.bonsai, a
+    /// ZapitSetup's bank load through the controller, as the launching app drives it (Pieces\ZapitSetupBank.bonsai, a
     /// simulated ZapitDaq). The simulated load answers BankLoaded while Loading is still being passed on, so with the
-    /// metric reported after the command, Loading overwrote BankLoaded and the agent waited out its 60 s (BLUE-OPTO-2, 24 Nov 2026).
+    /// metric reported after the command, Loading overwrote BankLoaded and the agent waited out its 60 s (on a rig, 24 Nov 2026).
     /// </summary>
     [TestClass]
     public class ZapitSetupTests
