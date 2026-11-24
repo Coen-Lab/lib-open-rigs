@@ -5,7 +5,7 @@ word for word (each task's own tests hold it to them with shared_block_problems)
 The block is the lab's core (CORE_COLUMNS) with the opt-in blocks the task uses, each in its place: quietWait
 (QUIET_WAIT_COLUMNS: quietWaitSeconds) after itiSeconds, trialEnd (TRIAL_END_COLUMNS: trialEndTime, for a task whose
 response window always runs in full) after outcomeTime, optogenetics (OPTOGENETICS_COLUMNS: laserCondition, laserPointsMm,
-laserPowerMw, laserTriggerTime) after penalised, then a conditioned task's conditions (CONDITIONS_COLUMNS), stimulus (STIMULUS_COLUMNS)
+laserPowerMw, laserTriggerTime, laserOn, laserStarted) after penalised, then a conditioned task's conditions (CONDITIONS_COLUMNS), stimulus (STIMULUS_COLUMNS)
 and autoReward (AUTO_REWARD_COLUMNS) blocks, in that order. trialType and outcome are in the core by name, type and place,
 each described by its task. A task's own columns follow the block.
 
@@ -143,7 +143,7 @@ TRIAL_END_COLUMNS: List[Column] = [
 OPTOGENETICS_COLUMNS: List[Column] = [
     ("laserCondition", "int", None,
      "The Zapit condition sent to Zapit this trial (its conditions file's number, from 1), laser on or off: every trial "
-     "of an optogenetics experiment has one, so laser on is laserPowerMw > 0, not laserCondition > 0. 0 without "
+     "of an optogenetics experiment has one, so laser on is laserOn (drawn) or laserPowerMw > 0 (delivered), not laserCondition > 0. 0 without "
      "optogenetics."),
     ("laserPointsMm", "string", "mm",
      "Where Zapit aimed the laser this trial: laserCondition's points in the conditions file (Settings_ZapitConditions), "
@@ -151,15 +151,27 @@ OPTOGENETICS_COLUMNS: List[Column] = [
      "by ; (stimLocations01 with ML [1.5, -1.5] and AP [-0.7, -0.7] is -0.7 1.5;-0.7 -1.5). Filled whenever "
      "laserCondition is above 0, laser on or off (at 0 mW the galvos still move there); empty without optogenetics."),
     ("laserPowerMw", "double", "mW",
-     "Laser power sent to Zapit for this trial (the task's optogenetics.laserPowerMw), as commanded, not measured. 0 on "
-     "laser-off trials, without optogenetics, on a trial answered before its trigger, and on one ZapitDaq never "
-     "started (no Started event: its trigger was missed, or LaserOff or a stop came first), unless its outcome came "
-     "within 50 ms of the trigger, before Started could arrive (the Zapit event rows' samples settle that case)."),
+     "Laser power delivered this trial, time-averaged per point: the Zapit bank's power for the trial's condition after "
+     "the laser's maximum and rig.yml's zapit.ceilingMw (a peak) capped it (ZapitDaq's Armed event's cappedPowerMw; the "
+     "task's optogenetics.laserPowerMw on MATLAB Zapit), from calibration, not measured. Below the task's power when the "
+     "bank capped it (the Zapit event rows' powerCapped). 0 on laser-off trials, without optogenetics, on a trial answered "
+     "before its trigger, and on one ZapitDaq never started (laserStarted false: its trigger was missed, or LaserOff or a "
+     "stop came first), unless its outcome came within 50 ms of the trigger, before Started could arrive (the Zapit event "
+     "rows' samples settle that case)."),
     ("laserTriggerTime", "double", "s",
      "Harp time the workflow raised the Zapit trigger line (the laser, or at 0 mW the galvos and masking light alone): "
      "the first tick of the 1 ms Harp clock at or after laserToStimulusSeconds before the stimulus was due. NaN without "
      "optogenetics and on a trial that ended before its trigger, so a laser-off trial (a time, laserPowerMw 0) and one "
      "answered first (NaN) differ."),
+    ("laserOn", "bool", None,
+     "True when the trial drew the laser on (laserOnProbability, once trialsBeforeLaser trials are past), whether or not "
+     "it fired: a laser-off trial (false) is a control, its galvos and masking light played as on a laser trial. False "
+     "without optogenetics."),
+    ("laserStarted", "bool", None,
+     "True when ZapitDaq reported the trial's Started after its trigger by the outcome: its samples (laser, galvos and "
+     "masking light) began. A laser trial or a control with laserStarted false did not play, unless its outcome came "
+     "within 50 ms of the trigger, before Started could arrive (the Zapit event rows settle that case). A Started before "
+     "the trigger stops the workflow. False without optogenetics and on MATLAB Zapit."),
 ]
 
 CONDITIONS_COLUMNS: List[Column] = [

@@ -57,6 +57,7 @@ namespace OpenRigs.Trials
         TTrial awaitingReply;   // the trial whose StartStimulus Zapit has not yet answered
         TTrial armed;           // the last trial Zapit armed
         double armedPowerMw;    // ZapitDaq's power for it (its Armed event's CappedPowerMw)
+        double armedSeconds;    // its whole length with the ramp (its Armed event's TrialSeconds)
         int laserStarted;       // the last trial ZapitDaq reported Started: its samples were generated
 
         /// <summary>How long after the trigger ZapitDaq's Started may still be on its way: an outcome sooner logs the armed power.</summary>
@@ -179,16 +180,22 @@ namespace OpenRigs.Trials
         /// (ZapitDaqTrial.CheckArmed); a Started marks its samples generated, so only then does the trial log its power
         /// (a missed trigger ends Stopped or Zeroed with none generated, and logs 0 mW); an outcome within
         /// <see cref="StartedGraceSeconds"/> of the trigger logs the power before Started can come (the board's trigger write,
-        /// NI's start and ZapitDaq's polling), and the Zapit event rows settle it. Any other event is not the loop's.
+        /// NI's start and ZapitDaq's polling), and the Zapit event rows settle it. A Started for the armed trial before its
+        /// trigger stops the workflow (ZapitDaqTrial.StartedBeforeTrigger). Any other event is not the loop's.
         /// </summary>
         public void OnZapitEvent(ZapitDaqEvent zapit)
         {
-            if (zapit != null && zapit.Kind == ZapitDaqEventKind.Started) laserStarted = zapit.Trial;
+            if (zapit != null && zapit.Kind == ZapitDaqEventKind.Started)
+            {
+                if (armed != null && zapit.Trial == armed.TrialNumber && armed == trial && !triggered) throw ZapitDaqTrial.StartedBeforeTrigger(zapit.Trial);
+                laserStarted = zapit.Trial;
+            }
             if (zapit == null || zapit.Kind != ZapitDaqEventKind.Armed || awaitingReply == null) return;
             var asked = (IZapitTrial)awaitingReply;   // Check: every laser trial is one
             ZapitDaqTrial.CheckArmed(zapit, asked.TrialNumber, asked.LaserCondition, asked.LaserOn);
             armed = awaitingReply;
             armedPowerMw = zapit.LaserOn ? zapit.CappedPowerMw : 0;
+            armedSeconds = zapit.TrialSeconds;
             awaitingReply = null;
         }
 
@@ -322,7 +329,10 @@ namespace OpenRigs.Trials
             {
                 var duration = LaserTiming.DurationOf(trial);
                 Schedule(now + duration, TrialEventKind.TriggerOff, trial, null);
-                laserFreeAt = now + duration + laser.RampDownSeconds;
+                // ZapitDaq plays whole scan cycles and the ramp from the line's edge, after this tick: free once its whole
+                // trial has played, plus a margin for the edge and its polling (ZapitDaqTrial.FreeMarginSeconds).
+                laserFreeAt = zapitDaq ? now + Math.Max(armedSeconds, duration + laser.RampDownSeconds) + ZapitDaqTrial.FreeMarginSeconds
+                    : now + duration + laser.RampDownSeconds;
             }
             else
             {
@@ -415,7 +425,8 @@ namespace OpenRigs.Trials
                 ResponseStartTime = responseStart,
                 ResponseEndTime = responseEnd,
                 LaserTriggerTime = triggerTime,
-                LaserPowerMw = !zapitDaq ? double.NaN : triggered && armed == trial && (laserStarted == ((IZapitTrial)trial).TrialNumber || now - triggerTime < StartedGraceSeconds) ? armedPowerMw : 0,
+                LaserPowerMw = !zapitDaq ? double.NaN : triggered && armed == trial && (laserStarted == trial.TrialNumber || now - triggerTime < StartedGraceSeconds) ? armedPowerMw : 0,
+                LaserStarted = zapitDaq && triggered && armed == trial && laserStarted == trial.TrialNumber,
                 StimulusOffTime = StimulusTiming.Time(onset, timing.StimulusDurationSeconds, now, timing.ResponseToStimulusOffSeconds),
                 Now = now,
                 ResponseWindowAlwaysFull = timing.ResponseWindowAlwaysFull,

@@ -191,15 +191,15 @@ def test_each_block_sits_in_its_place_in_the_core():
     core = [name for name, _, _, _ in CORE_COLUMNS]
     assert [name for name, _, _, _ in shared_columns(())] == core
     both = [name for name, _, _, _ in shared_columns(BOTH)]
-    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-9:] == [
+    assert both[5:7] == ["itiSeconds", "quietWaitSeconds"] and both[-11:] == [
         "rewardOfferedUl", "rewarded", "penaltyTimeoutSeconds", "penaltyFlashBrightness", "penalised", "laserCondition",
-        "laserPointsMm", "laserPowerMw", "laserTriggerTime"]
-    assert len(both) == 20 and len(core) == 15
+        "laserPointsMm", "laserPowerMw", "laserTriggerTime", "laserOn", "laserStarted"]
+    assert len(both) == 22 and len(core) == 15
 
 
 def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
     names = [name for name, _, _, _ in shared_columns(("conditions", "autoReward", "stimulus", "optogenetics", "quietWait"))]
-    assert names[names.index("penalised"):] == ["penalised", "laserCondition", "laserPointsMm", "laserPowerMw", "laserTriggerTime", "trialConditionId",
+    assert names[names.index("penalised"):] == ["penalised", "laserCondition", "laserPointsMm", "laserPowerMw", "laserTriggerTime", "laserOn", "laserStarted", "trialConditionId",
                                                 "trialCombinationId", "visualInitialContrast", "visualPhaseRad", "auditoryInitialLevelDbfs",
                                                 "auditoryInitialAzimuthDeg", "auditoryInitialElevationDeg", "autoReward"]
 
@@ -207,7 +207,7 @@ def test_a_conditioned_task_s_blocks_follow_optogenetics_in_order():
 def test_a_task_without_a_block_is_held_to_the_core_alone():
     assert shared_block_problems(_block(()), ()) == []
     # A task naming a block its file lacks, or lacking one it names, is told.
-    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 19 columns are")
+    assert shared_block_problems(_block(()), ("optogenetics",))[0].startswith("the first 21 columns are")
     assert shared_block_problems(_block(BOTH), ())[0].startswith("the first 15 columns are")
 
 
@@ -225,7 +225,7 @@ def test_a_change_to_the_shared_block_is_named():
         "laserCondition is double, not int",
     ]
     reordered = dict(reversed(list(_block().items())))
-    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 20 columns are")
+    assert shared_block_problems(reordered, BOTH)[0].startswith("the first 22 columns are")
 
 
 def test_go_the_outcomes_and_the_penalty_are_checked_against_the_task(tmp_path):

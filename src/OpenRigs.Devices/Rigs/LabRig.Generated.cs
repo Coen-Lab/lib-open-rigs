@@ -4833,13 +4833,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// This rig's laser ceiling, in mW: lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.
+        /// This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("ceilingMw")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="ceilingMw")]
-        [System.ComponentModel.DescriptionAttribute("This rig\'s laser ceiling, in mW: lib_zapit caps every volts value it hands out (b" +
-            "ank, aiming, scanner calibration) at it. 0 means the laser is disabled: every la" +
-            "ser volts value is 0 V.")]
+        [System.ComponentModel.DescriptionAttribute(@"This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")]
         public double? CeilingMw
         {
             get

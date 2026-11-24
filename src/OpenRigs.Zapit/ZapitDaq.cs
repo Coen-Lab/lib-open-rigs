@@ -21,7 +21,9 @@ namespace OpenRigs.Zapit
     /// zeroed on subscribe and on unsubscribe, however the workflow stops. A Point once trials are armed, and a bank over the
     /// ceiling, are Refused (an event; the session runs on); any other refusal or DAQ error is an error. No laser sample above
     /// <see cref="LaserCeilingVolts"/> is written except by the staircase (the calibration that measures the laser curve the
-    /// ceiling comes from), and a bank holding one, or a power above <see cref="CeilingMw"/>, is refused at LoadBank. The first
+    /// ceiling comes from), and a bank holding one, built under a ceiling above <see cref="CeilingMw"/> (peak), or delivering
+    /// more average power than it asked (average), is refused at LoadBank. The simulated twin starts a trial on a Trigger
+    /// command, as the NI DAQ on its line. A trial that has played is noticed at the next Arm as well as by polling. The first
     /// trial that can stop early (until the outcome) is refused unless <see cref="EarlyStopLeadSeconds"/> reaches past the
     /// device's onboard buffer and one scan cycle, so a lead too short fails at once, not at a random early stop.
     /// </summary>
@@ -64,8 +66,8 @@ namespace OpenRigs.Zapit
         [Description("The AO sample rate, in samples per second; a bank built for another is refused.")]
         public double SampleRate { get; set; }
 
-        /// <summary>The rig's laser ceiling, in mW (rig.yml's zapit.ceilingMw). At 0, the default, the laser is disabled and ZapitDaq refuses any laser sample above 0 V, so a lost mapping fails safe.</summary>
-        [Description("The rig's laser ceiling, in mW. At 0 (the default) the laser is disabled and ZapitDaq refuses any laser sample above 0 V.")]
+        /// <summary>The rig's laser ceiling, a peak power in mW (rig.yml's zapit.ceilingMw); a bank built under a higher one is refused. At 0, the default, the laser is disabled and ZapitDaq refuses any laser sample above 0 V, so a lost mapping fails safe.</summary>
+        [Description("The rig's laser ceiling, a peak power in mW; a bank built under a higher one is refused. At 0 (the default) the laser is disabled and ZapitDaq refuses any laser sample above 0 V.")]
         public double CeilingMw { get; set; }
 
         /// <summary>The highest laser control volts (rig.yml's zapit.laserMinMaxControlVolts[1]). ZapitDaq refuses any laser sample above it or below 0 V. The default, 0, refuses any laser sample above 0 V.</summary>
@@ -111,7 +113,8 @@ namespace OpenRigs.Zapit
             };
             if (DeviceFactory == null && !Simulated && (wiring.AnalogOutputs.Any(string.IsNullOrEmpty) || string.IsNullOrEmpty(PhotodiodeChannel)))
                 throw new InvalidOperationException("ZapitDaq needs its four AO channels and the photodiode channel (rig.yml's zapit block).");
-            var device = DeviceFactory?.Invoke() ?? (Simulated ? new SimulatedZapitDevice() : CreateNi(wiring));
+            // The twin starts on the Trigger command the workflow sends with the line, so a desk run triggers as late as a rig.
+            var device = DeviceFactory?.Invoke() ?? (Simulated ? new SimulatedZapitDevice { AutoTrigger = false } : CreateNi(wiring));
             Session session;
             try { session = new Session(this, device, observer); }
             catch
@@ -139,6 +142,7 @@ namespace OpenRigs.Zapit
             public int Cycles;
             public long Samples;
             public long StopAt;
+            public double Seconds;
             public bool Started;
             public bool Stopping;
         }
@@ -181,6 +185,7 @@ namespace OpenRigs.Zapit
                             case ZapitDaqCommandKind.Zero: Finish(ZapitDaqEventKind.Zeroed); break;
                             case ZapitDaqCommandKind.Point: Point(command); break;
                             case ZapitDaqCommandKind.Staircase: Staircase(command); break;
+                            case ZapitDaqCommandKind.Trigger: (device as SimulatedZapitDevice)?.Trigger(); break;
                             default: throw new InvalidOperationException($"ZapitDaq has no command {command.Kind}.");
                         }
                     }
@@ -214,10 +219,12 @@ namespace OpenRigs.Zapit
                 {
                     if (!(loaded.CeilingMw <= node.CeilingMw))
                         throw new CeilingRefusal($"The Zapit bank was built under a {loaded.CeilingMw} mW ceiling, above rig.yml's zapit.ceilingMw ({node.CeilingMw} mW): rebuild the bank.");
-                    // The bank's ceiling_mw is its own claim: its powers and volts are held to the rig's ceiling too.
-                    var over = loaded.Conditions.SelectMany(c => c.Variants).Where(v => v.LaserOn && !(v.CappedPowerMw <= node.CeilingMw + FloatSlackMw)).Select(v => v.CappedPowerMw).DefaultIfEmpty().Max();
-                    if (over > 0)
-                        throw new CeilingRefusal($"The Zapit bank delivers {over} mW, above rig.yml's zapit.ceilingMw ({node.CeilingMw} mW): rebuild the bank.");
+                    // Like with like: ceiling_mw and ceilingMw are peak powers (above); a variant's powers are time-averaged per
+                    // point, so its delivered average is held to its asked average. The bank's ceiling_mw is its own claim: its
+                    // samples' peak is held to the rig's ceiling as volts (LaserCeilingVolts, ceilingMw through the laser curve).
+                    var raised = loaded.Conditions.SelectMany(c => c.Variants).FirstOrDefault(v => v.LaserOn && !(v.CappedPowerMw <= v.PowerMw + FloatSlackMw));
+                    if (raised != null)
+                        throw new CeilingRefusal($"The Zapit bank delivers {raised.CappedPowerMw} mW on average where {raised.PowerMw} mW was asked: rebuild the bank.");
                     RefuseLaser(new[] { loaded.MinLaserVolts, loaded.MaxLaserVolts }, "The Zapit bank's samples");
                 }
                 catch (CeilingRefusal refusal)
@@ -248,6 +255,8 @@ namespace OpenRigs.Zapit
             void Arm(ZapitDaqCommand command)
             {
                 var loaded = bank ?? throw new InvalidOperationException($"Trial {command.Trial} cannot arm: no Zapit bank is loaded.");
+                if (trial != null) Poll(trial);   // it may have started or ended since the monitor's last look
+                if (disposed) return;
                 if (trial != null && trial.Started)
                     throw new InvalidOperationException($"Trial {command.Trial} cannot arm while trial {trial.Command.Trial} still plays.");
                 if (trial != null) Finish(ZapitDaqEventKind.Stopped);   // armed but never triggered
@@ -265,13 +274,15 @@ namespace OpenRigs.Zapit
                     CheckLead(loaded);
                     leadChecked = true;
                 }
-                trial = new Trial { Command = command, Variant = variant, Cycles = cycles, Samples = samples.GetLength(1), StopAt = samples.GetLength(1) };
+                trial = new Trial { Command = command, Variant = variant, Cycles = cycles, Samples = samples.GetLength(1), StopAt = samples.GetLength(1), Seconds = samples.GetLength(1) / loaded.SampleRate };
                 Emit(TrialEvent(ZapitDaqEventKind.Armed, 0, watch.Elapsed.TotalSeconds));
             }
 
             void EarlyStop(ZapitDaqCommand command)
             {
                 if (trial == null || trial.Command.Trial != command.Trial || trial.Stopping) return;   // already over
+                Poll(trial);   // started (so it ramps) or ended since the monitor's last look
+                if (disposed || trial == null) return;
                 if (!trial.Started)
                 {
                     Finish(ZapitDaqEventKind.Stopped);
@@ -370,6 +381,7 @@ namespace OpenRigs.Zapit
                 CappedPowerMw = t.Variant.CappedPowerMw,
                 PowerCapped = t.Variant.PowerCapped,
                 Samples = t.Samples,
+                TrialSeconds = t.Seconds,
                 SamplesGenerated = generated,
                 ArmSeconds = armSeconds,
             };

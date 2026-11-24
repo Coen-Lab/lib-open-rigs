@@ -395,31 +395,32 @@ namespace OpenRigs.Trials.Tests
                 .Replace("OUTCOME_AT", outcomeAt.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         }
 
-        // ZapitDaqTrials, ForDuration: the Arm carries the duration, at the Arm event; nothing stops it at the outcome.
+        // ZapitDaqTrials, ForDuration: the Arm carries the duration, at the Arm event; nothing stops it at the outcome. Every
+        // trigger also sends ZapitDaq's Trigger (the simulated twin's edge; Audit F F4).
         [TestMethod]
         public void ZapitDaqTrialsForDurationArmsWithTheDurationAndNoStop()
         {
-            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0.5", "line set", "line clear" }, RunZapitDaq("Duration", 0, 0.6));
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0.5", "line set", "zapit Trigger trial 0", "line clear" }, RunZapitDaq("Duration", 0, 0.6));
         }
 
         // UntilOutcome: the Arm with no duration, and one EarlyStop at the outcome.
         [TestMethod]
         public void ZapitDaqTrialsUntilOutcomeStopsEarlyAtTheOutcome()
         {
-            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit EarlyStop trial 1", "line clear" }, RunZapitDaq("UntilOutcome", 10, 0.6));
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "zapit EarlyStop trial 1", "line clear" }, RunZapitDaq("UntilOutcome", 10, 0.6));
         }
 
         // No outcome and no LaserCap: LaserBackstop stops it LaserCapSeconds after the trigger on the computer's clock.
         [TestMethod]
         public void ZapitDaqTrialsUntilOutcomeWithNoOutcomeStopsAtTheBackstop()
         {
-            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit EarlyStop trial 1", "line clear" }, RunZapitDaq("UntilOutcome", 0.2, 0));
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "zapit EarlyStop trial 1", "line clear" }, RunZapitDaq("UntilOutcome", 0.2, 0));
         }
 
         [TestMethod]
         public void ZapitDaqTrialsWithoutALaserSendsNoCommand()
         {
-            CollectionAssert.AreEquivalent(new[] { "line set", "line clear" }, RunZapitDaq("None", 0, 0.6));
+            CollectionAssert.AreEquivalent(new[] { "line set", "zapit Trigger trial 0", "line clear" }, RunZapitDaq("None", 0, 0.6));
         }
     }
 }

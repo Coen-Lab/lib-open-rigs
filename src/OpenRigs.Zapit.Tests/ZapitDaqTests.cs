@@ -178,6 +178,31 @@ namespace OpenRigs.Zapit.Tests
             StringAssert.Contains(h.ErrorMessage(Arm(3, 1, true, 2.0, 0.05)), "Trial 3 cannot arm while trial 2 still plays");
         }
 
+        // Audit F F1: an Arm the moment the last trial's samples are all generated raced the monitor's 1 ms poll and stopped
+        // the workflow (30 of 30 probe runs); Arm now looks for itself. The Trigger command is the twin's line.
+        [TestMethod]
+        public void AnArmAsTheLastTrialEndsFindsItEnded()
+        {
+            for (int rep = 0; rep < 20; rep++)
+            {
+                using var h = new Harness();
+                h.Send(Load(Unpack()));
+                h.Next(ZapitDaqEventKind.BankLoaded);
+                h.Send(Arm(1, 1, true, 2.0, 0.1));
+                var armed = h.Next(ZapitDaqEventKind.Armed);
+                Assert.AreEqual(0.35, armed.TrialSeconds, 1e-12, "4 whole 25 ms cycles and the 250 ms ramp");
+                h.Now = 1.0;
+                h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Trigger });
+                h.Now = 1.001;
+                h.Next(ZapitDaqEventKind.Started);
+                h.Now = 1.0 + armed.TrialSeconds;
+                h.Send(Arm(2, 2, false, 0, 0.1));
+                Assert.IsNull(h.Error, $"rep {rep}: {h.Error?.Message}");
+                Assert.AreEqual(1, h.Next(ZapitDaqEventKind.Ended).Trial);
+                Assert.AreEqual(2, h.Next(ZapitDaqEventKind.Armed).Trial);
+            }
+        }
+
         [TestMethod]
         public void AnEarlyStopRampsThenEndsAtZeroOnLaserAndLed()
         {
@@ -361,7 +386,7 @@ namespace OpenRigs.Zapit.Tests
             var index = JObject.Parse(File.ReadAllText(path));
             index["ceiling_mw"] = 0.0;   // a bank claiming the disabled ceiling but driving the laser
             File.WriteAllText(path, index.ToString());
-            StringAssert.Contains(h.Refusal(Load(path)), "above rig.yml's zapit.ceilingMw (0 mW)");
+            StringAssert.Contains(h.Refusal(Load(path)), "but rig.yml's zapit.ceilingMw is 0 (laser disabled)");
         }
 
         // rig.yml's ceiling lowered after the bank was built: the bank's powers are not capped at it, so it is refused.
@@ -448,7 +473,7 @@ namespace OpenRigs.Zapit.Tests
         }
 
         // Audit 24 Nov 2026 L1: a bank's ceiling_mw is its own claim; a json edited to claim a lower one (the bin untouched)
-        // still delivers its powers, which the rig's ceiling refuses.
+        // still drives its peaks, which the rig's ceiling refuses as volts (ceilingMw through the laser curve).
         [TestMethod]
         public void ABankClaimingALowerCeilingThanItDeliversIsRefused()
         {
@@ -456,8 +481,24 @@ namespace OpenRigs.Zapit.Tests
             var index = JObject.Parse(File.ReadAllText(path));
             index["ceiling_mw"] = 0.5;
             File.WriteAllText(path, index.ToString());
-            using var h = new Harness(ceilingMw: 0.5);
-            StringAssert.Contains(h.Refusal(Load(path)), "above rig.yml's zapit.ceilingMw (0.5 mW)");
+            using var h = new Harness(ceilingMw: 0.5, laserCeilingVolts: 0.01);
+            StringAssert.Contains(h.Refusal(Load(path)), "above the ceiling's 0.01 V");
+        }
+
+        // Audit F F2: ceilingMw is a peak power and a variant's powers are time-averaged per point, so the old check of the
+        // capped average against the ceiling never fired. LoadBank compares like with like: the bank's ceiling with the rig's
+        // (peak), and each variant's delivered average with its asked average.
+        [TestMethod]
+        public void LoadBankComparesPeakWithPeakAndAverageWithAverage()
+        {
+            using (var h = new Harness(ceilingMw: 2.0))   // the fixture's 27 mW average under a 1e9 mW peak ceiling
+                StringAssert.Contains(h.Refusal(Load(Unpack())), "built under a 1000000000 mW ceiling, above rig.yml's zapit.ceilingMw (2 mW)");
+            var path = Unpack();
+            var index = JObject.Parse(File.ReadAllText(path));
+            index["conditions"][0]["variants"][0]["capped_power_mw"] = 3.0;   // asked 2 mW
+            File.WriteAllText(path, index.ToString());
+            using (var h = new Harness())
+                StringAssert.Contains(h.Refusal(Load(path)), "delivers 3 mW on average where 2 mW was asked");
         }
 
         // Audit C R1: the staircase measures the laser curve LaserCeilingVolts comes from, so LaserCeilingVolts (even its

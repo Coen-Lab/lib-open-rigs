@@ -60,10 +60,11 @@ namespace OpenRigs.Trials.Tests
         {
             var python = File.ReadAllText(Path.Combine(Repo(), "src", "open_rigs", "components", "zapit.py"));
             StringAssert.Contains(python, "ZAPIT_ARM_SECONDS = " + ZapitDaqTrial.ArmSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            StringAssert.Contains(python, "ZAPIT_FREE_MARGIN_SECONDS = " + ZapitDaqTrial.FreeMarginSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
-        [TestMethod]
-        public void ADrawTakesTheBanksConditionsAndPointsAndTheBankIsCheckedAtGo()
+        /// <summary>The contract bank (OpenRigs.Zapit.Tests' fixture) unpacked into a new temporary folder: its index's path.</summary>
+        internal static string UnpackBank()
         {
             var data = Path.Combine(Repo(), "src", "OpenRigs.Zapit.Tests", "Data");
             var folder = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -71,8 +72,15 @@ namespace OpenRigs.Trials.Tests
             File.Copy(Path.Combine(data, "Settings_ZapitBank_T.json"), Path.Combine(folder, "Settings_ZapitBank_T.json"));
             using (var input = new System.IO.Compression.GZipStream(File.OpenRead(Path.Combine(data, "Settings_ZapitBank_T.bin.gz")), System.IO.Compression.CompressionMode.Decompress))
             using (var output = File.Create(Path.Combine(folder, "Settings_ZapitBank_T.bin"))) input.CopyTo(output);
-            var bank = ZapitBank.Load(Path.Combine(folder, "Settings_ZapitBank_T.json"));
-            Directory.Delete(folder, true);
+            return Path.Combine(folder, "Settings_ZapitBank_T.json");
+        }
+
+        [TestMethod]
+        public void ADrawTakesTheBanksConditionsAndPointsAndTheBankIsCheckedAtGo()
+        {
+            var path = UnpackBank();
+            var bank = ZapitBank.Load(path);
+            Directory.Delete(Path.GetDirectoryName(path), true);
             var random = new Random(1);
             var conditions = new HashSet<int>();
             for (var n = 1; n <= 200; n++)

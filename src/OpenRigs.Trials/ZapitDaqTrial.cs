@@ -13,6 +13,31 @@ namespace OpenRigs.Trials
         /// long before the trigger (open_rigs.components.zapit ZAPIT_ARM_SECONDS, held equal by a test). To be measured on a rig.</summary>
         public const double ArmSeconds = 0.2;
 
+        /// <summary>How long after a timed trial's last sample is due the loop waits before arming the next, in seconds: the
+        /// trigger line's edge comes after the loop's trigger tick, so the DAQ's last sample comes after the loop's reckoning
+        /// (open_rigs.components.zapit ZAPIT_FREE_MARGIN_SECONDS, held equal by a test). The loop frees ZapitDaq at the trigger
+        /// plus the trial's whole length (its Armed event's TrialSeconds) plus this; Go's limits on laserDurationSeconds take it too.</summary>
+        public const double FreeMarginSeconds = 0.05;
+
+        /// <summary>The most a timed ZapitDaq trial outlasts its laserDurationSeconds, in seconds: up to one scan cycle more
+        /// (whole cycles), the bank's longest ramp and <see cref="FreeMarginSeconds"/>. Go's limits subtract it.</summary>
+        public static double FreeAfterLaserSeconds(ZapitBank bank)
+        {
+            if (bank == null) throw new ArgumentNullException("bank");
+            double cycle = 0;
+            foreach (var condition in bank.Conditions) cycle = Math.Max(cycle, condition.ScanCycle.Length / bank.SampleRate);
+            return cycle + bank.LongestRampSeconds + FreeMarginSeconds;
+        }
+
+        /// <summary>The stop for a Started that came before the trial's trigger: a stray edge on the trigger line, or a
+        /// device that starts at arming, would put the laser in the interval while the row says it played at the trigger.</summary>
+        public static InvalidOperationException StartedBeforeTrigger(int trialNumber)
+        {
+            return new InvalidOperationException(string.Format(
+                "ZapitDaq started trial {0} before the workflow raised its trigger, so the laser (or its masking light) played outside the trial and the workflow stopped. Check the Zapit trigger line's wiring for a stray edge.",
+                trialNumber));
+        }
+
         /// <summary>A trial's Arm command: its condition, the laser on at its power or off, for its laser duration (an
         /// ILaserDurationTrial) or until an early stop (0).</summary>
         public static ZapitDaqCommand Arm(IZapitTrial trial)
@@ -88,6 +113,19 @@ namespace OpenRigs.Trials
         public IObservable<ZapitDaqCommand> Process<TTrial>(IObservable<TTrial> source) where TTrial : IZapitTrial
         {
             return source.Select(trial => ZapitDaqTrial.Arm(trial));
+        }
+    }
+
+    /// <summary>ZapitDaq's Trigger with each trigger the loop raises: the simulated twin's edge (it has no line); the NI DAQ starts on the line and ignores it.</summary>
+    [Combinator]
+    [Description("A ZapitDaq Trigger for each input (the loop's Trigger events): the simulated twin's trigger edge, as the line's on a rig, where the NI DAQ ignores it.")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class ZapitTwinTrigger
+    {
+        /// <summary>Each input's Trigger.</summary>
+        public IObservable<ZapitDaqCommand> Process<TSource>(IObservable<TSource> source)
+        {
+            return source.Select(_ => new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Trigger });
         }
     }
 

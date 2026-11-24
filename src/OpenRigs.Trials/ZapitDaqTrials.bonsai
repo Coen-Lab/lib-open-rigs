@@ -232,6 +232,14 @@
         <Set>false</Set>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Name>TwinTrigger</Name>
+        <Description>The same trigger as ZapitDaq's Trigger command: the simulated twin's edge, so a desk run starts each trial at the loop's trigger as a rig's line does. The NI DAQ ignores it.</Description>
+        <Combinator xsi:type="trl:ZapitTwinTrigger" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -241,6 +249,8 @@
       <Edge From="5" To="6" Label="Source1" />
       <Edge From="7" To="8" Label="Source1" />
       <Edge From="8" To="9" Label="Source1" />
+      <Edge From="5" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

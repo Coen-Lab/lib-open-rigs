@@ -19,8 +19,8 @@ namespace OpenRigs.Trials
         /// <summary>The quietWait block: filled when the row has it.</summary>
         public static readonly string[] QuietWait = { "quietWaitSeconds" };
 
-        /// <summary>The optogenetics block: filled when the row has it, all four or none.</summary>
-        public static readonly string[] Optogenetics = { "laserCondition", "laserPointsMm", "laserPowerMw", "laserTriggerTime" };
+        /// <summary>The optogenetics block: filled when the row has it, all six or none.</summary>
+        public static readonly string[] Optogenetics = { "laserCondition", "laserPointsMm", "laserPowerMw", "laserTriggerTime", "laserOn", "laserStarted" };
 
         /// <summary>The trialEnd block: filled when the row has it; a row whose trial's response window always runs in full
         /// (TrialTimes.ResponseWindowAlwaysFull) must have it.</summary>
@@ -33,7 +33,8 @@ namespace OpenRigs.Trials
         /// timeout (<see cref="Penalties.For"/>: its kind's, penalty.incorrect or penalty.noResponse) when penalised, else 0; penaltyFlashBrightness its kind's
         /// flash.brightness (ResolvedPenalty.Flash) when penalised, else 0 (0: no flash played); penalised itself; with the trialEnd block, trialEndTime (TrialTimes.TrialEndTime), which a trial whose response window always runs in full must have; with the optogenetics block, the trial's laser condition, its points (IZapitTrial.LaserPointsMm,
         /// required when the condition is above 0; empty at condition 0), its power only if the
-        /// laser was triggered (else 0 mW) and the trigger's time (NaN if none), or 0, empty, 0 and NaN for a trial that is not an
+        /// laser was triggered (else 0 mW), the trigger's time (NaN if none), whether the laser was drawn on (laserOn) and whether
+        /// ZapitDaq started the trial (laserStarted, TrialTimes.LaserStarted), or 0, empty, 0, NaN, false and false for a trial that is not an
         /// IZapitTrial. Throws naming a missing or mistyped column. Returns the row.
         /// </summary>
         public static T Fill<T>(T row, ITrial trial, TrialTimes times, double rewardOfferedUl, bool rewarded, bool penalised, double penaltyTimeoutSeconds, double penaltyFlashBrightness) where T : class
@@ -74,6 +75,8 @@ namespace OpenRigs.Trials
                 values["laserPointsMm"] = points;
                 values["laserPowerMw"] = laser != null && times.LaserFired ? (double.IsNaN(times.LaserPowerMw) ? laser.LaserPowerMw : times.LaserPowerMw) : 0.0;   // answered before its trigger: no laser
                 values["laserTriggerTime"] = times.LaserTriggerTime;
+                values["laserOn"] = laser != null && laser.LaserCondition > 0 && laser.LaserOn;
+                values["laserStarted"] = times.LaserStarted;
             }
             foreach (var value in values)
             {

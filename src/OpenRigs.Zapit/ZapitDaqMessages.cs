@@ -17,6 +17,8 @@ namespace OpenRigs.Zapit
         Point,
         /// <summary>Calibration: play laser levels on the AO clock and read the photodiode on the same clock.</summary>
         Staircase,
+        /// <summary>The trigger line's rising edge for the simulated twin, which has no line; the NI DAQ starts on the line itself and ignores it.</summary>
+        Trigger,
     }
 
     /// <summary>One command to <see cref="ZapitDaq"/>. Fields a kind does not use are ignored.</summary>
@@ -134,6 +136,9 @@ namespace OpenRigs.Zapit
 
         /// <summary>The trial's samples per channel.</summary>
         public long Samples { get; set; }
+
+        /// <summary>The trial's length with its ramp, in seconds: <see cref="Samples"/> at the bank's sample rate, whole scan cycles and the tail.</summary>
+        public double TrialSeconds { get; set; }
 
         /// <summary>The samples per channel generated when the event was seen.</summary>
         public long SamplesGenerated { get; set; }

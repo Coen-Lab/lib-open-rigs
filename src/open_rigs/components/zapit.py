@@ -21,6 +21,11 @@ ZAPIT_REPLY_MARGIN_SECONDS = 0.2
 # event's ArmSeconds; OpenRigs.Trials ZapitDaqTrial.ArmSeconds). Every task on ZapitDaq arms at least this long before its
 # trigger. To be measured on a rig (a 2.8 s trial at 100 kS/s).
 ZAPIT_ARM_SECONDS = 0.2
+# How long after a timed ZapitDaq trial's last sample is due the next is armed, in seconds (OpenRigs.Trials
+# ZapitDaqTrial.FreeMarginSeconds): the trigger line's edge comes after the loop's trigger tick. The loop frees ZapitDaq at
+# the trigger plus the trial's whole length (whole scan cycles and the ramp) plus this, so a laserDurationSeconds limit
+# subtracts this, the ramp and one scan cycle.
+ZAPIT_FREE_MARGIN_SECONDS = 0.05
 # The longest Zapit ramp-down a task may ask for, in seconds (OpenRigs.Devices ZapitConditions.MaximumRampDownSeconds).
 ZAPIT_MAX_RAMP_DOWN_SECONDS = 0.5
 # The validation context key a task model reads its conditions file's largest ramp-down from (open_rigs.rigs.check_task
@@ -124,7 +129,7 @@ class Zapit(BaseSchema):
     sample_rate: Optional[float] = Field(default=None, gt=0, examples=[100000], description="AO samples a second, per channel; every bank is built at it.")
     laser_min_max_mw: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.")
     laser_min_max_control_volts: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's control volts at its lowest and highest power.")
-    ceiling_mw: Optional[float] = Field(default=None, ge=0, description="This rig's laser ceiling, in mW: lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
+    ceiling_mw: Optional[float] = Field(default=None, ge=0, description="This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
     max_trial_seconds: Optional[float] = Field(default=None, gt=0, description="The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.")
     early_stop_lead_seconds: Optional[float] = Field(default=None, gt=0, description="How far ahead of the samples generated an early stop writes its ramp, in seconds.")
     microns_per_pixel: Optional[float] = Field(default=None, gt=0, description="The Zapit camera's scale at the sample, in microns a pixel.")

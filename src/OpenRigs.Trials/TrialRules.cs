@@ -268,6 +268,10 @@ namespace OpenRigs.Trials
         /// off); NaN on MATLAB Zapit, whose trial row logs the trial's own LaserPowerMw.</summary>
         public double LaserPowerMw { get; set; } = double.NaN;
 
+        /// <summary>Gets or sets whether ZapitDaq's Started for the trial came after its trigger by Now (laserStarted): its
+        /// samples, laser on or off, began. False without ZapitDaq.</summary>
+        public bool LaserStarted { get; set; }
+
         /// <summary>Gets or sets the Harp clock's latest tick: an outcome given now is timed then (outcomeTime).</summary>
         public double Now { get; set; }
 

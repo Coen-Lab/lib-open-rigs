@@ -132,6 +132,98 @@ namespace OpenRigs.Trials.Tests
             Assert.IsTrue(LaserTiming.ForDuration(0.3).HardwareTriggered);
         }
 
+        // Audit F F1: the loop armed the next ForDuration trial at trigger + duration + ramp, while the real ZapitDaq, started
+        // by the line's edge after the loop's trigger tick, was still playing its whole cycles and ramp: the workflow stopped
+        // ("cannot arm while trial 1 still plays"). The twin is triggered from the loop's Trigger event a tick late, as a rig's
+        // edge comes after the tick. The old moment is refused; the loop's (trigger + TrialSeconds + FreeMarginSeconds) is not.
+        [TestMethod]
+        public void TheNextTimedTrialArmsOnlyOnceZapitDaqHasPlayedTheLast()
+        {
+            var bank = ZapitDaqTrialTests.UnpackBank();
+            double clock = 0;
+            var device = new SimulatedZapitDevice { AutoTrigger = false, Clock = () => System.Threading.Volatile.Read(ref clock) };
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, EarlyStopLeadSeconds = 0.05, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
+            var commands = new Subject<ZapitDaqCommand>();
+            var zapitEvents = new System.Collections.Concurrent.ConcurrentQueue<ZapitDaqEvent>();
+            Exception error = null;
+            var rules = new StubRules
+            {
+                Plan = n => new TrialTiming { ItiSeconds = 3, LaserToStimulusSeconds = 0.5, Laser = true, ResponseWindowSeconds = 30 },
+                Laser = LaserTiming.ForDuration(0.25),
+                OnLick = (t, s, x, u) => StubRules.Outcome("Lick" + s, 0, x),
+            };
+            var rig = new LoopRig(rules, zapitDaq: true);
+            using (node.Process(commands).Subscribe(zapitEvents.Enqueue, e => error = e))
+            {
+                commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.LoadBank, Path = bank });
+                Func<TrialEventKind, TrialEvent<StubTrial, string, StubOutcome>> runTo = kind =>
+                {
+                    var seen = rig.Events.Count;
+                    bool trigger = false;
+                    while (!rig.Events.Skip(seen).Any(e => e.Kind == kind) && error == null)
+                    {
+                        var before = rig.Events.Count;
+                        rig.Tick();
+                        System.Threading.Volatile.Write(ref clock, rig.Now);
+                        if (trigger) commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Trigger });   // the edge, a tick late
+                        trigger = false;
+                        foreach (var e in rig.Events.Skip(before))
+                        {
+                            if (e.Kind == TrialEventKind.Arm) commands.OnNext(ZapitDaqTrial.Arm(e.Trial));
+                            if (e.Kind == TrialEventKind.Trigger) trigger = true;
+                        }
+                        while (zapitEvents.TryDequeue(out var z)) rig.Loop.OnZapitEvent(z);
+                    }
+                    return rig.Events.Skip(seen).FirstOrDefault(e => e.Kind == kind);
+                };
+                runTo(TrialEventKind.Arm);
+                var trigger1 = runTo(TrialEventKind.Stimulus).Seconds - 0.5;
+                rig.Lick(0);
+                var next = runTo(TrialEventKind.Arm);
+                Assert.IsNull(error, error?.Message);
+                Assert.AreEqual(trigger1 + 2.75 + ZapitDaqTrial.FreeMarginSeconds, next.Seconds, 0.0015, "trigger + 100 whole 25 ms cycles and the 250 ms ramp + the margin");
+                runTo(TrialEventKind.Trigger);
+                Assert.IsNull(error, error?.Message);
+            }
+
+            // The old moment, trigger + laserDurationSeconds + ramp, with the edge a tick after the trigger tick.
+            var old = new SimulatedZapitDevice { AutoTrigger = false, Clock = () => System.Threading.Volatile.Read(ref clock) };
+            var oldNode = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, EarlyStopLeadSeconds = 0.05, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => old };
+            Exception stop = null;
+            using (oldNode.Process(commands).Subscribe(_ => { }, e => stop = e))
+            {
+                clock = 0;
+                commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.LoadBank, Path = bank });
+                commands.OnNext(ZapitDaqTrial.Arm(new StubTrial { TrialNumber = 1, LaserCondition = 1, LaserOn = true, LaserPowerMw = 2 }));
+                clock = 10.001;
+                commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Trigger });
+                clock = 10 + 2.5 + 0.25;
+                commands.OnNext(ZapitDaqTrial.Arm(new StubTrial { TrialNumber = 2, LaserCondition = 2, LaserOn = false }));
+            }
+            Assert.IsNotNull(stop, "the old moment");
+            StringAssert.Contains(stop.Message, "Trial 2 cannot arm while trial 1 still plays");
+        }
+
+        // Audit F F4: a Started before the trial's trigger (a stray edge, or a device that starts at arming) stops the
+        // workflow; after it, the row says laserStarted.
+        [TestMethod]
+        public void AStartedBeforeTheTriggerStopsTheWorkflowAndOneAfterItIsLogged()
+        {
+            var early = new LoopRig(Rules(), zapitDaq: true);
+            var arm = early.RunTo(TrialEventKind.Arm);
+            early.Armed(arm.Trial, 1.5);
+            StringAssert.Contains(Refusal(() => early.Started(arm.Trial)), "ZapitDaq started trial 1 before the workflow raised its trigger");
+
+            var rig = new LoopRig(Rules(), zapitDaq: true);
+            arm = rig.RunTo(TrialEventKind.Arm);
+            rig.Armed(arm.Trial, 1.5);
+            rig.RunTo(TrialEventKind.Trigger);
+            rig.Started(arm.Trial);
+            rig.RunTo(TrialEventKind.Stimulus);
+            rig.Lick(0);
+            Assert.IsTrue(rig.Of(TrialEventKind.Outcome).Single().Outcome.Times.LaserStarted);
+        }
+
         [TestMethod]
         public void ObserveTakesZapitDaqsEvents()
         {
