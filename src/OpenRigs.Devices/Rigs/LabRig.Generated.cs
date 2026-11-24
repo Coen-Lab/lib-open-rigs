@@ -2201,12 +2201,13 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// ADC threshold (0-255) above which Channel 0 triggers a lick, written to the board at start; left out, the board keeps its own.
+        /// Percent of the board's running baseline signal below which Channel 0 starts a lick (board default 90), written to the board at start; left out, the board keeps its own.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("channel0TriggerThreshold")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="channel0TriggerThreshold")]
-        [System.ComponentModel.DescriptionAttribute("ADC threshold (0-255) above which Channel 0 triggers a lick, written to the board" +
-            " at start; left out, the board keeps its own.")]
+        [System.ComponentModel.DescriptionAttribute("Percent of the board\'s running baseline signal below which Channel 0 starts a lic" +
+            "k (board default 90), written to the board at start; left out, the board keeps i" +
+            "ts own.")]
         public int? Channel0TriggerThreshold
         {
             get
@@ -2220,12 +2221,13 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// ADC threshold (0-255) below which Channel 0 untriggers a lick, written to the board at start; left out, the board keeps its own.
+        /// Percent of the board's running baseline signal above which Channel 0 ends a lick (board default 98), written to the board at start; left out, the board keeps its own.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("channel0UntriggerThreshold")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="channel0UntriggerThreshold")]
-        [System.ComponentModel.DescriptionAttribute("ADC threshold (0-255) below which Channel 0 untriggers a lick, written to the boa" +
-            "rd at start; left out, the board keeps its own.")]
+        [System.ComponentModel.DescriptionAttribute("Percent of the board\'s running baseline signal above which Channel 0 ends a lick " +
+            "(board default 98), written to the board at start; left out, the board keeps its" +
+            " own.")]
         public int? Channel0UntriggerThreshold
         {
             get

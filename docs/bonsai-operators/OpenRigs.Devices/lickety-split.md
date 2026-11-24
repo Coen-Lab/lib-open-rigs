@@ -11,10 +11,10 @@ The LicketySplit (`who_am_i = 1400`) is a Harp lick detector. It samples one or 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `port_name` | `str` | - | Serial port the device is connected to (e.g. `COM3`) |
-| `channel0_trigger_threshold` | `Byte` or none | none | ADC threshold (0-255) above which Channel 0 triggers a lick, written at start; left out, the board keeps its own |
-| `channel0_untrigger_threshold` | `Byte` or none | none | ADC threshold (0-255) below which Channel 0 untriggers a lick, written at start; left out, the board keeps its own |
+| `channel0_trigger_threshold` | `Byte` or none | none | Percent of the board's running baseline signal below which Channel 0 starts a lick (board default 90), written at start; left out, the board keeps its own |
+| `channel0_untrigger_threshold` | `Byte` or none | none | Percent of the board's running baseline signal above which Channel 0 ends a lick (board default 98), written at start; left out, the board keeps its own |
 
-Leave both thresholds out to keep the board's own: writing 0/0 hangs the board about 1 s after start (no heartbeats until a power cycle). Set them only from a measurement, a reading at rest and one during a touch, with the trigger between them and the untrigger below the trigger. The rig model refuses a trigger of 0, a trigger not above the untrigger, and an untrigger without a trigger. The register dump at start records the thresholds the board used.
+Leave both thresholds out to keep the board's own: writing 0/0 hangs the board about 1 s after start (no heartbeats until a power cycle). Set them only from a measurement. The firmware (`lick_detector.cpp`) compares the signal with these percentages of its running baseline: a lick starts when the signal falls below the trigger and ends when it rises above the untrigger, so the trigger is below the untrigger. The rig model refuses a trigger of 0, a trigger not below the untrigger, and an untrigger without a trigger. The register dump at start records the thresholds the board used.
 
 ### Configuration example
 
@@ -28,8 +28,8 @@ licketySplit:
   right:
     portName: COM6
     usbSerial: CHANGE-ME
-    channel0TriggerThreshold: 120   # only from a measurement, as above
-    channel0UntriggerThreshold: 60
+    channel0TriggerThreshold: 85    # only from a measurement, as above
+    channel0UntriggerThreshold: 95
 ```
 
 In Python it is `LabRig(lickety_split={"left": LicketySplit(port_name="COM5", ...)})`.

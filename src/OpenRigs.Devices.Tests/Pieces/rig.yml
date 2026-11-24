@@ -86,8 +86,8 @@ stepperDriver:
       Input1: {device: ElevationHome, side: right}
 
 # Leave channel0TriggerThreshold and channel0UntriggerThreshold out to keep the board's own thresholds. Set them
-# only from a measurement (a reading at rest and one during a touch): the trigger between them, the untrigger below
-# the trigger. 0 hangs the board.
+# only from a measurement. Both are percent of the board's running baseline signal (board defaults 90 and 98): a lick
+# starts below the trigger and ends above the untrigger, so the trigger is below the untrigger. 0 hangs the board.
 licketySplit:
   left:
     portName: COM97

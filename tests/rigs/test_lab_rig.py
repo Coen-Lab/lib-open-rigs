@@ -65,14 +65,15 @@ def test_lick_thresholds_left_out_keep_the_boards_own():
     assert rig.lickety_split["left"].channel0_trigger_threshold is None
     assert rig.lickety_split["left"].channel0_untrigger_threshold is None
     both = copy.deepcopy(RIG)
-    both["licketySplit"]["left"] = {**HARP, "channel0TriggerThreshold": 90, "channel0UntriggerThreshold": 0}
+    both["licketySplit"]["left"] = {**HARP, "channel0TriggerThreshold": 90, "channel0UntriggerThreshold": 98}
     assert LabRig.model_validate(both).lickety_split["left"].channel0_trigger_threshold == 90
 
 
 @pytest.mark.parametrize("thresholds, message", [
     # 0/0, every rig's copy of the template from 15 Nov 2026, hung the board about 1 s after start.
     ({"channel0TriggerThreshold": 0, "channel0UntriggerThreshold": 0}, "channel0TriggerThreshold is 0, and it must be above 0"),
-    ({"channel0TriggerThreshold": 50, "channel0UntriggerThreshold": 50}, "channel0TriggerThreshold 50 must be above channel0UntriggerThreshold 50"),
+    ({"channel0TriggerThreshold": 50, "channel0UntriggerThreshold": 50}, "channel0TriggerThreshold 50 must be below channel0UntriggerThreshold 50"),
+    ({"channel0TriggerThreshold": 98, "channel0UntriggerThreshold": 90}, "channel0TriggerThreshold 98 must be below channel0UntriggerThreshold 90"),
     ({"channel0UntriggerThreshold": 10}, "channel0UntriggerThreshold is 10 with no channel0TriggerThreshold"),
 ])
 def test_lick_thresholds_the_board_cannot_take_are_refused(thresholds, message):
