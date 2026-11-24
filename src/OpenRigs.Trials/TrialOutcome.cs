@@ -32,7 +32,7 @@ namespace OpenRigs.Trials
     /// (TrialOutcomeEffects and the trial loop read them). A task that sets off more at the outcome (its spouts) derives from it.
     /// </summary>
     /// <typeparam name="TRow">The task's trial row.</typeparam>
-    public class TrialOutcome<TRow> : ISpoutBiasOutcome where TRow : class
+    public class TrialOutcome<TRow> : ISpoutOutcome where TRow : class
     {
         /// <summary>
         /// The outcome of <paramref name="row"/>, whose shared block is filled: the reward, when the row is rewarded,
@@ -82,10 +82,6 @@ namespace OpenRigs.Trials
 
         /// <summary>Gets where the spouts go at the outcome in a task whose spouts move (Spouts.AtOutcome): the rewarded valve's spout alone, else both out.</summary>
         public OpenRigs.Devices.LickSpoutCommand SpoutCommand { get { return Spouts.AtOutcome(Reward); } }
-
-        /// <summary>Gets or sets the bias move the outcome makes in a task with spouts.biasCorrection on (the task's
-        /// <see cref="SpoutBias.Respond"/> of this trial), which SpoutCommands sends; null, the default, for none.</summary>
-        public OpenRigs.Devices.LickSpoutCommand? SpoutBiasCommand { get; set; }
 
         static T Get<T>(TRow row, string name)
         {

@@ -6,7 +6,7 @@ import pytest
 import yaml
 from pydantic import Field, ValidationError
 
-from open_rigs.core.task import Optogenetics, Reward, Spouts, TaskParameters
+from open_rigs.core.task import Optogenetics, Reward, TaskParameters
 from open_rigs.rigs import conditioned_task as ct
 
 
@@ -82,19 +82,6 @@ def test_a_condition_no_trial_type_matches_is_refused_naming_it():
 def test_a_condition_is_refused_naming_why(condition, message):
     with pytest.raises(ValidationError, match=message.replace("(", r"\(").replace(")", r"\)")):
         Params.model_validate(task(**condition))
-
-
-def test_a_task_with_spouts_keeps_the_bias_correction_one_per_experiment():
-    class WithSpouts(Params):
-        SESSION_FIELDS = {**Params.SESSION_FIELDS, **ct.SPOUTS_SESSION_FIELDS}
-        spouts: Spouts = Spouts(stimulus_to_spouts_in_seconds=0.0)
-
-    assert "spouts.biasCorrection" in ct.schema_extra(WithSpouts.SESSION_FIELDS, (), ())["x-session-fields"]
-    WithSpouts.model_validate(task(set={"spouts.alwaysIn": True}))  # the rest of the spouts block may change per condition
-    for path in ("spouts.biasCorrection.enabled", "spouts.biasCorrection"):
-        with pytest.raises(ValidationError, match=r"a session field \(x-session-fields: spouts.biasCorrection "):
-            WithSpouts.model_validate(task(set={path: True if path.endswith("enabled") else {"enabled": True}}))
-    assert "spouts.biasCorrection" not in ct.COMMON_SESSION_FIELDS  # a task without spouts lists nothing of them
 
 
 def test_combinations_pair_and_multiply_first_cell_fastest():

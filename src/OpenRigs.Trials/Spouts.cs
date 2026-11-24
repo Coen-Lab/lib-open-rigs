@@ -25,16 +25,6 @@ namespace OpenRigs.Trials
         LickSpoutCommand SpoutCommand { get; }
     }
 
-    /// <summary>An outcome that may carry a move of the spouts' bias offset (<see cref="SpoutBias"/>): <see cref="TrialOutcome{TRow}"/> is one.</summary>
-    public interface ISpoutBiasOutcome : ISpoutOutcome
-    {
-        /// <summary>Gets whether the trial is rewarded: its bias move waits for the end of the drink (the SpoutsOut cue).</summary>
-        bool Rewarded { get; }
-
-        /// <summary>Gets the bias move the outcome makes (BiasLeft or BiasRight, the task's <see cref="SpoutBias.Respond"/>), or null for none.</summary>
-        LickSpoutCommand? SpoutBiasCommand { get; }
-    }
-
     /// <summary>
     /// The lab's spouts block (open_rigs.core.task Spouts, the task file's spouts): the cues that move the spouts, where they
     /// go, and the block's rules, for every task whose spouts move. <see cref="SpoutCommands"/> makes the moves.
@@ -115,7 +105,7 @@ namespace OpenRigs.Trials
 
     /// <summary>Every spout move from the trial events, as LickSpoutStage takes them.</summary>
     [Combinator]
-    [Description("Every spout move, from the trial events (OpenRigs.Trials Spouts): both out at trial 1's interval start and at each SpoutsOut cue, unless the coming trial's spouts are always in (spouts.alwaysIn, the trial drawn at its interval's start); at each SpoutsIn cue the trial's SpoutsInCommand; at the outcome, unless the trial's spouts are always in, the outcome's (the rewarded spout alone, else both out). An outcome's bias move (ISpoutBiasOutcome.SpoutBiasCommand, spouts.biasCorrection) follows the outcome's own move on an unrewarded trial, and on a rewarded one waits for the SpoutsOut cue, after its own move if any, so the spout never shifts while the mouse drinks.")]
+    [Description("Every spout move, from the trial events (OpenRigs.Trials Spouts): both out at trial 1's interval start and at each SpoutsOut cue, unless the coming trial's spouts are always in (spouts.alwaysIn, the trial drawn at its interval's start); at each SpoutsIn cue the trial's SpoutsInCommand; at the outcome, unless the trial's spouts are always in, the outcome's (the rewarded spout alone, else both out).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class SpoutCommands
     {
@@ -128,29 +118,15 @@ namespace OpenRigs.Trials
             {
                 var firstIti = true;
                 ISpoutTrial coming = null;
-                LickSpoutCommand? biasAtSpoutsOut = null;
                 return source.SelectMany(e =>
                 {
-                    var moves = new List<LickSpoutCommand>(2);
                     var command = Command(e.Kind, e.Cue, e.Trial, e.Outcome, firstIti, coming);
-                    if (command.HasValue) moves.Add(command.Value);
                     if (e.Kind == TrialEventKind.Iti)
                     {
                         firstIti = false;
                         coming = e.Trial;
                     }
-                    var biased = (object)e.Outcome as ISpoutBiasOutcome;
-                    if (e.Kind == TrialEventKind.Outcome && biased != null && biased.SpoutBiasCommand.HasValue)
-                    {
-                        if (biased.Rewarded) biasAtSpoutsOut = biased.SpoutBiasCommand;
-                        else moves.Add(biased.SpoutBiasCommand.Value);
-                    }
-                    if (e.Kind == TrialEventKind.Cue && e.Cue == Spouts.OutCue && biasAtSpoutsOut.HasValue)
-                    {
-                        moves.Add(biasAtSpoutsOut.Value);
-                        biasAtSpoutsOut = null;
-                    }
-                    return moves;
+                    return command.HasValue ? new[] { command.Value } : new LickSpoutCommand[0];
                 });
             });
         }

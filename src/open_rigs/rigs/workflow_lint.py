@@ -150,7 +150,7 @@ BLOCK_SUBJECTS = {
     REWARDS: {"RewardRequests": "rx:BehaviorSubject", "RewardValves": "rx:ReplaySubject", "RewardDelivered": "rx:BehaviorSubject"},
     SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in (*SPEAKER_MIXER_SOUNDS, "LoopStimulusSounds", "StopStimulusSounds")},
     READY_GATE: {"ReadyStages": "rx:ReplaySubject", "HarpClockSet": "rx:AsyncSubject", "Ready": "rx:AsyncSubject"},
-    LICK_SPOUT_STAGE: {"LickSpoutStage.Commands": "rx:BehaviorSubject", "LickSpoutStage.BiasSettings": "rx:BehaviorSubject", "LickSpoutStage.Homed": "rx:BehaviorSubject",
+    LICK_SPOUT_STAGE: {"LickSpoutStage.Commands": "rx:BehaviorSubject", "LickSpoutStage.Moves": "rx:BehaviorSubject", "LickSpoutStage.Homed": "rx:BehaviorSubject",
                        "StepperDriver-A.Commands": "rx:BehaviorSubject", "StepperDriver-B.Commands": "rx:BehaviorSubject"},
     CLOCK_FROM_GENERATOR: {"Timestamp": "rx:BehaviorSubject"},
     CLOCK_FROM_BOARD: {"Timestamp": "rx:BehaviorSubject"},

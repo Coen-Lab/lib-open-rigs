@@ -108,44 +108,6 @@ class ResponseWindowAlwaysFull(TaskBlock):
 
 
 SPOUTS_REWARD_CONSUMPTION_SECONDS = 1.5  # OpenRigs.Trials Spouts.DefaultRewardConsumptionSeconds
-# The furthest a bias correction may move the spouts from the mouse's in position, each way, in motor steps
-# (OpenRigs.Trials SpoutBias.MaxStepsCeiling): the schema's ceiling, checked as a curriculum is edited.
-BIAS_CORRECTION_MAX_STEPS = 1000
-
-
-class BiasCorrection(TaskBlock):
-    """The spouts' bias correction (OpenRigs.Trials SpoutBias, LickSpoutStage's bias offset): the last trialsPerSide counted
-    results of left-target and of right-target trials (a side target, both spouts offered, a choice, not a repeat, laser
-    off); once both are full, after every counted response (after a move, once each side has newTrialsAfterMove new counted
-    trials), the left fraction correct less the right's above threshold moves
-    the spouts' base stepSteps toward the mouse's left (the right spout toward the midline), below minus threshold toward its
-    right, at most one move a trial and never past maxSteps either way. The offset rides on the mouse's in position, never
-    saved, and starts at 0 every experiment. One value per experiment: a trial condition may not set it (SPOUTS_SESSION_FIELDS)."""
-
-    enabled: bool = Field(default=False, description="Bias correction on: the spouts move sideways, a step at a time, toward the side the mouse neglects, until it uses both equally; off unless a curriculum stage sets it")
-    trials_per_side: int = Field(default=10, ge=1, description="Counted trials of each target side the bias is worked out from (each side's ring buffer); nothing moves until both are full")
-    threshold: float = Field(
-        default=0.3, gt=0, le=1, description="Fraction correct on the left less on the right above which the spouts move toward the mouse's left (below minus this, toward its right); above 0, at most 1"
-    )
-    step_steps: int = Field(default=100, ge=1, description="Motor steps of the base transverse axis one move shifts the spouts; at most maxSteps")
-    new_trials_after_move: int = Field(
-        default=3,
-        ge=0,
-        le=100,
-        description="After a move, the new counted trials each side takes before the bias is worked out again (the buffers are kept), so a move is judged on trials at its place; 0: after every counted response; at most 100",
-    )
-    max_steps: int = Field(
-        default=500,
-        ge=1,
-        le=BIAS_CORRECTION_MAX_STEPS,
-        description=f"The furthest all moves together may take the spouts from the mouse's in position, each way, in motor steps; at most {BIAS_CORRECTION_MAX_STEPS}",
-    )
-
-    @model_validator(mode="after")
-    def _step_within_max(self):
-        if self.step_steps > self.max_steps:
-            raise ValueError(f"bias_correction.step_steps ({self.step_steps}) is above max_steps ({self.max_steps}): one move would go past the furthest")
-        return self
 
 
 class Spouts(TaskBlock):
@@ -164,10 +126,6 @@ class Spouts(TaskBlock):
         default=SPOUTS_REWARD_CONSUMPTION_SECONDS,
         ge=0,
         description="From the next interval's start (the outcome plus any timeout) to drawing the spouts out (the SpoutsOut cue), in seconds: time to drink a reward, inside the interval, which it never delays; with any lead of the spouts before the stimulus, at most itiMinSeconds",
-    )
-    bias_correction: BiasCorrection = Field(
-        default=BiasCorrection(),
-        description="Bias correction: the spouts shifted sideways, a step at a time, toward the side the mouse neglects; a move after an unrewarded outcome at once, after a reward at the SpoutsOut cue. One value per experiment, off by default",
     )
 
     def check_fits(self, iti_min_seconds: float, stimulus_to_response_window_seconds: float) -> None:
