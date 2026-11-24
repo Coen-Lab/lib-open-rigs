@@ -192,6 +192,37 @@ namespace OpenRigs.Devices.Tests
             CollectionAssert.AreEqual(new[] { Header, "M1,30,2100,2100,3005,3100" }, File.ReadAllLines(list));
         }
 
+        [TestMethod]
+        public void AbsoluteMovesSetThePositionIgnoreReversedAndAreLimited()
+        {
+            var folder = TempFolder();
+            var stage = new LickSpoutStage { RigFile = RigFile(folder, Wiring.Replace("{0}", ", reversed: true, maxSteps: 2100")), PositionsFile = Path.Combine(folder, "none.csv"), SubjectId = "M1" };
+            var moves = new Subject<SpoutMove>();
+            var steps = new List<LickSpoutStep>();
+            stage.Process(Observable.Empty<LickSpoutCommand>(), moves).Subscribe(steps.Add);
+
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.RadialLeft, Position = 500 });
+            Assert.AreEqual(500, steps.Last().Positions.RadialLeft, "the raw step count, not flipped on a reversed axis");
+            Assert.AreEqual("M1 radialLeft=500 baseTransverse=10 radialLeft=500 radialRight=2100 elevationLeft=3000 elevationRight=3100", steps.Last().Detail);
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.RadialLeft, Position = 5000 });
+            Assert.AreEqual(2100, steps.Last().Positions.RadialLeft, "held to the axis limit");
+        }
+
+        [DataTestMethod]
+        [DataRow(5, 7)]
+        [DataRow(0, null)]
+        public void MovesSettingBothOrNeitherStepsNorPositionFail(int steps, int? position)
+        {
+            var folder = TempFolder();
+            var stage = new LickSpoutStage { RigFile = RigFile(folder), PositionsFile = Path.Combine(folder, "none.csv"), SubjectId = "M1" };
+            var moves = new Subject<SpoutMove>();
+            Exception error = null;
+            stage.Process(Observable.Empty<LickSpoutCommand>(), moves).Subscribe(_ => { }, e => error = e);
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.BaseTransverse, Steps = steps, Position = position });
+            Assert.IsInstanceOfType(error, typeof(InvalidOperationException));
+            StringAssert.Contains(error.Message, "baseTransverse");
+        }
+
         [DataTestMethod]
         [DataRow("1,2,3,4,5\n")]
         [DataRow(Header + "\nM1,1,2,3,4\n")]
