@@ -455,6 +455,23 @@ namespace OpenRigs.Trials.Tests
         }
 
         [TestMethod]
+        public void UntilStimulusOffALaserTriggeredAfterItsStimulusWentOffEndsAtTheTrigger()
+        {
+            // Triggered 0.5 s after the stimulus, which went off 0.3 s after it: LaserOff in the trigger's own tick, after it.
+            Func<TrialTiming> late = () => { var t = OffTiming(0.3, null); t.LaserToStimulusSeconds = -0.5; return t; };
+            var rig = new LoopRig(new StubRules { Plan = n => late(), Laser = LaserTiming.UntilStimulusOff(true, 0.3, 10) });
+            rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
+            var stimulus = rig.RunTo(TrialEventKind.Stimulus);
+            var trigger = rig.RunTo(TrialEventKind.Trigger);
+            Assert.AreEqual(stimulus.Seconds + 0.3, rig.Of(TrialEventKind.StimulusOff).Single().Seconds, 1e-9);
+            var laserOff = rig.Of(TrialEventKind.LaserOff).Single();
+            Assert.AreEqual(trigger.Seconds, laserOff.Seconds, 1e-12, "the stimulus already off");
+            Assert.IsTrue(rig.Events.IndexOf(laserOff) > rig.Events.IndexOf(trigger), "just after the trigger");
+            Assert.AreEqual(trigger.Seconds + 0.3, rig.RunTo(TrialEventKind.TriggerOff).Seconds, 1e-9, "the line held the hold past the trigger");
+            Assert.IsFalse(rig.Of(TrialEventKind.LaserCap).Any());
+        }
+
+        [TestMethod]
         public void UntilStimulusOffTheCapStopsALaserStillOn()
         {
             // The stimulus stays on to the answer in a 30 s window: the cap stops the laser, the trial's own 2.5 s (ILaserDurationTrial)

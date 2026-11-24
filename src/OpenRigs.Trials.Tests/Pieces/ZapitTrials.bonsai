@@ -6,7 +6,7 @@
                  xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
                  xmlns:test="clr-namespace:OpenRigs.Trials.Tests;assembly=OpenRigs.Trials.Tests"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>ZapitTrials: the ZapitTrigger line DO1, the rules at 0.1 s with a laser stopping as STOP (HARDWARE triggered, cap LASER_CAP s), then trial 1's Arm, Trigger, Outcome (at OUTCOME_AT s, none at 0), LaserOff (at LASER_OFF_AT s, none at 0) and TriggerOff as TrialEvents. The output describes ZapitCommands and BehaviorBoard-Main.Commands.</Description>
+  <Description>ZapitTrials: the ZapitTrigger line DO1, the rules at 0.1 s with a laser stopping as STOP (HARDWARE triggered, cap LASER_CAP s), then trial 1's Arm, Trigger, Outcome (at OUTCOME_AT s, none at 0), LaserOff (at LASER_OFF_AT s, none at 0), LaserCap (at LASER_CAP_AT s, none at 0) and TriggerOff as TrialEvents. The output describes ZapitCommands and BehaviorBoard-Main.Commands.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="Combinator">
@@ -26,6 +26,7 @@
           <test:OutcomeAt>OUTCOME_AT</test:OutcomeAt>
           <test:Timed>TIMED</test:Timed>
           <test:LaserOffAt>LASER_OFF_AT</test:LaserOffAt>
+          <test:LaserCapAt>LASER_CAP_AT</test:LaserCapAt>
         </Combinator>
       </Expression>
       <Expression xsi:type="rx:PublishSubject">
