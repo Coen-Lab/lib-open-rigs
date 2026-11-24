@@ -26,6 +26,7 @@ namespace OpenRigs.Trials.Tests
         public bool AlwaysFull;                                 // TrialTiming.ResponseWindowAlwaysFull
         public string LickOutcome = TrialOutcomes.Correct;   // correct rewarded, incorrect penalised with Timeout, probe neither
         public int Licks;                                    // the licks the rules were given
+        public Func<int, LickSpoutCommand?> Bias = n => null; // each trial's outcome's SpoutBiasCommand
         int drawn;
 
         public LaserTiming Laser { get { return null; } }
@@ -48,12 +49,12 @@ namespace OpenRigs.Trials.Tests
             if (!times.Responding) return null;
             var penalised = LickOutcome == TrialOutcomes.Incorrect;
             var row = new PieceRow { trialNumber = trial.TrialNumber, outcome = LickOutcome, outcomeTime = times.Now, rewarded = LickOutcome == TrialOutcomes.Correct, rewardOfferedUl = 3, penalised = penalised, penaltyTimeoutSeconds = penalised ? Timeout : 0 };
-            return new TrialOutcome<PieceRow>(row, spout == 0 ? "left" : "right", double.NaN, 10);
+            return new TrialOutcome<PieceRow>(row, spout == 0 ? "left" : "right", double.NaN, 10) { SpoutBiasCommand = Bias(trial.TrialNumber) };
         }
         public TrialOutcome<PieceRow> ResponseEnd(SpoutTrial trial, TrialTimes times)
         {
             var row = new PieceRow { trialNumber = trial.TrialNumber, outcome = TrialOutcomes.NoResponse, outcomeTime = times.Now, penalised = Timeout > 0, penaltyTimeoutSeconds = Timeout };
-            return new TrialOutcome<PieceRow>(row, "left", double.NaN, 10);
+            return new TrialOutcome<PieceRow>(row, "left", double.NaN, 10) { SpoutBiasCommand = Bias(trial.TrialNumber) };
         }
     }
 
@@ -241,6 +242,60 @@ namespace OpenRigs.Trials.Tests
             CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds 2 s exceeds itiMinSeconds 1.5 s of a combination that may come next" }, Spouts.BetweenTrialsProblems(new[] { 0.5, 0.5 }, new[] { false, false }, new[] { 1.0, 2.0 }, new[] { 1.5, 3.0 }));
             CollectionAssert.AreEqual(new[] { "spouts.rewardConsumptionSeconds 1.5 s plus the spouts' longest lead before the stimulus 1.1 s exceeds itiMinSeconds 2.5 s of a combination that may come next" }, Spouts.BetweenTrialsProblems(new[] { -1.1, 0.5 }, new[] { false, false }, new[] { 1.5, 1.0 }, new[] { 2.5, 3.0 }));
             Assert.AreEqual(0, Spouts.BetweenTrialsProblems(new[] { -1.1, 0.5 }, new[] { true, false }, new[] { 1.5, 1.0 }, new[] { 2.5, 3.0 }).Count, "an always-in combination leads nothing");
+        }
+
+        LickSpoutCommand[] MovesAt(TrialEventKind kind, int trialNumber, string cue = null)
+        {
+            return Moves().Single(m => m.Item1.Kind == kind && m.Item1.Trial.TrialNumber == trialNumber && (cue == null || m.Item1.Cue == cue)).Item2;
+        }
+
+        [TestMethod]
+        public void WithoutBiasMovesEveryEventMovesAsCommandSays()
+        {
+            // Rewards, misses and always-in trials mixed, no outcome with a bias move: each event's moves are exactly
+            // SpoutCommands.Command's, the stream as it was before bias correction.
+            Run(new SpoutRules { AlwaysIn = n => n % 4 == 3, InCommand = n => n % 2 == 0 ? LickSpoutCommand.SpoutsIn : LickSpoutCommand.RightOnly }, 160, 102.7, 110.0, 121.5, 133.3);
+            SpoutTrial coming = null;
+            var first = true;
+            foreach (var m in Moves())
+            {
+                var e = m.Item1;
+                var expected = SpoutCommands.Command(e.Kind, e.Cue, e.Trial, e.Outcome, first, coming);
+                CollectionAssert.AreEqual(expected.HasValue ? new[] { expected.Value } : new LickSpoutCommand[0], m.Item2, e.Kind + " " + e.Cue + " of trial " + e.Trial.TrialNumber);
+                if (e.Kind == TrialEventKind.Iti) { first = false; coming = e.Trial; }
+            }
+            Assert.IsTrue(events.Count(e => e.Kind == TrialEventKind.Outcome && e.Outcome.Rewarded) >= 2 && events.Count(e => e.Kind == TrialEventKind.Outcome && !e.Outcome.Rewarded) >= 3);
+        }
+
+        [TestMethod]
+        public void AnUnrewardedTrialsBiasMoveFollowsItsOutcomesMove()
+        {
+            Run(new SpoutRules { Bias = n => n == 1 ? LickSpoutCommand.BiasLeft : (LickSpoutCommand?)null }, 107);
+            CollectionAssert.AreEqual(new[] { LickSpoutCommand.SpoutsOut, LickSpoutCommand.BiasLeft }, MovesAt(TrialEventKind.Outcome, 1), "the miss draws both out, then the bias shifts them");
+            CollectionAssert.AreEqual(new[] { LickSpoutCommand.SpoutsOut }, MovesAt(TrialEventKind.Cue, 1, Spouts.OutCue));
+            Assert.AreEqual(1, Commands().Count(c => c == LickSpoutCommand.BiasLeft));
+        }
+
+        [TestMethod]
+        public void ARewardedTrialsBiasMoveWaitsForTheEndOfTheDrink()
+        {
+            Run(new SpoutRules { Bias = n => n == 1 ? LickSpoutCommand.BiasRight : (LickSpoutCommand?)null }, 104.5, 102.7);
+            CollectionAssert.AreEqual(new[] { LickSpoutCommand.LeftOnly }, MovesAt(TrialEventKind.Outcome, 1), "the rewarded spout stays in front of the mouse");
+            CollectionAssert.AreEqual(new[] { LickSpoutCommand.SpoutsOut, LickSpoutCommand.BiasRight }, MovesAt(TrialEventKind.Cue, 1, Spouts.OutCue), "after the SpoutsOut cue's own move");
+            CollectionAssert.AreEqual(new[] { LickSpoutCommand.SpoutsOut, LickSpoutCommand.SpoutsIn, LickSpoutCommand.LeftOnly, LickSpoutCommand.SpoutsOut, LickSpoutCommand.BiasRight }, Commands().ToArray());
+        }
+
+        [TestMethod]
+        public void AlwaysInSpoutsTakeTheBiasMoveAtTheSameTimesWithNoMovesOfTheirOwn()
+        {
+            Run(new SpoutRules { AlwaysIn = n => true, Bias = n => n == 1 ? LickSpoutCommand.BiasLeft : (LickSpoutCommand?)null }, 104.5, 102.7);
+            CollectionAssert.AreEqual(new LickSpoutCommand[0], MovesAt(TrialEventKind.Outcome, 1), "rewarded: nothing while the mouse drinks");
+            CollectionAssert.AreEqual(new[] { LickSpoutCommand.BiasLeft }, MovesAt(TrialEventKind.Cue, 1, Spouts.OutCue), "no SpoutsOut, the bias move still at its time");
+
+            loop = null; events.Clear(); now = 100;
+            Run(new SpoutRules { AlwaysIn = n => true, Bias = n => n == 1 ? LickSpoutCommand.BiasRight : (LickSpoutCommand?)null }, 107);
+            CollectionAssert.AreEqual(new[] { LickSpoutCommand.BiasRight }, MovesAt(TrialEventKind.Outcome, 1), "unrewarded: the spouts shift at once");
+            CollectionAssert.AreEqual(new[] { LickSpoutCommand.SpoutsIn, LickSpoutCommand.BiasRight, LickSpoutCommand.SpoutsIn }, Commands().ToArray());
         }
 
         double NextIti()
