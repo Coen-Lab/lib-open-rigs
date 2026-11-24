@@ -26,8 +26,8 @@ namespace OpenRigs.Devices
         public string Name { get; set; }
 
         /// <summary>Gets or sets how far the device's heartbeat may be from the clock, in seconds.</summary>
-        [Description("How far the device's heartbeat may be from the rig's clock, in seconds.")]
-        public double ToleranceSeconds { get; set; } = 0.5;
+        [Description("How far the device's heartbeat may be from the rig's clock, in seconds. Wide, as a device off its clock-sync cable is out by hours, while a follower's heartbeat can reach the workflow over a second late as the rig starts (-0.5 to -1.3 s on four rigs, 23-24 Nov 2026), with its data still on time.")]
+        public double ToleranceSeconds { get; set; } = 10;
 
         /// <summary>Gets or sets how many heartbeats in a row decide agreement or disagreement.</summary>
         [Description("How many heartbeats in a row decide: so many agreeing pass, so many disagreeing stop the workflow before Go or warn after it. A clock set between two beats costs one.")]
