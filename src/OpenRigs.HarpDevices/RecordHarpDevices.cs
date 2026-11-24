@@ -33,6 +33,7 @@ namespace OpenRigs.HarpDevices
         /// <summary>Initializes a new instance of the <see cref="RecordHarpDevices"/> class.</summary>
         public RecordHarpDevices()
         {
+            GroupNode.Settings<RecordHarpDevicesMark>(Workflow);
         }
 
         /// <summary>Initializes a copy with the given inner workflow (Bonsai's copies of a group).</summary>
@@ -40,6 +41,7 @@ namespace OpenRigs.HarpDevices
         public RecordHarpDevices(ExpressionBuilderGraph workflow)
             : base(workflow)
         {
+            GroupNode.Settings<RecordHarpDevicesMark>(Workflow);
         }
 
         /// <summary>Remakes the inner workflow if rig.yml or the subjects published have changed, then builds it.</summary>
@@ -64,7 +66,10 @@ namespace OpenRigs.HarpDevices
 
         // As StreamDevices: the inner workflow is one group, HarpDevices, swapped whole for a new
         // one when the plan changes (emptying it mid-build stops the build), and made inspectable
-        // in the editor's copy, where every node is wrapped in an InspectBuilder.
+        // in the editor's copy, where every node is wrapped in an InspectBuilder. The mark, always
+        // there, tells that copy: the plan is made at build, so an inner workflow with nothing else
+        // in it gave no sign, and the player showing a layout cast the plain group to InspectBuilder
+        // and stopped the workflow at Start (24 Nov 2026).
         void Generate(HarpDevicePlan plan)
         {
             var content = new ExpressionBuilderGraph();
@@ -73,8 +78,9 @@ namespace OpenRigs.HarpDevices
                 content.Add(Group(device.Name, Summary(device), Device(device)));
             }
             var workflow = Workflow;
+            var mark = GroupNode.Settings<RecordHarpDevicesMark>(workflow);
             var inspectable = workflow.Any(node => node.Value is InspectBuilder);
-            var old = workflow.ToList();
+            var old = workflow.Where(node => GroupNode.Unwrap(node.Value) != mark).ToList();
             var description = "Made from this machine's rig.yml each time the workflow is built; edits here are lost." +
                 (plan.Notes.Count > 0 ? " Notes: " + string.Join("; ", plan.Notes) + "." : "");
             var group = new ExpressionBuilderGraph();
@@ -128,6 +134,22 @@ namespace OpenRigs.HarpDevices
         static GroupWorkflowBuilder Group(string name, string description, ExpressionBuilderGraph workflow)
         {
             return new GroupWorkflowBuilder(workflow) { Name = name, Description = description };
+        }
+    }
+
+    /// <summary>
+    /// Always in RecordHarpDevices' inner workflow, so Bonsai's copies of the group wrap it like every other node and
+    /// the devices made at build are wrapped to match. Holds nothing; builds to nothing.
+    /// </summary>
+    [Description("Kept in RecordHarpDevices' inner workflow so the devices it makes at build match how Bonsai shows the group. Holds nothing.")]
+    public class RecordHarpDevicesMark : ZeroArgumentExpressionBuilder
+    {
+        /// <summary>Builds to an empty sequence.</summary>
+        /// <param name="arguments">None.</param>
+        /// <returns>An empty sequence.</returns>
+        public override Expression Build(IEnumerable<Expression> arguments)
+        {
+            return Expression.Constant(Observable.Empty<Unit>(), typeof(IObservable<Unit>));
         }
     }
 }
