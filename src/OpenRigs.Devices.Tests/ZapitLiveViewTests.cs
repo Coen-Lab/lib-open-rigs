@@ -10,7 +10,7 @@ using System.Xml;
 namespace OpenRigs.Devices.Tests
 {
     /// <summary>
-    /// The Zapit camera in the live view (BLUE-OPTO-2, 23 Nov 2026): ConnectForTaskZapitDaq and StreamDevices, built as
+    /// The Zapit camera in the live view (23 Nov 2026): ConnectForTaskZapitDaq and StreamDevices, built as
     /// a task workflow has them (Pieces\ZapitLiveView.bonsai), never run. Camera-Zapit.Data published inside the Zapit
     /// SelectMany, a subject scope of its own, was invisible to StreamDevices, which streamed nothing for it.
     /// </summary>

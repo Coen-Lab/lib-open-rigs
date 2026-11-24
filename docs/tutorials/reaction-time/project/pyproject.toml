@@ -7,9 +7,9 @@ name = "open-rigs-reaction-time"
 description = "A library that defines a open-rigs data schema for the reaction-time experiment."
 authors = [ {name = "RoboDoig", email = "a.erskine@neurogears.org"}]
 license = "MIT"
-requires-python = ">=3.11, <3.12"
+requires-python = ">=3.13, <3.14"
 classifiers = [
-    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: Microsoft :: Windows",
 ]
 version = "0.0.0-rc1"
@@ -32,7 +32,7 @@ reaction-time = "open_rigs_reaction_time.cli:main"
 
 [tool.ruff]
 line-length = 120
-target-version = 'py311'
+target-version = 'py313'
 
 [tool.ruff.lint]
 extend-select = ['Q', 'RUF100', 'C90', 'I']

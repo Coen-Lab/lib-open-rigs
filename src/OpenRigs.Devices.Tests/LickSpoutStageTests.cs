@@ -250,6 +250,19 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual(9100, state.Apply(LickSpoutCommand.RightIn, 7000, 1500).RadialRight, "an axis with no maxSteps has no limit");
         }
 
+        [TestMethod]
+        public void AReversedAxisNudgesTheOtherWay()
+        {
+            var folder = TempFolder();
+            var state = LickSpoutStage.Start(RigFile(folder, Wiring.Replace("{0}", ", reversed: true")), Path.Combine(folder, "LickSpoutPositions.csv"), "M1");
+            state.Apply(LickSpoutCommand.SpoutsIn, 150, 1500);
+            Assert.AreEqual(1850, state.Apply(LickSpoutCommand.LeftIn, 150, 1500).RadialLeft, "In takes steps off a reversed axis");
+            Assert.AreEqual(2000, state.Apply(LickSpoutCommand.LeftOut, 150, 1500).RadialLeft);
+            Assert.AreEqual(2250, state.Apply(LickSpoutCommand.RightIn, 150, 1500).RadialRight, "the others are as wired");
+            var wrong = RigFile(TempFolder(), Wiring.Replace("{0}", ", reversed: yes"));
+            StringAssert.Contains(Assert.ThrowsException<InvalidDataException>(() => LickSpoutWiring.FromRigFile(wrong)).Message, "Motor1.reversed must be true or false");
+        }
+
         static HarpMessage Switches(params int[] away)
         {
             return DigitalInputState.FromPayload(MessageType.Event, (DigitalInputStates)away.Sum(m => 1 << m));

@@ -60,7 +60,8 @@ timestampGeneratorGen3:
 
 # The lick spout stage's two Harp StepperDriver boards (OpenRigs.Devices LickSpoutStage). Its five axes are the motors
 # wired BaseTransverse, Radial and Elevation (with their side), each homed on the input of the same number. maxSteps
-# is how far a motor may go from home: the board moves it no further. A spare motor may drive anything else.
+# is how far a motor may go from home: the board moves it no further. reversed: true swaps an axis's nudges, for a
+# motor and home switch mounted at the other end. A spare motor may drive anything else.
 stepperDriver:
   a:
     portName: COM3

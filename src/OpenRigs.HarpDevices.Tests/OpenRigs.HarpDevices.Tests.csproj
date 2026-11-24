@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.HarpDevices\OpenRigs.HarpDevices.csproj" />
+    <!-- The workflow's ConfigRoot, as ReadLabRig gives it (WorkflowConfigRoot). -->
+    <ProjectReference Include="..\OpenRigs.Core\OpenRigs.Core.csproj" />
     <!-- Not a dependency of the package: a real Harp package, whose register map the record finds by WhoAmI. -->
     <PackageReference Include="Harp.Behavior" />
     <!-- Released without its device.yml: the record gets the lab's copy (RegisterMaps.LabCopies). -->

@@ -4,12 +4,9 @@
                  xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices"
                  xmlns:mf="clr-namespace:OpenRigs.Manifest;assembly=OpenRigs.Manifest"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The experiment's records, the same in every workflow that makes an experiment folder, after everything else: every controller event in WorkflowData_Events (LogControlEvents); every Harp device in rig.yml checked at Start and recorded into the experiment (OpenRigs.HarpDevices RecordHarpDevices, from rig.yml under ConfigRoot, read when the workflow is built, so ConfigRoot is a property, not the ConfigRoot subject); and manifest.json (OpenRigs.Manifest ExperimentManifest, with the workflow's IngestScript, ExpectedFiles, TrialColumns, schemas\trial-columns.yml by default, blank for a workflow with no trial log, and StreamColumns, each further log's columns file, blank by default). No run input: the manifest's outcome is the controller's phase when the workflow stops. RecordHarpDevices and ExperimentManifest find each device by its subjects published before them, so this include is the workflow's last node but StreamDevices. Rewards are not records: a workflow that gives them includes OpenRigs.Devices Rewards and its RewardValve pieces itself. Needs OpenRigs.HarpDevices and OpenRigs.Manifest in the workflow's environment.</Description>
+  <Description>The experiment's records, the same in every workflow that makes an experiment folder, after everything else: every controller event in WorkflowData_Events (LogControlEvents); every Harp device in rig.yml checked at Start and recorded into the experiment (OpenRigs.HarpDevices RecordHarpDevices, from rig.yml under the workflow's ConfigRoot, ReadLabRig's, read when the workflow is built, so ReadLabRig goes before this include); and manifest.json (OpenRigs.Manifest ExperimentManifest, with the workflow's IngestScript, ExpectedFiles, TrialColumns, schemas\trial-columns.yml by default, blank for a workflow with no trial log, and StreamColumns, each further log's columns file, blank by default). No run input: the manifest's outcome is the controller's phase when the workflow stops. RecordHarpDevices and ExperimentManifest find each device by its subjects published before them, so this include is the workflow's last node but StreamDevices. Rewards are not records: a workflow that gives them includes OpenRigs.Devices Rewards and its RewardValve pieces itself. Needs OpenRigs.HarpDevices and OpenRigs.Manifest in the workflow's environment.</Description>
   <Workflow>
     <Nodes>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="ConfigRoot" Description="The root under which each machine has its rig.yml (&lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml), the same as ReadLabRig's: read by RecordHarpDevices and ExperimentManifest when the workflow is built, so it cannot come from the ConfigRoot subject. Unset, the workflow stops at Start." />
-      </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="IngestScript" Description="The workflow's name, which the overnight copy files the experiment under." />
         <Property Name="ExpectedFiles" Description="What the experiment must leave, separated by ; (ExperimentManifest's ExpectedFiles): auto, harp and the start of each log's path, with its condition." />
@@ -19,12 +16,10 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogControlEvents.bonsai" />
       <Expression xsi:type="hd:RecordHarpDevices">
         <Name>RecordHarpDevices</Name>
-        <hd:ConfigRoot />
       </Expression>
       <Expression xsi:type="mf:ExperimentManifest">
         <Name>ExperimentManifest</Name>
         <mf:IngestScript />
-        <mf:ConfigRoot />
         <mf:ExpectedFiles />
         <mf:TrialColumns>schemas\trial-columns.yml</mf:TrialColumns>
         <mf:StreamColumns />
@@ -32,8 +27,6 @@
     </Nodes>
     <Edges>
       <Edge From="0" To="3" Label="Source1" />
-      <Edge From="1" To="4" Label="Source1" />
-      <Edge From="0" To="4" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

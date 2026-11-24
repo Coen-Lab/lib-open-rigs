@@ -18,7 +18,7 @@ https://copier.readthedocs.io/en/stable/
 Ensure the following are installed:
 
 - **Windows 10 or newer**
-- **Python >3.11 + <3.12**
+- **Python >=3.13 + <3.14**
   - Download from https://www.python.org/downloads/windows/
   - Make sure **“Add Python to PATH”** is checked during installation
 - **Git 2.27+**

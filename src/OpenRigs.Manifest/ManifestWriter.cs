@@ -136,7 +136,7 @@ namespace OpenRigs.Manifest
             foreach (var entry in Entries(configFiles))
             {
                 if (entry != RigFilesToken) { yield return entry; continue; }
-                if (string.IsNullOrWhiteSpace(configRoot)) continue;  // refused at Start (ConfigRootRefusal)
+                if (string.IsNullOrWhiteSpace(configRoot)) continue;  // never at run time: ExperimentManifest's build requires ReadLabRig's root
                 foreach (var file in RigFiles(RigDevices.PathFor(configRoot))) yield return file;
             }
         }
@@ -144,14 +144,6 @@ namespace OpenRigs.Manifest
         static IEnumerable<string> Entries(string configFiles)
         {
             return (configFiles ?? "").Split(';').Select(e => e.Trim()).Where(e => e.Length > 0);
-        }
-
-        /// <summary>Why ExperimentManifest stops at Start, or null: ConfigFiles has {RigFiles} and ConfigRoot is unset.</summary>
-        public static string ConfigRootRefusal(string configFiles, string configRoot)
-        {
-            if (!Entries(configFiles).Contains(RigFilesToken) || !string.IsNullOrWhiteSpace(configRoot)) return null;
-            return "ExperimentManifest has no ConfigRoot, the folder holding <MACHINE-NAME>\\rig.yml, so its ConfigFiles' " + RigFilesToken +
-                   " names no rig.yml: map the workflow's ConfigRoot onto it (OpenRigs.Logging's ExperimentRecords does).";
         }
 
         /// <summary>rig.yml and every file it names, as <see cref="RigFilesToken"/> expands to; just rig.yml if it cannot be read.</summary>

@@ -113,9 +113,9 @@ if ($Step -eq 'Build') {
     try { $wb = [Bonsai.WorkflowBuilder]::Serializer.Deserialize($reader) } finally { $reader.Close() }
     $rigYml = Write-FilledTemplate
     $configRoot = Join-Path $bin 'config'
-    # Every node's own copy of where rig.yml is (ResolveRigConfigDirectory, RecordHarpDevices, StreamDevices;
-    # ExperimentManifest's ConfigFiles) is typed by hand into the workflow: they must all be the same root, and
-    # each is pointed at the filled template for this build.
+    # Every copy of where rig.yml is typed into the workflow (ReadLabRig's ConfigRoot, which StreamDevices,
+    # RecordHarpDevices and ExperimentManifest take at build; ExperimentManifest's ConfigFiles) must be the same
+    # root, and each is pointed at the filled template for this build.
     $script:roots = New-Object System.Collections.Generic.List[string]
     function Redirect-ConfigRoots($graph, [bool]$record = $true) {
         foreach ($n in $graph) {
@@ -131,8 +131,7 @@ if ($Step -eq 'Build') {
             }
             # An include's workflow is not loaded before the build: its ConfigRoot is the include's own property, kept as XML until then.
             # One that takes ConfigRoot is loaded now (an embedded include is not reloaded at the build) and redirected inside,
-            # its nodes' own roots not counted, as they are the include's or set from ReadLabRig's subject: ExperimentRecords'
-            # RecordHarpDevices and ExperimentManifest.
+            # its nodes' own roots not counted, as they are the include's (ReadLabRig's WorkflowConfigRoot).
             if ($b -is [Bonsai.Expressions.IncludeWorkflowBuilder]) {
                 $p = [ComponentModel.TypeDescriptor]::GetProperties($b)['ConfigRoot']
                 if ($p) {

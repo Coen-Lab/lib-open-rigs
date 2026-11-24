@@ -17,6 +17,9 @@ namespace OpenRigs.Devices
 
         /// <summary>Gets the farthest the motor may go from its home switch, in steps, or null for no limit.</summary>
         public int? MaxSteps { get; internal set; }
+
+        /// <summary>Gets whether the axis's nudges are swapped, its motor and home switch mounted at the other end.</summary>
+        public bool Reversed { get; internal set; }
     }
 
     /// <summary>
@@ -73,7 +76,12 @@ namespace OpenRigs.Devices
                         }
                         maxSteps = steps;
                     }
-                    axes[axis] = new AxisMotor { Driver = driver, Motor = motor, MaxSteps = maxSteps };
+                    var reversed = Text(line, "reversed");
+                    if (reversed != null && reversed != "true" && reversed != "false")
+                    {
+                        throw Wrong(rigFile, name + ".reversed must be true or false");
+                    }
+                    axes[axis] = new AxisMotor { Driver = driver, Motor = motor, MaxSteps = maxSteps, Reversed = reversed == "true" };
                 }
             }
             var missing = Enumerable.Range(0, Devices.Length).Where(i => axes[i] == null).ToList();

@@ -45,7 +45,7 @@ namespace OpenRigs.Devices.Tests
         }
 
         static readonly double[][] Drift = { new[] { Now, Now }, new[] { Now + 1, Now + 1 }, new[] { Now + 2, Now + 2 },
-            new[] { Now + 3, Now + 3.6 }, new[] { Now + 4, Now + 4.7 }, new[] { Now + 5, Now + 5.8 }, new[] { Now + 6, Now + 6.9 },
+            new[] { Now + 3, Now + 13.6 }, new[] { Now + 4, Now + 14.7 }, new[] { Now + 5, Now + 15.8 }, new[] { Now + 6, Now + 16.9 },
             new[] { Now + 7, Now + 7 }, new[] { Now + 8, Now + 8 }, new[] { Now + 9, Now + 9 } };
 
         [TestMethod]
@@ -79,7 +79,17 @@ namespace OpenRigs.Devices.Tests
         {
             var run = Run(-1, Drift);
             CollectionAssert.AreEqual(new[] { Now + 2 }, run.Item1);
-            StringAssert.StartsWith(run.Item2.Message, "BehaviorBoard-Main's Harp clock is 0.8 s from the rig's clock");
+            StringAssert.StartsWith(run.Item2.Message, "BehaviorBoard-Main's Harp clock is 10.8 s from the rig's clock");
+        }
+
+        // A heartbeat reaching the workflow late as the rig starts (-0.5 to -1.3 s seen on four rigs, 23-24 Nov 2026,
+        // stopping the preflight) is no fault: the device's data is on time.
+        [TestMethod]
+        public void LateHeartbeatsAtStart_AreNoFault()
+        {
+            var run = Run(-1, new[] { Now, Now - 1.3 }, new[] { Now + 1, Now - 0.1 }, new[] { Now + 2, Now + 0.8 }, new[] { Now + 3, Now + 3 });
+            Assert.IsNull(run.Item2);
+            CollectionAssert.AreEqual(new[] { Now + 0.8, Now + 3 }, run.Item1);
         }
 
         // P1R-H1 (audit 22 Nov 2026): after Go a session already recording is worth more than its clock, so a
@@ -90,7 +100,7 @@ namespace OpenRigs.Devices.Tests
             var run = Run(1, Drift);
             Assert.IsNull(run.Item2);
             CollectionAssert.AreEqual(new[] { Now + 2, Now + 9 }, run.Item1);
-            StringAssert.StartsWith(run.Item3, "HarpClockAgrees: warning: BehaviorBoard-Main's Harp clock is 0.8 s from the rig's clock");
+            StringAssert.StartsWith(run.Item3, "HarpClockAgrees: warning: BehaviorBoard-Main's Harp clock is 10.8 s from the rig's clock");
             StringAssert.Contains(run.Item3, "check its clock-sync cable");
             Assert.AreEqual(1, run.Item3.Split(new[] { "warning:" }, StringSplitOptions.None).Length - 1, run.Item3);
         }

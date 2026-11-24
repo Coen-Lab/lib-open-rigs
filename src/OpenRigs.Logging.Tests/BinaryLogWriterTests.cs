@@ -68,6 +68,23 @@ namespace OpenRigs.Logging.Tests
         }
 
         [TestMethod]
+        public void ASparseStream_IsOnDiskWhileTheSourceRuns()
+        {
+            var path = Path.Combine(folder, "d.bin");
+            var source = new Subject<byte[]>();
+            var subscription = new BinaryLogWriter { FileName = path }.Process(source).Subscribe(_ => { });
+            source.OnNext(new byte[] { 4, 5 });
+            Func<long> length = () =>
+            {
+                try { using (var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) return s.Length; }
+                catch (IOException) { return 0; }
+            };
+            Assert.IsTrue(SpinWait.SpinUntil(() => length() == 2, TimeSpan.FromSeconds(5)), "a reader sees the bytes before Stop");
+            subscription.Dispose();
+            Assert.IsTrue(Closes(path));
+        }
+
+        [TestMethod]
         public void AFileThatExists_IsAnErrorAndTheThreadEnds()
         {
             Directory.CreateDirectory(folder);
