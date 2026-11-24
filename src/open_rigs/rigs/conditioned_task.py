@@ -48,6 +48,11 @@ COMMON_SESSION_FIELDS = {
     "optogenetics.enabled": "Zapit is connected and its conditions file loaded at Go",
     "optogenetics.zapitConditionsPath": "the conditions file loaded in Zapit and counted at Go",
 }
+# The session field of a task with the lab's spouts block (open_rigs.core.task Spouts): its SESSION_FIELDS adds it. The spouts
+# may change per condition, but the bias correction's buffers and offset run across the whole experiment.
+SPOUTS_SESSION_FIELDS = {
+    "spouts.biasCorrection": "the bias correction counts every trial of the experiment and moves the spouts across them",
+}
 # One block order for every conditioned task's model (top-level fields by alias): identity, the mix, timing, stimuli,
 # reward, penalty, optogenetics, then the task's own (block_order_problems).
 BLOCK_ORDER = ("rngSeed", "curriculum", "trialConditions", "trialStructure", "visualStimulus", "auditoryStimulus",
