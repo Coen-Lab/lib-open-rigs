@@ -30,7 +30,9 @@ namespace OpenRigs.Trials
     /// the bias is the left fraction correct less the right's: above <see cref="Threshold"/> the mouse favours the left spout,
     /// and the spouts move one <see cref="StepSteps"/> toward its left (BiasLeft: the right spout toward the midline); below
     /// minus the threshold, toward its right (BiasRight); else nothing, and the offset stays where the mouse is balanced.
-    /// At most one move a trial, none past <see cref="MaxSteps"/> either way. A new one starts at offset 0 with empty buffers.
+    /// At most one move a trial, none past <see cref="MaxSteps"/> either way. After a move the bias is not worked out again
+    /// until each side has taken <see cref="NewTrialsAfterMove"/> new counted trials (the buffers are kept), so a move is
+    /// judged on trials run at its place; 0, after every counted response. A new one starts at offset 0 with empty buffers.
     /// The task sends each move to LickSpoutStage.Commands at the time <see cref="SpoutCommands"/> gives it (the outcome's
     /// <see cref="ISpoutBiasOutcome.SpoutBiasCommand"/>), and <see cref="StageSettings"/> once to LickSpoutStage.BiasSettings.
     /// </summary>
@@ -39,21 +41,27 @@ namespace OpenRigs.Trials
         /// <summary>The furthest maxSteps may be, in steps (open_rigs.core.task BIAS_CORRECTION_MAX_STEPS).</summary>
         public const int MaxStepsCeiling = 1000;
 
+        /// <summary>The most newTrialsAfterMove may be (open_rigs.core.task BiasCorrection.new_trials_after_move).</summary>
+        public const int MaxNewTrialsAfterMove = 100;
+
         /// <summary>The words of a side target and choice.</summary>
         public const string Left = "left", Right = "right";
 
         readonly Queue<bool> left = new Queue<bool>();
         readonly Queue<bool> right = new Queue<bool>();
+        int newLeft, newRight;   // counted trials of each side since the last move
+        bool moved;
 
         /// <summary>The rule with the task's spouts.biasCorrection; throws naming any value <see cref="Problems"/> refuses.</summary>
-        public SpoutBias(int trialsPerSide, double threshold, int stepSteps, int maxSteps)
+        public SpoutBias(int trialsPerSide, double threshold, int stepSteps, int maxSteps, int newTrialsAfterMove)
         {
-            var problems = Problems(trialsPerSide, threshold, stepSteps, maxSteps);
+            var problems = Problems(trialsPerSide, threshold, stepSteps, maxSteps, newTrialsAfterMove);
             if (problems.Count > 0) throw new ArgumentException(string.Join("; ", problems));
             TrialsPerSide = trialsPerSide;
             Threshold = threshold;
             StepSteps = stepSteps;
             MaxSteps = maxSteps;
+            NewTrialsAfterMove = newTrialsAfterMove;
         }
 
         /// <summary>Gets each buffer's length: the last this many counted trials of each target side.</summary>
@@ -67,6 +75,9 @@ namespace OpenRigs.Trials
 
         /// <summary>Gets the furthest the offset may go each way, in steps.</summary>
         public int MaxSteps { get; private set; }
+
+        /// <summary>Gets the new counted trials each side takes after a move before the bias is worked out again; 0, every counted response.</summary>
+        public int NewTrialsAfterMove { get; private set; }
 
         /// <summary>Gets the offset the moves so far add up to, in steps, positive toward the mouse's left, as LickSpoutStage holds it.</summary>
         public int OffsetSteps { get; private set; }
@@ -94,7 +105,9 @@ namespace OpenRigs.Trials
             var buffer = response.Target == Left ? left : right;
             buffer.Enqueue(response.Choice == response.Target);
             if (buffer.Count > TrialsPerSide) buffer.Dequeue();
+            if (buffer == left) newLeft++; else newRight++;
             if (left.Count < TrialsPerSide || right.Count < TrialsPerSide) return null;
+            if (moved && (newLeft < NewTrialsAfterMove || newRight < NewTrialsAfterMove)) return null;
 
             // Both buffers hold TrialsPerSide, so the bias is (correct left - correct right) / TrialsPerSide, compared in counts.
             var difference = left.Count(correct => correct) - right.Count(correct => correct);
@@ -102,15 +115,18 @@ namespace OpenRigs.Trials
             var limit = Threshold * TrialsPerSide + 1e-9;
             var command = difference > limit ? LickSpoutCommand.BiasLeft : difference < -limit ? LickSpoutCommand.BiasRight : (LickSpoutCommand?)null;
             if (!command.HasValue) return null;
-            var moved = Math.Max(-MaxSteps, Math.Min(MaxSteps, OffsetSteps + (command == LickSpoutCommand.BiasLeft ? StepSteps : -StepSteps)));
-            if (moved == OffsetSteps) return null;
-            OffsetSteps = moved;
+            var offset = Math.Max(-MaxSteps, Math.Min(MaxSteps, OffsetSteps + (command == LickSpoutCommand.BiasLeft ? StepSteps : -StepSteps)));
+            if (offset == OffsetSteps) return null;
+            OffsetSteps = offset;
+            moved = true;
+            newLeft = newRight = 0;
             return command;
         }
 
         /// <summary>spouts.biasCorrection's values against their bounds, as the task schema has them: trialsPerSide 1 or more,
-        /// threshold above 0 and at most 1, maxSteps 1 to <see cref="MaxStepsCeiling"/>, stepSteps 1 to maxSteps.</summary>
-        public static List<string> Problems(int trialsPerSide, double threshold, int stepSteps, int maxSteps)
+        /// threshold above 0 and at most 1, maxSteps 1 to <see cref="MaxStepsCeiling"/>, stepSteps 1 to maxSteps,
+        /// newTrialsAfterMove 0 to <see cref="MaxNewTrialsAfterMove"/>.</summary>
+        public static List<string> Problems(int trialsPerSide, double threshold, int stepSteps, int maxSteps, int newTrialsAfterMove)
         {
             var problems = new List<string>();
             if (trialsPerSide < 1) problems.Add(string.Format("spouts.biasCorrection.trialsPerSide ({0}) must be 1 or more", trialsPerSide));
@@ -118,6 +134,7 @@ namespace OpenRigs.Trials
             if (maxSteps < 1 || maxSteps > MaxStepsCeiling) problems.Add(string.Format("spouts.biasCorrection.maxSteps ({0}) must be 1 to {1} steps", maxSteps, MaxStepsCeiling));
             if (stepSteps < 1) problems.Add(string.Format("spouts.biasCorrection.stepSteps ({0}) must be 1 or more", stepSteps));
             else if (stepSteps > maxSteps) problems.Add(string.Format("spouts.biasCorrection.stepSteps ({0}) is above maxSteps ({1}): one move would go past the furthest", stepSteps, maxSteps));
+            if (newTrialsAfterMove < 0 || newTrialsAfterMove > MaxNewTrialsAfterMove) problems.Add(string.Format("spouts.biasCorrection.newTrialsAfterMove ({0}) must be 0 to {1}", newTrialsAfterMove, MaxNewTrialsAfterMove));
             return problems;
         }
 

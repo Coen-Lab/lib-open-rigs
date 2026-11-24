@@ -248,7 +248,7 @@ def test_spouts_keys_default_and_rules():
         "alwaysIn": False,
         "stimulusToSpoutsInSeconds": 0.5,
         "rewardConsumptionSeconds": 1.5,
-        "biasCorrection": {"enabled": False, "trialsPerSide": 10, "threshold": 0.3, "stepSteps": 100, "maxSteps": 500},
+        "biasCorrection": {"enabled": False, "trialsPerSide": 10, "threshold": 0.3, "stepSteps": 100, "newTrialsAfterMove": 3, "maxSteps": 500},
     }
     spouts.check_fits(1.5, 0.5)
     with pytest.raises(ValueError, match=r"reward_consumption_seconds \(1.5 s\) is above iti_min_seconds \(1.4 s\)"):
@@ -271,15 +271,17 @@ def test_bias_correction_keys_defaults_and_bounds():
     assert on.bias_correction.enabled and on.bias_correction.step_steps == 50 and on.bias_correction.trials_per_side == 10
     assert task.BIAS_CORRECTION_MAX_STEPS == 1000  # OpenRigs.Trials SpoutBias.MaxStepsCeiling
     for refused in ({"trialsPerSide": 0}, {"threshold": 0}, {"threshold": 1.01}, {"stepSteps": 0}, {"maxSteps": 0}, {"maxSteps": 1001},
-                    {"stepSteps": 600}, {"threshold": float("nan")}):
+                    {"stepSteps": 600}, {"threshold": float("nan")}, {"newTrialsAfterMove": -1}, {"newTrialsAfterMove": 101}):
         with pytest.raises(ValidationError):
             BiasCorrection.model_validate(refused)
-    BiasCorrection.model_validate({"threshold": 1, "trialsPerSide": 1, "stepSteps": 1000, "maxSteps": 1000})
+    BiasCorrection.model_validate({"threshold": 1, "trialsPerSide": 1, "stepSteps": 1000, "maxSteps": 1000, "newTrialsAfterMove": 0})
+    assert BiasCorrection.model_validate({"newTrialsAfterMove": 100}).new_trials_after_move == 100
     schema = Spouts.model_json_schema(by_alias=True)
     fields = schema["$defs"]["BiasCorrection"]["properties"]
     assert fields["maxSteps"]["maximum"] == 1000 and fields["maxSteps"]["minimum"] == 1
     assert fields["threshold"]["exclusiveMinimum"] == 0 and fields["threshold"]["maximum"] == 1
     assert fields["trialsPerSide"]["minimum"] == 1 and fields["stepSteps"]["minimum"] == 1
+    assert fields["newTrialsAfterMove"]["minimum"] == 0 and fields["newTrialsAfterMove"]["maximum"] == 100
 
 
 def test_stimulus_timing_keys_default_and_rules():

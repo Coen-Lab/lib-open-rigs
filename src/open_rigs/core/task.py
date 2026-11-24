@@ -116,7 +116,8 @@ BIAS_CORRECTION_MAX_STEPS = 1000
 class BiasCorrection(TaskBlock):
     """The spouts' bias correction (OpenRigs.Trials SpoutBias, LickSpoutStage's bias offset): the last trialsPerSide counted
     results of left-target and of right-target trials (a side target, both spouts offered, a choice, not a repeat, laser
-    off); once both are full, after every counted response, the left fraction correct less the right's above threshold moves
+    off); once both are full, after every counted response (after a move, once each side has newTrialsAfterMove new counted
+    trials), the left fraction correct less the right's above threshold moves
     the spouts' base stepSteps toward the mouse's left (the right spout toward the midline), below minus threshold toward its
     right, at most one move a trial and never past maxSteps either way. The offset rides on the mouse's in position, never
     saved, and starts at 0 every experiment. One value per experiment: a trial condition may not set it (SPOUTS_SESSION_FIELDS)."""
@@ -127,6 +128,12 @@ class BiasCorrection(TaskBlock):
         default=0.3, gt=0, le=1, description="Fraction correct on the left less on the right above which the spouts move toward the mouse's left (below minus this, toward its right); above 0, at most 1"
     )
     step_steps: int = Field(default=100, ge=1, description="Motor steps of the base transverse axis one move shifts the spouts; at most maxSteps")
+    new_trials_after_move: int = Field(
+        default=3,
+        ge=0,
+        le=100,
+        description="After a move, the new counted trials each side takes before the bias is worked out again (the buffers are kept), so a move is judged on trials at its place; 0: after every counted response; at most 100",
+    )
     max_steps: int = Field(
         default=500,
         ge=1,
