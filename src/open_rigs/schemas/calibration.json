@@ -1,7 +1,7 @@
 {
   "$defs": {
     "CalibrationCurve": {
-      "description": "A calibration measured as pairs, such as valve opening time against delivered volume.\n\nWritten by the platform's DispenseCalibration procedure (valves, pumps) and read by a rig\nwhose configuration points a CalibratedPulse at it; the rig fits the points at startup.",
+      "description": "A calibration measured as pairs, such as valve opening time against volume per pulse, with its linear fit.\n\nThe fit is made in Python when the curve is written; a rig whose configuration points a\nCalibratedPulse at the file reads `linear_fit` and `pulse_gap_ms`, never the points.",
       "properties": {
         "calibratedAt": {
           "description": "When the calibration was measured, in UTC.",
@@ -15,7 +15,7 @@
           "type": "string"
         },
         "machineName": {
-          "description": "Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.",
+          "description": "Name of the machine the calibration was measured on.",
           "title": "MachineName",
           "type": "string"
         },
@@ -58,13 +58,24 @@
           "type": "string"
         },
         "points": {
-          "description": "Measured pairs; the fit is done at load, not stored.",
+          "description": "Measured pairs, kept as the record of what was weighed.",
           "items": {
             "$ref": "#/$defs/CalibrationPoint"
           },
           "minItems": 2,
           "title": "Points",
           "type": "array"
+        },
+        "pulseGapMs": {
+          "description": "Off-to-on time between the pulses of each sample, in milliseconds; a rig fires at the same gap.",
+          "maximum": 65535,
+          "minimum": 0,
+          "title": "PulseGapMs",
+          "type": "integer"
+        },
+        "linearFit": {
+          "$ref": "#/$defs/LinearFit",
+          "description": "The line fitted to the points, which a rig plans with."
         },
         "payloadPath": {
           "anyOf": [
@@ -89,23 +100,12 @@
         "xUnit",
         "yName",
         "yUnit",
-        "points"
+        "points",
+        "pulseGapMs",
+        "linearFit"
       ],
       "title": "CalibrationCurve",
       "type": "object"
-    },
-    "CalibrationModel": {
-      "description": "How a calibration curve is derived from its points; the `OpenRigs.Core.CalibrationModel` operators' enum.",
-      "enum": [
-        "LinearFit",
-        "PolynomialFit",
-        "Linear",
-        "CubicSpline",
-        "Step"
-      ],
-      "title": "CalibrationModel",
-      "type": "string",
-      "x-sgen-typename": "OpenRigs.Core.CalibrationModel"
     },
     "CalibrationPoint": {
       "description": "One measured pair of a calibration curve.",
@@ -129,7 +129,7 @@
       "type": "object"
     },
     "DispenseCalibration": {
-      "description": "What an experiment repository commits as `config/<dispenser>-calibration.yml`.\n\n`OpenRigs.Core:DispenseCalibration.bonsai` deserialises it with the Core `DeserializeFromYaml`\nand runs the procedure; the balance port is set on the workflow at run time.",
+      "description": "What an experiment repository commits as `config/<dispenser>-calibration.yml`.\n\nA calibration workflow deserialises it with the Core `DeserializeFromYaml` and runs the\nprocedure; the balance port is set on the workflow at run time.",
       "properties": {
         "procedure": {
           "$ref": "#/$defs/DispenseProcedure",
@@ -146,9 +146,9 @@
             "writeBufferSize": 2048,
             "tareCommand": "T",
             "printCommand": "IP",
-            "printPeriodS": 0.5,
-            "bootDelayS": 0.5,
-            "tareDelayS": 1.5,
+            "printPeriodSeconds": 0.5,
+            "bootDelaySeconds": 0.5,
+            "tareDelaySeconds": 1.5,
             "unitSuffix": "g",
             "unstableMarker": "?",
             "ignore": "ES"
@@ -164,10 +164,10 @@
       "type": "object"
     },
     "DispenseProcedure": {
-      "description": "Settings of the dispense calibration: fire known sizes, weigh the gain, write a CalibrationCurve.\n\nRun by `OpenRigs.Core:DispenseCalibration.bonsai`. Subjects are declared to wire in a rig's own hardware",
+      "description": "Settings of the dispense calibration: fire known pulse widths, weigh the gain, write a CalibrationCurve.\n\nRun by a calibration workflow; the fit is done afterwards in Python and written into the CalibrationCurve.",
       "properties": {
         "samples": {
-          "description": "Sizes to measure, each fired and weighed in turn.",
+          "description": "Pulse widths to measure, each fired and weighed in turn.",
           "items": {
             "$ref": "#/$defs/DispenseSample"
           },
@@ -181,12 +181,6 @@
           "title": "XName",
           "type": "string"
         },
-        "xUnit": {
-          "default": "ms",
-          "description": "Unit of the sizes.",
-          "title": "XUnit",
-          "type": "string"
-        },
         "primingPulses": {
           "default": 5,
           "description": "Pulses fired before the baseline weighing to fill the line.",
@@ -194,7 +188,7 @@
           "title": "PrimingPulses",
           "type": "integer"
         },
-        "primingSize": {
+        "primingPulseWidthMs": {
           "anyOf": [
             {
               "maximum": 65535,
@@ -206,8 +200,8 @@
             }
           ],
           "default": null,
-          "description": "Size of the priming pulses; the largest sample size when unset.",
-          "title": "PrimingSize"
+          "description": "Width of the priming pulses, in milliseconds; the largest sample's when unset.",
+          "title": "PrimingPulseWidthMs"
         },
         "densityGPerMl": {
           "default": 1.0,
@@ -216,38 +210,19 @@
           "title": "DensityGPerMl",
           "type": "number"
         },
-        "settleWindow": {
+        "settleReadings": {
           "default": 10,
           "description": "Consecutive stable readings, after the last pulse, before a weight is taken.",
           "minimum": 1,
-          "title": "SettleWindow",
+          "title": "SettleReadings",
           "type": "integer"
         },
-        "weighTimeoutS": {
+        "weighTimeoutSeconds": {
           "default": 60.0,
           "description": "Fail if the balance has not settled within this time, in seconds.",
           "exclusiveMinimum": 0,
-          "title": "WeighTimeoutS",
+          "title": "WeighTimeoutSeconds",
           "type": "number"
-        },
-        "fit": {
-          "$ref": "#/$defs/CalibrationModel",
-          "default": "LinearFit",
-          "description": "Model fitted to the points for the acceptance report; the artefact stores the points, not the fit.",
-          "title": "Fit"
-        },
-        "fitOrder": {
-          "default": 2,
-          "description": "Polynomial order; used by PolynomialFit only.",
-          "minimum": 1,
-          "title": "FitOrder",
-          "type": "integer"
-        },
-        "requireMonotone": {
-          "default": true,
-          "description": "Refuse to write a curve that is not monotone in either direction, since a rig inverts it to look a volume up.",
-          "title": "RequireMonotone",
-          "type": "boolean"
         }
       },
       "required": [
@@ -257,36 +232,74 @@
       "type": "object"
     },
     "DispenseSample": {
-      "description": "One size to measure: the dispenser fires `repeats` times at it and the gain is weighed once.\n    ",
+      "description": "One pulse width to measure: the valve fires `pulses` pulses of it and the gain is weighed once.\n    ",
       "properties": {
-        "size": {
-          "description": "The size to fire, in the procedure's x unit: milliseconds for a valve, steps for a pump.",
+        "pulseWidthMs": {
+          "description": "The width of each pulse fired, in milliseconds.",
           "exclusiveMinimum": 0,
           "maximum": 65535,
           "minimum": 0,
-          "title": "Size",
+          "title": "PulseWidthMs",
           "type": "integer"
         },
-        "repeats": {
+        "pulses": {
           "default": 10,
-          "description": "Pulses fired at this size before the gain is weighed.",
+          "description": "Pulses fired at this width before the gain is weighed.",
           "minimum": 1,
-          "title": "Repeats",
+          "title": "Pulses",
           "type": "integer"
         },
-        "interPulseIntervalMs": {
+        "pulseGapMs": {
           "default": 500,
-          "description": "Gap between consecutive pulses, in milliseconds; long enough for the valve to seat.",
+          "description": "Off-to-on time between consecutive pulses, in milliseconds; long enough for the valve to seat.",
           "maximum": 65535,
           "minimum": 0,
-          "title": "InterPulseIntervalMs",
+          "title": "PulseGapMs",
           "type": "integer"
         }
       },
       "required": [
-        "size"
+        "pulseWidthMs"
       ],
       "title": "DispenseSample",
+      "type": "object"
+    },
+    "LinearFit": {
+      "description": "A straight line fitted to a curve's points: y = slope * x + intercept, valid from `min_x` to `max_x`.\n\nFor a valve, x is the pulse width in ms and y the volume per pulse in ul; a rig plans pulses only\ninside the range.",
+      "properties": {
+        "slope": {
+          "description": "y per unit of x, such as ul per ms of pulse width.",
+          "exclusiveMinimum": 0,
+          "title": "Slope",
+          "type": "number"
+        },
+        "intercept": {
+          "description": "y at x = 0, in the unit of y.",
+          "title": "Intercept",
+          "type": "number"
+        },
+        "minX": {
+          "description": "Smallest x the fit is valid for, such as the shortest pulse width measured.",
+          "maximum": 65535,
+          "minimum": 0,
+          "title": "MinX",
+          "type": "integer"
+        },
+        "maxX": {
+          "description": "Largest x the fit is valid for, such as the longest pulse width measured.",
+          "maximum": 65535,
+          "minimum": 0,
+          "title": "MaxX",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "slope",
+        "intercept",
+        "minX",
+        "maxX"
+      ],
+      "title": "LinearFit",
       "type": "object"
     },
     "MeshMap": {
@@ -304,7 +317,7 @@
           "type": "string"
         },
         "machineName": {
-          "description": "Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.",
+          "description": "Name of the machine the calibration was measured on.",
           "title": "MachineName",
           "type": "string"
         },
@@ -396,25 +409,25 @@
           "title": "PrintCommand",
           "type": "string"
         },
-        "printPeriodS": {
+        "printPeriodSeconds": {
           "default": 0.5,
           "description": "How often a reading is requested, in seconds.",
           "exclusiveMinimum": 0,
-          "title": "PrintPeriodS",
+          "title": "PrintPeriodSeconds",
           "type": "number"
         },
-        "bootDelayS": {
+        "bootDelaySeconds": {
           "default": 0.5,
           "description": "Wait after opening the port before taring, in seconds.",
           "minimum": 0,
-          "title": "BootDelayS",
+          "title": "BootDelaySeconds",
           "type": "number"
         },
-        "tareDelayS": {
+        "tareDelaySeconds": {
           "default": 1.5,
           "description": "Wait after taring before the first reading is requested, in seconds.",
           "minimum": 0,
-          "title": "TareDelayS",
+          "title": "TareDelaySeconds",
           "type": "number"
         },
         "unitSuffix": {
@@ -454,7 +467,7 @@
           "type": "string"
         },
         "machineName": {
-          "description": "Name of the machine the calibration was measured on. A rig warns when it is not the machine it runs on.",
+          "description": "Name of the machine the calibration was measured on.",
           "title": "MachineName",
           "type": "string"
         },

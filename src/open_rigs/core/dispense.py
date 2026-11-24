@@ -13,8 +13,8 @@ from open_rigs.devices.serial_balance import SerialBalance
 class DispenseCalibration(CalibrationSchema):
     """What an experiment repository commits as `config/<dispenser>-calibration.yml`.
 
-    `OpenRigs.Core:DispenseCalibration.bonsai` deserialises it with the Core `DeserializeFromYaml`
-    and runs the procedure; the balance port is set on the workflow at run time.
+    A calibration workflow deserialises it with the Core `DeserializeFromYaml` and runs the
+    procedure; the balance port is set on the workflow at run time.
     """
 
     procedure: DispenseProcedure = Field(description="What to fire and how to weigh it.")

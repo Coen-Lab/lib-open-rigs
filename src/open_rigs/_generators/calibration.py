@@ -3,7 +3,7 @@
 Writes `schemas/calibration.json` and runs Bonsai.Sgen on it into
 `src/OpenRigs.Core/Calibration/Calibration.Generated.cs`. The `x-sgen-typename` tags that every
 `CalibrationSchema` model carries are removed here, which makes this the one place the types
-are generated. `CalibrationModel` keeps its tag to the hand-written enum.
+are generated.
 """
 
 import json

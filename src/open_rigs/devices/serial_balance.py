@@ -16,11 +16,11 @@ class SerialBalance(SerialDevice, CalibrationSchema):
     )
     tare_command: str = Field(default="T", description="Command that tares the balance.")
     print_command: str = Field(default="IP", description="Command that makes the balance print one reading.")
-    print_period_s: data_types.Double = Field(default=0.5, gt=0, description="How often a reading is requested, in seconds.")
-    boot_delay_s: data_types.Double = Field(
+    print_period_seconds: data_types.Double = Field(default=0.5, gt=0, description="How often a reading is requested, in seconds.")
+    boot_delay_seconds: data_types.Double = Field(
         default=0.5, ge=0, description="Wait after opening the port before taring, in seconds."
     )
-    tare_delay_s: data_types.Double = Field(
+    tare_delay_seconds: data_types.Double = Field(
         default=1.5, ge=0, description="Wait after taring before the first reading is requested, in seconds."
     )
     unit_suffix: str = Field(
