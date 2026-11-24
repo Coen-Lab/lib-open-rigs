@@ -1,6 +1,8 @@
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, Generic, TypeVar, Any, Literal
-from pydantic import Field
+from pydantic import Field, GetCoreSchemaHandler
+from pydantic_core import core_schema
 from pydantic.json_schema import JsonSchemaValue
 from swc.aeon.schema import BaseSchema
 
@@ -26,14 +28,31 @@ def bind_typename(schema: JsonSchemaValue, typename: str) -> JsonSchemaValue:
     schema["x-sgen-typename"] = typename
     return schema
 
-SByte = Annotated[int, Field(ge=-128, le=127)]
-Byte = Annotated[int, Field(ge=0, le=255)]
-Short = Annotated[int, Field(ge=-32768, le=32767)]
-UShort = Annotated[int, Field(ge=0, le=65535)]
-Int = Annotated[int, Field(ge=-2147483648, le=2147483647)]
-UInt = Annotated[int, Field(ge=0, le=4294967295)]
-Long = Annotated[int, Field(ge=-9223372036854775808, le=9223372036854775807)]
-ULong = Annotated[int, Field(ge=0, le=18446744073709551615)]
+@dataclass(frozen=True)
+class _Range:
+    """The C# type's range, applied as the integer schema's ge and le only where a model's own Field sets none.
+    As a Field in the alias (Field(ge=...)) it replaced the model's own ge and le instead."""
+
+    low: int
+    high: int
+
+    def __get_pydantic_core_schema__(self, source: Any, handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
+        schema = handler(source)
+        if schema["type"] != "int":
+            raise TypeError(f"_Range bounds an int, not a {schema['type']}")
+        schema.setdefault("ge", self.low)
+        schema.setdefault("le", self.high)
+        return schema
+
+
+SByte = Annotated[int, _Range(-128, 127)]
+Byte = Annotated[int, _Range(0, 255)]
+Short = Annotated[int, _Range(-32768, 32767)]
+UShort = Annotated[int, _Range(0, 65535)]
+Int = Annotated[int, _Range(-2147483648, 2147483647)]
+UInt = Annotated[int, _Range(0, 4294967295)]
+Long = Annotated[int, _Range(-9223372036854775808, 9223372036854775807)]
+ULong = Annotated[int, _Range(0, 18446744073709551615)]
 
 Float = float
 Double = float
