@@ -87,7 +87,8 @@ namespace OpenRigs.Zapit
 
         /// <summary>The setup steps for the requests, as frames and ZapitDaq's events come. A bank request (its
         /// Settings_ZapitBank_&lt;DateTime&gt;.json) inside the pending folder becomes ZapitDaq's LoadBank (stage Loading);
-        /// one outside it is refused. An aim ("xVolts,yVolts,laserVolts", the agent's volts through the scanner fit and laser
+        /// one outside it is refused, and one ZapitDaq answers Refused (over the ceiling) is reported Refused with its reason. Laser
+        /// volts get ZapitDaq's 1e-4 V float slack. An aim ("xVolts,yVolts,laserVolts", the agent's volts through the scanner fit and laser
         /// curve) points the galvos with the laser on until the next aim, LaserOff or setup step; it is refused at ceilingMw 0,
         /// above LaserMaxVolts or LaserCeilingVolts, outside +/-10 V or during a grid run or still; a grid's laserVolts is held
         /// to the same rules. A still with no frame within FrameTimeout is refused. When the aims end (Go), a grid run or still
@@ -100,6 +101,7 @@ namespace OpenRigs.Zapit
             Run? run = null;
             string? still = null;
             var aiming = false;
+            var loading = false;   // a LoadBank awaits ZapitDaq's BankLoaded or Refused
             void Emit(ZapitSetupStep step) => observer.OnNext(step);
             void Refuse(string why) => Emit(new ZapitSetupStep { Stage = "Refused", Detail = why });
             var watchdog = new SerialDisposable();
@@ -142,9 +144,10 @@ namespace OpenRigs.Zapit
             {
                 if (volts == 0) return null;
                 if (!(CeilingMw > 0)) return "rig.yml's zapit.ceilingMw is 0 (laser disabled), so the laser volts must be 0";
-                if (!(volts >= 0 && volts <= LaserMaxVolts))
+                // ZapitDaq's float slack, so the setup refuses nothing the DAQ would write (the launch rounds LaserCeilingVolts).
+                if (!(volts >= 0 && volts <= LaserMaxVolts + ZapitDaq.FloatSlackVolts))
                     return string.Format(CultureInfo.InvariantCulture, "the laser volts must be 0 to {0} V (rig.yml's zapit.laserMinMaxControlVolts[1])", LaserMaxVolts);
-                if (!(volts <= LaserCeilingVolts))
+                if (!(volts <= LaserCeilingVolts + ZapitDaq.FloatSlackVolts))
                     return string.Format(CultureInfo.InvariantCulture, "the laser volts must be at most the ceiling's {0} V (LaserCeilingVolts)", LaserCeilingVolts);
                 return null;
             }
@@ -213,6 +216,7 @@ namespace OpenRigs.Zapit
                     Refuse("a bank is a .json inside " + pending + ": " + request);
                     return;
                 }
+                loading = true;
                 Emit(new ZapitSetupStep { Stage = "Loading", Detail = path, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.LoadBank, Path = path } });
             }
 
@@ -267,6 +271,12 @@ namespace OpenRigs.Zapit
 
             void OnEvent(ZapitDaqEvent e)
             {
+                if (loading && (e.Kind == ZapitDaqEventKind.BankLoaded || e.Kind == ZapitDaqEventKind.Refused))
+                {
+                    loading = false;
+                    if (e.Kind == ZapitDaqEventKind.Refused) Refuse(e.Detail ?? "ZapitDaq refused the bank");   // over the ceiling: the session runs on
+                    return;
+                }
                 if (run != null && e.Kind == ZapitDaqEventKind.Pointed && run.Skip < 0)
                 {
                     run.Skip = run.SkipFrames;

@@ -54,6 +54,9 @@ namespace OpenRigs.Zapit
         /// <summary>The clocked task's samples per channel generated so far (0 before its trigger).</summary>
         long SamplesGenerated { get; }
 
+        /// <summary>The clocked task's onboard FIFO, in samples per channel, beyond reach of <see cref="WriteAt"/> (0 with no task).</summary>
+        long OnboardSamples { get; }
+
         /// <summary>Whether a clocked task exists.</summary>
         bool HasClockedTask { get; }
 
@@ -86,7 +89,7 @@ namespace OpenRigs.Zapit
         {
             if (firstSample < generated + onboard)
                 throw new InvalidOperationException($"A Zapit early stop wrote its ramp from sample {firstSample}, but {generated} were generated and the next {onboard} already sit in the device's onboard buffer, " +
-                    "so the ramp could not be kept: raise rig.yml's zapit.earlyStopLeadSeconds above the onboard buffer's length (its samples per channel over the sample rate).");
+                    "so the ramp could not be kept: raise rig.yml's zapit.earlyStopLeadSeconds above the onboard buffer plus one scan cycle (their samples per channel over the sample rate).");
         }
 
         public static InvalidOperationException Reserved() =>
@@ -150,6 +153,8 @@ namespace OpenRigs.Zapit
         }
 
         public long SamplesGenerated => clocked?.Stream.TotalSamplesGeneratedPerChannel ?? 0;
+
+        public long OnboardSamples => clocked?.Stream.Buffer.OutputOnBoardBufferSize ?? 0;
 
         public bool HasClockedTask => clocked != null;
 

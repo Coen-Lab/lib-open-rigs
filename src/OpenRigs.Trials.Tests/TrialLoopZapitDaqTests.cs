@@ -62,6 +62,26 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(0, times.LaserPowerMw);
         }
 
+        // Audit C R4: an outcome within StartedGraceSeconds of the trigger (a trigger inside the response window) comes before
+        // ZapitDaq's Started can, so the row logs the armed power; later with no Started it logs 0 mW.
+        [TestMethod]
+        public void AnOutcomeJustAfterTheTriggerLogsThePowerBeforeStartedComes()
+        {
+            foreach (var (wait, power) in new[] { (0.01, 1.5), (0.1, 0.0) })
+            {
+                var rules = Rules();
+                rules.Plan = n => new TrialTiming { ItiSeconds = 2, LaserToStimulusSeconds = -0.2, Laser = true, ResponseWindowSeconds = 30 };
+                var rig = new LoopRig(rules, zapitDaq: true);
+                var arm = rig.RunTo(TrialEventKind.Arm);
+                rig.Armed(arm.Trial, 1.5);
+                rig.RunTo(TrialEventKind.Trigger);
+                rig.Until(rig.Now + wait);
+                rig.Lick(0);
+                var times = rig.Of(TrialEventKind.Outcome).Single().Outcome.Times;
+                Assert.AreEqual(power, times.LaserPowerMw, $"outcome {wait} s after the trigger");
+            }
+        }
+
         [TestMethod]
         public void MatlabZapitLeavesThePowerToTheTrial()
         {

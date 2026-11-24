@@ -54,14 +54,20 @@ namespace OpenRigs.Zapit.Tests
             public readonly SimulatedZapitDevice Device = new SimulatedZapitDevice { AutoTrigger = false };
             public Exception Error;
 
-            public Harness(double sampleRate = 100000, double maxTrialSeconds = 1.0, double earlyStopLeadSeconds = 0.01, double ceilingMw = double.PositiveInfinity, double laserMaxVolts = 5, double? laserCeilingVolts = null)
+            // laserCeilingVolts: null is LaserMaxVolts; DefaultCeiling leaves LaserCeilingVolts unset, its default (0) as a launch without it.
+            public const double DefaultCeiling = double.NaN;
+
+            public Harness(double sampleRate = 100000, double maxTrialSeconds = 1.0, double earlyStopLeadSeconds = 0.05, double ceilingMw = double.PositiveInfinity, double laserMaxVolts = 5, double? laserCeilingVolts = null, long onboardSamples = 0)
             {
                 Device.Clock = () => Volatile.Read(ref now);
+                Device.OnboardSamples = onboardSamples;
                 var node = new ZapitDaq
                 {
                     SampleRate = sampleRate, MaxTrialSeconds = maxTrialSeconds, EarlyStopLeadSeconds = earlyStopLeadSeconds,
-                    TriggerTerminal = Trigger, CeilingMw = ceilingMw, LaserMaxVolts = laserMaxVolts, LaserCeilingVolts = laserCeilingVolts ?? laserMaxVolts, DeviceFactory = () => Device,
+                    TriggerTerminal = Trigger, CeilingMw = ceilingMw, LaserMaxVolts = laserMaxVolts, DeviceFactory = () => Device,
                 };
+                if (laserCeilingVolts == null) node.LaserCeilingVolts = laserMaxVolts;
+                else if (!double.IsNaN(laserCeilingVolts.Value)) node.LaserCeilingVolts = laserCeilingVolts.Value;
                 subscription = node.Process(commands).Subscribe(events.Add, e => Error = e);
             }
 
@@ -83,6 +89,15 @@ namespace OpenRigs.Zapit.Tests
                 Send(command);
                 Assert.IsNotNull(Error, $"{command} was not refused.");
                 return Error.Message;
+            }
+
+            // A refusal as an event (Refused): the session runs on.
+            public string Refusal(ZapitDaqCommand command)
+            {
+                Send(command);
+                var detail = Next(ZapitDaqEventKind.Refused).Detail;
+                Assert.IsNull(Error, $"{command} stopped the session: {Error?.Message}");
+                return detail;
             }
 
             public void Dispose() => subscription.Dispose();
@@ -180,18 +195,18 @@ namespace OpenRigs.Zapit.Tests
             h.Send(EarlyStop(3));   // another trial's: ignored
             h.Send(EarlyStop(4));
             h.NothingNext();
-            // 12340 generated, 10 ms lead: the ramp starts on the next cycle boundary, 15000, and lasts 25000 samples.
+            // 12340 generated, 50 ms lead: the ramp starts on the next cycle boundary, 17500, and lasts 25000 samples.
             var buffer = h.Device.LastBuffer;
-            var ramp = bank.Assemble(1, variant, 6, 15000);
+            var ramp = bank.Assemble(1, variant, 7, 17500);
             Assert.AreEqual(25000, ramp.GetLength(1));
-            for (int i = 0; i < 15000; i++) CollectionAssert.AreEqual(Column(before, i), Column(buffer, i));
-            for (int i = 0; i < 25000; i++) CollectionAssert.AreEqual(Column(ramp, i), Column(buffer, 15000 + i));
-            for (int i = 39999; i < 100000; i++) Assert.IsTrue(buffer[2, i] == 0 && buffer[3, i] == 0, $"Sample {i} is not dark.");
-            Assert.IsTrue(Enumerable.Range(15000, 1000).Any(i => buffer[2, i] > 0), "The ramp has no light.");
+            for (int i = 0; i < 17500; i++) CollectionAssert.AreEqual(Column(before, i), Column(buffer, i));
+            for (int i = 0; i < 25000; i++) CollectionAssert.AreEqual(Column(ramp, i), Column(buffer, 17500 + i));
+            for (int i = 42499; i < 100000; i++) Assert.IsTrue(buffer[2, i] == 0 && buffer[3, i] == 0, $"Sample {i} is not dark.");
+            Assert.IsTrue(Enumerable.Range(17500, 1000).Any(i => buffer[2, i] > 0), "The ramp has no light.");
 
-            h.Now = 0.4;
+            h.Now = 0.45;
             var stopped = h.Next(ZapitDaqEventKind.Stopped);
-            Assert.IsTrue(stopped.SamplesGenerated >= 40000 && stopped.SamplesGenerated < 100000);
+            Assert.IsTrue(stopped.SamplesGenerated >= 42500 && stopped.SamplesGenerated < 100000);
             Assert.IsFalse(h.Device.HasClockedTask);
             AssertZeros(h.Device.OnDemandWrites.Last());
             Assert.IsNull(h.Error);
@@ -237,6 +252,7 @@ namespace OpenRigs.Zapit.Tests
             public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal) => Twin.ArmFinite(samples, sampleRate, triggerTerminal);
             public void WriteAt(double[,] samples, long firstSample) => Twin.WriteAt(samples, firstSample);
             public long SamplesGenerated => Twin.SamplesGenerated;
+            public long OnboardSamples => Twin.OnboardSamples;
             public bool HasClockedTask => Twin.HasClockedTask;
             public bool IsDone => false;
             public void StopClocked()
@@ -253,7 +269,7 @@ namespace OpenRigs.Zapit.Tests
         public void UnsubscribingZeroesEveryLineEvenWhenStoppingFails()
         {
             var device = new StopFails();
-            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.01, CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, EarlyStopLeadSeconds = 0.05, CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
             var commands = new Subject<ZapitDaqCommand>();
             var events = new BlockingCollection<ZapitDaqEvent>();
             var subscription = node.Process(commands).Subscribe(events.Add, e => { });
@@ -345,7 +361,7 @@ namespace OpenRigs.Zapit.Tests
             var index = JObject.Parse(File.ReadAllText(path));
             index["ceiling_mw"] = 0.0;   // a bank claiming the disabled ceiling but driving the laser
             File.WriteAllText(path, index.ToString());
-            StringAssert.Contains(h.ErrorMessage(Load(path)), "above rig.yml's zapit.ceilingMw (0 mW)");
+            StringAssert.Contains(h.Refusal(Load(path)), "above rig.yml's zapit.ceilingMw (0 mW)");
         }
 
         // rig.yml's ceiling lowered after the bank was built: the bank's powers are not capped at it, so it is refused.
@@ -353,9 +369,9 @@ namespace OpenRigs.Zapit.Tests
         public void ABankBuiltUnderAHigherCeilingIsRefused()
         {
             using var h = new Harness(ceilingMw: 5);
-            StringAssert.Contains(h.ErrorMessage(Load(Unpack())), "rebuild the bank");
+            StringAssert.Contains(h.Refusal(Load(Unpack())), "rebuild the bank");
             using var zero = new Harness(ceilingMw: 0);
-            StringAssert.Contains(zero.ErrorMessage(Load(Unpack())), "rebuild the bank");
+            StringAssert.Contains(zero.Refusal(Load(Unpack())), "rebuild the bank");
             using var same = new Harness(ceilingMw: 1e9);
             same.Send(Load(Unpack()));
             same.Next(ZapitDaqEventKind.BankLoaded);
@@ -423,7 +439,7 @@ namespace OpenRigs.Zapit.Tests
             using (var h = new Harness(ceilingMw: 1, laserCeilingVolts: 0.5))
                 StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, GalvoXVolts = 1, LaserVolts = 5 }), "above the ceiling's 0.5 V");
             using (var h = new Harness(laserCeilingVolts: 0.5))
-                StringAssert.Contains(h.ErrorMessage(Load(Unpack())), "above the ceiling's 0.5 V");
+                StringAssert.Contains(h.Refusal(Load(Unpack())), "above the ceiling's 0.5 V");
             using (var h = new Harness(laserCeilingVolts: 0.5))
             {
                 h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.5 });
@@ -441,7 +457,42 @@ namespace OpenRigs.Zapit.Tests
             index["ceiling_mw"] = 0.5;
             File.WriteAllText(path, index.ToString());
             using var h = new Harness(ceilingMw: 0.5);
-            StringAssert.Contains(h.ErrorMessage(Load(path)), "above rig.yml's zapit.ceilingMw (0.5 mW)");
+            StringAssert.Contains(h.Refusal(Load(path)), "above rig.yml's zapit.ceilingMw (0.5 mW)");
+        }
+
+        // Audit C R1: the staircase measures the laser curve LaserCeilingVolts comes from, so LaserCeilingVolts (even its
+        // default 0, as the laser-curve calibration workflow's node has) does not hold it; ceilingMw 0 and LaserMaxVolts still do.
+        [TestMethod]
+        public void TheStaircaseCoversTheLaserRangeAboveTheCeilingsVolts()
+        {
+            var full = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Staircase, LaserLevelsVolts = new[] { 0.0, 1, 2.5, 5 }, SamplesPerLevel = 10 };
+            foreach (var ceiling in new[] { Harness.DefaultCeiling, 0.0, 2.0 })
+                using (var h = new Harness(laserCeilingVolts: ceiling))
+                {
+                    h.Send(full);
+                    Assert.AreEqual(41, h.Next(ZapitDaqEventKind.StaircaseRead).AnalogIn.Length);
+                    Assert.IsNull(h.Error, $"LaserCeilingVolts {ceiling}: {h.Error?.Message}");
+                }
+            using (var h = new Harness(ceilingMw: 0, laserCeilingVolts: Harness.DefaultCeiling))
+                StringAssert.Contains(h.ErrorMessage(full), "ceilingMw is 0");
+            using (var h = new Harness(laserMaxVolts: 4, laserCeilingVolts: Harness.DefaultCeiling))
+                StringAssert.Contains(h.ErrorMessage(full), "outside 0 to 4 V");
+        }
+
+        // Audit C R1: at the default LaserCeilingVolts (0, a launch without it) an aim and a trial's bank stay refused.
+        [TestMethod]
+        public void TheDefaultCeilingVoltsRefuseAimsAndBanks()
+        {
+            using (var h = new Harness(laserCeilingVolts: Harness.DefaultCeiling))
+                StringAssert.Contains(h.ErrorMessage(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 }), "above the ceiling's 0 V");
+            using (var h = new Harness(laserCeilingVolts: Harness.DefaultCeiling))
+            {
+                h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, GalvoXVolts = 1, LaserVolts = 0 });
+                h.Next(ZapitDaqEventKind.Pointed);
+                // Audit C R6: the bank is Refused (an event), the session runs on, and a trial then has no bank.
+                StringAssert.Contains(h.Refusal(Load(Unpack())), "above the ceiling's 0 V");
+                StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 2.0, 0.05)), "no Zapit bank is loaded");
+            }
         }
 
         // Audit 24 Nov 2026 L3: a subscriber that disposes the node inside an event (Take(1) on BankLoaded) must not
@@ -462,21 +513,58 @@ namespace OpenRigs.Zapit.Tests
             }
         }
 
-        // Audit 24 Nov 2026 L4: an early stop whose ramp would start inside the onboard FIFO (samples NI cannot overwrite)
-        // is an error naming the setting, never a ramp cut short in silence.
+        // Audit C R2: a lead too short for the onboard FIFO (an X-series AO FIFO of 8191 shared by 4 lines) and one scan cycle
+        // is refused at the first trial that can stop early, naming the setting and its minimum, with the lines zeroed; a
+        // timed trial never stops early, so it is not held to it.
         [TestMethod]
-        public void AnEarlyStopTooLateForTheOnboardBufferIsAnError()
+        public void ALeadTooShortForTheOnboardBufferIsRefusedAtTheFirstUntilOutcomeArm()
         {
-            using var h = new Harness();
-            h.Device.OnboardSamples = 2047;   // an X-series AO FIFO shared by 4 lines; the lead is 1000 samples
-            h.Send(Load(Unpack()));
-            h.Next(ZapitDaqEventKind.BankLoaded);
-            h.Send(Arm(1, 1, true, 8.0, 0));
-            h.Next(ZapitDaqEventKind.Armed);
-            h.Device.Trigger();
-            h.Now = 0.01;
-            h.Next(ZapitDaqEventKind.Started);
-            StringAssert.Contains(h.ErrorMessage(EarlyStop(1)), "earlyStopLeadSeconds");
+            using (var h = new Harness(earlyStopLeadSeconds: 0.02, onboardSamples: 2047))
+            {
+                h.Send(Load(Unpack()));
+                h.Next(ZapitDaqEventKind.BankLoaded);
+                h.Send(Arm(1, 1, true, 8.0, 0.05));
+                h.Next(ZapitDaqEventKind.Armed);
+                var message = h.ErrorMessage(Arm(2, 1, true, 8.0, 0));
+                StringAssert.Contains(message, "earlyStopLeadSeconds (0.02 s, 2000 samples)");
+                StringAssert.Contains(message, "above 0.04547 s");   // 2047 + one 2500-sample cycle at 100 kS/s
+                Assert.IsFalse(h.Device.HasClockedTask);
+                AssertZeros(h.Device.OnDemandWrites.Last());
+            }
+        }
+
+        // Audit C R2 (probe Q2): with a lead that passes the check, no early stop over one whole scan cycle errors.
+        [TestMethod]
+        public void NoEarlyStopErrorsOnceTheLeadPassesTheCheck()
+        {
+            var path = Unpack();
+            int cycle = ZapitBank.Load(path).Conditions[0].ScanCycle.Length;
+            for (long generated = 5000; generated < 5000 + cycle; generated += cycle / 50)
+                using (var h = new Harness(earlyStopLeadSeconds: 0.05, onboardSamples: 2047, maxTrialSeconds: 3))
+                {
+                    h.Send(Load(path));
+                    h.Next(ZapitDaqEventKind.BankLoaded);
+                    h.Send(Arm(1, 1, true, 2.0, 0));
+                    h.Next(ZapitDaqEventKind.Armed);
+                    h.Device.Trigger();
+                    h.Now = generated / 100000.0;
+                    h.Next(ZapitDaqEventKind.Started);
+                    h.Send(EarlyStop(1));
+                    Assert.IsNull(h.Error, $"{generated} generated: {h.Error?.Message}");
+                }
+        }
+
+        // Audit C R2: the device-level check stays: a ramp written inside the FIFO is an error, never a cut ramp.
+        [TestMethod]
+        public void TheTwinRefusesAWriteInsideTheOnboardBuffer()
+        {
+            double now = 0;
+            var device = new SimulatedZapitDevice { AutoTrigger = false, OnboardSamples = 100, Clock = () => now };
+            device.ArmFinite(new double[4, 1000], 1000, Trigger);
+            device.Trigger();
+            now = 0.1;
+            StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => device.WriteAt(new double[4, 10], 150)).Message, "earlyStopLeadSeconds");
+            device.WriteAt(new double[4, 10], 200);
         }
 
         [TestMethod]

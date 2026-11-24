@@ -18,9 +18,12 @@ namespace OpenRigs.Zapit
     /// and LED at 0 V; an early stop writes the ramp <see cref="EarlyStopLeadSeconds"/> ahead of the generated samples, then
     /// stops. Between trials the clocked task is stopped and deleted and every line zeroed on a short-lived on-demand task.
     /// Calibration: on-demand points, and a laser staircase read back through the photodiode on the AO clock. Every line is
-    /// zeroed on subscribe and on unsubscribe, however the workflow stops. A Point once trials are armed is Refused (an event;
-    /// the session runs on); any other refusal or DAQ error is an error. No laser sample above <see cref="LaserCeilingVolts"/>
-    /// is written, and a bank holding one, or a power above <see cref="CeilingMw"/>, is refused at LoadBank.
+    /// zeroed on subscribe and on unsubscribe, however the workflow stops. A Point once trials are armed, and a bank over the
+    /// ceiling, are Refused (an event; the session runs on); any other refusal or DAQ error is an error. No laser sample above
+    /// <see cref="LaserCeilingVolts"/> is written except by the staircase (the calibration that measures the laser curve the
+    /// ceiling comes from), and a bank holding one, or a power above <see cref="CeilingMw"/>, is refused at LoadBank. The first
+    /// trial that can stop early (until the outcome) is refused unless <see cref="EarlyStopLeadSeconds"/> reaches past the
+    /// device's onboard buffer and one scan cycle, so a lead too short fails at once, not at a random early stop.
     /// </summary>
     [Description("Runs Zapit trials and calibration steps on the rig's NI DAQ, or its simulated twin.")]
     public class ZapitDaq : Combinator<ZapitDaqCommand, ZapitDaqEvent>
@@ -79,8 +82,9 @@ namespace OpenRigs.Zapit
         [Description("The longest trial with its ramp, in seconds; until-outcome trials are finite at it.")]
         public double MaxTrialSeconds { get; set; }
 
-        /// <summary>How far ahead of the generated samples an early stop writes its ramp, in seconds.</summary>
-        [Description("How far ahead of the generated samples an early stop writes its ramp, in seconds.")]
+        /// <summary>How far ahead of the generated samples an early stop writes its ramp, in seconds: more than the device's
+        /// onboard buffer and one scan cycle, checked at the first trial that can stop early.</summary>
+        [Description("How far ahead of the generated samples an early stop writes its ramp, in seconds: more than the onboard buffer and one scan cycle.")]
         public double EarlyStopLeadSeconds { get; set; }
 
         /// <summary>Tests replace the device; null takes <see cref="Simulated"/>.</summary>
@@ -91,7 +95,7 @@ namespace OpenRigs.Zapit
 
         // The bank stores float32 volts from lib_zapit's float maths: some rows come out a few microvolts below 0 (-2e-6 V
         // in the contract bank), and a maximum such as 4.9 V reads back 1e-7 V above it. The laser limits allow that rounding and no more.
-        const double FloatSlackVolts = 1e-4;
+        internal const double FloatSlackVolts = 1e-4;   // ZapitSetupCapture's too
         const double FloatSlackMw = 1e-3;   // the bank's powers come from the same float maths
 
         /// <summary>Runs each command in order and reports what the DAQ did.</summary>
@@ -122,6 +126,12 @@ namespace OpenRigs.Zapit
         [MethodImpl(MethodImplOptions.NoInlining)]
         static IZapitDevice CreateNi(ZapitWiring wiring) => new NiZapitDevice(wiring);
 
+        /// <summary>A refusal by the laser ceiling (ceilingMw or LaserCeilingVolts): at LoadBank a Refused event, elsewhere an error.</summary>
+        sealed class CeilingRefusal : InvalidOperationException
+        {
+            public CeilingRefusal(string message) : base(message) { }
+        }
+
         sealed class Trial
         {
             public ZapitDaqCommand Command = null!;
@@ -144,6 +154,7 @@ namespace OpenRigs.Zapit
             ZapitBank? bank;
             Trial? trial;
             bool trialsArmed;   // a trial was armed: Point is refused for the rest of the session
+            bool leadChecked;   // EarlyStopLeadSeconds passed CheckLead
 
             public Session(ZapitDaq node, IZapitDevice device, IObserver<ZapitDaqEvent> observer)
             {
@@ -196,16 +207,42 @@ namespace OpenRigs.Zapit
                 var loaded = ZapitBank.Load(command.Path ?? throw new InvalidOperationException("LoadBank needs the bank's Path."));
                 if (loaded.SampleRate != node.SampleRate)
                     throw new InvalidOperationException($"The Zapit bank was built for {loaded.SampleRate} samples/s; the rig runs {node.SampleRate}.");
-                if (!(loaded.CeilingMw <= node.CeilingMw))
-                    throw new InvalidOperationException($"The Zapit bank was built under a {loaded.CeilingMw} mW ceiling, above rig.yml's zapit.ceilingMw ({node.CeilingMw} mW): rebuild the bank.");
-                // The bank's ceiling_mw is its own claim: its powers and volts are held to the rig's ceiling too.
-                var over = loaded.Conditions.SelectMany(c => c.Variants).Where(v => v.LaserOn && !(v.CappedPowerMw <= node.CeilingMw + FloatSlackMw)).Select(v => v.CappedPowerMw).DefaultIfEmpty().Max();
-                if (over > 0)
-                    throw new InvalidOperationException($"The Zapit bank delivers {over} mW, above rig.yml's zapit.ceilingMw ({node.CeilingMw} mW): rebuild the bank.");
-                RefuseLaser(new[] { loaded.MinLaserVolts, loaded.MaxLaserVolts }, "The Zapit bank's samples");
                 loaded.Verify(command.ConditionsPath, command.ScannerFitHash, command.LaserCurveHash, command.SampleHash);
+                // Over the ceiling (a stale or missing laser curve passes LaserCeilingVolts 0): Refused, the session runs on and
+                // shows why, and any bank loaded before stays.
+                try
+                {
+                    if (!(loaded.CeilingMw <= node.CeilingMw))
+                        throw new CeilingRefusal($"The Zapit bank was built under a {loaded.CeilingMw} mW ceiling, above rig.yml's zapit.ceilingMw ({node.CeilingMw} mW): rebuild the bank.");
+                    // The bank's ceiling_mw is its own claim: its powers and volts are held to the rig's ceiling too.
+                    var over = loaded.Conditions.SelectMany(c => c.Variants).Where(v => v.LaserOn && !(v.CappedPowerMw <= node.CeilingMw + FloatSlackMw)).Select(v => v.CappedPowerMw).DefaultIfEmpty().Max();
+                    if (over > 0)
+                        throw new CeilingRefusal($"The Zapit bank delivers {over} mW, above rig.yml's zapit.ceilingMw ({node.CeilingMw} mW): rebuild the bank.");
+                    RefuseLaser(new[] { loaded.MinLaserVolts, loaded.MaxLaserVolts }, "The Zapit bank's samples");
+                }
+                catch (CeilingRefusal refusal)
+                {
+                    Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = refusal.Message + " " + command.Path });
+                    return;
+                }
                 bank = loaded;
-                Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.BankLoaded, Bank = loaded });
+                Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.BankLoaded, Bank = loaded, Detail = command.Path });
+            }
+
+            // An early stop writes its ramp from the cycle boundary at or after generated + lead, so the ramp is kept
+            // whenever the lead passes the onboard FIFO; one scan cycle more is the margin for samples NI has already sent
+            // the device beyond it (USB transfers). Fixed per rig and bank, so it is checked once, at the first trial
+            // that can stop early, the task armed (NI knows its onboard buffer only then).
+            void CheckLead(ZapitBank loaded)
+            {
+                long lead = (long)Math.Ceiling(node.EarlyStopLeadSeconds * loaded.SampleRate);
+                long cycle = loaded.Conditions.Max(c => c.ScanCycle.Length);
+                long minimum = device.OnboardSamples + cycle;
+                if (lead > minimum) return;
+                device.WriteOnDemand(Zeros);   // deletes the armed task: the lines at 0 V
+                throw new InvalidOperationException(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "rig.yml's zapit.earlyStopLeadSeconds ({0} s, {1} samples) must be more than the DAQ's onboard buffer ({2} samples per channel) plus one scan cycle ({3} samples): above {4} s at {5} samples/s. Raise earlyStopLeadSeconds before running trials that stop early.",
+                    node.EarlyStopLeadSeconds, lead, device.OnboardSamples, cycle, minimum / loaded.SampleRate, loaded.SampleRate));
             }
 
             void Arm(ZapitDaqCommand command)
@@ -223,6 +260,11 @@ namespace OpenRigs.Zapit
                 RefuseLaser(Laser(samples), $"Trial {command.Trial}'s bank samples");
                 device.WriteOnDemand(Zeros);
                 device.ArmFinite(samples, loaded.SampleRate, node.TriggerTerminal);
+                if (!(command.DurationSeconds > 0) && !leadChecked)
+                {
+                    CheckLead(loaded);
+                    leadChecked = true;
+                }
                 trial = new Trial { Command = command, Variant = variant, Cycles = cycles, Samples = samples.GetLength(1), StopAt = samples.GetLength(1) };
                 Emit(TrialEvent(ZapitDaqEventKind.Armed, 0, watch.Elapsed.TotalSeconds));
             }
@@ -272,7 +314,9 @@ namespace OpenRigs.Zapit
                 var levels = command.LaserLevelsVolts;
                 if (levels == null || levels.Length == 0 || command.SamplesPerLevel < 1)
                     throw new InvalidOperationException("A Zapit staircase needs laser levels and at least one sample per level.");
-                RefuseLaser(levels, "The staircase");
+                // The staircase measures the laser curve LaserCeilingVolts comes from, so it covers the laser's range: every
+                // other limit holds (ceilingMw 0 disables it, and 0 to LaserMaxVolts).
+                RefuseLaser(levels, "The staircase", ceilingVolts: false);
                 var samples = new double[4, levels.Length * command.SamplesPerLevel + 1];   // the last sample: laser at 0 V
                 for (int i = 0; i < samples.GetLength(1); i++)
                 {
@@ -286,15 +330,15 @@ namespace OpenRigs.Zapit
                 Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.StaircaseRead, Samples = samples.GetLength(1), AnalogIn = read });
             }
 
-            void RefuseLaser(double[] volts, string what)
+            void RefuseLaser(double[] volts, string what, bool ceilingVolts = true)
             {
                 double max = volts.Max(), min = volts.Min();
                 if (node.CeilingMw <= 0 && max > 0)
-                    throw new InvalidOperationException($"{what} drive the laser to {max} V, but rig.yml's zapit.ceilingMw is 0 (laser disabled).");
+                    throw new CeilingRefusal($"{what} drive the laser to {max} V, but rig.yml's zapit.ceilingMw is 0 (laser disabled).");
                 if (!(max <= node.LaserMaxVolts + FloatSlackVolts) || !(min >= -FloatSlackVolts))
                     throw new InvalidOperationException($"{what} drive the laser from {min} to {max} V, outside 0 to {node.LaserMaxVolts} V (rig.yml's zapit.laserMinMaxControlVolts[1]).");
-                if (!(max <= node.LaserCeilingVolts + FloatSlackVolts))
-                    throw new InvalidOperationException($"{what} drive the laser to {max} V, above the ceiling's {node.LaserCeilingVolts} V (LaserCeilingVolts: rig.yml's zapit.ceilingMw through the laser curve).");
+                if (ceilingVolts && !(max <= node.LaserCeilingVolts + FloatSlackVolts))
+                    throw new CeilingRefusal($"{what} drive the laser to {max} V, above the ceiling's {node.LaserCeilingVolts} V (LaserCeilingVolts: rig.yml's zapit.ceilingMw through the laser curve).");
             }
 
             static double[] Laser(double[,] samples) => Enumerable.Range(0, samples.GetLength(1)).Select(i => samples[2, i]).ToArray();

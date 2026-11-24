@@ -90,9 +90,10 @@ The workflow reports `Refused <why>` and keeps running if a request:
 - names a folder that already holds PNGs;
 - names a still that is not a new `.png` in an existing folder;
 - names a bank that is not a `.json`;
-- arrives while another Setup or Still is in progress.
+- arrives while another Setup or Still is in progress;
+- names a bank over the rig's ceiling: built under a higher `ceilingMw`, delivering more than it, or with laser samples above `LaserCeilingVolts` (0 when the launch has no laser curve). ZapitDaq answers `Refused` and keeps any bank loaded before.
 
-A bank that ZapitDaq refuses (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still`, `Zapit-Main.LoadBank` and `Zapit-Main.Aim`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
+A bank that ZapitDaq refuses otherwise (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still`, `Zapit-Main.LoadBank` and `Zapit-Main.Aim`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
 
 ## Reruns
 

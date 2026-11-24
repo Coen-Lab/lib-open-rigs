@@ -106,6 +106,44 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual("Aiming", rig.Steps.Last().Stage);
         }
 
+        // Audit C R5 / D R7 (probe Q3): the setup has ZapitDaq's 1e-4 V slack, so an aim or grid at the ceiling's full-precision
+        // volts, the launch's rounded to 6 figures, is taken as the DAQ takes it; beyond the slack it is still refused.
+        [TestMethod]
+        public void LaserVoltsAtTheCeilingGetTheDaqsSlack()
+        {
+            using (var rig = new Rig(laserCeilingVolts: 3.14159))
+            {
+                rig.Aims.OnNext("0,0,3.14159");
+                Assert.AreEqual("Aiming", rig.Steps.Last().Stage, rig.Steps.Last().ToString());
+                rig.Aims.OnNext("0,0,3.1415927");
+                Assert.AreEqual("Aiming", rig.Steps.Last().Stage, rig.Steps.Last().ToString());
+                rig.Aims.OnNext("0,0,3.1418");
+                Assert.AreEqual("Refused", rig.Steps.Last().Stage);
+            }
+            using (var rig = new Rig(laserCeilingVolts: 3.14159))
+            {
+                rig.Grids.OnNext(rig.Run("Frames_T", "{\"volts\": [[1, 2]], \"laserVolts\": 3.1415927}"));
+                Assert.AreEqual("Pointing", rig.Steps.Single().Stage, rig.Steps.Single().ToString());
+            }
+        }
+
+        // Audit C R6 (probe Q4): ZapitDaq's Refused for a bank (over the ceiling, as at LaserCeilingVolts 0) is reported as the
+        // Refused stage with its reason; the session runs on.
+        [TestMethod]
+        public void ABankZapitDaqRefusesIsReportedRefused()
+        {
+            using var rig = new Rig();
+            var bank = Path.Combine(rig.Pending, "Settings_ZapitBank_T.json");
+            rig.Banks.OnNext(bank);
+            Assert.AreEqual("Loading " + bank, rig.Steps.Last().ToString());
+            rig.Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "The Zapit bank's samples drive the laser to 5 V, above the ceiling's 0 V" });
+            Assert.AreEqual("Refused The Zapit bank's samples drive the laser to 5 V, above the ceiling's 0 V", rig.Steps.Last().ToString());
+            rig.Banks.OnNext(bank);
+            rig.Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.BankLoaded });
+            Assert.AreEqual("Loading", rig.Steps.Last().Stage);
+            Assert.IsNull(rig.Error);
+        }
+
         // Two points with one frame skipped, two backgrounds: each point's frame after the skip, the backgrounds laser off.
         [TestMethod]
         public void AGridRunSavesAFramePerPointThenTheBackgrounds()
