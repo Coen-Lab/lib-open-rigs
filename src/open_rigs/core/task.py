@@ -277,7 +277,7 @@ class Optogenetics(TaskBlock):
     def check_zapit_free_in_time(
         self, iti_min_seconds: float, *, laser_duration_seconds: float, ramp_down_seconds: float = 0.0, response_delay_seconds: float = 0.0
     ) -> None:
-        """Refuses a laser duration (LaserTiming.ForDuration, each trial's own: call it on every combination) that leaves Zapit
+        """Refuses a laser duration (LaserTiming.ForDuration, or the cap of LaserTiming.UntilStimulusOff; each trial's own: call it on every combination) that leaves Zapit
         busy at the next trial's trigger, less its reply margin (OpenRigs.Trials TrialLoop stops there naming the last laser: the
         same rule). Off unless enabled. response_delay_seconds is the soonest an outcome follows the stimulus; the next trigger
         comes at the soonest iti_min_seconds - laser_to_stimulus_seconds after an outcome. A laser until the outcome holds the

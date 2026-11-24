@@ -18,7 +18,8 @@ namespace OpenRigs.Trials
     /// if Zapit has not armed the trial by then, naming the last laser when it held Zapit too long, and a trial answered
     /// first gets no laser), the stimulus the lead after the start, the response window, the outcome and its timeout
     /// (from the window's end when the window always runs in full, TrialTiming.ResponseWindowAlwaysFull; cues still to come that are DroppedAtOutcome never come), and with a timed stimulus (TrialTiming.StimulusDurationSeconds)
-    /// its StimulusOff, once, at StimulusTiming.Time (rules that are an IStimulusAfterOutcome update it after the outcome until then). What is the task's own (the draw, the stimulus, the
+    /// its StimulusOff, once, at StimulusTiming.Time (rules that are an IStimulusAfterOutcome update it after the outcome until then; a
+    /// LaserTiming.UntilStimulusOff laser ends with it, LaserOff). What is the task's own (the draw, the stimulus, the
     /// response rule, the outcome) is its <see cref="ITrialRules{TTrial, TUpdate, TOutcome}"/>. Every time is on the Harp
     /// clock: inputs between ticks are timed at the latest tick. Not thread-safe: <see cref="TrialLoop.Observe"/> runs it
     /// under one lock.
@@ -59,6 +60,8 @@ namespace OpenRigs.Trials
         TrialTimes onTimes;     // its times from its outcome
         double offDue;          // its off time: onset + duration, from the outcome the earlier of that and outcome + responseToStimulusOffSeconds
         bool afterOutcome, hookOpen;   // its outcome has come; AfterOutcome still called (until its off or the next trial's start)
+        TTrial lasing;          // the trial whose LaserTiming.UntilStimulusOff laser is on, until its LaserOff or LaserCap
+        double lasingCapAt;     // its LaserCap's time
 
         /// <summary>A loop running <paramref name="rules"/>' trials; the first is drawn at the first clock tick. Without
         /// a wheel (<paramref name="hasWheel"/> false) the wheel's distance stays NaN and a trial that waits for the wheel
@@ -99,6 +102,11 @@ namespace OpenRigs.Trials
             }
             if (onTrial != null && now >= offDue - TrialLoop.Tolerance) Off(events);
             else if (onTrial != null && afterOutcome) AfterOutcome(events);
+            if (lasing != null && now >= lasingCapAt - TrialLoop.Tolerance)
+            {
+                events.Add(Event(TrialEventKind.LaserCap, now, lasing, null));
+                LaserEnded(events, false);
+            }
             if (trial != null && timing.Laser && laser.HardwareTriggered && !armSent && (phase == Phase.Iti || phase == Phase.Running)
                 && now >= armAt - TrialLoop.Tolerance)
             {
@@ -186,6 +194,8 @@ namespace OpenRigs.Trials
             if (!(t.ResponseDelaySeconds >= 0) || double.IsInfinity(t.ResponseDelaySeconds)) problems.Add(string.Format("its response delay is {0} s, not a finite number from 0", t.ResponseDelaySeconds));
             if (!(t.ResponseWindowSeconds > 0)) problems.Add(string.Format("its response window is {0} s, not above 0 (infinity for no limit)", t.ResponseWindowSeconds));
             if (t.Laser && laser == null) problems.Add("it is a laser trial, but the rules give no LaserTiming");
+            if (t.Laser && laser != null && laser.End == LaserEnd.AtStimulusOff && double.IsNaN(t.StimulusDurationSeconds) && !t.ResponseToStimulusOffSeconds.HasValue)
+                problems.Add("its laser ends at the stimulus off (LaserTiming.UntilStimulusOff), but its stimulus has no off time (StimulusDurationSeconds NaN and ResponseToStimulusOffSeconds null)");
             if (t.Laser && !(next is IZapitTrial)) problems.Add(string.Format("it is a laser trial, but its type {0} is not an IZapitTrial (its laser condition, laser on and power)", next.GetType().Name));
             problems.AddRange(QuietWait.LickProblems(t.LickQuietSeconds));
             problems.AddRange(QuietWait.WheelProblems(t.WheelQuietSeconds, t.WheelQuietCm));
@@ -289,6 +299,13 @@ namespace OpenRigs.Trials
                 Schedule(now + duration, TrialEventKind.TriggerOff, trial, null);
                 laserFreeAt = now + duration + laser.RampDownSeconds;
             }
+            else if (laser.End == LaserEnd.AtStimulusOff)
+            {
+                lasing = trial;
+                lasingCapAt = now + laser.CapOf(trial);
+                laserFreeAt = lasingCapAt + laser.TriggerHoldSeconds;   // the latest; LaserEnded brings it forward
+                if (stimulated && onTrial != trial) LaserEnded(events, true);   // its stimulus already off
+            }
             else
             {
                 capAt = now + laser.LaserCapSeconds;
@@ -309,7 +326,7 @@ namespace OpenRigs.Trials
             lastOutcome = outcome;
             if (timing.Laser)
             {
-                if (laser.End == LaserEnd.AtOutcome)
+                if (laser.End == LaserEnd.AtOutcome || (laser.End == LaserEnd.AtStimulusOff && !triggered))
                 {
                     Schedule(now + laser.TriggerHoldSeconds, TrialEventKind.TriggerOff, trial, null);
                     laserFreeAt = now + laser.TriggerHoldSeconds;
@@ -329,6 +346,7 @@ namespace OpenRigs.Trials
                 afterOutcome = true;
                 if (now >= offDue - TrialLoop.Tolerance) Off(events);
             }
+            if (lasing == trial && onTrial != trial) LaserEnded(events, true);   // its stimulus never came on: the laser ends with the trial
             if (timing.Cues != null)
             {
                 foreach (var cue in timing.Cues)
@@ -342,8 +360,21 @@ namespace OpenRigs.Trials
         void Off(List<TrialEvent<TTrial, TUpdate, TOutcome>> events)
         {
             events.Add(Event(TrialEventKind.StimulusOff, now, onTrial, null));
+            var off = onTrial;
             onTrial = null;
             onTimes = null;
+            if (lasing != null && lasing == off) LaserEnded(events, true);
+        }
+
+        // The UntilStimulusOff laser has ended (with LaserOff unless its LaserCap said so): the line falls TriggerHoldSeconds later,
+        // Zapit free then, and a trial waiting in its interval to be armed is armed from then.
+        void LaserEnded(List<TrialEvent<TTrial, TUpdate, TOutcome>> events, bool laserOff)
+        {
+            if (laserOff) events.Add(Event(TrialEventKind.LaserOff, now, lasing, null));
+            Schedule(now + laser.TriggerHoldSeconds, TrialEventKind.TriggerOff, lasing, null);
+            laserFreeAt = now + laser.TriggerHoldSeconds;
+            if (phase == Phase.Iti && trial != lasing && !armSent) armAt = Math.Max(itiStart, laserFreeAt);
+            lasing = null;
         }
 
         // The ended trial's stimulus while on, until the next trial starts.
