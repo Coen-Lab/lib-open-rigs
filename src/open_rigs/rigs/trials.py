@@ -153,7 +153,8 @@ OPTOGENETICS_COLUMNS: List[Column] = [
     ("laserPowerMw", "double", "mW",
      "Laser power sent to Zapit for this trial (the task's optogenetics.laserPowerMw), as commanded, not measured. 0 on "
      "laser-off trials, without optogenetics, on a trial answered before its trigger, and on one ZapitDaq never "
-     "started (no Started event: its trigger was missed, or LaserOff or a stop came first)."),
+     "started (no Started event: its trigger was missed, or LaserOff or a stop came first), unless its outcome came "
+     "within 50 ms of the trigger, before Started could arrive (the Zapit event rows' samples settle that case)."),
     ("laserTriggerTime", "double", "s",
      "Harp time the workflow raised the Zapit trigger line (the laser, or at 0 mW the galvos and masking light alone): "
      "the first tick of the 1 ms Harp clock at or after laserToStimulusSeconds before the stimulus was due. NaN without "
