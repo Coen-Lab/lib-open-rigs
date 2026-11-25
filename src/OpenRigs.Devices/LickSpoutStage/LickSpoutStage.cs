@@ -46,16 +46,49 @@ namespace OpenRigs.Devices
         BaseRight
     }
 
+    /// <summary>The lick spout stage's five axes, in <see cref="SpoutPositions.AxisNames"/> order.</summary>
+    public enum SpoutAxis
+    {
+        /// <summary>The base's transverse axis.</summary>
+        BaseTransverse,
+        /// <summary>The left spout's radial axis.</summary>
+        RadialLeft,
+        /// <summary>The right spout's radial axis.</summary>
+        RadialRight,
+        /// <summary>The left spout's elevation axis.</summary>
+        ElevationLeft,
+        /// <summary>The right spout's elevation axis.</summary>
+        ElevationRight
+    }
+
+    /// <summary>
+    /// A move of one axis's in position, relative or absolute. Relative (<see cref="Steps"/>): + is the way BaseLeft,
+    /// LeftIn, RightIn, LeftUp and RightUp move, flipped like them on an axis wired <c>reversed: true</c>.
+    /// Absolute (<see cref="Position"/>): the raw motor step count from home, not flipped. Set exactly one of the two.
+    /// </summary>
+    public class SpoutMove
+    {
+        /// <summary>Gets or sets the axis moved.</summary>
+        public SpoutAxis Axis { get; set; }
+
+        /// <summary>Gets or sets the motor steps moved, signed; 0 when <see cref="Position"/> is set.</summary>
+        public int Steps { get; set; }
+
+        /// <summary>Gets or sets the in position the axis moves to, in raw motor steps from home (not flipped by <c>reversed</c>), or null for a relative move.</summary>
+        public int? Position { get; set; }
+    }
+
     /// <summary>
     /// The lick spout stage's state: the mouse's in positions, loaded once from its row of the rig's
     /// LickSpoutPositions.csv (or rig.yml's lickSpoutDefaultPosition when it has none), and the placement
-    /// last asked for. Each placement command outputs the stage's new target; each nudge changes the in
-    /// positions and outputs the current placement's target again; SpoutsDefault sets the in positions back
-    /// to rig.yml's default and places the spouts in; SaveSpoutPositions writes the mouse's row and outputs
-    /// the positions saved. The first output is the positions the stage started from.
+    /// last asked for. Each placement command outputs the stage's new target; each nudge or <see cref="SpoutMove"/>
+    /// changes the in positions and outputs the current placement's target again (a move from the second input
+    /// also a SpoutPositionsMoved event); SpoutsDefault sets the in positions back to rig.yml's default and places the
+    /// spouts in; SaveSpoutPositions writes the mouse's row and outputs the positions saved. The first output is
+    /// the positions the stage started from.
     /// </summary>
     [Combinator]
-    [Description("Turns lick spout stage commands into the stage's targets, in steps: loads the mouse's in positions from its row of PositionsFile (rig.yml's lickSpoutDefaultPosition if it has none), nudges them by StepSize, resets them to rig.yml's default (SpoutsDefault), saves them as its row, and places the spouts home, in, out, left only or right only.")]
+    [Description("Turns lick spout stage commands into the stage's targets, in steps: loads the mouse's in positions from its row of PositionsFile (rig.yml's lickSpoutDefaultPosition if it has none), nudges them by StepSize or moves them by (or to) the second input's SpoutMove, resets them to rig.yml's default (SpoutsDefault), saves them as its row, and places the spouts home, in, out, left only or right only.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class LickSpoutStage
     {
@@ -85,12 +118,20 @@ namespace OpenRigs.Devices
         /// <summary>The positions the stage started from, then each command's step: a new target, or the positions saved.</summary>
         public IObservable<LickSpoutStep> Process(IObservable<LickSpoutCommand> source)
         {
+            return Process(source, Observable.Empty<SpoutMove>());
+        }
+
+        /// <summary>The positions the stage started from, then each command's or move's step, one at a time.</summary>
+        public IObservable<LickSpoutStep> Process(IObservable<LickSpoutCommand> source, IObservable<SpoutMove> moves)
+        {
             return Observable.Defer(() =>
             {
                 var state = Start(RigFile, PositionsFile, SubjectId);
                 var started = new LickSpoutStep { Event = state.StartedFrom, Positions = state.In, SubjectId = SubjectId };
-                return Observable.Return(started).Concat(
-                    source.Select(command => state.Step(command, StepSize, RetractSteps)).Where(step => step != null));
+                var steps = Observable.Merge(
+                    source.Select(command => (Func<LickSpoutStep>)(() => state.Step(command, StepSize, RetractSteps))),
+                    moves.Select(move => (Func<LickSpoutStep>)(() => state.Step(move, RetractSteps))));
+                return Observable.Return(started).Concat(steps.Select(step => step()).Where(step => step != null));
             });
         }
 
@@ -150,12 +191,19 @@ namespace OpenRigs.Devices
                 return target == null ? null : new LickSpoutStep { Target = target };
             }
 
+            /// <summary>Applies a task's move: a <see cref="LickSpoutStep.Moved"/> step, with the new target unless the spouts are home; throws when the move sets both Steps and Position, or neither.</summary>
+            public LickSpoutStep Step(SpoutMove move, int retractSteps)
+            {
+                var name = SpoutPositions.AxisNames[(int)move.Axis];
+                if (move.Position.HasValue && move.Steps != 0) throw new InvalidOperationException("SpoutMove for " + name + " sets both Steps and Position; set one.");
+                if (!move.Position.HasValue && move.Steps == 0) throw new InvalidOperationException("SpoutMove for " + name + " sets neither Steps nor Position.");
+                var target = Move(move, retractSteps);
+                return new LickSpoutStep { Target = target, Event = LickSpoutStep.Moved, Positions = In, SubjectId = SubjectId, Move = move };
+            }
+
             /// <summary>Applies one command other than a save; the new target, or null when the stage does not move.</summary>
             public SpoutPositions Apply(LickSpoutCommand command, int stepSize, int retractSteps)
             {
-                var values = In.ToArray();
-                var nudged = Nudged(command);
-                if (nudged >= 0 && Wiring.Axes[nudged].Reversed) stepSize = -stepSize;
                 switch (command)
                 {
                     case LickSpoutCommand.SpoutsHome:
@@ -169,33 +217,37 @@ namespace OpenRigs.Devices
                         In = Wiring.Limit(SpoutPositions.FromRigFile(RigFile));
                         Placement = LickSpoutCommand.SpoutsIn;
                         return Target(retractSteps);
-                    case LickSpoutCommand.LeftUp: values[3] += stepSize; break;
-                    case LickSpoutCommand.LeftDown: values[3] -= stepSize; break;
-                    case LickSpoutCommand.RightUp: values[4] += stepSize; break;
-                    case LickSpoutCommand.RightDown: values[4] -= stepSize; break;
-                    case LickSpoutCommand.LeftIn: values[1] += stepSize; break;
-                    case LickSpoutCommand.LeftOut: values[1] -= stepSize; break;
-                    case LickSpoutCommand.RightIn: values[2] += stepSize; break;
-                    case LickSpoutCommand.RightOut: values[2] -= stepSize; break;
-                    case LickSpoutCommand.BaseLeft: values[0] += stepSize; break;
-                    case LickSpoutCommand.BaseRight: values[0] -= stepSize; break;
-                    default: throw new ArgumentOutOfRangeException(nameof(command), command, null);
+                    default: return Move(Nudge(command, stepSize), retractSteps);
                 }
+            }
+
+            /// <summary>Moves one axis's in position, relative or absolute and held to its limit; the current placement's new target, or null when home.</summary>
+            public SpoutPositions Move(SpoutMove move, int retractSteps)
+            {
+                var axis = (int)move.Axis;
+                var values = In.ToArray();
+                if (move.Position.HasValue) values[axis] = move.Position.Value;
+                else values[axis] += Wiring.Axes[axis].Reversed ? -move.Steps : move.Steps;
                 In = Wiring.Limit(SpoutPositions.FromArray(values));
                 return Placement == LickSpoutCommand.SpoutsHome ? null : Target(retractSteps);
             }
 
-            // The axis a nudge moves, in SpoutPositions.AxisNames order, or -1 for a placement.
-            static int Nudged(LickSpoutCommand command)
+            // A nudge as a move of one step size.
+            static SpoutMove Nudge(LickSpoutCommand command, int stepSize)
             {
                 switch (command)
                 {
-                    case LickSpoutCommand.BaseLeft: case LickSpoutCommand.BaseRight: return 0;
-                    case LickSpoutCommand.LeftIn: case LickSpoutCommand.LeftOut: return 1;
-                    case LickSpoutCommand.RightIn: case LickSpoutCommand.RightOut: return 2;
-                    case LickSpoutCommand.LeftUp: case LickSpoutCommand.LeftDown: return 3;
-                    case LickSpoutCommand.RightUp: case LickSpoutCommand.RightDown: return 4;
-                    default: return -1;
+                    case LickSpoutCommand.BaseLeft: return new SpoutMove { Axis = SpoutAxis.BaseTransverse, Steps = stepSize };
+                    case LickSpoutCommand.BaseRight: return new SpoutMove { Axis = SpoutAxis.BaseTransverse, Steps = -stepSize };
+                    case LickSpoutCommand.LeftIn: return new SpoutMove { Axis = SpoutAxis.RadialLeft, Steps = stepSize };
+                    case LickSpoutCommand.LeftOut: return new SpoutMove { Axis = SpoutAxis.RadialLeft, Steps = -stepSize };
+                    case LickSpoutCommand.RightIn: return new SpoutMove { Axis = SpoutAxis.RadialRight, Steps = stepSize };
+                    case LickSpoutCommand.RightOut: return new SpoutMove { Axis = SpoutAxis.RadialRight, Steps = -stepSize };
+                    case LickSpoutCommand.LeftUp: return new SpoutMove { Axis = SpoutAxis.ElevationLeft, Steps = stepSize };
+                    case LickSpoutCommand.LeftDown: return new SpoutMove { Axis = SpoutAxis.ElevationLeft, Steps = -stepSize };
+                    case LickSpoutCommand.RightUp: return new SpoutMove { Axis = SpoutAxis.ElevationRight, Steps = stepSize };
+                    case LickSpoutCommand.RightDown: return new SpoutMove { Axis = SpoutAxis.ElevationRight, Steps = -stepSize };
+                    default: throw new ArgumentOutOfRangeException(nameof(command), command, null);
                 }
             }
 
@@ -225,6 +277,9 @@ namespace OpenRigs.Devices
         /// <summary>The event of the positions SaveSpoutPositions wrote as the mouse's row.</summary>
         public const string Saved = "SpoutPositionsSaved";
 
+        /// <summary>The event of a task's move (LickSpoutStage.Moves): the new in positions after <see cref="Move"/>.</summary>
+        public const string Moved = "SpoutPositionsMoved";
+
         /// <summary>Gets or sets the stage's new target, or null when the step is an event.</summary>
         public SpoutPositions Target { get; set; }
 
@@ -237,14 +292,20 @@ namespace OpenRigs.Devices
         /// <summary>Gets or sets the mouse.</summary>
         public string SubjectId { get; set; }
 
-        /// <summary>The event's detail for the experiment's events log: the mouse and each axis's steps.</summary>
+        /// <summary>Gets or sets the task's move of a <see cref="Moved"/> event, or null.</summary>
+        public SpoutMove Move { get; set; }
+
+        /// <summary>The event's detail for the experiment's events log: the mouse, the move if any (baseTransverse+50, or baseTransverse=60 when absolute), and each axis's steps.</summary>
         public string Detail
         {
             get
             {
                 if (Positions == null) return null;
+                var invariant = System.Globalization.CultureInfo.InvariantCulture;
                 var values = Positions.ToArray();
-                return SubjectId + " " + string.Join(" ", SpoutPositions.AxisNames.Select((axis, i) => axis + "=" + values[i].ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                var move = Move == null ? "" : " " + SpoutPositions.AxisNames[(int)Move.Axis]
+                    + (Move.Position.HasValue ? "=" + Move.Position.Value.ToString(invariant) : Move.Steps.ToString("+0;-0;0", invariant));
+                return SubjectId + move + " " + string.Join(" ", SpoutPositions.AxisNames.Select((axis, i) => axis + "=" + values[i].ToString(invariant)));
             }
         }
     }

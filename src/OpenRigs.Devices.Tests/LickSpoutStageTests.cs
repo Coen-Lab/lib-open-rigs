@@ -154,6 +154,75 @@ namespace OpenRigs.Devices.Tests
             CollectionAssert.AreEqual(new[] { LickSpoutStep.FromDefault, "10,2000,2100,3000,3100", LickSpoutStep.Saved, "5,2000,2100,3000,3100" }, steps.ToArray());
         }
 
+        [TestMethod]
+        public void NoMovesBehavesAsOneInput()
+        {
+            var folder = TempFolder();
+            var commands = new[] { LickSpoutCommand.SpoutsIn, LickSpoutCommand.LeftUp, LickSpoutCommand.SpoutsOut, LickSpoutCommand.BaseRight };
+            Func<IObservable<LickSpoutStep>, string[]> run = steps => steps.Select(t => t.Target != null ? t.Target.ToString() : t.Event).ToList().Wait().ToArray();
+            var stage = new LickSpoutStage { RigFile = RigFile(folder), PositionsFile = Path.Combine(folder, "none.csv"), SubjectId = "M1", StepSize = 5 };
+            CollectionAssert.AreEqual(run(stage.Process(commands.ToObservable())), run(stage.Process(commands.ToObservable(), Observable.Empty<SpoutMove>())));
+        }
+
+        [TestMethod]
+        public void MovesRetargetThePlacementAndAreLoggedButSavedOnlyBySave()
+        {
+            var folder = TempFolder();
+            var list = Path.Combine(folder, "LickSpoutPositions.csv");
+            var stage = new LickSpoutStage { RigFile = RigFile(folder, Wiring.Replace("{0}", ", reversed: true, maxSteps: 2100")), PositionsFile = list, SubjectId = "M1", StepSize = 5 };
+            var commands = new Subject<LickSpoutCommand>();
+            var moves = new Subject<SpoutMove>();
+            var steps = new List<LickSpoutStep>();
+            stage.Process(commands, moves).Subscribe(steps.Add);
+
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.BaseTransverse, Steps = 50 });
+            Assert.IsNull(steps.Last().Target, "at home the in position moves, the stage does not");
+            Assert.AreEqual("M1 baseTransverse+50 baseTransverse=60 radialLeft=2000 radialRight=2100 elevationLeft=3000 elevationRight=3100", steps.Last().Detail);
+            commands.OnNext(LickSpoutCommand.SpoutsOut);
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.BaseTransverse, Steps = -30 });
+            Assert.AreEqual(LickSpoutStep.Moved, steps.Last().Event);
+            Assert.AreEqual("30,500,600,1500,1600", steps.Last().Target.ToString(), "the current placement, out, re-targeted at once");
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.RadialLeft, Steps = -200 });
+            Assert.AreEqual(2100, steps.Last().Positions.RadialLeft, "a reversed axis takes the move the other way, held to its maxSteps");
+            Assert.AreEqual("M1 radialLeft-200 baseTransverse=30 radialLeft=2100 radialRight=2100 elevationLeft=3000 elevationRight=3100", steps.Last().Detail);
+            commands.OnNext(LickSpoutCommand.LeftUp);
+            Assert.IsNull(steps.Last().Event, "a nudge logs nothing");
+            Assert.IsFalse(File.Exists(list), "a move is not saved");
+            commands.OnNext(LickSpoutCommand.SaveSpoutPositions);
+            CollectionAssert.AreEqual(new[] { Header, "M1,30,2100,2100,3005,3100" }, File.ReadAllLines(list));
+        }
+
+        [TestMethod]
+        public void AbsoluteMovesSetThePositionIgnoreReversedAndAreLimited()
+        {
+            var folder = TempFolder();
+            var stage = new LickSpoutStage { RigFile = RigFile(folder, Wiring.Replace("{0}", ", reversed: true, maxSteps: 2100")), PositionsFile = Path.Combine(folder, "none.csv"), SubjectId = "M1" };
+            var moves = new Subject<SpoutMove>();
+            var steps = new List<LickSpoutStep>();
+            stage.Process(Observable.Empty<LickSpoutCommand>(), moves).Subscribe(steps.Add);
+
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.RadialLeft, Position = 500 });
+            Assert.AreEqual(500, steps.Last().Positions.RadialLeft, "the raw step count, not flipped on a reversed axis");
+            Assert.AreEqual("M1 radialLeft=500 baseTransverse=10 radialLeft=500 radialRight=2100 elevationLeft=3000 elevationRight=3100", steps.Last().Detail);
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.RadialLeft, Position = 5000 });
+            Assert.AreEqual(2100, steps.Last().Positions.RadialLeft, "held to the axis limit");
+        }
+
+        [DataTestMethod]
+        [DataRow(5, 7)]
+        [DataRow(0, null)]
+        public void MovesSettingBothOrNeitherStepsNorPositionFail(int steps, int? position)
+        {
+            var folder = TempFolder();
+            var stage = new LickSpoutStage { RigFile = RigFile(folder), PositionsFile = Path.Combine(folder, "none.csv"), SubjectId = "M1" };
+            var moves = new Subject<SpoutMove>();
+            Exception error = null;
+            stage.Process(Observable.Empty<LickSpoutCommand>(), moves).Subscribe(_ => { }, e => error = e);
+            moves.OnNext(new SpoutMove { Axis = SpoutAxis.BaseTransverse, Steps = steps, Position = position });
+            Assert.IsInstanceOfType(error, typeof(InvalidOperationException));
+            StringAssert.Contains(error.Message, "baseTransverse");
+        }
+
         [DataTestMethod]
         [DataRow("1,2,3,4,5\n")]
         [DataRow(Header + "\nM1,1,2,3,4\n")]
