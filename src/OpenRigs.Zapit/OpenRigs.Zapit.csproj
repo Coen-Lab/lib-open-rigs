@@ -4,7 +4,7 @@
     <Description>Zapit optostimulation on an NI DAQ: trials concatenated from lib_zapit's bank and armed as finite AO on a trigger line, the scanner and laser calibration steps, and a simulated twin.</Description>
     <PackageTags>$(PackageTags) Zapit</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-zapit-native.20</Version>
+    <Version>0.1.1-zapit-native.21</Version>
   </PropertyGroup>
 
   <!--

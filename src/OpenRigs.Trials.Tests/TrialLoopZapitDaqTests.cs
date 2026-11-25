@@ -45,6 +45,22 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(1.5, times.LaserPowerMw, "the Armed event's CappedPowerMw, not the trial's 2 mW");
         }
 
+        // Merging main's stop-reply wait (Trials .24, 25 Nov 2026): ZapitDaq answers no StopStimulus, so a laser played until
+        // stopped never holds the next trial for one.
+        [TestMethod]
+        public void ALaserPlayedUntilStoppedNeverWaitsForAStopReply()
+        {
+            var rig = new LoopRig(Rules(), zapitDaq: true) { StopReplySeconds = null };
+            var arm = rig.RunTo(TrialEventKind.Arm);
+            rig.Armed(arm.Trial, 1.5);
+            rig.RunTo(TrialEventKind.Trigger);
+            rig.Started(arm.Trial);
+            rig.RunTo(TrialEventKind.Stimulus);
+            rig.Lick(0);
+            Assert.IsFalse(rig.Loop.AwaitingStopReply);
+            Assert.AreEqual(2, rig.RunTo(TrialEventKind.Arm).Trial.TrialNumber);
+        }
+
         // Audit 24 Nov 2026 C1: the trigger line went up but ZapitDaq never generated the trial (no Started; it ends Stopped
         // or Zeroed with 0 samples), so the row must not claim the laser fired.
         [TestMethod]
