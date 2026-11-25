@@ -132,6 +132,19 @@ namespace OpenRigs.Trials
             return timed == null ? LaserCapSeconds : Math.Min(LaserCapSeconds, DurationOf(trial));
         }
 
+        /// <summary>How long a laser played until stopped (AtOutcome, AtStimulusOff) runs from its trigger before its own ramp, in
+        /// seconds, as ZapitDaq arms it: under AtStimulusOff with a timed stimulus its stimulus's own off (laserToStimulusSeconds plus
+        /// StimulusDurationSeconds), at most its LaserCap; else its LaserCap; 0 with no cap (until stopped, at most maxTrialSeconds).
+        /// The samples end there with no early stop, so a laser never outlasts its cap or its stimulus's own off; an early stop
+        /// ends it sooner (an off after the answer, an outcome before the stimulus).</summary>
+        public double ArmedSecondsOf(ITrial trial, TrialTiming timing)
+        {
+            var seconds = CapOf(trial);
+            var off = timing.LaserToStimulusSeconds + timing.StimulusDurationSeconds;
+            if (End == LaserEnd.AtStimulusOff && off > 0) seconds = Math.Min(seconds, off);   // NaN with no duration: the cap
+            return double.IsInfinity(seconds) ? 0 : seconds;
+        }
+
         /// <summary>The laser on for each trial's own duration from the trigger (every laser trial an ILaserDurationTrial); the next trial armed rampDownSeconds after the line falls.</summary>
         public static LaserTiming ForDuration(bool hardwareTriggered, double rampDownSeconds)
         {
@@ -421,5 +434,9 @@ namespace OpenRigs.Trials
 
         /// <summary>Gets the outcome (Outcome).</summary>
         public TOutcome Outcome { get; private set; }
+
+        /// <summary>Gets how long the trial's laser runs from its trigger before its ramp as Zapit is armed (Arm, with a laser
+        /// played until stopped: LaserTiming.ArmedSecondsOf); 0 otherwise.</summary>
+        public double LaserSeconds { get; internal set; }
     }
 }

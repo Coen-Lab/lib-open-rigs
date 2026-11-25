@@ -147,7 +147,9 @@ namespace OpenRigs.Trials
                 armSent = true;
                 armSentAt = now;
                 awaitingReply = trial;
-                events.Add(Event(TrialEventKind.Arm, now, trial, null));
+                var arm = Event(TrialEventKind.Arm, now, trial, null);
+                if (zapitDaq && laser.UntilStopped) arm.LaserSeconds = laser.ArmedSecondsOf(trial, timing);
+                events.Add(arm);
             }
             if (phase == Phase.Iti && now >= wait.TrialStartTime - TrialLoop.Tolerance) Begin(events);
             else if (phase == Phase.Running) Run(events);

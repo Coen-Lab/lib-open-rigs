@@ -57,3 +57,20 @@ def test_rising_laser_limits():
     rig["zapit"]["laserMinMaxMw"] = [50, 0]
     with pytest.raises(ValidationError, match="laserMinMaxMw must rise"):
         LabRig.model_validate(rig)
+
+
+def test_the_trigger_filter_defaults_to_one_millisecond_and_zero_turns_it_off():
+    rig = load("B2-both")
+    assert LabRig.model_validate(rig).zapit.trigger_filter_seconds == 0.001
+    rig["zapit"]["triggerFilterSeconds"] = 0
+    assert LabRig.model_validate(rig).zapit.trigger_filter_seconds == 0
+    rig["zapit"]["triggerFilterSeconds"] = 0.005
+    assert LabRig.model_validate(rig).zapit.trigger_filter_seconds == 0.005
+
+
+@pytest.mark.parametrize("seconds", [-0.001, 0.01, 1])
+def test_a_trigger_filter_outside_zero_to_ten_milliseconds_is_refused(seconds):
+    rig = load("B2-both")
+    rig["zapit"]["triggerFilterSeconds"] = seconds
+    with pytest.raises(ValidationError, match="triggerFilterSeconds"):
+        LabRig.model_validate(rig)

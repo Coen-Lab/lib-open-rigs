@@ -132,7 +132,7 @@ def zapit_daq_for_task_problems(root: ET.Element) -> list[str]:
     for channel in ("GalvoXChannel", "GalvoYChannel", "LaserChannel", "LedChannel", "PhotodiodeChannel"):
         if mapped.get(channel) != channel + "Path":
             problems.append(f"ZapitDaq's {channel} is not mapped from {channel}Path")
-    for name in ("TriggerTerminal", "SampleRate", "MaxTrialSeconds", "EarlyStopLeadSeconds"):
+    for name in ("TriggerTerminal", "SampleRate", "MaxTrialSeconds", "EarlyStopLeadSeconds", "TriggerFilterSeconds"):
         if mapped.get(name) != name:
             problems.append(f"ZapitDaq's {name} is not mapped from rig.yml's zapit block")
     if mapped.get("CeilingMw") != "LaserCeilingMw":

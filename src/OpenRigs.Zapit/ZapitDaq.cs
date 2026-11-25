@@ -24,7 +24,7 @@ namespace OpenRigs.Zapit
     /// ceiling comes from), and a bank holding one, built under a ceiling above <see cref="CeilingMw"/> (peak), or delivering
     /// more average power than it asked (average), is refused at LoadBank. The simulated twin starts a trial on a Trigger
     /// command, as the NI DAQ on its line. A trial that has played is noticed at the next Arm as well as by polling. The first
-    /// trial that can stop early (until the outcome) is refused unless <see cref="EarlyStopLeadSeconds"/> reaches past the
+    /// trial armed with no duration (until the outcome) is refused unless <see cref="EarlyStopLeadSeconds"/> reaches past the
     /// device's onboard buffer and one scan cycle, so a lead too short fails at once, not at a random early stop.
     /// </summary>
     [Description("Runs Zapit trials and calibration steps on the rig's NI DAQ, or its simulated twin.")]
@@ -89,6 +89,11 @@ namespace OpenRigs.Zapit
         [Description("How far ahead of the generated samples an early stop writes its ramp, in seconds: more than the onboard buffer and one scan cycle.")]
         public double EarlyStopLeadSeconds { get; set; }
 
+        /// <summary>The minimum pulse width of the NI digital filter on the trigger line, in seconds: 0 turns it off. The filter delays
+        /// the recognised edge by up to this width; the trigger is a level held about 1 s, so 1 ms rejects glitches without missing triggers.</summary>
+        [Description("Minimum pulse width of the digital filter on the trigger line, in seconds: a glitch shorter than it does not start a trial. 0 turns the filter off.")]
+        public double TriggerFilterSeconds { get; set; } = 0.001;
+
         /// <summary>Tests replace the device; null takes <see cref="Simulated"/>.</summary>
         [XmlIgnore, Browsable(false)]
         internal Func<IZapitDevice>? DeviceFactory { get; set; }
@@ -105,6 +110,7 @@ namespace OpenRigs.Zapit
         {
             if (!(SampleRate > 0) || !(MaxTrialSeconds > 0) || !(EarlyStopLeadSeconds > 0))
                 throw new InvalidOperationException("ZapitDaq needs SampleRate, MaxTrialSeconds and EarlyStopLeadSeconds above 0 (rig.yml's zapit block).");
+            ZapitDeviceChecks.TriggerFilter(TriggerFilterSeconds);
             var wiring = new ZapitWiring
             {
                 AnalogOutputs = new[] { GalvoXChannel, GalvoYChannel, LaserChannel, LedChannel },
@@ -244,12 +250,13 @@ namespace OpenRigs.Zapit
             {
                 long lead = (long)Math.Ceiling(node.EarlyStopLeadSeconds * loaded.SampleRate);
                 long cycle = loaded.Conditions.Max(c => c.ScanCycle.Length);
-                long minimum = device.OnboardSamples + cycle;
+                long onboard = device.OnboardSamples;   // read with the task armed: NI has no onboard buffer once it is deleted
+                long minimum = onboard + cycle;
                 if (lead > minimum) return;
                 device.WriteOnDemand(Zeros);   // deletes the armed task: the lines at 0 V
                 throw new InvalidOperationException(string.Format(System.Globalization.CultureInfo.InvariantCulture,
                     "rig.yml's zapit.earlyStopLeadSeconds ({0} s, {1} samples) must be more than the DAQ's onboard buffer ({2} samples per channel) plus one scan cycle ({3} samples): above {4} s at {5} samples/s. Raise earlyStopLeadSeconds before running trials that stop early.",
-                    node.EarlyStopLeadSeconds, lead, device.OnboardSamples, cycle, minimum / loaded.SampleRate, loaded.SampleRate));
+                    node.EarlyStopLeadSeconds, lead, onboard, cycle, minimum / loaded.SampleRate, loaded.SampleRate));
             }
 
             void Arm(ZapitDaqCommand command)
@@ -268,7 +275,7 @@ namespace OpenRigs.Zapit
                 var samples = loaded.Assemble(command.Condition, variant, cycles);
                 RefuseLaser(Laser(samples), $"Trial {command.Trial}'s bank samples");
                 device.WriteOnDemand(Zeros);
-                device.ArmFinite(samples, loaded.SampleRate, node.TriggerTerminal);
+                device.ArmFinite(samples, loaded.SampleRate, node.TriggerTerminal, node.TriggerFilterSeconds);
                 if (!(command.DurationSeconds > 0) && !leadChecked)
                 {
                     CheckLead(loaded);

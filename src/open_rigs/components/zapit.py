@@ -105,6 +105,9 @@ ZAPIT_DAQ_REQUIRED = ("device", "galvo_x_channel", "galvo_y_channel", "laser_cha
                       "trigger_channel", "sample_rate", "laser_min_max_mw", "laser_min_max_control_volts", "ceiling_mw",
                       "max_trial_seconds", "early_stop_lead_seconds", "microns_per_pixel", "volts_per_pixel", "safety_gate", "camera")
 
+# The trigger filter's widest minimum pulse: the trigger is a level held about 1 s, so a wider filter would start eating it.
+ZAPIT_TRIGGER_FILTER_LIMIT_SECONDS = 0.01
+
 
 class Zapit(BaseSchema):
     """Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings
@@ -131,7 +134,11 @@ class Zapit(BaseSchema):
     laser_min_max_control_volts: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's control volts at its lowest and highest power.")
     ceiling_mw: Optional[float] = Field(default=None, ge=0, description="This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
     max_trial_seconds: Optional[float] = Field(default=None, gt=0, description="The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.")
-    early_stop_lead_seconds: Optional[float] = Field(default=None, gt=0, description="How far ahead of the samples generated an early stop writes its ramp, in seconds.")
+    early_stop_lead_seconds: Optional[float] = Field(default=None, gt=0, description="How far ahead of the samples generated an early stop writes its ramp, in seconds: more than the DAQ's onboard buffer plus the bank's longest scan cycle, which ZapitDaq checks at the first trial armed with no duration. The lab's is 0.08 (a USB-6453's 4095 samples per channel and a 40 Hz cycle at 100000 samples/s need above 0.06595).")
+    trigger_filter_seconds: float = Field(
+        default=0.001, ge=0, lt=ZAPIT_TRIGGER_FILTER_LIMIT_SECONDS,
+        description="Minimum pulse width of the NI card's digital filter on the trigger line (triggerChannel), in seconds: an edge pair closer than this is a glitch and does not start a trial. The filter delays the recognised edge by up to this width; the trigger is a level held about 1 s, so the default 1 ms rejects glitches without missing triggers. 0 turns the filter off. Optional, and not part of the native fields a block gives together.",
+    )
     microns_per_pixel: Optional[float] = Field(default=None, gt=0, description="The Zapit camera's scale at the sample, in microns a pixel.")
     volts_per_pixel: Optional[float] = Field(default=None, gt=0, description="The galvos' volts a camera pixel, the scanner calibration's starting guess.")
     invert_x_scanner: bool = Field(default=False, description="Whether the X galvo moves against the camera's X.")

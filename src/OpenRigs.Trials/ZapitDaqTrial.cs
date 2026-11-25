@@ -39,8 +39,9 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>A trial's Arm command: its condition, the laser on at its power or off, for its laser duration (an
-        /// ILaserDurationTrial) unless untilStopped (LaserTiming.UntilStopped), else until an early stop (0).</summary>
-        public static ZapitDaqCommand Arm(IZapitTrial trial, bool untilStopped = false)
+        /// ILaserDurationTrial) unless untilStopped (LaserTiming.UntilStopped), else for laserSeconds, the most it plays before an
+        /// early stop (its Arm event's LaserSeconds; 0 until the early stop, at most maxTrialSeconds).</summary>
+        public static ZapitDaqCommand Arm(IZapitTrial trial, bool untilStopped = false, double laserSeconds = 0)
         {
             if (trial.LaserCondition < 1) throw new InvalidOperationException(string.Format("Trial {0} has laser condition {1}; a laser trial's is from 1.", trial.TrialNumber, trial.LaserCondition));
             var timed = trial as ILaserDurationTrial;
@@ -51,7 +52,7 @@ namespace OpenRigs.Trials
                 Condition = trial.LaserCondition,
                 LaserOn = trial.LaserOn,
                 PowerMw = trial.LaserOn ? trial.LaserPowerMw : 0,
-                DurationSeconds = timed != null && !untilStopped ? timed.LaserDurationSeconds : 0,
+                DurationSeconds = timed != null && !untilStopped ? timed.LaserDurationSeconds : laserSeconds,
             };
         }
 
@@ -105,21 +106,22 @@ namespace OpenRigs.Trials
     /// <summary>Each trial's Arm for ZapitDaq (<see cref="ZapitDaqTrial.Arm"/>), sent as the loop arms it during the interval.</summary>
     [Combinator]
     [Description("Each laser trial's ZapitDaq Arm: its condition, the laser on at its power or off (galvos and masking light either way), " +
-        "for the trial's laser duration (an ILaserDurationTrial), else, or with UntilStopped, until an early stop. Input: the trial at its Arm event.")]
+        "for the trial's laser duration (an ILaserDurationTrial), else, or with UntilStopped, for the Arm event's LaserSeconds (its cap, or its stimulus's own off), " +
+        "the early stop ending it sooner. Input: the loop's Arm events.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitDaqTrialCommand
     {
-        /// <summary>Gets or sets whether every trial plays until its early stop, no duration sent, even a trial's with its own laser duration.</summary>
-        [Description("Whether every trial plays until its early stop (no duration sent), even a trial's with its own laser duration. Map it from the rules' LaserTiming.UntilStopped.")]
+        /// <summary>Gets or sets whether every trial plays until its early stop, for its Arm event's LaserSeconds, even a trial's with its own laser duration.</summary>
+        [Description("Whether every trial plays until its early stop, for at most its Arm event's LaserSeconds, even a trial's with its own laser duration. Map it from the rules' LaserTiming.UntilStopped.")]
         public bool UntilStopped { get; set; }
 
-        /// <summary>Each trial's Arm; UntilStopped is read at subscription.</summary>
-        public IObservable<ZapitDaqCommand> Process<TTrial>(IObservable<TTrial> source) where TTrial : IZapitTrial
+        /// <summary>Each Arm event's Arm; UntilStopped is read at subscription.</summary>
+        public IObservable<ZapitDaqCommand> Process<TTrial, TUpdate, TOutcome>(IObservable<TrialEvent<TTrial, TUpdate, TOutcome>> source) where TTrial : IZapitTrial
         {
             return Observable.Defer(() =>
             {
                 var untilStopped = UntilStopped;
-                return source.Select(trial => ZapitDaqTrial.Arm(trial, untilStopped));
+                return source.Select(e => ZapitDaqTrial.Arm(e.Trial, untilStopped, e.LaserSeconds));
             });
         }
     }

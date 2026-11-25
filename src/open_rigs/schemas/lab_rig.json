@@ -2025,8 +2025,16 @@
             }
           ],
           "default": null,
-          "description": "How far ahead of the samples generated an early stop writes its ramp, in seconds.",
+          "description": "How far ahead of the samples generated an early stop writes its ramp, in seconds: more than the DAQ's onboard buffer plus the bank's longest scan cycle, which ZapitDaq checks at the first trial armed with no duration. The lab's is 0.08 (a USB-6453's 4095 samples per channel and a 40 Hz cycle at 100000 samples/s need above 0.06595).",
           "title": "EarlyStopLeadSeconds"
+        },
+        "triggerFilterSeconds": {
+          "default": 0.001,
+          "description": "Minimum pulse width of the NI card's digital filter on the trigger line (triggerChannel), in seconds: an edge pair closer than this is a glitch and does not start a trial. The filter delays the recognised edge by up to this width; the trigger is a level held about 1 s, so the default 1 ms rejects glitches without missing triggers. 0 turns the filter off. Optional, and not part of the native fields a block gives together.",
+          "exclusiveMaximum": 0.01,
+          "minimum": 0,
+          "title": "TriggerFilterSeconds",
+          "type": "number"
         },
         "micronsPerPixel": {
           "anyOf": [

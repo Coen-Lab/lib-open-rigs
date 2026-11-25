@@ -307,10 +307,49 @@ namespace OpenRigs.Zapit.Tests
             public readonly List<string> Writes = new List<string>();
             public Features(Dictionary<string, object> values) => Values = values;
             public bool Has(string name) => Values.ContainsKey(name);
+            // Like a Basler camera: with an auto mode Continuous, the exposure (or gain) exists and reads but cannot be written.
+            bool Auto(string name) => Values.TryGetValue(name, out var mode) && (string)mode == "Continuous";
+            void CheckWritable(string name)
+            {
+                if ((name.StartsWith("ExposureTime") && Auto("ExposureAuto")) || (name.StartsWith("Gain") && Auto("GainAuto")))
+                    throw new InvalidOperationException(name + " is not writable");
+            }
             public string GetEnum(string name) => (string)Values[name];
             public void SetEnum(string name, string value) { Writes.Add(name + "=" + value); Values[name] = value; }
             public double GetFloat(string name) => (double)Values[name];
-            public void SetFloat(string name, double value) { Writes.Add(name + "=" + value); Values[name] = value; }
+            public void SetFloat(string name, double value) { CheckWritable(name); Writes.Add(name + "=" + value); Values[name] = value; }
+            public long GetInteger(string name) => (long)Values[name];
+            public void SetInteger(string name, long value) { Writes.Add(name + "=" + value); Values[name] = value; }
+        }
+
+        // Auto exposure Continuous makes ExposureTime read-only: the auto modes go off first and are put back last.
+        [TestMethod]
+        public void CameraExposureTurnsAutoOffBeforeSettingAReadOnlyExposure()
+        {
+            var camera = new Features(new Dictionary<string, object> { ["ExposureTime"] = 31000.0, ["Gain"] = 2.0, ["DigitalShift"] = 4L, ["ExposureAuto"] = "Continuous", ["GainAuto"] = "Continuous" });
+            var exposure = new CameraExposure(camera);
+            exposure.Apply(new ZapitCameraSettings { ExposureUs = 2000, GainDb = 0 });
+            Assert.AreEqual("Off", camera.Values["ExposureAuto"]);
+            Assert.AreEqual(2000.0, camera.Values["ExposureTime"]);
+            camera.Writes.Clear();
+            exposure.Apply(new ZapitCameraSettings { Restore = true });
+            Assert.AreEqual(31000.0, camera.Values["ExposureTime"]);
+            Assert.AreEqual(2.0, camera.Values["Gain"]);
+            Assert.AreEqual(4L, camera.Values["DigitalShift"]);
+            CollectionAssert.AreEqual(new[] { "ExposureTime=31000", "Gain=2", "DigitalShift=4", "ExposureAuto=Continuous", "GainAuto=Continuous" }, camera.Writes);
+        }
+
+        // A session .pfs DigitalShift is 0 for the grid and back after.
+        [TestMethod]
+        public void CameraExposureZeroesDigitalShiftForTheGridAndPutsItBack()
+        {
+            var camera = new Features(new Dictionary<string, object> { ["ExposureTime"] = 31000.0, ["Gain"] = 2.0, ["DigitalShift"] = 4L });
+            var exposure = new CameraExposure(camera);
+            exposure.Apply(new ZapitCameraSettings { ExposureUs = 2000, GainDb = 0 });
+            Assert.AreEqual(0L, camera.Values["DigitalShift"]);
+            exposure.Apply(new ZapitCameraSettings { ExposureUs = 1500, GainDb = 1 });
+            exposure.Apply(new ZapitCameraSettings { Restore = true });
+            Assert.AreEqual(4L, camera.Values["DigitalShift"]);
         }
 
         // Auto off before the fixed values; the camera's own values back, then its auto modes; a second grid keeps the first saved.

@@ -223,6 +223,100 @@ namespace OpenRigs.Trials.Tests
             StringAssert.Contains(stop.Message, "Trial 2 cannot arm while trial 1 still plays");
         }
 
+        /// <summary>The simulated twin with NI-DAQmx's write into a running buffer: DAQmx waits for space in the buffer, so a
+        /// WriteAt returns only once the samples it would overwrite have been generated, too late to change them (the clock moves
+        /// on to then, as the workflow's thread waited on the rig).</summary>
+        sealed class NiWriteDevice : IZapitDevice
+        {
+            public readonly SimulatedZapitDevice Twin;
+            readonly Action advance;
+
+            public NiWriteDevice(SimulatedZapitDevice twin, Action advance)
+            {
+                Twin = twin;
+                this.advance = advance;
+            }
+
+            public void WriteAt(double[,] samples, long firstSample)
+            {
+                while (!Twin.IsDone && Twin.SamplesGenerated < firstSample + samples.GetLength(1)) advance();
+            }
+
+            public void WriteOnDemand(double[] volts) { Twin.WriteOnDemand(volts); }
+            public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal, double triggerFilterSeconds) { Twin.ArmFinite(samples, sampleRate, triggerTerminal, triggerFilterSeconds); }
+            public long SamplesGenerated { get { return Twin.SamplesGenerated; } }
+            public long OnboardSamples { get { return Twin.OnboardSamples; } }
+            public bool HasClockedTask { get { return Twin.HasClockedTask; } }
+            public bool IsDone { get { return Twin.IsDone; } }
+            public void StopClocked() { Twin.StopClocked(); }
+            public double[] Staircase(double[,] samples, double sampleRate) { return Twin.Staircase(samples, sampleRate); }
+            public void Dispose() { Twin.Dispose(); }
+        }
+
+        // Rig, 25 Nov 2026 (laserEnd stimulusOff, laserDurationSeconds 2, maxTrialSeconds 3): the loop's LaserOff and so the
+        // EarlyStop came at StimulusOff, but every trial was Armed with no duration and NI could not rewrite its buffer in time, so
+        // the laser played the whole 3 s buffer (Stopped at 297901 of 300000 samples, logged at the next trial's Arm, at the
+        // outcome). A stimulus with its own off is armed to end there: its samples and ramp end by themselves, early stop or not.
+        [TestMethod]
+        public void AStimulusOffLaserEndsAtItsStimulusOffThoughNiCannotRewriteTheBuffer()
+        {
+            var bank = ZapitDaqTrialTests.UnpackBank();
+            double clock = 0;
+            var device = new NiWriteDevice(new SimulatedZapitDevice { AutoTrigger = false, Clock = () => System.Threading.Volatile.Read(ref clock) },
+                () => System.Threading.Volatile.Write(ref clock, System.Threading.Volatile.Read(ref clock) + 0.001));
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, EarlyStopLeadSeconds = 0.05, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
+            var hold = ZapitDaqTrial.FreeAfterLaserSeconds(ZapitBank.Load(bank)) + node.EarlyStopLeadSeconds;
+            var commands = new Subject<ZapitDaqCommand>();
+            var zapitEvents = new System.Collections.Concurrent.ConcurrentQueue<ZapitDaqEvent>();
+            var ended = new List<ZapitDaqEvent>();
+            Exception error = null;
+            // The 1.5 s stimulus 0.1 s after the trigger, the response window 0.5 to 2.5 s after it in full, a 2 s cap.
+            var rules = new StubRules
+            {
+                Plan = n => new TrialTiming { ItiSeconds = 3, LaserToStimulusSeconds = 0.1, Laser = true, StimulusDurationSeconds = 1.5, ResponseDelaySeconds = 0.5, ResponseWindowSeconds = 2, ResponseWindowAlwaysFull = true },
+                Laser = LaserTiming.UntilStimulusOff(hold, 2),
+            };
+            var rig = new LoopRig(rules, zapitDaq: true);
+            using (node.Process(commands).Subscribe(zapitEvents.Enqueue, e => error = e))
+            {
+                commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.LoadBank, Path = bank });
+                bool trigger = false, stopped = false;
+                while (rig.Of(TrialEventKind.Arm).Count() < 2 && error == null)
+                {
+                    var before = rig.Events.Count;
+                    rig.Tick();
+                    System.Threading.Volatile.Write(ref clock, Math.Max(System.Threading.Volatile.Read(ref clock), rig.Now));
+                    if (trigger) device.Twin.Trigger();   // the line's edge, a tick late
+                    trigger = false;
+                    foreach (var e in rig.Events.Skip(before).ToList())
+                    {
+                        if (e.Kind == TrialEventKind.Arm) commands.OnNext(ZapitDaqTrial.Arm(e.Trial, rules.Laser.UntilStopped, e.LaserSeconds));
+                        if (e.Kind == TrialEventKind.Trigger) trigger = true;
+                        if ((e.Kind == TrialEventKind.LaserOff || e.Kind == TrialEventKind.LaserCap) && !stopped)   // ZapitDaqTrials: once a trial
+                        {
+                            stopped = true;
+                            commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.EarlyStop, Trial = e.Trial.TrialNumber });
+                        }
+                    }
+                    ZapitDaqEvent z;
+                    while (zapitEvents.TryDequeue(out z))
+                    {
+                        if (z.Kind == ZapitDaqEventKind.Stopped || z.Kind == ZapitDaqEventKind.Ended) ended.Add(z);
+                        rig.Loop.OnZapitEvent(z);
+                    }
+                }
+            }
+            Assert.IsNull(error, error == null ? "" : error.Message);
+            var off = rig.Of(TrialEventKind.StimulusOff).Single().Seconds;
+            Assert.AreEqual(off, rig.Of(TrialEventKind.LaserOff).Single().Seconds, "the early stop at StimulusOff");
+            Assert.IsTrue(off < rig.Of(TrialEventKind.Outcome).Single().Seconds - 0.9, "StimulusOff a second before the outcome");
+            Assert.AreEqual(0, rig.Of(TrialEventKind.LaserCap).Count());
+            // 1.6 s from the trigger is 64 whole 25 ms cycles, then the 250 ms ramp: 185000 samples, the last with the laser at 0 V.
+            var trial1 = ended.Single(z => z.Trial == 1);
+            Assert.AreEqual(185000, trial1.Samples, "armed for the stimulus's own off, not maxTrialSeconds");
+            Assert.AreEqual(185000, trial1.SamplesGenerated, "its own ramp played to its end");
+        }
+
         // Audit F F4: a Started before the trial's trigger (a stray edge, or a device that starts at arming) stops the
         // workflow; after it, the row says laserStarted.
         [TestMethod]

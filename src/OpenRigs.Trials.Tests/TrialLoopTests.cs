@@ -521,6 +521,36 @@ namespace OpenRigs.Trials.Tests
             StringAssert.Contains(Refusal(() => LaserTiming.UntilStimulusOff(true, 0.3, 0)), "laserCapSeconds");
         }
 
+        // ZapitDaq arms a laser played until stopped for at most its stimulus's own off (a timed stimulus, UntilStimulusOff) or its
+        // cap (the StubTrial's own 2.5 s when shorter), 0 with none; a timed laser (ForDuration) has no LaserOff, LaserCap or LaserSeconds.
+        [TestMethod]
+        public void ZapitDaqArmsALaserUntilStoppedForItsStimulusOffOrItsCap()
+        {
+            var trial = new StubTrial { TrialNumber = 1 };
+            Assert.AreEqual(1.3, LaserTiming.UntilStimulusOff(0.3, 10).ArmedSecondsOf(trial, OffTiming(0.8, null)), 1e-12, "0.5 s lead + 0.8 s stimulus");
+            Assert.AreEqual(1.3, LaserTiming.UntilStimulusOff(0.3, 10).ArmedSecondsOf(trial, OffTiming(0.8, 0.2)), 1e-12, "an off after the answer only comes sooner");
+            Assert.AreEqual(1.0, LaserTiming.UntilStimulusOff(0.3, 1).ArmedSecondsOf(trial, OffTiming(0.8, null)), 1e-12, "the cap");
+            Assert.AreEqual(2.5, LaserTiming.UntilStimulusOff(0.3, 10).ArmedSecondsOf(trial, OffTiming(double.NaN, 0.2)), 1e-12, "no duration: the trial's own cap");
+            Assert.AreEqual(2.5, LaserTiming.UntilOutcome(0.3, 10).ArmedSecondsOf(trial, OffTiming(0.8, null)), 1e-12, "until the outcome: the cap");
+            Assert.AreEqual(1.0, LaserTiming.UntilOutcome(0.3, 1).ArmedSecondsOf(new TimelessTrial(), OffTiming(0.8, null)), 1e-12);
+            Assert.AreEqual(0, LaserTiming.UntilOutcome(0.3, double.PositiveInfinity).ArmedSecondsOf(new TimelessTrial(), OffTiming(0.8, null)), "no cap: until stopped");
+
+            var off = new LoopRig(new StubRules { Plan = n => OffTiming(0.8, null), Laser = LaserTiming.UntilStimulusOff(0.3, 10) }, zapitDaq: true);
+            Assert.AreEqual(1.3, off.RunTo(TrialEventKind.Arm).LaserSeconds, 1e-12);
+            var timed = new LoopRig(new StubRules { Plan = n => OffTiming(0.8, null), Laser = LaserTiming.ForDuration(0.3) }, zapitDaq: true);
+            var arm = timed.RunTo(TrialEventKind.Arm);
+            Assert.AreEqual(0, arm.LaserSeconds, "its Arm carries the trial's own duration");
+            timed.Armed(arm.Trial, 2);
+            timed.RunTo(TrialEventKind.Outcome);
+            timed.RunTo(TrialEventKind.Arm);
+            Assert.IsFalse(timed.Of(TrialEventKind.LaserOff).Any() || timed.Of(TrialEventKind.LaserCap).Any(), "no early stop");
+        }
+
+        class TimelessTrial : ITrial
+        {
+            public int TrialNumber { get; set; }
+        }
+
         [TestMethod]
         public void LicksCountOnlyInTheResponseWindowAndItsEndIsTheRulesOutcome()
         {

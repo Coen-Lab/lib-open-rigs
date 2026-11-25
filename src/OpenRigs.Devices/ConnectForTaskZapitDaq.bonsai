@@ -92,6 +92,7 @@
                 <Property Name="SampleRate" Selector="SampleRate" />
                 <Property Name="MaxTrialSeconds" Selector="MaxTrialSeconds" />
                 <Property Name="EarlyStopLeadSeconds" Selector="EarlyStopLeadSeconds" />
+                <Property Name="TriggerFilterSeconds" Selector="TriggerFilterSeconds" />
                 <Property Name="CeilingMw" Selector="LaserCeilingMw" />
                 <Property Name="LaserMaxVolts" Selector="LaserMaxControlVolts" />
               </PropertyMappings>

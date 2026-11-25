@@ -9,7 +9,7 @@ using Bonsai.Pylon;
 
 namespace OpenRigs.Zapit
 {
-    /// <summary>The Zapit camera's exposure and gain for a grid run (auto exposure and auto gain off), or the camera's
+    /// <summary>The Zapit camera's exposure and gain for a grid run (auto exposure and auto gain off, DigitalShift 0), or the camera's
     /// own settings put back once the run ends.</summary>
     public class ZapitCameraSettings
     {
@@ -34,9 +34,13 @@ namespace OpenRigs.Zapit
         void SetEnum(string name, string value);
         double GetFloat(string name);
         void SetFloat(string name, double value);
+        long GetInteger(string name);
+        void SetInteger(string name, long value);
     }
 
-    /// <summary>Applies a grid run's exposure and gain, auto exposure and auto gain off, and puts back what the camera had.</summary>
+    /// <summary>Applies a grid run's exposure and gain, auto exposure and auto gain off and DigitalShift 0 (so a session .pfs
+    /// DigitalShift does not move the grid's frames off the camera's plain 8-bit range the spot-size threshold assumes), and
+    /// puts back what the camera had.</summary>
     internal sealed class CameraExposure
     {
         readonly ICameraFeatures camera;
@@ -44,7 +48,8 @@ namespace OpenRigs.Zapit
 
         public CameraExposure(ICameraFeatures camera) => this.camera = camera;
 
-        /// <summary>The first of the names the camera has (USB3 cameras name it ExposureTime, older GigE ones ExposureTimeAbs).</summary>
+        /// <summary>The first of the names the camera has, writable or not: an auto mode left on makes the feature read-only
+        /// (USB3 cameras name it ExposureTime, older GigE ones ExposureTimeAbs).</summary>
         string Feature(params string[] names)
         {
             foreach (var name in names) if (camera.Has(name)) return name;
@@ -54,24 +59,32 @@ namespace OpenRigs.Zapit
         public void Apply(ZapitCameraSettings settings)
         {
             if (settings.Restore) { Restore(); return; }
-            var exposure = Feature("ExposureTime", "ExposureTimeAbs");
-            var gain = Feature("Gain", "GainAbs");
             if (saved == null)
             {
-                saved = new Dictionary<string, object> { [exposure] = camera.GetFloat(exposure), [gain] = camera.GetFloat(gain) };
+                saved = new Dictionary<string, object>();
                 foreach (var auto in new[] { "ExposureAuto", "GainAuto" })
                     if (camera.Has(auto)) saved[auto] = camera.GetEnum(auto);
             }
             foreach (var auto in new[] { "ExposureAuto", "GainAuto" })
-                if (camera.Has(auto)) camera.SetEnum(auto, "Off");   // an auto mode left on overrides a fixed value
+                if (camera.Has(auto)) camera.SetEnum(auto, "Off");   // an auto mode left on overrides a fixed value and makes it read-only
+            var exposure = Feature("ExposureTime", "ExposureTimeAbs");
+            var gain = Feature("Gain", "GainAbs");
+            if (!saved.ContainsKey(exposure)) saved[exposure] = camera.GetFloat(exposure);
+            if (!saved.ContainsKey(gain)) saved[gain] = camera.GetFloat(gain);
             camera.SetFloat(exposure, settings.ExposureUs);
             camera.SetFloat(gain, settings.GainDb);
+            if (camera.Has("DigitalShift"))
+            {
+                if (!saved.ContainsKey("DigitalShift")) saved["DigitalShift"] = camera.GetInteger("DigitalShift");
+                camera.SetInteger("DigitalShift", 0);
+            }
         }
 
         void Restore()
         {
             if (saved == null) return;
             foreach (var kv in saved) if (kv.Value is double value) camera.SetFloat(kv.Key, value);
+            foreach (var kv in saved) if (kv.Value is long shift) camera.SetInteger(kv.Key, shift);
             foreach (var kv in saved) if (kv.Value is string mode) camera.SetEnum(kv.Key, mode);   // the auto modes last
             saved = null;
         }
@@ -116,11 +129,13 @@ namespace OpenRigs.Zapit
         {
             readonly IParameterCollection parameters;
             public BaslerFeatures(IParameterCollection parameters) => this.parameters = parameters;
-            public bool Has(string name) => parameters.Contains(name) && parameters[name].IsWritable;
+            public bool Has(string name) => parameters.Contains(name);
             public string GetEnum(string name) => parameters[new EnumName(name)].GetValue();
             public void SetEnum(string name, string value) => parameters[new EnumName(name)].SetValue(value);
             public double GetFloat(string name) => parameters[new FloatName(name)].GetValue();
             public void SetFloat(string name, double value) => parameters[new FloatName(name)].SetValue(value);
+            public long GetInteger(string name) => parameters[new IntegerName(name)].GetValue();
+            public void SetInteger(string name, long value) => parameters[new IntegerName(name)].SetValue(value);
         }
     }
 }

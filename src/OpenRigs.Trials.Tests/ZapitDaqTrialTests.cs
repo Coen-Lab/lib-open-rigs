@@ -23,17 +23,36 @@ namespace OpenRigs.Trials.Tests
             public double LaserDurationSeconds { get { return 1.5; } }
         }
 
+        // The loop's Arm event for a trial, with the LaserSeconds the loop gives a laser played until stopped.
+        static TrialEvent<Trial, string, string> ArmEvent(Trial trial, double laserSeconds)
+        {
+            var constructor = typeof(TrialEvent<Trial, string, string>).GetConstructors(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)[0];
+            var e = (TrialEvent<Trial, string, string>)constructor.Invoke(new object[] { TrialEventKind.Arm, 1.0, trial, null, null, null });
+            typeof(TrialEvent<Trial, string, string>).GetProperty("LaserSeconds").SetValue(e, laserSeconds);
+            return e;
+        }
+
+        static List<string> Arms(bool untilStopped, params TrialEvent<Trial, string, string>[] events)
+        {
+            var sent = new List<string>();
+            var arms = new System.Reactive.Subjects.Subject<TrialEvent<Trial, string, string>>();
+            using (new ZapitDaqTrialCommand { UntilStopped = untilStopped }.Process(arms).Subscribe(c => sent.Add(c.ToString())))
+            {
+                foreach (var e in events) arms.OnNext(e);
+            }
+            return sent;
+        }
+
         [TestMethod]
         public void EachTrialIsArmedWithItsConditionLaserAndDuration()
         {
-            var sent = new List<string>();
-            var trials = new System.Reactive.Subjects.Subject<Trial>();
-            using (new ZapitDaqTrialCommand().Process(trials).Subscribe(c => sent.Add(c.ToString())))
-            {
-                trials.OnNext(new TimedTrial { TrialNumber = 1, LaserCondition = 3, LaserOn = true, LaserPowerMw = 4.5 });
-                trials.OnNext(new Trial { TrialNumber = 2, LaserCondition = 2, LaserOn = false, LaserPowerMw = 4.5 });
-            }
-            CollectionAssert.AreEqual(new[] { "Arm(trial=1, condition=3, laserOn=True, power=4.5, duration=1.5)", "Arm(trial=2, condition=2, laserOn=False, power=0, duration=0)" }, sent);
+            var timed = new TimedTrial { TrialNumber = 1, LaserCondition = 3, LaserOn = true, LaserPowerMw = 4.5 };
+            var untimed = new Trial { TrialNumber = 2, LaserCondition = 2, LaserOn = false, LaserPowerMw = 4.5 };
+            CollectionAssert.AreEqual(new[] { "Arm(trial=1, condition=3, laserOn=True, power=4.5, duration=1.5)", "Arm(trial=2, condition=2, laserOn=False, power=0, duration=0)" },
+                Arms(false, ArmEvent(timed, 0), ArmEvent(untimed, 0)));
+            // Played until stopped: the Arm event's LaserSeconds (its cap, or its stimulus's own off), not the trial's own duration.
+            CollectionAssert.AreEqual(new[] { "Arm(trial=1, condition=3, laserOn=True, power=4.5, duration=1.6)", "Arm(trial=2, condition=2, laserOn=False, power=0, duration=0)" },
+                Arms(true, ArmEvent(timed, 1.6), ArmEvent(untimed, 0)));
             var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitDaqTrial.Arm(new Trial { TrialNumber = 4, LaserCondition = 0 }));
             StringAssert.Contains(ex.Message, "Trial 4 has laser condition 0");
         }

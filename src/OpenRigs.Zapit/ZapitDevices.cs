@@ -43,8 +43,9 @@ namespace OpenRigs.Zapit
 
         /// <summary>Writes <paramref name="samples"/> (one row per AO line) to a new finite clocked task and starts it,
         /// generating on the first rising edge of <paramref name="triggerTerminal"/> (at once when empty). Refused while a
-        /// clocked task exists.</summary>
-        void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal);
+        /// clocked task exists. A <paramref name="triggerFilterSeconds"/> above 0 puts NI's digital filter of that minimum pulse width
+        /// on the start trigger, so a glitch shorter than it does not start the task; the filter delays the recognised edge by up to that width.</summary>
+        void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal, double triggerFilterSeconds);
 
         /// <summary>Overwrites the clocked task's buffer from sample <paramref name="firstSample"/>, which must not yet be
         /// generated nor already in the device's onboard FIFO (whose samples cannot be overwritten): one too late is refused
@@ -92,6 +93,15 @@ namespace OpenRigs.Zapit
                     "so the ramp could not be kept: raise rig.yml's zapit.earlyStopLeadSeconds above the onboard buffer plus one scan cycle (their samples per channel over the sample rate).");
         }
 
+        // Under the trigger's level (about 1 s): the filter delays the edge it passes by up to its width.
+        public const double TriggerFilterLimitSeconds = 0.01;
+
+        public static void TriggerFilter(double seconds)
+        {
+            if (!(seconds >= 0 && seconds < TriggerFilterLimitSeconds))
+                throw new InvalidOperationException($"rig.yml's zapit.triggerFilterSeconds must be at least 0 (0 turns the filter off) and under {TriggerFilterLimitSeconds} s, not {seconds}.");
+        }
+
         public static InvalidOperationException Reserved() =>
             new InvalidOperationException("The Zapit AO lines are reserved by a clocked task; it must be stopped and deleted first.");
     }
@@ -120,16 +130,35 @@ namespace OpenRigs.Zapit
             new AnalogMultiChannelWriter(task.Stream).WriteSingleSample(true, volts);
         }
 
-        public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal)
+        public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal, double triggerFilterSeconds)
         {
             ZapitDeviceChecks.Range(samples);
+            ZapitDeviceChecks.TriggerFilter(triggerFilterSeconds);
             if (clocked != null) throw ZapitDeviceChecks.Reserved();
             var task = AnalogOutputTask("ZapitTrial");
             try
             {
                 task.Timing.ConfigureSampleClock("", sampleRate, SampleClockActiveEdge.Rising, SampleQuantityMode.FiniteSamples, samples.GetLength(1));
                 if (!string.IsNullOrEmpty(triggerTerminal))
+                {
                     task.Triggers.StartTrigger.ConfigureDigitalEdgeTrigger(triggerTerminal, DigitalEdgeStartTriggerEdge.Rising);
+                    // The trigger is a level held about 1 s (DO3 high for the trial), so a filter of 1 ms rejects a glitch
+                    // (a stray edge pair shorter than the width) without missing a trigger. It delays the recognised edge by up to
+                    // the width. The minimum pulse width must be set before the filter is enabled, or DAQmx refuses the enable.
+                    if (triggerFilterSeconds > 0)
+                    {
+                        try
+                        {
+                            task.Triggers.StartTrigger.DigitalEdge.DigitalFilterMinimumPulseWidth = triggerFilterSeconds;
+                            task.Triggers.StartTrigger.DigitalEdge.DigitalFilterEnable = true;
+                        }
+                        catch (DaqException e)
+                        {
+                            throw new InvalidOperationException($"The NI device refused the digital filter on the Zapit trigger {triggerTerminal} " +
+                                $"(rig.yml's zapit.triggerFilterSeconds {triggerFilterSeconds} s): set it to 0 to run without one. {e.Message}", e);
+                        }
+                    }
+                }
                 task.Stream.WriteRegenerationMode = WriteRegenerationMode.AllowRegeneration;
                 new AnalogMultiChannelWriter(task.Stream).WriteMultiSample(false, samples);
                 task.Start();
@@ -231,11 +260,21 @@ namespace OpenRigs.Zapit
         /// <summary>The samples the last clocked task had generated when it was stopped.</summary>
         public long LastSamplesGenerated { get; private set; }
 
-        /// <summary>The onboard FIFO's samples per channel, already beyond reach of <see cref="WriteAt"/>, as NI's; 0 by default.</summary>
-        public long OnboardSamples { get; set; }
+        /// <summary>The onboard FIFO's samples per channel, already beyond reach of <see cref="WriteAt"/>, as NI's: 0 with no
+        /// clocked task (whatever is set); 0 by default.</summary>
+        public long OnboardSamples
+        {
+            get { return HasClockedTask ? onboardSamples : 0; }
+            set { onboardSamples = value; }
+        }
+
+        long onboardSamples;
 
         /// <summary>The last clocked task's trigger terminal.</summary>
         public string? LastTriggerTerminal { get; private set; }
+
+        /// <summary>The last clocked task's trigger filter minimum pulse width in seconds (0: no filter).</summary>
+        public double LastTriggerFilterSeconds { get; private set; }
 
         /// <summary>A new twin on the host's stopwatch.</summary>
         public SimulatedZapitDevice() => Clock = () => stopwatch.Elapsed.TotalSeconds;
@@ -259,14 +298,16 @@ namespace OpenRigs.Zapit
         }
 
         /// <inheritdoc/>
-        public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal)
+        public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal, double triggerFilterSeconds)
         {
             ZapitDeviceChecks.Range(samples);
+            ZapitDeviceChecks.TriggerFilter(triggerFilterSeconds);
             if (HasClockedTask) throw ZapitDeviceChecks.Reserved();
             if (!(sampleRate > 0)) throw new InvalidOperationException("A Zapit clocked task needs a sample rate above 0.");
             rate = sampleRate;
             LastBuffer = (double[,])samples.Clone();
             LastTriggerTerminal = triggerTerminal;
+            LastTriggerFilterSeconds = triggerFilterSeconds;
             HasClockedTask = true;
             triggeredAt = AutoTrigger ? Clock() : (double?)null;
         }
