@@ -37,27 +37,50 @@ namespace OpenRigs.Control
         /// <summary>Never gives anything; in headless Bonsai (--no-editor), watches for the stop from a background thread and holds the process once the workflow ends.</summary>
         public IObservable<string> Process()
         {
+            var grace = GraceSeconds;
+            var hold = HoldSeconds;
+            if (grace > 0 && hold >= grace)
+                return Observable.Throw<string>(new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                    "EndAfterStop: HoldSeconds ({0}) must be below GraceSeconds ({1}), or the grace ends every clean exit", hold, grace)));
             return Observable.Create<string>(observer =>
+                Environment.GetCommandLineArgs().Contains("--no-editor") ? Start(grace, hold) : Disposable.Empty);
+        }
+
+        static double armedHold;
+
+        /// <summary>
+        /// What Process does in headless Bonsai: arms the hold, so the controller's stop starts it (HoldOnStop) before any
+        /// device's teardown, watches for the stop when <paramref name="grace"/> is above 0, and holds again once disposed.
+        /// </summary>
+        public static IDisposable Start(double grace, double hold)
+        {
+            Volatile.Write(ref armedHold, hold);
+            var ending = new ManualResetEventSlim(false);
+            if (grace > 0)
             {
-                if (!Environment.GetCommandLineArgs().Contains("--no-editor")) return Disposable.Empty;
-                var grace = GraceSeconds;
-                var hold = HoldSeconds;
-                var ending = new ManualResetEventSlim(false);
-                if (grace > 0)
-                {
-                    var watch = new Thread(() => Watch(ending, TimeSpan.FromSeconds(grace)));
-                    watch.IsBackground = true;
-                    watch.Name = "EndAfterStop";
-                    watch.Start();
-                }
-                // Disposed means the workflow is ending: the watch goes on, since a teardown held up is what it is for.
-                return Disposable.Create(() =>
-                {
-                    ending.Set();
-                    Hold(hold);
-                });
+                var watch = new Thread(() => Watch(ending, TimeSpan.FromSeconds(grace)));
+                watch.IsBackground = true;
+                watch.Name = "EndAfterStop";
+                watch.Start();
+            }
+            // Disposed means the workflow is ending (after an error too, with no stop): the watch goes on, since a
+            // teardown held up is what it is for, and a hold starts here as well.
+            return Disposable.Create(() =>
+            {
+                Volatile.Write(ref armedHold, 0);
+                ending.Set();
+                Hold(hold);
             });
         }
+
+        /// <summary>Called by the control server as it takes a stop: starts the armed hold, if an EndAfterStop runs headless.</summary>
+        public static Thread HoldOnStop()
+        {
+            return Hold(Volatile.Read(ref armedHold));
+        }
+
+        /// <summary>The last hold started, for the tests.</summary>
+        public static Thread LastHold { get; private set; }
 
         /// <summary>Starts a foreground thread that keeps the process running <paramref name="seconds"/>; null for 0 or less.</summary>
         public static Thread Hold(double seconds)
@@ -67,6 +90,7 @@ namespace OpenRigs.Control
             hold.IsBackground = false;
             hold.Name = "EndAfterStop hold";
             hold.Start();
+            LastHold = hold;
             return hold;
         }
 
