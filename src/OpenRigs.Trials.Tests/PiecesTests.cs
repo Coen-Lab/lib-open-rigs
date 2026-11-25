@@ -138,7 +138,7 @@ namespace OpenRigs.Trials.Tests
 
     /// <summary>
     /// The rules at 0.1 s, then trial 1's Arm (0.3 s), Trigger (0.4 s), Outcome (OutcomeAt s, none when 0) and TriggerOff
-    /// (0.9 s), as TrialEvents. Stop: Duration (LaserTiming.ForDuration, 0.5 s), UntilOutcome (LaserCapSeconds cap), or None.
+    /// (0.9 s), as TrialEvents. Stop: Duration (LaserTiming.ForDuration, 0.5 s), UntilOutcome or UntilStimulusOff (LaserCapSeconds cap), or None.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
@@ -153,7 +153,8 @@ namespace OpenRigs.Trials.Tests
             return Observable.Defer(() =>
             {
                 var laser = Stop == "Duration" ? LaserTiming.ForDuration(HardwareTriggered, 0.5)
-                    : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(HardwareTriggered, 0, LaserCapSeconds) : null;
+                    : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(HardwareTriggered, 0, LaserCapSeconds)
+                    : Stop == "UntilStimulusOff" ? LaserTiming.UntilStimulusOff(HardwareTriggered, 0, LaserCapSeconds) : null;
                 return Observable.Timer(TimeSpan.FromSeconds(0.1)).Select(_ => new PieceRules { Laser = laser });
             });
         }
@@ -175,6 +176,13 @@ namespace OpenRigs.Trials.Tests
         /// <summary>Whether trial 1 has its own laser duration (a ForDuration task's trial).</summary>
         public bool Timed { get; set; }
 
+        /// <summary>When trial 1's LaserOff comes, in seconds; none when 0.</summary>
+        public double LaserOffAt { get; set; }
+
+        /// <summary>When trial 1's LaserCap comes, in seconds; none when 0.</summary>
+        public double LaserCapAt { get; set; }
+
+        // Events at the same time come in one tick, in the order listed (as the loop emits Trigger, then LaserOff).
         public IObservable<TrialEvent<PieceTrial, string, PieceOutcome>> Process()
         {
             return Observable.Defer(() =>
@@ -187,7 +195,10 @@ namespace OpenRigs.Trials.Tests
                     Tuple.Create(0.3, TrialEventKind.Arm), Tuple.Create(0.4, TrialEventKind.Trigger), Tuple.Create(0.9, TrialEventKind.TriggerOff),
                 };
                 if (OutcomeAt > 0) events.Add(Tuple.Create(OutcomeAt, TrialEventKind.Outcome));
-                return events.OrderBy(e => e.Item1).ToObservable().SelectMany(e => Observable.Timer(TimeSpan.FromSeconds(e.Item1)).Select(_ => Event(e.Item2, e.Item1, trial, outcome)));
+                if (LaserOffAt > 0) events.Add(Tuple.Create(LaserOffAt, TrialEventKind.LaserOff));
+                if (LaserCapAt > 0) events.Add(Tuple.Create(LaserCapAt, TrialEventKind.LaserCap));
+                return events.OrderBy(e => e.Item1).GroupBy(e => e.Item1).ToObservable()
+                    .SelectMany(g => Observable.Timer(TimeSpan.FromSeconds(g.Key)).SelectMany(_ => g.Select(e => Event(e.Item2, e.Item1, trial, outcome))));
             });
         }
 
@@ -341,11 +352,13 @@ namespace OpenRigs.Trials.Tests
             StringAssert.Contains(InProcessWorkflow.Innermost(result.Item2), "the penalty sound lasts 0.1 s, longer than penalty.incorrect.timeoutSeconds in the test (0.05 s) with a flash");
         }
 
-        static List<string> RunZapit(string stop, bool hardwareTriggered, double laserCapSeconds, double outcomeAt)
+        static List<string> RunZapit(string stop, bool hardwareTriggered, double laserCapSeconds, double outcomeAt, double laserOffAt = 0, double laserCapAt = 0)
         {
-            return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop == "Duration" ? "true" : "false").Replace("STOP", stop).Replace("HARDWARE", hardwareTriggered ? "true" : "false")
+            return Run("ZapitTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop == "Duration" || stop == "UntilStimulusOff" ? "true" : "false").Replace("STOP", stop).Replace("HARDWARE", hardwareTriggered ? "true" : "false")
+                .Replace("LASER_CAP_AT", laserCapAt.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("LASER_CAP", laserCapSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("OUTCOME_AT", outcomeAt.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                .Replace("OUTCOME_AT", outcomeAt.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("LASER_OFF_AT", laserOffAt.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         }
 
         // ForDuration: the StartStimulus carries the duration, at Arm on a hardware-triggered rig; nothing stops it at the outcome.
@@ -371,6 +384,41 @@ namespace OpenRigs.Trials.Tests
         {
             CollectionAssert.AreEquivalent(new[] { "zapit StartStimulus condition 3 hardware True duration 0", "line set", "zapit StopStimulus", "line clear" },
                 RunZapit("UntilOutcome", true, 0.2, 0));
+        }
+
+        // UntilStimulusOff: the StartStimulus with no duration, though the trial has its own; the outcome does not stop it, its LaserOff does.
+        [TestMethod]
+        public void ZapitTrialsUntilStimulusOffStopsAtLaserOffNotTheOutcome()
+        {
+            CollectionAssert.AreEquivalent(new[] { "line set", "zapit StartStimulus condition 3 hardware False duration 0", "line clear" },
+                RunZapit("UntilStimulusOff", false, 10, 0.6));
+            CollectionAssert.AreEquivalent(new[] { "line set", "zapit StartStimulus condition 3 hardware False duration 0", "zapit StopStimulus", "line clear" },
+                RunZapit("UntilStimulusOff", false, 10, 0.6, 0.7));
+        }
+
+        // UntilStimulusOff with the stimulus still on at the LaserCap: the cap stops it, and the LaserOff after it sends nothing more.
+        [TestMethod]
+        public void ZapitTrialsUntilStimulusOffStopsOnceAtTheLaserCap()
+        {
+            CollectionAssert.AreEquivalent(new[] { "line set", "zapit StartStimulus condition 3 hardware False duration 0", "zapit StopStimulus", "line clear" },
+                RunZapit("UntilStimulusOff", false, 10, 0.5, 0.7, 0.6));
+        }
+
+        // UntilStimulusOff on a hardware-triggered rig: the StartStimulus at Arm with no duration, stopped at its LaserOff.
+        [TestMethod]
+        public void ZapitTrialsUntilStimulusOffOnAHardwareTriggeredRigArmsWithNoDuration()
+        {
+            CollectionAssert.AreEquivalent(new[] { "zapit StartStimulus condition 3 hardware True duration 0", "line set", "zapit StopStimulus", "line clear" },
+                RunZapit("UntilStimulusOff", true, 10, 0.5, 0.7));
+        }
+
+        // A stimulus already off at the trigger: the loop's Trigger and LaserOff in one tick; the laser is started, then stopped.
+        [TestMethod]
+        public void ZapitTrialsUntilStimulusOffStopsALaserOffInTheTriggersTick()
+        {
+            var outputs = RunZapit("UntilStimulusOff", false, 10, 0.6, 0.4);
+            CollectionAssert.AreEquivalent(new[] { "line set", "zapit StartStimulus condition 3 hardware False duration 0", "zapit StopStimulus", "line clear" }, outputs, string.Join(", ", outputs));
+            Assert.IsTrue(outputs.IndexOf("zapit StartStimulus condition 3 hardware False duration 0") < outputs.IndexOf("zapit StopStimulus"), "Stopped before it was started: " + string.Join(", ", outputs));
         }
 
         // Rules with no laser: no Zapit command at all.

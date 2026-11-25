@@ -69,6 +69,10 @@ namespace OpenRigs.Trials.Tests
         public readonly List<TrialEvent<StubTrial, string, StubOutcome>> Events = new List<TrialEvent<StubTrial, string, StubOutcome>>();
         public double Now;
 
+        /// <summary>How long after each StopStimulus Zapit answers it, in seconds; null for never.</summary>
+        public double? StopReplySeconds = 0;
+        double stopReplyDue = double.NaN;
+
         public LoopRig(StubRules rules, double first = 100.001)
         {
             Loop = new TrialLoop<StubTrial, string, StubOutcome>(rules, true);
@@ -79,7 +83,20 @@ namespace OpenRigs.Trials.Tests
         {
             Now = Math.Round(Now + step, 6);
             Events.AddRange(Loop.OnClock(Now));
+            AnswerStop();
         }
+
+        // Zapit's reply to the StopStimulus the loop waits for, StopReplySeconds after the loop began to wait.
+        void AnswerStop()
+        {
+            if (StopReplySeconds == null) return;
+            if (double.IsNaN(stopReplyDue) && Loop.AwaitingStopReply) stopReplyDue = Now + StopReplySeconds.Value;
+            if (double.IsNaN(stopReplyDue) || Now < stopReplyDue - 1e-9) return;
+            stopReplyDue = double.NaN;
+            StopReply();
+        }
+
+        public void StopReply() { Loop.OnZapitReply(new ZapitReply { Command = ZapitCommandType.StopStimulus }); }
 
         public void Until(double seconds, Func<bool> stop = null)
         {
@@ -94,7 +111,7 @@ namespace OpenRigs.Trials.Tests
         }
 
         public IEnumerable<TrialEvent<StubTrial, string, StubOutcome>> Of(TrialEventKind kind) { return Events.Where(e => e.Kind == kind); }
-        public void Touch(int spout, bool touched) { Events.AddRange(Loop.OnLick(spout, touched)); }
+        public void Touch(int spout, bool touched) { Events.AddRange(Loop.OnLick(spout, touched)); AnswerStop(); }
         public void Lick(int spout) { Touch(spout, true); Touch(spout, false); }
         public void Wheel(double cm) { Events.AddRange(Loop.OnWheel(cm)); }
 
@@ -368,7 +385,7 @@ namespace OpenRigs.Trials.Tests
                 Plan = n => new TrialTiming { ItiSeconds = 5, LaserToStimulusSeconds = 0.5, Laser = true, ResponseWindowSeconds = 1.5 },
                 Laser = LaserTiming.ForDuration(true, 0.5),
             };
-            var rig = new LoopRig(rules);
+            var rig = new LoopRig(rules) { StopReplySeconds = null };   // no StopStimulus is sent, so none is waited for
             rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
             var trigger = rig.RunTo(TrialEventKind.Trigger);
             rig.RunTo(TrialEventKind.Stimulus);
@@ -399,6 +416,97 @@ namespace OpenRigs.Trials.Tests
             var next = rig.RunTo(TrialEventKind.Arm);
             Assert.AreEqual(stimulus.Seconds + 0.5, next.Seconds, 1e-9, "armed once the unanswered trigger's moment has passed");
             Assert.IsFalse(rig.Of(TrialEventKind.TriggerOff).Any(), "the line never rose");
+        }
+
+        static TrialTiming OffTiming(double durationSeconds, double? afterOutcomeSeconds, double response = 1.5)
+        {
+            var timing = Timing(0.5, true, response);
+            timing.StimulusDurationSeconds = durationSeconds;
+            timing.ResponseToStimulusOffSeconds = afterOutcomeSeconds;
+            return timing;
+        }
+
+        [TestMethod]
+        public void UntilStimulusOffTheLaserEndsAtTheStimulusOffEvenAfterTheOutcome()
+        {
+            // Off 0.4 s after the answer: the laser runs on past the outcome to the StimulusOff, the line falls 0.3 s later, and
+            // the next trial (its interval from the outcome) is armed only then.
+            var rig = new LoopRig(new StubRules { Plan = n => OffTiming(double.NaN, 0.4), Laser = LaserTiming.UntilStimulusOff(true, 0.3, 10) });
+            rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
+            rig.RunTo(TrialEventKind.Stimulus);
+            rig.Until(rig.Now + 0.2);
+            rig.Lick(0);
+            var outcome = rig.Of(TrialEventKind.Outcome).Single();
+            Assert.IsFalse(rig.Of(TrialEventKind.LaserOff).Any(), "on past the outcome");
+            var next = rig.RunTo(TrialEventKind.Arm);
+            var off = rig.Of(TrialEventKind.StimulusOff).Single();
+            var laserOff = rig.Of(TrialEventKind.LaserOff).Single();
+            Assert.AreEqual(outcome.Seconds + 0.4, off.Seconds, 1e-9);
+            Assert.AreEqual(off.Seconds, laserOff.Seconds, 1e-12, "the laser ends with the stimulus");
+            Assert.IsTrue(rig.Events.IndexOf(laserOff) > rig.Events.IndexOf(off), "just after the StimulusOff");
+            Assert.AreEqual(1, laserOff.Trial.TrialNumber);
+            Assert.AreEqual(off.Seconds + 0.3, rig.Of(TrialEventKind.TriggerOff).Single().Seconds, 1e-9, "the line held the hold past the laser's end");
+            Assert.AreEqual(off.Seconds + 0.3, next.Seconds, 1e-9, "the next armed once the line has fallen");
+            Assert.IsFalse(rig.Of(TrialEventKind.LaserCap).Any());
+
+            // A timed stimulus off before the outcome: the laser ends there, and the outcome adds nothing.
+            var timed = new LoopRig(new StubRules { Plan = n => OffTiming(0.3, null), Laser = LaserTiming.UntilStimulusOff(true, 0.3, 10) });
+            timed.Reply(timed.RunTo(TrialEventKind.Arm).Trial);
+            var stimulus = timed.RunTo(TrialEventKind.Stimulus);
+            timed.RunTo(TrialEventKind.Outcome);
+            Assert.AreEqual(stimulus.Seconds + 0.3, timed.Of(TrialEventKind.LaserOff).Single().Seconds, 1e-9);
+            Assert.AreEqual(stimulus.Seconds + 0.6, timed.Of(TrialEventKind.TriggerOff).Single().Seconds, 1e-9);
+        }
+
+        [TestMethod]
+        public void UntilStimulusOffTheLaserEndsAtAnOutcomeBeforeTheStimulus()
+        {
+            var rig = new LoopRig(new StubRules { Plan = n => OffTiming(1.0, null), Laser = LaserTiming.UntilStimulusOff(false, 0.3, 10) });
+            rig.Reply(rig.RunTo(TrialEventKind.Trigger).Trial);
+            rig.Until(rig.Now + 0.1);
+            rig.Lick(0);
+            var outcome = rig.Of(TrialEventKind.Outcome).Single();
+            Assert.AreEqual(outcome.Seconds, rig.Of(TrialEventKind.LaserOff).Single().Seconds, 1e-12, "no stimulus, so no StimulusOff: the outcome ends it");
+            Assert.AreEqual(outcome.Seconds + 0.3, rig.RunTo(TrialEventKind.TriggerOff).Seconds, 1e-9);
+            Assert.IsFalse(rig.Of(TrialEventKind.StimulusOff).Any());
+        }
+
+        [TestMethod]
+        public void UntilStimulusOffALaserTriggeredAfterItsStimulusWentOffEndsAtTheTrigger()
+        {
+            // Triggered 0.5 s after the stimulus, which went off 0.3 s after it: LaserOff in the trigger's own tick, after it.
+            Func<TrialTiming> late = () => { var t = OffTiming(0.3, null); t.LaserToStimulusSeconds = -0.5; return t; };
+            var rig = new LoopRig(new StubRules { Plan = n => late(), Laser = LaserTiming.UntilStimulusOff(true, 0.3, 10) });
+            rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
+            var stimulus = rig.RunTo(TrialEventKind.Stimulus);
+            var trigger = rig.RunTo(TrialEventKind.Trigger);
+            Assert.AreEqual(stimulus.Seconds + 0.3, rig.Of(TrialEventKind.StimulusOff).Single().Seconds, 1e-9);
+            var laserOff = rig.Of(TrialEventKind.LaserOff).Single();
+            Assert.AreEqual(trigger.Seconds, laserOff.Seconds, 1e-12, "the stimulus already off");
+            Assert.IsTrue(rig.Events.IndexOf(laserOff) > rig.Events.IndexOf(trigger), "just after the trigger");
+            Assert.AreEqual(trigger.Seconds + 0.3, rig.RunTo(TrialEventKind.TriggerOff).Seconds, 1e-9, "the line held the hold past the trigger");
+            Assert.IsFalse(rig.Of(TrialEventKind.LaserCap).Any());
+        }
+
+        [TestMethod]
+        public void UntilStimulusOffTheCapStopsALaserStillOn()
+        {
+            // The stimulus stays on to the answer in a 30 s window: the cap stops the laser, the trial's own 2.5 s (ILaserDurationTrial)
+            // under the timing's 10 s, then 1 s when that is the shorter; no LaserOff after it.
+            foreach (var cap in new[] { 10.0, 1.0 })
+            {
+                var rig = new LoopRig(new StubRules { Plan = n => OffTiming(double.NaN, 0.2, 30), Laser = LaserTiming.UntilStimulusOff(true, 0.3, cap) });
+                rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
+                var trigger = rig.RunTo(TrialEventKind.Trigger);
+                var capped = rig.RunTo(TrialEventKind.LaserCap);
+                Assert.AreEqual(trigger.Seconds + Math.Min(cap, 2.5), capped.Seconds, 1e-9);
+                Assert.AreEqual(capped.Seconds + 0.3, rig.RunTo(TrialEventKind.TriggerOff).Seconds, 1e-9);
+                rig.Lick(0);
+                rig.RunTo(TrialEventKind.StimulusOff);
+                Assert.IsFalse(rig.Of(TrialEventKind.LaserOff).Any(), "stopped already");
+            }
+            StringAssert.Contains(Refusal(() => new LoopRig(new StubRules { Plan = n => Timing(0.5, true), Laser = LaserTiming.UntilStimulusOff(true, 0.3, 10) }).Tick()), "its stimulus has no off time");
+            StringAssert.Contains(Refusal(() => LaserTiming.UntilStimulusOff(true, 0.3, 0)), "laserCapSeconds");
         }
 
         [TestMethod]
@@ -681,6 +789,76 @@ namespace OpenRigs.Trials.Tests
             quick.Lick(0);
             quick.Reply(quick.RunTo(TrialEventKind.Arm).Trial);
             Assert.AreEqual(2, quick.RunTo(TrialEventKind.Trigger).Trial.TrialNumber, "a quick reply is enough");
+        }
+
+        // Answered 0.1 s after the stimulus, a 3 s interval: laser trials one after another.
+        static StubRules Answered(LaserTiming laser)
+        {
+            return new StubRules
+            {
+                Laser = laser,
+                Plan = n => { var t = OffTiming(0.3, null); t.ItiSeconds = 3; return t; },
+                OnTick = (t, x, u) => x.Now >= x.StimulusOnsetTime + 0.1 - 1e-9 ? StubRules.Outcome("Lick0", 0, x) : null,
+            };
+        }
+
+        [TestMethod]
+        public void AfterAStopTheNextIsArmedOnlyOnceZapitHasAnsweredItAndTheMarginHasPassed()
+        {
+            // A rig test, 25 Nov 2026: Zapit answers StopStimulus about 1 s after it (its ramp-down blocks) and stops whatever runs 0.2 s
+            // after each stop, so a trial armed at the 0.25 s hold played no laser, every other trial. Now each is armed only once
+            // Zapit has answered the last stop, StopReplyMarginSeconds from the tick after the reply, and every trial is armed and triggered.
+            foreach (var laser in new[] { LaserTiming.UntilStimulusOff(true, 0.25, 10), LaserTiming.UntilOutcome(true, 0.25, 10) })
+            {
+                var rig = new LoopRig(Answered(laser)) { StopReplySeconds = 1.0 };
+                for (var n = 1; n <= 4; n++)
+                {
+                    var arm = rig.RunTo(TrialEventKind.Arm);
+                    Assert.AreEqual(n, arm.Trial.TrialNumber);
+                    if (n > 1)
+                    {
+                        var stop = rig.Of(laser.End == LaserEnd.AtStimulusOff ? TrialEventKind.LaserOff : TrialEventKind.Outcome).Last().Seconds;
+                        Assert.AreEqual(stop + 1.0 + 0.001 + TrialLoop.StopReplyMarginSeconds, arm.Seconds, 1e-9, "the reply, then the margin from the next tick");
+                    }
+                    rig.Reply(arm.Trial);
+                    Assert.AreEqual(n, rig.RunTo(TrialEventKind.Trigger).Trial.TrialNumber, "armed in time, so triggered");
+                }
+                Assert.AreEqual(4, rig.Of(TrialEventKind.Trigger).Count());
+            }
+        }
+
+        [TestMethod]
+        public void AStopStillUnansweredAtTheNextTriggerStopsTheWorkflowNamingIt()
+        {
+            foreach (var hardware in new[] { true, false })
+            {
+                var rig = new LoopRig(Answered(LaserTiming.UntilStimulusOff(hardware, 0.25, 10))) { StopReplySeconds = null };
+                rig.Reply(rig.RunTo(hardware ? TrialEventKind.Arm : TrialEventKind.Trigger).Trial);
+                rig.RunTo(TrialEventKind.LaserOff);
+                var refusal = Refusal(() => rig.RunTo(TrialEventKind.Trigger));
+                StringAssert.Contains(refusal, "Zapit had not answered trial 1's StopStimulus by trial 2's trigger");
+                Assert.IsFalse(rig.Of(TrialEventKind.Arm).Any(e => e.Trial.TrialNumber == 2), "never armed");
+                Assert.AreEqual(1, rig.Of(TrialEventKind.Trigger).Count());
+            }
+
+            // Answered, but 2.2 s after a stop 2.3 s before trial 2's trigger: the margin runs past it.
+            var late = new LoopRig(Answered(LaserTiming.UntilStimulusOff(true, 0.25, 10))) { StopReplySeconds = 2.2 };
+            late.Reply(late.RunTo(TrialEventKind.Arm).Trial);
+            late.RunTo(TrialEventKind.LaserOff);
+            StringAssert.Contains(Refusal(() => late.RunTo(TrialEventKind.Trigger)), "Zapit answered trial 1's StopStimulus too late for trial 2");
+        }
+
+        [TestMethod]
+        public void AStopAnsweredBeforeTheLoopsOwnStopIsNotWaitedForAgain()
+        {
+            // The workflow's wall-clock backstop can stop Zapit before the loop's LaserOff: that reply counts, and the next is armed
+            // the margin after the loop's stop, not at the 0.1 s hold.
+            var rig = new LoopRig(Answered(LaserTiming.UntilStimulusOff(true, 0.1, 10))) { StopReplySeconds = null };
+            rig.Reply(rig.RunTo(TrialEventKind.Arm).Trial);
+            rig.RunTo(TrialEventKind.Trigger);
+            rig.StopReply();
+            var laserOff = rig.RunTo(TrialEventKind.LaserOff);
+            Assert.AreEqual(laserOff.Seconds + TrialLoop.StopReplyMarginSeconds, rig.RunTo(TrialEventKind.Arm).Seconds, 1e-9);
         }
 
         [TestMethod]
