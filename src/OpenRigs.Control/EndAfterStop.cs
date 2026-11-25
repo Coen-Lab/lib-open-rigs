@@ -47,14 +47,17 @@ namespace OpenRigs.Control
         }
 
         static double armedHold;
+        static int stopHeld;
 
         /// <summary>
         /// What Process does in headless Bonsai: arms the hold, so the controller's stop starts it (HoldOnStop) before any
-        /// device's teardown, watches for the stop when <paramref name="grace"/> is above 0, and holds again once disposed.
+        /// device's teardown, and watches for the stop when <paramref name="grace"/> is above 0. Once disposed it holds only
+        /// if no stop did: a second hold after the stop's could outlast the grace and end a clean exit as a held-up one.
         /// </summary>
         public static IDisposable Start(double grace, double hold)
         {
             Volatile.Write(ref armedHold, hold);
+            Volatile.Write(ref stopHeld, 0);
             var ending = new ManualResetEventSlim(false);
             if (grace > 0)
             {
@@ -63,20 +66,21 @@ namespace OpenRigs.Control
                 watch.Name = "EndAfterStop";
                 watch.Start();
             }
-            // Disposed means the workflow is ending (after an error too, with no stop): the watch goes on, since a
-            // teardown held up is what it is for, and a hold starts here as well.
+            // Disposed means the workflow is ending: the watch goes on, since a teardown held up is what it is for. Still
+            // armed, so a second EndAfterStop disposed first takes nothing from the stop.
             return Disposable.Create(() =>
             {
-                Volatile.Write(ref armedHold, 0);
                 ending.Set();
-                Hold(hold);
+                if (Volatile.Read(ref stopHeld) == 0) Hold(hold); // an ending after an error, with no stop
             });
         }
 
         /// <summary>Called by the control server as it takes a stop: starts the armed hold, if an EndAfterStop runs headless.</summary>
         public static Thread HoldOnStop()
         {
-            return Hold(Volatile.Read(ref armedHold));
+            var held = Hold(Volatile.Read(ref armedHold));
+            if (held != null) Volatile.Write(ref stopHeld, 1);
+            return held;
         }
 
         /// <summary>The last hold started, for the tests.</summary>

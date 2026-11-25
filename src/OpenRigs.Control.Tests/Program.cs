@@ -361,13 +361,18 @@ namespace OpenRigs.Control.Tests
                 Check("a hold not below the grace stops the workflow at Start", tooLong is InvalidOperationException && tooLong.Message.Contains("HoldSeconds (2) must be below GraceSeconds (2)"), tooLong == null ? "taken" : tooLong.Message);
                 Check("with no EndAfterStop running headless, a stop holds nothing", EndAfterStop.HoldOnStop() == null, "a hold");
                 // Grace 0, so no watch ends this process.
-                var run = EndAfterStop.Start(0, 0.3);
-                var onStop = EndAfterStop.HoldOnStop();
-                Check("headless, the controller's stop starts the hold at once", onStop != null && onStop.IsAlive && !onStop.IsBackground, onStop == null ? "none" : "not a live foreground thread");
-                run.Dispose();
+                var errored = EndAfterStop.Start(0, 0.3);
+                var before = EndAfterStop.LastHold;
+                errored.Dispose();
                 var onDispose = EndAfterStop.LastHold;
-                Check("disposal starts a hold too, for an ending with no stop", onDispose != null && onDispose != onStop && onDispose.IsAlive, "no new hold");
-                Check("after disposal a stop holds nothing", EndAfterStop.HoldOnStop() == null, "a hold");
+                Check("an ending with no stop holds at disposal", onDispose != null && onDispose != before && onDispose.IsAlive && !onDispose.IsBackground, "no new foreground hold");
+                var stopped = EndAfterStop.Start(0, 0.3);
+                var second = EndAfterStop.Start(0, 0.3);
+                second.Dispose();
+                var onStop = EndAfterStop.HoldOnStop();
+                Check("headless, the controller's stop starts the hold at once, though another EndAfterStop was disposed first", onStop != null && onStop.IsAlive && !onStop.IsBackground, onStop == null ? "none" : "not a live foreground thread");
+                stopped.Dispose();
+                Check("after a stop, disposal adds no second hold that could outlast the grace", EndAfterStop.LastHold == onStop, "a second hold");
                 Check("the holds end by themselves", onStop != null && onStop.Join(2000) && onDispose.Join(2000), "still running");
             }
 
