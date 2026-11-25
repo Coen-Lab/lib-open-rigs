@@ -29,7 +29,10 @@ namespace OpenRigs.Trials
         TriggerOff,
         /// <summary>The trial's stimulus goes off (StimulusTiming): once per trial whose stimulus came on and whose timing has a
         /// StimulusDurationSeconds or ResponseToStimulusOffSeconds, at the first tick at or after StimulusTiming.Time, or at the outcome itself when that is the time.</summary>
-        StimulusOff
+        StimulusOff,
+        /// <summary>A LaserTiming.UntilStimulusOff laser ends (stop Zapit): just after its trial's StimulusOff, or at its outcome when
+        /// its stimulus is not on (never came on), whichever is first; at the trigger when the stimulus was already off. Never after its LaserCap.</summary>
+        LaserOff
     }
 
     /// <summary>When a trial's laser ends, and so when the next trial's StartStimulus may go.</summary>
@@ -38,7 +41,10 @@ namespace OpenRigs.Trials
         /// <summary>The laser runs until the outcome (or LaserCap); the trigger line falls TriggerHoldSeconds after the outcome.</summary>
         AtOutcome,
         /// <summary>The laser runs the trial's LaserDurationSeconds (ILaserDurationTrial) from the trigger, outcome or not; the line falls then.</summary>
-        AfterDuration
+        AfterDuration,
+        /// <summary>The laser runs until the trial's StimulusOff, even past the outcome (or its outcome when its stimulus never came on,
+        /// or LaserCap), then LaserOff; the trigger line falls TriggerHoldSeconds after the laser's end.</summary>
+        AtStimulusOff
     }
 
     /// <summary>
@@ -57,13 +63,18 @@ namespace OpenRigs.Trials
         /// <summary>Gets when the laser ends.</summary>
         public LaserEnd End { get; private set; }
 
-        /// <summary>Gets how long the trigger line stays up past the outcome, in seconds (AtOutcome).</summary>
+        /// <summary>Gets whether the laser plays until StopStimulus (AtOutcome, AtStimulusOff), its StartStimulus with no duration
+        /// (ZapitTrialCommand.UntilStopped), even for a trial with its own laser duration.</summary>
+        public bool UntilStopped { get { return End != LaserEnd.AfterDuration; } }
+
+        /// <summary>Gets how long the trigger line stays up past the laser's end, in seconds (AtOutcome: the outcome; AtStimulusOff).</summary>
         public double TriggerHoldSeconds { get; private set; }
 
         /// <summary>Gets how long after the line falls Zapit takes the next StartStimulus, in seconds (AfterDuration).</summary>
         public double RampDownSeconds { get; private set; }
 
-        /// <summary>Gets how long after the trigger LaserCap comes with no outcome yet, in seconds (AtOutcome); infinity for none.</summary>
+        /// <summary>Gets how long after the trigger LaserCap comes with the laser still on, in seconds (AtOutcome, AtStimulusOff: a trial that is an
+        /// ILaserDurationTrial its own LaserDurationSeconds when shorter); infinity for none.</summary>
         public double LaserCapSeconds { get; private set; }
 
         /// <summary>The laser on until the outcome, stopped by LaserCap laserCapSeconds after the trigger; the line held triggerHoldSeconds past the outcome (the conditions file's MaxRampDownSeconds, ZapitConditions.Check).</summary>
@@ -88,11 +99,37 @@ namespace OpenRigs.Trials
             return UntilOutcome(true, triggerHoldSeconds, laserCapSeconds);
         }
 
+        /// <summary>ZapitDaq's (OpenRigs.Zapit) laser on until its trial's stimulus goes off, as <see cref="UntilStimulusOff(bool, double, double)"/>
+        /// with every trial armed during its interval and started by the trigger line; triggerHoldSeconds as <see cref="UntilOutcome(double, double)"/>'s.</summary>
+        public static LaserTiming UntilStimulusOff(double triggerHoldSeconds, double laserCapSeconds)
+        {
+            return UntilStimulusOff(true, triggerHoldSeconds, laserCapSeconds);
+        }
+
         /// <summary>ZapitDaq's (OpenRigs.Zapit) laser on for each trial's own duration, as <see cref="ForDuration(bool, double)"/> with every
         /// trial armed during its interval and started by the trigger line; rampDownSeconds the bank's longest ramp.</summary>
         public static LaserTiming ForDuration(double rampDownSeconds)
         {
             return ForDuration(true, rampDownSeconds);
+        }
+
+        /// <summary>The laser on until its trial's stimulus goes off (StimulusOff, which can come after the outcome), or its outcome when its
+        /// stimulus never came on, stopped by LaserCap laserCapSeconds after the trigger (a trial's own LaserDurationSeconds when it is an
+        /// ILaserDurationTrial and that is shorter); the line held triggerHoldSeconds past the laser's end, the next trial armed then.
+        /// Every laser trial's timing must give its stimulus an off time (TrialTiming.StimulusDurationSeconds or ResponseToStimulusOffSeconds).</summary>
+        public static LaserTiming UntilStimulusOff(bool hardwareTriggered, double triggerHoldSeconds, double laserCapSeconds)
+        {
+            var timing = UntilOutcome(hardwareTriggered, triggerHoldSeconds, laserCapSeconds);
+            timing.End = LaserEnd.AtStimulusOff;
+            return timing;
+        }
+
+        /// <summary>A trial's LaserCap under UntilStimulusOff, in seconds from its trigger: LaserCapSeconds, or the trial's own
+        /// LaserDurationSeconds when it is an ILaserDurationTrial and that is shorter.</summary>
+        public double CapOf(ITrial trial)
+        {
+            var timed = trial as ILaserDurationTrial;
+            return timed == null ? LaserCapSeconds : Math.Min(LaserCapSeconds, DurationOf(trial));
         }
 
         /// <summary>The laser on for each trial's own duration from the trigger (every laser trial an ILaserDurationTrial); the next trial armed rampDownSeconds after the line falls.</summary>

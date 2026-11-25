@@ -39,8 +39,8 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>A trial's Arm command: its condition, the laser on at its power or off, for its laser duration (an
-        /// ILaserDurationTrial) or until an early stop (0).</summary>
-        public static ZapitDaqCommand Arm(IZapitTrial trial)
+        /// ILaserDurationTrial) unless untilStopped (LaserTiming.UntilStopped), else until an early stop (0).</summary>
+        public static ZapitDaqCommand Arm(IZapitTrial trial, bool untilStopped = false)
         {
             if (trial.LaserCondition < 1) throw new InvalidOperationException(string.Format("Trial {0} has laser condition {1}; a laser trial's is from 1.", trial.TrialNumber, trial.LaserCondition));
             var timed = trial as ILaserDurationTrial;
@@ -51,7 +51,7 @@ namespace OpenRigs.Trials
                 Condition = trial.LaserCondition,
                 LaserOn = trial.LaserOn,
                 PowerMw = trial.LaserOn ? trial.LaserPowerMw : 0,
-                DurationSeconds = timed != null ? timed.LaserDurationSeconds : 0,
+                DurationSeconds = timed != null && !untilStopped ? timed.LaserDurationSeconds : 0,
             };
         }
 
@@ -105,14 +105,22 @@ namespace OpenRigs.Trials
     /// <summary>Each trial's Arm for ZapitDaq (<see cref="ZapitDaqTrial.Arm"/>), sent as the loop arms it during the interval.</summary>
     [Combinator]
     [Description("Each laser trial's ZapitDaq Arm: its condition, the laser on at its power or off (galvos and masking light either way), " +
-        "for the trial's laser duration (an ILaserDurationTrial), else until an early stop. Input: the trial at its Arm event.")]
+        "for the trial's laser duration (an ILaserDurationTrial), else, or with UntilStopped, until an early stop. Input: the trial at its Arm event.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitDaqTrialCommand
     {
-        /// <summary>Each trial's Arm.</summary>
+        /// <summary>Gets or sets whether every trial plays until its early stop, no duration sent, even a trial's with its own laser duration.</summary>
+        [Description("Whether every trial plays until its early stop (no duration sent), even a trial's with its own laser duration. Map it from the rules' LaserTiming.UntilStopped.")]
+        public bool UntilStopped { get; set; }
+
+        /// <summary>Each trial's Arm; UntilStopped is read at subscription.</summary>
         public IObservable<ZapitDaqCommand> Process<TTrial>(IObservable<TTrial> source) where TTrial : IZapitTrial
         {
-            return source.Select(trial => ZapitDaqTrial.Arm(trial));
+            return Observable.Defer(() =>
+            {
+                var untilStopped = UntilStopped;
+                return source.Select(trial => ZapitDaqTrial.Arm(trial, untilStopped));
+            });
         }
     }
 
@@ -126,6 +134,21 @@ namespace OpenRigs.Trials
         public IObservable<ZapitDaqCommand> Process<TSource>(IObservable<TSource> source)
         {
             return source.Select(_ => new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Trigger });
+        }
+    }
+
+    /// <summary>Each triggered trial again its rules' LaserCapSeconds later on the computer's clock (never with no cap): the backstop
+    /// that stops ZapitDaq should the Harp board stall so that LaserCap never comes.</summary>
+    [Combinator]
+    [Description("Each input trial (with the rules' laser timing, at its trigger) again LaserCapSeconds later on the computer's clock, never with no cap: the backstop should the Harp board stall.")]
+    [WorkflowElementCategory(ElementCategory.Combinator)]
+    public class ZapitLaserBackstop
+    {
+        /// <summary>Each trial at its cap.</summary>
+        public IObservable<TTrial> Process<TTrial>(IObservable<Tuple<TTrial, LaserTiming>> source)
+        {
+            return source.SelectMany(t => double.IsInfinity(t.Item2.LaserCapSeconds) ? Observable.Never<TTrial>()
+                : Observable.Timer(TimeSpan.FromSeconds(t.Item2.LaserCapSeconds)).Select(_ => t.Item1));
         }
     }
 

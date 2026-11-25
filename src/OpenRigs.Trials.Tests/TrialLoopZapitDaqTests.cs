@@ -130,6 +130,9 @@ namespace OpenRigs.Trials.Tests
             StringAssert.Contains(Refusal(() => new TrialLoop<StubTrial, string, StubOutcome>(rules, true, true)), "ZapitDaq arms every trial before its trigger");
             Assert.IsTrue(LaserTiming.UntilOutcome(0.3, 5).HardwareTriggered);
             Assert.IsTrue(LaserTiming.ForDuration(0.3).HardwareTriggered);
+            var offTiming = LaserTiming.UntilStimulusOff(0.3, 5);
+            Assert.IsTrue(offTiming.HardwareTriggered && offTiming.End == LaserEnd.AtStimulusOff && offTiming.UntilStopped);
+            new TrialLoop<StubTrial, string, StubOutcome>(new StubRules { Laser = offTiming }, true, true);
         }
 
         // Audit F F1: the loop armed the next ForDuration trial at trigger + duration + ramp, while the real ZapitDaq, started

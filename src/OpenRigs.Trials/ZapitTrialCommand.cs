@@ -35,7 +35,7 @@ namespace OpenRigs.Trials
     [Description("A trial's Zapit StartStimulus: its condition, the laser on or off (galvos and masking light either way, 0 mW off). " +
         "Inputs: the trial as its laser may be armed, the trial at its trigger. On a hardware-triggered rig it is sent from the first, " +
         "as the DAQ then waits for the trigger line; otherwise from the second, as Zapit then starts the laser on receipt. " +
-        "The stimulus lasts the trial's laser duration (an ILaserDurationTrial), else until StopStimulus.")]
+        "The stimulus lasts the trial's laser duration (an ILaserDurationTrial), else, or with UntilStopped, until StopStimulus.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class ZapitTrialCommand
     {
@@ -43,14 +43,19 @@ namespace OpenRigs.Trials
         [Description("Whether the Zapit DAQ waits for the trigger line. Map it from the rig file's zapit.hardwareTriggered.")]
         public bool HardwareTriggered { get; set; }
 
+        /// <summary>Gets or sets whether every stimulus plays until StopStimulus, no duration sent, even a trial's with its own laser duration.</summary>
+        [Description("Whether every stimulus plays until StopStimulus (no duration sent), even a trial's with its own laser duration. Map it from the rules' LaserTiming.UntilStopped.")]
+        public bool UntilStopped { get; set; }
+
         /// <summary>Each trial's StartStimulus, from the input the rig's triggering needs; the properties are read at subscription.</summary>
         public IObservable<ZapitCommand> Process<TTrial>(IObservable<TTrial> arm, IObservable<TTrial> trigger) where TTrial : IZapitTrial
         {
             return Observable.Defer(() =>
             {
                 var hardwareTriggered = HardwareTriggered;
+                var untilStopped = UntilStopped;
                 return SendAt(arm, trigger, hardwareTriggered).Select(trial =>
-                    ZapitTrial.Command(trial.TrialNumber, trial.LaserCondition, trial.LaserOn, trial.LaserPowerMw, hardwareTriggered, DurationOf(trial)));
+                    ZapitTrial.Command(trial.TrialNumber, trial.LaserCondition, trial.LaserOn, trial.LaserPowerMw, hardwareTriggered, untilStopped ? 0 : DurationOf(trial)));
             });
         }
 
