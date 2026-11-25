@@ -13,34 +13,61 @@ namespace OpenRigs.Control
     /// Ends headless Bonsai if it is still running GraceSeconds after the controller's stop (exit code 0) or after the
     /// workflow began to end for any other reason, an error (exit code 1): a device's teardown held up (the live view's
     /// publisher threads keep the process alive until every device's teardown reaches them) would otherwise keep Bonsai
-    /// running until the controller kills it, and headless Bonsai exits 0 after an error. Nothing in the editor.
+    /// running until the controller kills it, and headless Bonsai exits 0 after an error. It also keeps headless Bonsai
+    /// running HoldSeconds once the workflow begins to end, so devices finish closing their serial ports first: a workflow
+    /// that logs nothing has no writer thread to do that, and Bonsai exiting mid-close crashed it in SerialStream.Finalize
+    /// (ObjectDisposedException) on every preflight stop. Nothing in the editor.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
-    [Description("Ends headless Bonsai if it is still running GraceSeconds after the controller's stop (exit code 0) or after the workflow began to end for any other reason, an error (exit code 1); nothing in the editor.")]
+    [Description("Keeps headless Bonsai running HoldSeconds once the workflow begins to end, so devices finish closing their ports, and ends it if it is still running GraceSeconds after the controller's stop (exit code 0) or after the workflow began to end for any other reason, an error (exit code 1); nothing in the editor.")]
     public class EndAfterStop
     {
         double graceSeconds = 2;
+        double holdSeconds = 1;
 
         /// <summary>Gets or sets the seconds the workflow's own teardown is given after the stop; 0 or less leaves it to the controller's kill.</summary>
         [Description("Seconds the workflow's own teardown is given after the stop; 0 or less leaves it to the controller's kill.")]
         public double GraceSeconds { get { return graceSeconds; } set { graceSeconds = value; } }
 
-        /// <summary>Never gives anything; in headless Bonsai (--no-editor), watches for the stop from a background thread.</summary>
+        /// <summary>Gets or sets the seconds headless Bonsai is kept running once the workflow begins to end; 0 or less keeps it for nothing.</summary>
+        [Description("Seconds headless Bonsai is kept running once the workflow begins to end, so devices finish closing their ports; 0 or less keeps it for nothing. Below GraceSeconds.")]
+        public double HoldSeconds { get { return holdSeconds; } set { holdSeconds = value; } }
+
+        /// <summary>Never gives anything; in headless Bonsai (--no-editor), watches for the stop from a background thread and holds the process once the workflow ends.</summary>
         public IObservable<string> Process()
         {
             return Observable.Create<string>(observer =>
             {
+                if (!Environment.GetCommandLineArgs().Contains("--no-editor")) return Disposable.Empty;
                 var grace = GraceSeconds;
-                if (grace <= 0 || !Environment.GetCommandLineArgs().Contains("--no-editor")) return Disposable.Empty;
+                var hold = HoldSeconds;
                 var ending = new ManualResetEventSlim(false);
-                var watch = new Thread(() => Watch(ending, TimeSpan.FromSeconds(grace)));
-                watch.IsBackground = true;
-                watch.Name = "EndAfterStop";
-                watch.Start();
+                if (grace > 0)
+                {
+                    var watch = new Thread(() => Watch(ending, TimeSpan.FromSeconds(grace)));
+                    watch.IsBackground = true;
+                    watch.Name = "EndAfterStop";
+                    watch.Start();
+                }
                 // Disposed means the workflow is ending: the watch goes on, since a teardown held up is what it is for.
-                return Disposable.Create(ending.Set);
+                return Disposable.Create(() =>
+                {
+                    ending.Set();
+                    Hold(hold);
+                });
             });
+        }
+
+        /// <summary>Starts a foreground thread that keeps the process running <paramref name="seconds"/>; null for 0 or less.</summary>
+        public static Thread Hold(double seconds)
+        {
+            if (seconds <= 0) return null;
+            var hold = new Thread(() => Thread.Sleep(TimeSpan.FromSeconds(seconds)));
+            hold.IsBackground = false;
+            hold.Name = "EndAfterStop hold";
+            hold.Start();
+            return hold;
         }
 
         /// <summary>

@@ -351,6 +351,11 @@ namespace OpenRigs.Control.Tests
                 var gave = 0;
                 using (new EndAfterStop().Process().Subscribe(_ => gave++)) { }
                 Check("outside headless Bonsai it watches nothing and gives nothing", gave == 0, gave.ToString());
+                Check("the hold is below the grace, so a teardown that ends lets Bonsai exit by itself", new EndAfterStop().HoldSeconds < new EndAfterStop().GraceSeconds, "hold not below grace");
+                var hold = EndAfterStop.Hold(0.2);
+                Check("the hold is a foreground thread, so it keeps the process running", hold != null && hold.IsAlive && !hold.IsBackground, hold == null ? "none" : hold.IsBackground ? "background" : "ended");
+                Check("the hold ends by itself", hold != null && hold.Join(2000), "still running");
+                Check("a hold of 0 starts nothing", EndAfterStop.Hold(0) == null, "a thread");
             }
 
             Console.WriteLine("Two servers on one port:");
