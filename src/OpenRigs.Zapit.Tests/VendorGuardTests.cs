@@ -7,7 +7,7 @@ using OpenRigs.VendorGuard;
 namespace OpenRigs.Zapit.Tests
 {
     /// <summary>
-    /// A workflow that takes ZapitDaq's opto adapter (OpenRigs.Opto.ZapitDaq) also gets OpenRigs.Zapit, with the NI-DAQmx and
+    /// A workflow that takes the Zapit-Bonsai adapter (OpenRigs.Opto.ZapitBonsai) also gets OpenRigs.Zapit, with the NI-DAQmx and
     /// pylon wrappers (OpenRigs.Trials no longer does: OpenRigs.Trials.Tests' VendorGuardTests). It stays safe on a rig without
     /// those drivers only while no vendor type is reachable from what it loads: the adapter names Zapit's message and bank types
     /// only, and in Zapit the vendor types sit in NiZapitDevice (reached through ZapitDaq's NoInlining CreateNi, only when not

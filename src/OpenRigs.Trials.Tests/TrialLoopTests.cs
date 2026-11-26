@@ -5,7 +5,7 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Devices.Zapit;
-using OpenRigs.Opto.ZapitDaq;
+using OpenRigs.Opto.ZapitBonsai;
 using OpenRigs.Opto.ZapitMatlab;
 
 namespace OpenRigs.Trials.Tests
@@ -78,7 +78,7 @@ namespace OpenRigs.Trials.Tests
         /// <summary>The loop on <paramref name="opto"/>; by default MATLAB Zapit's, or with <paramref name="zapitDaq"/> ZapitDaq's.</summary>
         public LoopRig(StubRules rules, double first = 100.001, bool zapitDaq = false, IOptoSystem opto = null)
         {
-            Loop = new TrialLoop<StubTrial, string, StubOutcome>(rules, true, opto ?? (zapitDaq ? (IOptoSystem)ZapitDaqOptoSystem.Instance : ZapitMatlabOptoSystem.Instance));
+            Loop = new TrialLoop<StubTrial, string, StubOutcome>(rules, true, opto ?? (zapitDaq ? (IOptoSystem)ZapitBonsaiOptoSystem.Instance : ZapitMatlabOptoSystem.Instance));
             Now = Math.Round(first - 0.001, 6);
         }
 

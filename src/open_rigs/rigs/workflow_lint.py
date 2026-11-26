@@ -38,9 +38,9 @@ SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
 SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
 ZAPIT_INCLUDE = "OpenRigs.Devices:ConnectZapit.bonsai"
 ZAPIT_FOR_TASK = "OpenRigs.Devices:ConnectForTask.bonsai"
-# ZapitDaq's blocks (OpenRigs.Zapit, no MATLAB Zapit), all in its opto adapter package OpenRigs.Opto.ZapitDaq, beside
+# ZapitDaq's blocks (OpenRigs.Zapit, no MATLAB Zapit), all in its opto adapter package OpenRigs.Opto.ZapitBonsai, beside
 # MATLAB Zapit's until no workflow uses it: a workflow takes one set or the other, never both.
-ZAPIT_DAQ = "OpenRigs.Opto.ZapitDaq:"
+ZAPIT_DAQ = "OpenRigs.Opto.ZapitBonsai:"
 ZAPIT_DAQ_FOR_TASK = ZAPIT_DAQ + "ConnectForTaskZapitDaq.bonsai"  # includes ZapitCamera and ZapitSetup
 ZAPIT_CAMERA = ZAPIT_DAQ + "ZapitCamera.bonsai"
 ZAPIT_SETUP = ZAPIT_DAQ + "ZapitSetup.bonsai"

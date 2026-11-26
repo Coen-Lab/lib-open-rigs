@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using OpenRigs.Opto.ZapitDaq;
+using OpenRigs.Opto.ZapitBonsai;
 using OpenRigs.Zapit;
 
 namespace OpenRigs.Trials.Tests

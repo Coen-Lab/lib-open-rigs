@@ -50,7 +50,7 @@
       <Expression xsi:type="rx:PublishSubject" TypeArguments="harp:HarpMessage">
         <rx:Name>BehaviorBoard-Main.Data</rx:Name>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitBonsai:ConnectForTaskZapitDaq.bonsai" />
       <Expression xsi:type="lv:StreamDevices">
         <Name>LiveView</Name>
         <lv:DataPort>5556</lv:DataPort>

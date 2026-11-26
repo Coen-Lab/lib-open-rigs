@@ -35,8 +35,8 @@
     <ProjectReference Include="..\OpenRigs.Vision\OpenRigs.Vision.csproj" />
     <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
     <ProjectReference Include="..\OpenRigs.Zapit\OpenRigs.Zapit.csproj" />
-    <!-- DualZapitTests, ZapitLiveViewTests, ZapitSetupTests: ConnectForTaskZapitDaq, ZapitSetup and ZapitCamera are the ZapitDaq adapter's -->
-    <ProjectReference Include="..\OpenRigs.Opto.ZapitDaq\OpenRigs.Opto.ZapitDaq.csproj" />
+    <!-- DualZapitTests, ZapitLiveViewTests, ZapitSetupTests: ConnectForTaskZapitDaq, ZapitSetup and ZapitCamera are the Zapit-Bonsai adapter's -->
+    <ProjectReference Include="..\OpenRigs.Opto.ZapitBonsai\OpenRigs.Opto.ZapitBonsai.csproj" />
     <!-- WorkflowConfigRootTests: the nodes that read rig.yml when the workflow is built -->
     <ProjectReference Include="..\OpenRigs.LiveView\OpenRigs.LiveView.csproj" />
     <ProjectReference Include="..\OpenRigs.Streaming\OpenRigs.Streaming.csproj" />

@@ -1,6 +1,6 @@
 """Zapit, a rig's optostimulation, in either of two forms while both run: MATLAB Zapit, the server a rig's tasks arm each
 trial over TCP (host, port, hardwareTriggered), and ZapitDaq (OpenRigs.Zapit), the workflow's own NI DAQ driving two
-galvos, the laser and the masking LED, with its Basler camera (the native fields, lib_zapit's key names). A blue rig
+galvos, the laser and the masking LED, with its Basler camera (the Zapit-Bonsai fields, lib_zapit's key names). A blue rig
 running both carries both sets in its one zapit block."""
 import datetime
 import json
@@ -18,10 +18,10 @@ from open_rigs.core.artefacts import ArtefactPath
 # every task using Zapit leaves this much between arming Zapit and the trigger.
 ZAPIT_REPLY_MARGIN_SECONDS = 0.2
 # The most ZapitDaq's Arm may take, in seconds: building the trial's buffer, writing it and starting the task (its Armed
-# event's ArmSeconds; OpenRigs.Opto.ZapitDaq ZapitDaqTrial.ArmSeconds). Every task on ZapitDaq arms at least this long before its
+# event's ArmSeconds; OpenRigs.Opto.ZapitBonsai ZapitDaqTrial.ArmSeconds). Every task on ZapitDaq arms at least this long before its
 # trigger. To be measured on a rig (a 2.8 s trial at 100 kS/s).
 ZAPIT_ARM_SECONDS = 0.2
-# How long after a timed ZapitDaq trial's last sample is due the next is armed, in seconds (OpenRigs.Opto.ZapitDaq
+# How long after a timed ZapitDaq trial's last sample is due the next is armed, in seconds (OpenRigs.Opto.ZapitBonsai
 # ZapitDaqTrial.FreeMarginSeconds): the trigger line's edge comes after the loop's trigger tick. The loop frees ZapitDaq at
 # the trigger plus the trial's whole length (whole scan cycles and the ramp) plus this, so a laserDurationSeconds limit
 # subtracts this, the ramp and one scan cycle.
@@ -100,7 +100,7 @@ class ZapitCamera(BaseSchema):
     )
 
 
-# The native fields a block naming its NI device (zapit.device) must all give.
+# The Zapit-Bonsai fields a block naming its NI device (zapit.device) must all give.
 ZAPIT_DAQ_REQUIRED = ("device", "galvo_x_channel", "galvo_y_channel", "laser_channel", "led_channel", "photodiode_channel",
                       "trigger_channel", "sample_rate", "laser_min_max_mw", "laser_min_max_control_volts", "ceiling_mw",
                       "max_trial_seconds", "microns_per_pixel", "volts_per_pixel", "safety_gate", "camera")
@@ -109,7 +109,7 @@ ZAPIT_DAQ_REQUIRED = ("device", "galvo_x_channel", "galvo_y_channel", "laser_cha
 class Zapit(BaseSchema):
     """Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings
     file; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the
-    native fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
+    Zapit-Bonsai fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
     beside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0)."""
 
     host: str = Field(default="127.0.0.1", description="Host name or IP address of the PC running Zapit.")
@@ -118,13 +118,13 @@ class Zapit(BaseSchema):
         default=False,
         description="True: Zapit arms its DAQ on the TCP command and the ZapitTrigger line starts the stimulus. False: Zapit starts the stimulus on receipt of the command.",
     )
-    device: Optional[str] = Field(default=None, pattern=r"^\S+$", examples=["Dev1"], description="ZapitDaq's NI device, as NI MAX names it; with it, every native field below is given.")
+    device: Optional[str] = Field(default=None, pattern=r"^\S+$", examples=["Dev1"], description="ZapitDaq's NI device, as NI MAX names it; with it, every Zapit-Bonsai field below is given.")
     galvo_x_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao0"], description="The AO line driving the X galvo.")
     galvo_y_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao1"], description="The AO line driving the Y galvo.")
     laser_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao2"], description="The AO line setting the laser's power (its control volts).")
     led_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao3"], description="The AO line driving the masking LED.")
     photodiode_channel: Optional[str] = Field(default=None, pattern=r"^ai\d+$", examples=["ai0"], description="The AI line reading the photodiode, for the laser curve.")
-    blanking_times_ms: Optional[List[float]] = Field(default=None, min_length=3, max_length=3, description="The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the native fields a block gives together.")
+    blanking_times_ms: Optional[List[float]] = Field(default=None, min_length=3, max_length=3, description="The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.")
     trigger_channel: Optional[str] = Field(default=None, pattern=r"^PFI\d+$", examples=["PFI0"], description="The PFI line the Behavior board's ZapitTrigger line is cabled to; each trial starts on it.")
     sample_rate: Optional[float] = Field(default=None, gt=0, examples=[100000], description="AO samples a second, per channel; every bank is built at it.")
     laser_min_max_mw: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.")
@@ -144,7 +144,7 @@ class Zapit(BaseSchema):
         return self.device is not None
 
     @model_validator(mode="after")
-    def _native_fields_together(self) -> "Zapit":
+    def _zapit_bonsai_fields_together(self) -> "Zapit":
         given = [name for name in ZAPIT_DAQ_REQUIRED if getattr(self, name) is not None]
         if given and len(given) < len(ZAPIT_DAQ_REQUIRED):
             fields = type(self).model_fields

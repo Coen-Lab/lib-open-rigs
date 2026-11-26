@@ -27,20 +27,20 @@ namespace OpenRigs.Devices.Tests
         public void EachPieceTakesItsOwnSwitchAndTheWorkflowBuilds()
         {
             var builder = Built(BothBlocks);
-            var native = ZapitLiveViewTests.Included(builder.Workflow, "OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai");
+            var bonsai = ZapitLiveViewTests.Included(builder.Workflow, "OpenRigs.Opto.ZapitBonsai:ConnectForTaskZapitDaq.bonsai");
             var matlab = ZapitLiveViewTests.Included(builder.Workflow, "OpenRigs.Devices:ConnectForTask.bonsai");
             var logs = ZapitLiveViewTests.Included(builder.Workflow, "OpenRigs.Devices:ZapitLogs.bonsai");
-            CollectionAssert.AreEquivalent(new[] { "TaskParameters.Optogenetics.ZapitBonsai", "TaskParameters.Optogenetics.ZapitBonsai" }, Selectors(native.Workflow, "Optogenetics.ZapitBonsai"));
+            CollectionAssert.AreEquivalent(new[] { "TaskParameters.Optogenetics.ZapitBonsai", "TaskParameters.Optogenetics.ZapitBonsai" }, Selectors(bonsai.Workflow, "Optogenetics.ZapitBonsai"));
             CollectionAssert.AreEquivalent(new[] { "TaskParameters.Optogenetics.ZapitMatlab", "TaskParameters.Optogenetics.ZapitMatlab" }, Selectors(matlab.Workflow, "Optogenetics.ZapitMatlab"));
             CollectionAssert.AreEquivalent(new[] { "TaskParameters.Optogenetics.ZapitMatlab" }, Selectors(logs.Workflow, "Optogenetics.ZapitMatlab"));
             // Each switch is published under its own name: ConnectForTaskZapitDaq's Optogenetics (ZapitCamera and ExpectedFiles read
             // it), ConnectForTask's OptogeneticsMatlab.
             Assert.AreEqual(1, Declared(builder.Workflow, "Optogenetics"));
             Assert.AreEqual(1, Declared(builder.Workflow, "OptogeneticsMatlab"));
-            var openedBy = Switch(native.Workflow);
+            var openedBy = Switch(bonsai.Workflow);
             Assert.AreEqual("optogenetics.zapitBonsai", openedBy.Path);
             Assert.IsTrue(openedBy.EmptyPathValue);
-            var require = ZapitLiveViewTests.Nested(native.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<OpenRigs.Core.RequireValue>().Single();
+            var require = ZapitLiveViewTests.Nested(bonsai.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<OpenRigs.Core.RequireValue>().Single();
             StringAssert.StartsWith(require.Message, "Zapit-Bonsai is ticked");
         }
 
@@ -48,10 +48,10 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ThePiecesDefaultsAreTheEnabledSwitchAndNoOpenedBy()
         {
-            var native = ZapitLiveViewTests.Included(LiveView().Workflow, "OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai");
-            CollectionAssert.AreEquivalent(new[] { "TaskParameters.Optogenetics.Enabled", "TaskParameters.Optogenetics.Enabled" }, Selectors(native.Workflow, "Optogenetics.Enabled"));
+            var bonsai = ZapitLiveViewTests.Included(LiveView().Workflow, "OpenRigs.Opto.ZapitBonsai:ConnectForTaskZapitDaq.bonsai");
+            CollectionAssert.AreEquivalent(new[] { "TaskParameters.Optogenetics.Enabled", "TaskParameters.Optogenetics.Enabled" }, Selectors(bonsai.Workflow, "Optogenetics.Enabled"));
             // No OpenedBy opens, the file not read: a workflow with one Zapit opens it on any rig with zapit.device, as before.
-            var openedBy = Switch(native.Workflow);
+            var openedBy = Switch(bonsai.Workflow);
             Assert.AreEqual("", openedBy.Path);
             Assert.IsTrue(openedBy.EmptyPathValue);
             Assert.IsTrue(openedBy.Process(Observable.Return(Path.Combine(Path.GetTempPath(), "no-such-task-file.yml"))).Wait());
@@ -62,13 +62,13 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void ZapitDaqOpensOnlyWhenOpenedByIsTrue()
         {
-            var native = ZapitLiveViewTests.Included(LiveView().Workflow, "OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai");
-            var gate = ZapitLiveViewTests.Nested(native.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<Bonsai.Scripting.Expressions.ExpressionTransform>()
+            var bonsai = ZapitLiveViewTests.Included(LiveView().Workflow, "OpenRigs.Opto.ZapitBonsai:ConnectForTaskZapitDaq.bonsai");
+            var gate = ZapitLiveViewTests.Nested(bonsai.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<Bonsai.Scripting.Expressions.ExpressionTransform>()
                 .Single(t => t.Expression != null && t.Expression.Contains("Item1.Device"));
             var withDevice = new OpenRigs.Devices.Rigs.Zapit { Device = "Dev1" };
             var matlabOnly = new OpenRigs.Devices.Rigs.Zapit();
-            Assert.IsTrue(Opens(gate, withDevice, true), "native block, OpenedBy true: open");
-            Assert.IsFalse(Opens(gate, withDevice, false), "native block, OpenedBy false or left out: closed");
+            Assert.IsTrue(Opens(gate, withDevice, true), "Zapit-Bonsai block, OpenedBy true: open");
+            Assert.IsFalse(Opens(gate, withDevice, false), "Zapit-Bonsai block, OpenedBy false or left out: closed");
             Assert.IsFalse(Opens(gate, matlabOnly, true), "no zapit.device: closed");
             Assert.IsFalse(Opens(gate, null, true), "no zapit block: closed");
 
@@ -179,7 +179,7 @@ namespace OpenRigs.Devices.Tests
                 {
                     builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
                 }
-                var camera = ZapitLiveViewTests.Included(ZapitLiveViewTests.Included(builder.Workflow, "OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai").Workflow, "OpenRigs.Opto.ZapitDaq:ZapitCamera.bonsai").Workflow;
+                var camera = ZapitLiveViewTests.Included(ZapitLiveViewTests.Included(builder.Workflow, "OpenRigs.Opto.ZapitBonsai:ConnectForTaskZapitDaq.bonsai").Workflow, "OpenRigs.Opto.ZapitBonsai:ZapitCamera.bonsai").Workflow;
                 var pylon = ZapitLiveViewTests.Nested(camera).Select(n => n.Value).OfType<CombinatorBuilder>().Single(c => c.Combinator.GetType().FullName == "OpenRigs.Zapit.ZapitPylonCapture");
                 pylon.Combinator = new StandInPylonCapture();
                 builder.Workflow.Build();

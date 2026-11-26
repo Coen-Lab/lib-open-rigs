@@ -1,7 +1,7 @@
 using System.Linq;
 using System.Reflection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using OpenRigs.Opto.ZapitDaq;
+using OpenRigs.Opto.ZapitBonsai;
 using OpenRigs.Opto.ZapitMatlab;
 using OpenRigs.VendorGuard;
 
@@ -10,7 +10,7 @@ namespace OpenRigs.Trials.Tests
     /// <summary>
     /// The trial loop names no opto system: OpenRigs.Trials references no OpenRigs.Zapit type (nor an adapter's, nor a vendor's),
     /// so a workflow that takes Trials never gets the NI-DAQmx and pylon wrappers. Each opto system is an adapter package that
-    /// depends on Trials and its own driver (OpenRigs.Opto.ZapitDaq on OpenRigs.Zapit, OpenRigs.Opto.ZapitMatlab on MATLAB Zapit's
+    /// depends on Trials and its own driver (OpenRigs.Opto.ZapitBonsai on OpenRigs.Zapit, OpenRigs.Opto.ZapitMatlab on MATLAB Zapit's
     /// client in OpenRigs.Devices); the drivers never depend on Trials or an adapter. An adapter may name its driver's types, never a
     /// vendor's (OpenRigs.Zapit keeps those in its two vendor types, its own guard tests).
     /// </summary>
@@ -49,12 +49,12 @@ namespace OpenRigs.Trials.Tests
         [TestMethod]
         public void TheAdaptersNameNoVendorType()
         {
-            foreach (var assembly in new[] { typeof(ZapitDaqOptoSystem).Assembly, typeof(ZapitMatlabOptoSystem).Assembly })
+            foreach (var assembly in new[] { typeof(ZapitBonsaiOptoSystem).Assembly, typeof(ZapitMatlabOptoSystem).Assembly })
             {
                 var found = VendorReferences.Find(assembly.Location);
                 Assert.AreEqual(0, found.Count, assembly.GetName().Name + " names a vendor type:\n" + string.Join("\n", found.Select(h => "  " + h.Owner + ": " + h)));
             }
-            CollectionAssert.Contains(References(typeof(ZapitDaqOptoSystem).Assembly), "OpenRigs.Zapit", "ZapitDaq's adapter no longer names its driver: the checks here would pass vacuously");
+            CollectionAssert.Contains(References(typeof(ZapitBonsaiOptoSystem).Assembly), "OpenRigs.Zapit", "the Zapit-Bonsai adapter no longer names its driver: the checks here would pass vacuously");
             var matlab = References(typeof(ZapitMatlabOptoSystem).Assembly);
             Assert.IsFalse(matlab.Any(r => Vendor.Contains(r) || r.StartsWith("OpenRigs.Opto.")), "MATLAB Zapit's adapter needs neither ZapitDaq, another adapter nor a vendor: " + string.Join(", ", matlab));
         }
@@ -71,9 +71,9 @@ namespace OpenRigs.Trials.Tests
                 var back = References(assembly).Where(r => r == "OpenRigs.Trials" || r.StartsWith("OpenRigs.Opto.")).ToList();
                 Assert.AreEqual(0, back.Count, assembly.GetName().Name + " references " + string.Join(", ", back) + ": a driver never depends on the trial loop or an adapter.");
             }
-            Assert.IsFalse(References(devices).Contains("OpenRigs.Zapit"), "OpenRigs.Devices references OpenRigs.Zapit: ZapitDaq's pieces belong in OpenRigs.Opto.ZapitDaq.");
-            Assert.IsFalse(References(typeof(ZapitDaqOptoSystem).Assembly).Contains("OpenRigs.Opto.ZapitMatlab"), "one adapter references another");
-            CollectionAssert.Contains(References(typeof(ZapitDaqOptoSystem).Assembly), trials.GetName().Name);
+            Assert.IsFalse(References(devices).Contains("OpenRigs.Zapit"), "OpenRigs.Devices references OpenRigs.Zapit: ZapitDaq's pieces belong in OpenRigs.Opto.ZapitBonsai.");
+            Assert.IsFalse(References(typeof(ZapitBonsaiOptoSystem).Assembly).Contains("OpenRigs.Opto.ZapitMatlab"), "one adapter references another");
+            CollectionAssert.Contains(References(typeof(ZapitBonsaiOptoSystem).Assembly), trials.GetName().Name);
             CollectionAssert.Contains(References(typeof(ZapitMatlabOptoSystem).Assembly), trials.GetName().Name);
         }
     }

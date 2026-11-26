@@ -1774,7 +1774,7 @@
       "type": "object"
     },
     "Zapit": {
-      "description": "Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings\nfile; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the\nnative fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)\nbeside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).",
+      "description": "Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings\nfile; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the\nZapit-Bonsai fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)\nbeside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).",
       "properties": {
         "host": {
           "default": "127.0.0.1",
@@ -1807,7 +1807,7 @@
             }
           ],
           "default": null,
-          "description": "ZapitDaq's NI device, as NI MAX names it; with it, every native field below is given.",
+          "description": "ZapitDaq's NI device, as NI MAX names it; with it, every Zapit-Bonsai field below is given.",
           "examples": [
             "Dev1"
           ],
@@ -1913,7 +1913,7 @@
             }
           ],
           "default": null,
-          "description": "The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the native fields a block gives together.",
+          "description": "The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.",
           "title": "BlankingTimesMs"
         },
         "triggerChannel": {

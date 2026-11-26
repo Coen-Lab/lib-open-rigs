@@ -4477,13 +4477,13 @@ namespace OpenRigs.Devices.Rigs
     /// <summary>
     /// Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings
     ///file; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the
-    ///native fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
+    ///Zapit-Bonsai fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
     ///beside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
     [System.ComponentModel.DescriptionAttribute(@"Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings
     file; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the
-    native fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
+    Zapit-Bonsai fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
     beside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
@@ -4625,11 +4625,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// ZapitDaq's NI device, as NI MAX names it; with it, every native field below is given.
+        /// ZapitDaq's NI device, as NI MAX names it; with it, every Zapit-Bonsai field below is given.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("device")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="device")]
-        [System.ComponentModel.DescriptionAttribute("ZapitDaq\'s NI device, as NI MAX names it; with it, every native field below is gi" +
+        [System.ComponentModel.DescriptionAttribute("ZapitDaq\'s NI device, as NI MAX names it; with it, every Zapit-Bonsai field below is gi" +
             "ven.")]
         public string Device
         {
@@ -4734,14 +4734,14 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the native fields a block gives together.
+        /// The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("blankingTimesMs")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="blankingTimesMs")]
         [System.ComponentModel.DescriptionAttribute("The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads " +
             "them. Absent, lib_zapit uses MATLAB\'s 0.3, -0.12, 0.25. Optional, and not part o" +
-            "f the native fields a block gives together.")]
+            "f the Zapit-Bonsai fields a block gives together.")]
         public System.Collections.Generic.List<double> BlankingTimesMs
         {
             get

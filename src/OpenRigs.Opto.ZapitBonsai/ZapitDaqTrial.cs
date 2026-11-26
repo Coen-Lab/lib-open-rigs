@@ -5,9 +5,9 @@ using System;
 using System.ComponentModel;
 using System.Reactive.Linq;
 
-namespace OpenRigs.Opto.ZapitDaq
+namespace OpenRigs.Opto.ZapitBonsai
 {
-    /// <summary>The rules every task's laser trials share with ZapitDaq (MATLAB Zapit's are OpenRigs.Devices.Zapit ZapitTrial), and the checks ZapitDaqOptoSystem makes of its Armed events for the loop.</summary>
+    /// <summary>The rules every task's laser trials share with ZapitDaq (MATLAB Zapit's are OpenRigs.Devices.Zapit ZapitTrial), and the checks ZapitBonsaiOptoSystem makes of its Armed events for the loop.</summary>
     public static class ZapitDaqTrial
     {
         /// <summary>The most ZapitDaq's Arm may take, in seconds (its Armed event's ArmSeconds): every task arms at least this
@@ -83,7 +83,7 @@ namespace OpenRigs.Opto.ZapitDaq
         /// </summary>
         public static string LeadProblem(double laserToStimulusSeconds, double itiMinSeconds)
         {
-            return ZapitDaqOptoSystem.Limits(0).LeadProblem(laserToStimulusSeconds, itiMinSeconds);
+            return ZapitBonsaiOptoSystem.Limits(0).LeadProblem(laserToStimulusSeconds, itiMinSeconds);
         }
 
         /// <summary>The stop for a trial whose trigger came before ZapitDaq armed it: the task stops rather than move the trigger.</summary>

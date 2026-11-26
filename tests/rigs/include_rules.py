@@ -103,7 +103,7 @@ def zapit_daq_for_task_problems(root: ET.Element) -> list[str]:
     paths, and ZapitSetup, in one SelectMany fed from ZapitRig (rig.yml's Zapit behind a Condition on its device, once
     completed); ZapitCamera at its top
     level, where its Camera-Zapit.Data reaches StreamDevices (a SelectMany is a subject scope of its own); and
-    publishes Optogenetics from optogenetics.enabled and OptogeneticsLaserEnabled. `root` is OpenRigs.Opto.ZapitDaq's ConnectForTaskZapitDaq.bonsai."""
+    publishes Optogenetics from optogenetics.enabled and OptogeneticsLaserEnabled. `root` is OpenRigs.Opto.ZapitBonsai's ConnectForTaskZapitDaq.bonsai."""
     nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
     problems = []
     groups = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:SelectMany" and _name(n) == "Zapit"]

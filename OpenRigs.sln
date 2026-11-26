@@ -56,7 +56,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Zapit", "src\OpenR
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Zapit.Tests", "src\OpenRigs.Zapit.Tests\OpenRigs.Zapit.Tests.csproj", "{50F64BB4-DF0F-4D6B-ABE7-009BD766C157}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Opto.ZapitDaq", "src\OpenRigs.Opto.ZapitDaq\OpenRigs.Opto.ZapitDaq.csproj", "{99FBBE92-DB07-4433-B58E-188EBD3E99CE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Opto.ZapitBonsai", "src\OpenRigs.Opto.ZapitBonsai\OpenRigs.Opto.ZapitBonsai.csproj", "{99FBBE92-DB07-4433-B58E-188EBD3E99CE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Opto.ZapitMatlab", "src\OpenRigs.Opto.ZapitMatlab\OpenRigs.Opto.ZapitMatlab.csproj", "{3A77BBF1-F322-4258-895A-A641014A9671}"
 EndProject

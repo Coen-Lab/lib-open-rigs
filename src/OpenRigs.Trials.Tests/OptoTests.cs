@@ -5,7 +5,7 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Devices.Zapit;
-using OpenRigs.Opto.ZapitDaq;
+using OpenRigs.Opto.ZapitBonsai;
 using OpenRigs.Opto.ZapitMatlab;
 using OpenRigs.Zapit;
 
@@ -105,19 +105,19 @@ namespace OpenRigs.Trials.Tests
         [TestMethod]
         public void ZapitDaqsEventsMapToTheLoopsFeedback()
         {
-            var armed = ZapitDaqOpto.ToOptoFeedback(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Armed, Trial = 4, Condition = 3, LaserOn = true, PowerMw = 5, CappedPowerMw = 4.2, TrialSeconds = 2.75 });
+            var armed = ZapitBonsaiOpto.ToOptoFeedback(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Armed, Trial = 4, Condition = 3, LaserOn = true, PowerMw = 5, CappedPowerMw = 4.2, TrialSeconds = 2.75 });
             Assert.AreEqual(OptoFeedbackKind.Armed, armed.Kind);
             Assert.AreEqual(4, armed.Trial);
             Assert.AreEqual(3, armed.Condition);
             Assert.IsTrue(armed.On);
             Assert.AreEqual(4.2, armed.PowerMw, 0, "the capped power, what ZapitDaq delivers");
             Assert.AreEqual(2.75, armed.PlaySeconds, 0);
-            Assert.AreEqual(OptoFeedbackKind.Started, ZapitDaqOpto.ToOptoFeedback(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Started, Trial = 4 }).Kind);
+            Assert.AreEqual(OptoFeedbackKind.Started, ZapitBonsaiOpto.ToOptoFeedback(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Started, Trial = 4 }).Kind);
             foreach (var kind in new[] { ZapitDaqEventKind.Ended, ZapitDaqEventKind.Stopped, ZapitDaqEventKind.Zeroed })
-                Assert.AreEqual(OptoFeedbackKind.Ended, ZapitDaqOpto.ToOptoFeedback(new ZapitDaqEvent { Kind = kind, Trial = 4 }).Kind, kind.ToString());
+                Assert.AreEqual(OptoFeedbackKind.Ended, ZapitBonsaiOpto.ToOptoFeedback(new ZapitDaqEvent { Kind = kind, Trial = 4 }).Kind, kind.ToString());
             foreach (var kind in new[] { ZapitDaqEventKind.BankLoaded, ZapitDaqEventKind.Refused, ZapitDaqEventKind.Pointed })
-                Assert.IsNull(ZapitDaqOpto.ToOptoFeedback(new ZapitDaqEvent { Kind = kind }), kind.ToString());
-            Assert.IsNull(ZapitDaqOpto.ToOptoFeedback(null));
+                Assert.IsNull(ZapitBonsaiOpto.ToOptoFeedback(new ZapitDaqEvent { Kind = kind }), kind.ToString());
+            Assert.IsNull(ZapitBonsaiOpto.ToOptoFeedback(null));
         }
 
         [TestMethod]
@@ -142,23 +142,23 @@ namespace OpenRigs.Trials.Tests
             foreach (var lead in new[] { 3.1, 3.2, 3.3 })
             {
                 Assert.AreEqual(ZapitTrial.LeadProblem(lead, 3.4), ZapitMatlabOptoSystem.Limits(0.5).LeadProblem(lead, 3.4));
-                Assert.AreEqual(ZapitDaqTrial.LeadProblem(lead, 3.4), ZapitDaqOptoSystem.Limits(0.5).LeadProblem(lead, 3.4));
+                Assert.AreEqual(ZapitDaqTrial.LeadProblem(lead, 3.4), ZapitBonsaiOptoSystem.Limits(0.5).LeadProblem(lead, 3.4));
             }
             var matlab = ZapitMatlabOptoSystem.Limits(0.5);
             Assert.AreEqual(0.5 + ZapitTrial.ReplyMarginSeconds, matlab.OverheadSeconds, 1e-12, "the ramp-down plus the reply margin");
             var path = ZapitDaqTrialTests.UnpackBank();
             var bank = ZapitBank.Load(path);
             System.IO.Directory.Delete(System.IO.Path.GetDirectoryName(path), true);
-            Assert.AreEqual(ZapitDaqTrial.FreeAfterLaserSeconds(bank), ZapitDaqOptoSystem.Limits(bank, false).BusyAfterEndSeconds, 0);
-            Assert.AreEqual(ZapitDaqTrial.FreeAfterLaserSeconds(bank) + ZapitDaq.EarlyStopLeadSeconds, ZapitDaqOptoSystem.Limits(bank, true).BusyAfterEndSeconds, 0);
-            Assert.AreEqual(ZapitDaqOptoSystem.Limits(bank, true).BusyAfterEndSeconds + ZapitDaqTrial.ArmSeconds, ZapitDaqOptoSystem.Limits(bank, true).OverheadSeconds, 1e-12);
+            Assert.AreEqual(ZapitDaqTrial.FreeAfterLaserSeconds(bank), ZapitBonsaiOptoSystem.Limits(bank, false).BusyAfterEndSeconds, 0);
+            Assert.AreEqual(ZapitDaqTrial.FreeAfterLaserSeconds(bank) + ZapitDaq.EarlyStopLeadSeconds, ZapitBonsaiOptoSystem.Limits(bank, true).BusyAfterEndSeconds, 0);
+            Assert.AreEqual(ZapitBonsaiOptoSystem.Limits(bank, true).BusyAfterEndSeconds + ZapitDaqTrial.ArmSeconds, ZapitBonsaiOptoSystem.Limits(bank, true).OverheadSeconds, 1e-12);
         }
 
         // The two Zapits' policies, as the loop had them hard-coded before the port.
         [TestMethod]
         public void TheZapitsPoliciesAreTheLoopsOldOnes()
         {
-            var daq = ZapitDaqOptoSystem.Instance;
+            var daq = ZapitBonsaiOptoSystem.Instance;
             Assert.AreEqual(ZapitDaqTrial.ArmSeconds, daq.ArmLeadSeconds);
             Assert.IsTrue(daq.ConfirmsStart && daq.ArmCarriesLaserSeconds && !daq.EndNeedsReply);
             Assert.AreEqual(0.05, daq.StartedGraceSeconds);

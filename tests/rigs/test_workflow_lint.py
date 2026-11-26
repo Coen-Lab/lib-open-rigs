@@ -705,13 +705,13 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     def root(resource: str, package: str = "OpenRigs.Devices") -> lint.ET.Element:
         return lint.ET.fromstring((ROOT / "src" / package / resource).read_bytes())
     assert rules.zapit_for_task_problems(root("ConnectForTask.bonsai")) == []
-    assert rules.zapit_daq_for_task_problems(root("ConnectForTaskZapitDaq.bonsai", "OpenRigs.Opto.ZapitDaq")) == []
+    assert rules.zapit_daq_for_task_problems(root("ConnectForTaskZapitDaq.bonsai", "OpenRigs.Opto.ZapitBonsai")) == []
     # A lost mapping fails safe: ZapitDaq's CeilingMw default must be 0, and LaserMaxVolts is mapped.
-    text = (ROOT / "src" / "OpenRigs.Opto.ZapitDaq" / "ConnectForTaskZapitDaq.bonsai").read_text(encoding="utf-8-sig")
+    text = (ROOT / "src" / "OpenRigs.Opto.ZapitBonsai" / "ConnectForTaskZapitDaq.bonsai").read_text(encoding="utf-8-sig")
     lost = text.replace("<zap:CeilingMw>0<", "<zap:CeilingMw>INF<").replace(' Selector="LaserMaxControlVolts"', ' Selector="X"')
     assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(lost)) == [
         "ZapitDaq's LaserMaxVolts is not mapped from LaserMaxControlVolts", "ZapitDaq's CeilingMw default is not 0 (a lost mapping must fail safe)"]
-    # OpenedBy: ZapitDaq opens only when the task file's bool is true at launch, and with no OpenedBy on any native rig.
+    # OpenedBy: ZapitDaq opens only when the task file's bool is true at launch, and with no OpenedBy on any Zapit-Bonsai rig.
     closed_by = text.replace("Item1.Device != null &amp;&amp; Item2<", "Item1.Device != null &amp;&amp; !Item2<")
     assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(closed_by)) == [
         "ConnectForTaskZapitDaq's ZapitRig Condition does not open only when OpenedBy is true (... && Item2)"]

@@ -93,7 +93,7 @@ namespace OpenRigs.Trials
 
         /// <summary>A hardware-triggered laser on until the outcome, as <see cref="UntilOutcome(bool, double, double)"/> with every trial
         /// armed during its interval and started by the trigger line (a system that arms every trial before its trigger takes only these);
-        /// triggerHoldSeconds at least the system's longest ramp plus its early stop's lead (OpenRigs.Opto.ZapitDaq: ZapitBank.LongestRampSeconds
+        /// triggerHoldSeconds at least the system's longest ramp plus its early stop's lead (OpenRigs.Opto.ZapitBonsai: ZapitBank.LongestRampSeconds
         /// plus ZapitDaq.EarlyStopLeadSeconds), so an early-stopped trial has played out before the next trial is armed.</summary>
         public static LaserTiming UntilOutcome(double triggerHoldSeconds, double laserCapSeconds)
         {

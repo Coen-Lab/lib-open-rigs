@@ -6,7 +6,7 @@ Changes considered and not made, with the reason, so they are not proposed again
 
 - C5, "Off Go" after LaserOff: LaserOff does not clear the aim, so Go sends a second Zero and reports "Off Go" for a beam already off. Not changed: the extra Zero is harmless.
 - The agent's Zapit backstop skips while another Bonsai runs: not changed, as a running Bonsai may own the NI lines and zeroing them under it would fight it.
-- No backstop for a native workflow that dies before Ready (the agent marks it native only at Ready): not changed, as before Ready no command has driven the lines, and ZapitDaq zeroes them when it opens.
+- No backstop for a Zapit-Bonsai workflow that dies before Ready (the agent marks it Zapit-Bonsai only at Ready): not changed, as before Ready no command has driven the lines, and ZapitDaq zeroes them when it opens.
 
 ## Streamed early stop, 26 Nov 2026 (open)
 
@@ -14,7 +14,7 @@ Changes considered and not made, with the reason, so they are not proposed again
 
 ## Opto port, 26 Nov 2026 (open)
 
-OpenRigs.Trials now names no opto system: `TrialLoop` runs any `IOptoSystem`, and each system is an adapter package (`OpenRigs.Opto.ZapitDaq`, `OpenRigs.Opto.ZapitMatlab`) that depends on Trials and its own driver. Left for later, each with its reason:
+OpenRigs.Trials now names no opto system: `TrialLoop` runs any `IOptoSystem`, and each system is an adapter package (`OpenRigs.Opto.ZapitBonsai`, `OpenRigs.Opto.ZapitMatlab`) that depends on Trials and its own driver. Left for later, each with its reason:
 - **Retiring MATLAB Zapit** is now: delete `OpenRigs.Opto.ZapitMatlab` and its include, then MATLAB Zapit's pieces still in Devices (`OpenRigs.Devices.Zapit`, `ConnectForTask`, `ConnectZapit`, `ZapitLogs`, `ZapitTriggerLine` stays) and `TaskLogs`' include of `ZapitLogs`. `TrialLoop` does not change. Before deleting, move `OpenRigs.Trials.Tests`' loop tests (`TrialLoopTests`' `LoopRig` defaults to MATLAB Zapit's system) onto ZapitDaq's or a test system (`OptoTests`' `OtherOptoSystem`).
 - **Neutral `opto*` trial columns** (`optoSystem`, `optoCondition`, ..., `optoDetail`, a fixed block): deferred. The `laser*` columns, `TrialTimes.Laser*`, `LaserTiming` and the event names `Arm`, `Trigger`, `LaserCap`, `LaserOff`, `TriggerOff` keep their names until then, so no task's row, schema or workflow changed with the port.
 - **One `optogenetics.system` choice in the task file**: deferred. Decision-making keeps its two boxes (`optogenetics.zapitBonsai`, `optogenetics.zapitMatlab`), navigation and `open_rigs.core.task` keep `optogenetics.enabled`.

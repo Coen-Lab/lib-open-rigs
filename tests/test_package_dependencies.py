@@ -77,7 +77,7 @@ def test_the_known_hidden_dependencies_are_still_hidden():
 def test_the_trial_loop_depends_on_no_opto_system_and_no_driver_on_the_loop():
     projects = packages()
     adapters = sorted(name for name in projects if name.startswith("OpenRigs.Opto."))
-    assert adapters == ["OpenRigs.Opto.ZapitDaq", "OpenRigs.Opto.ZapitMatlab"]
+    assert adapters == ["OpenRigs.Opto.ZapitBonsai", "OpenRigs.Opto.ZapitMatlab"]
     trials = closure("OpenRigs.Trials", projects)
     assert not trials & {"OpenRigs.Zapit", *adapters}, f"OpenRigs.Trials depends on an opto system: {sorted(trials)}"
     vendor = {"Bonsai.DAQmx", "Bonsai.Pylon"}
@@ -88,5 +88,5 @@ def test_the_trial_loop_depends_on_no_opto_system_and_no_driver_on_the_loop():
     for adapter in adapters:
         assert "OpenRigs.Trials" in closure(adapter, projects), f"{adapter} does not depend on the trial loop"
         assert not closure(adapter, projects) & (set(adapters) - {adapter}), f"{adapter} depends on another adapter"
-    assert "OpenRigs.Zapit" in closure("OpenRigs.Opto.ZapitDaq", projects)
+    assert "OpenRigs.Zapit" in closure("OpenRigs.Opto.ZapitBonsai", projects)
     assert "OpenRigs.Zapit" not in closure("OpenRigs.Opto.ZapitMatlab", projects), "MATLAB Zapit's adapter needs no ZapitDaq"

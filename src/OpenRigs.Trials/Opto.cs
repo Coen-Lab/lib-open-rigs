@@ -41,7 +41,7 @@ namespace OpenRigs.Trials
 
     /// <summary>
     /// One message from an opto system to the trial loop, mapped from the system's own message by its adapter
-    /// (OpenRigs.Opto.ZapitDaq ZapitDaqOpto.ToOptoFeedback, OpenRigs.Opto.ZapitMatlab ZapitMatlabOpto.ToOptoFeedback).
+    /// (OpenRigs.Opto.ZapitBonsai ZapitBonsaiOpto.ToOptoFeedback, OpenRigs.Opto.ZapitMatlab ZapitMatlabOpto.ToOptoFeedback).
     /// </summary>
     public sealed class OptoFeedback
     {
@@ -70,7 +70,7 @@ namespace OpenRigs.Trials
     /// <summary>
     /// An opto system's policy, which <see cref="TrialLoop{TTrial, TUpdate, TOutcome}"/> consults and never hard-codes: how long an Arm
     /// takes, whether the system confirms its start, whether an end-now needs its reply before the next Arm, when it is free after a timed
-    /// trial, and the words of each stop. Each system's adapter package implements it (OpenRigs.Opto.ZapitDaq, OpenRigs.Opto.ZapitMatlab);
+    /// trial, and the words of each stop. Each system's adapter package implements it (OpenRigs.Opto.ZapitBonsai, OpenRigs.Opto.ZapitMatlab);
     /// adding a system adds an adapter, never a change to the loop. Every adapter's include must also drive its outputs to zero when the
     /// workflow stops or errors, and stop the light at <see cref="OptoBackstop"/> should the Harp clock stall.
     /// </summary>

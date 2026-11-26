@@ -3,21 +3,21 @@ using OpenRigs.Zapit;
 using System;
 using System.Reactive.Linq;
 
-namespace OpenRigs.Opto.ZapitDaq
+namespace OpenRigs.Opto.ZapitBonsai
 {
     /// <summary>
     /// ZapitDaq (Zapit-Bonsai, OpenRigs.Zapit) as the trial loop's opto system: it arms every trial before its trigger
     /// (<see cref="ZapitDaqTrial.ArmSeconds"/>), confirms each start (Started), needs no reply to an early stop, and is free after a
     /// timed trial once its whole armed trial has played plus <see cref="ZapitDaqTrial.FreeMarginSeconds"/>.
     /// </summary>
-    public sealed class ZapitDaqOptoSystem : OptoSystem
+    public sealed class ZapitBonsaiOptoSystem : OptoSystem
     {
-        ZapitDaqOptoSystem()
+        ZapitBonsaiOptoSystem()
         {
         }
 
         /// <summary>The one ZapitDaq opto system.</summary>
-        public static readonly ZapitDaqOptoSystem Instance = new ZapitDaqOptoSystem();
+        public static readonly ZapitBonsaiOptoSystem Instance = new ZapitBonsaiOptoSystem();
 
         /// <inheritdoc/>
         public override string Name { get { return "ZapitDaq"; } }
@@ -122,7 +122,7 @@ namespace OpenRigs.Opto.ZapitDaq
     }
 
     /// <summary>ZapitDaq's messages for the trial loop, and the loop run on them.</summary>
-    public static class ZapitDaqOpto
+    public static class ZapitBonsaiOpto
     {
         /// <summary>A ZapitDaq event as the loop's opto feedback: Armed (its trial, condition, laser, capped power and whole trial
         /// length), Started (its trial), Ended, Stopped and Zeroed (Ended); null for any other event, which is not the loop's.</summary>
@@ -162,7 +162,7 @@ namespace OpenRigs.Opto.ZapitDaq
             where TOutcome : class, ITrialOutcome
         {
             if (zapitEvents == null) throw new ArgumentNullException("zapitEvents");
-            return TrialLoop.Observe(rules, clock, licks, ZapitDaqOptoSystem.Instance, zapitEvents.Select(ToOptoFeedback).Where(f => f != null), wheelCm);
+            return TrialLoop.Observe(rules, clock, licks, ZapitBonsaiOptoSystem.Instance, zapitEvents.Select(ToOptoFeedback).Where(f => f != null), wheelCm);
         }
 
         /// <summary>An event from ZapitDaq into a loop whose opto system is ZapitDaq's (<see cref="TrialLoop{TTrial, TUpdate, TOutcome}.OnOpto"/>).</summary>

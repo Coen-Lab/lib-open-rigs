@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Subjects;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using OpenRigs.Opto.ZapitDaq;
+using OpenRigs.Opto.ZapitBonsai;
 using OpenRigs.Zapit;
 
 namespace OpenRigs.Trials.Tests
@@ -166,12 +166,12 @@ namespace OpenRigs.Trials.Tests
         public void ZapitDaqRefusesMatlabZapitsSoftwareTriggering()
         {
             var rules = new StubRules { Laser = LaserTiming.UntilOutcome(false, 0, double.PositiveInfinity) };
-            StringAssert.Contains(Refusal(() => new TrialLoop<StubTrial, string, StubOutcome>(rules, true, ZapitDaqOptoSystem.Instance)), "ZapitDaq arms every trial before its trigger");
+            StringAssert.Contains(Refusal(() => new TrialLoop<StubTrial, string, StubOutcome>(rules, true, ZapitBonsaiOptoSystem.Instance)), "ZapitDaq arms every trial before its trigger");
             Assert.IsTrue(LaserTiming.UntilOutcome(0.3, 5).HardwareTriggered);
             Assert.IsTrue(LaserTiming.ForDuration(0.3).HardwareTriggered);
             var offTiming = LaserTiming.UntilStimulusOff(0.3, 5);
             Assert.IsTrue(offTiming.HardwareTriggered && offTiming.End == LaserEnd.AtStimulusOff && offTiming.UntilStopped);
-            new TrialLoop<StubTrial, string, StubOutcome>(new StubRules { Laser = offTiming }, true, ZapitDaqOptoSystem.Instance);
+            new TrialLoop<StubTrial, string, StubOutcome>(new StubRules { Laser = offTiming }, true, ZapitBonsaiOptoSystem.Instance);
         }
 
         // Audit F F1: the loop armed the next ForDuration trial at trigger + duration + ramp, while the real ZapitDaq, started
@@ -341,7 +341,7 @@ namespace OpenRigs.Trials.Tests
             var zapit = new Subject<ZapitDaqEvent>();
             var events = new List<TrialEvent<StubTrial, string, StubOutcome>>();
             Exception error = null;
-            using (ZapitDaqOpto.Observe(rules, clock, new[] { lick }, zapit).Subscribe(events.Add, e => error = e))
+            using (ZapitBonsaiOpto.Observe(rules, clock, new[] { lick }, zapit).Subscribe(events.Add, e => error = e))
             {
                 rules.OnNext(Rules());
                 var now = 100.0;
