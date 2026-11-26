@@ -100,7 +100,9 @@ namespace OpenRigs.Zapit
         /// to the same rules. A still with no frame within FrameTimeout is refused. When the aims end (Go), a grid run or still
         /// in progress is refused and, as for a beam still aimed, the lines are zeroed. ZapitDaq's Zeroed not from a Zero of this
         /// node's own (Zapit-Main.LaserOff, or any other Zero) ends a grid run or still in progress (refused, the camera put back,
-        /// the lines zeroed again past any Point that crossed it) and the aim (Off Laser Off): no Point follows until a new
+        /// the lines zeroed again past any Point that crossed it) and the aim (Off Laser Off, the lines zeroed again too). A
+        /// Zeroed that finds the lock busy is handled once it is free, so at most one more Point (the one in flight, or one
+        /// for a camera frame queued first) can follow the Laser Off before that second Zero; none follows it until a new
         /// request. An aim not renewed within AimTimeout is turned off (Off, the lines zeroed).</summary>
         public IObservable<ZapitSetupStep> Process(IObservable<string> gridRuns, IObservable<string> stills, IObservable<string> banks,
             IObservable<ZapitDaqEvent> events, IObservable<IplImage> frames, IObservable<string> aims) => Observable.Create<ZapitSetupStep>(observer =>
@@ -328,7 +330,9 @@ namespace OpenRigs.Zapit
                 }
                 if (!aiming) return;
                 StopAiming();
-                Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Laser Off" });
+                // Zero again: a deferred Zeroed (the lock busy) can be handled after an aim's Point that waited on ZapitDaq's
+                // lock went out past the Laser Off, and this ends the aim watchdog too. Its Zeroed is this node's own.
+                Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Laser Off", Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
             }
 
             void OnEvent(ZapitDaqEvent e)

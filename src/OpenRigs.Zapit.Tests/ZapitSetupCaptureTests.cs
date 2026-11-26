@@ -19,6 +19,7 @@ namespace OpenRigs.Zapit.Tests
             public readonly Subject<IplImage> Frames = new Subject<IplImage>();
             public readonly List<ZapitSetupStep> Steps = new List<ZapitSetupStep>();
             public Exception Error;
+            public Action<ZapitSetupStep> OnStep;   // runs as each step goes out, the node's lock held
             readonly IDisposable subscription;
             byte shade;
 
@@ -31,6 +32,7 @@ namespace OpenRigs.Zapit.Tests
                     .Subscribe(step =>
                     {
                         lock (Steps) Steps.Add(step);
+                        OnStep?.Invoke(step);
                         if (step.Command?.Kind == ZapitDaqCommandKind.Point) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed });
                         if (step.Command?.Kind == ZapitDaqCommandKind.Zero) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Zeroed });
                     }, e => Error = e);
@@ -489,10 +491,36 @@ namespace OpenRigs.Zapit.Tests
             Assert.IsNull(rig.Error, rig.Error?.ToString());
             Assert.AreEqual("Off Laser Off", rig.Steps.Last().ToString());
             Assert.IsTrue(rig.Steps.Last().Aim);
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, rig.Steps.Last().Command?.Kind, "zeroed again, past a Point that crossed the Laser Off");
             var count = rig.Steps.Count;
             rig.LaserOff();
             rig.Aims.OnCompleted();
             Assert.AreEqual(count, rig.Steps.Count, string.Join("; ", rig.Steps));
+        }
+
+        // A Laser Off whose Zeroed finds the lock busy (an aim's Point going out, waiting on ZapitDaq's lock) is handled once
+        // the lock is free, after that Point: Off Laser Off zeroes the lines again, so the beam is not left on.
+        [TestMethod]
+        public void ADeferredLaserOffDuringAnAimsPointZeroesAfterIt()
+        {
+            using var rig = new Rig();
+            var fired = false;
+            rig.OnStep = step =>
+            {
+                if (fired || step.Stage != "Aiming") return;
+                fired = true;
+                var other = new System.Threading.Thread(rig.LaserOff);
+                other.Start();
+                other.Join();   // its Zeroed is deferred: this thread holds the node's lock
+            };
+            rig.Aims.OnNext("1,1,0.4");
+            Assert.IsTrue(rig.WaitFor(s => s.Stage == "Off"), string.Join("; ", rig.Steps));
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            List<ZapitSetupStep> steps;
+            lock (rig.Steps) steps = rig.Steps.ToList();
+            Assert.AreEqual("Aiming 1,1,0.4", steps[0].ToString());
+            Assert.AreEqual("Off Laser Off", steps.Last().ToString());
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, steps.Last().Command?.Kind, "the last command to ZapitDaq zeroes the lines");
         }
 
         // The aim watchdog: an aim not renewed within AimTimeout is turned off, the lines zeroed.
