@@ -42,7 +42,7 @@ namespace OpenRigs.Devices.Tests
             StringAssert.StartsWith(require.Message, "Zapit-Bonsai is ticked");
         }
 
-        // The defaults are unchanged for a workflow that includes one Zapit (coen-dome-navigation: ConnectForTask on optogenetics.enabled).
+        // The defaults are unchanged for a workflow that includes one Zapit (a task workflow with ConnectForTask on optogenetics.enabled).
         [TestMethod]
         public void ThePiecesDefaultsAreTheEnabledSwitchAndNoClosedBy()
         {
