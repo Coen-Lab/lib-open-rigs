@@ -9,7 +9,8 @@ A task names its parameters model in its pyproject.toml:
 
 `python -m open_rigs.rigs.check_task <task file>` prints the file's problems (exit 1 on any). With no file it serves:
 its first line says {"model": ...} (or {"error": ...} and it exits), then each stdin line {"taskParameters": {...}} gets
-one stdout line {"problems": [...]}, [] when the values fit, so one process answers every check (importing a model
+one stdout line {"problems": [...]}, [] when the values fit (a line may add "zapitBank", a ZapitDaq session's
+Settings_ZapitBank_<DateTime>.json once built, for its longest ramp-down), so one process answers every check (importing a model
 takes seconds, a check milliseconds)."""
 
 import json
@@ -21,7 +22,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ValidationError
 
-from open_rigs.components.zapit import RAMP_DOWN_CONTEXT, max_ramp_down_seconds
+from open_rigs.components.zapit import RAMP_DOWN_CONTEXT, bank_ramp_down_seconds, max_ramp_down_seconds
 
 GROUP = "open_rigs.task"
 
@@ -34,12 +35,21 @@ def model() -> type[BaseModel]:
     return found[0].load()
 
 
-def context(parameters: dict) -> dict:
-    """The validation context from files the task names, where they are (the rig): with optogenetics on, its Zapit
-    conditions file's largest ramp-down (RAMP_DOWN_CONTEXT). None readable: {}, and the workflow checks the file at Go."""
+def context(parameters: dict, bank: str | None = None) -> dict:
+    """The validation context from files the task names, where they are (the rig): with optogenetics on, the largest
+    ramp-down (RAMP_DOWN_CONTEXT) of the ZapitDaq session's bank when given, else of its Zapit conditions file. None
+    readable: {}, and the workflow checks at Go. Optogenetics is on with the lab's enabled, or with either box of a task that
+    chooses its Zapit per session (decision-making's zapitBonsai and zapitMatlab)."""
     opto = parameters.get("optogenetics") or {}
+    if not (opto.get("enabled") or opto.get("zapitBonsai") or opto.get("zapitMatlab")):
+        return {}
+    if bank:
+        try:
+            return {RAMP_DOWN_CONTEXT: bank_ramp_down_seconds(bank)} if Path(bank).is_file() else {}
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+            return {}
     path = str(opto.get("zapitConditionsPath") or "")
-    if not opto.get("enabled") or not path or not Path(path).is_file():
+    if not path or not Path(path).is_file():
         return {}
     try:
         return {RAMP_DOWN_CONTEXT: max_ramp_down_seconds(path)}
@@ -47,10 +57,10 @@ def context(parameters: dict) -> dict:
         return {}
 
 
-def problems(parameters_model: type[BaseModel], parameters: dict) -> list[str]:
+def problems(parameters_model: type[BaseModel], parameters: dict, bank: str | None = None) -> list[str]:
     """What the model refuses in a task's taskParameters, each in its words, its field's path before it when it has one."""
     try:
-        parameters_model.model_validate(parameters, context=context(parameters))
+        parameters_model.model_validate(parameters, context=context(parameters, bank))
     except ValidationError as error:
         said = []
         for e in error.errors():
@@ -83,7 +93,8 @@ def main() -> None:
         sys.exit(1 if said else 0)
     print(json.dumps({"model": f"{found.__module__}:{found.__qualname__}"}), flush=True)
     for line in sys.stdin:
-        print(json.dumps({"problems": problems(found, json.loads(line)["taskParameters"])}), flush=True)
+        request = json.loads(line)
+        print(json.dumps({"problems": problems(found, request["taskParameters"], request.get("zapitBank"))}), flush=True)
 
 
 if __name__ == "__main__":

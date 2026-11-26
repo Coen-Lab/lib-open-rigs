@@ -42,7 +42,7 @@ namespace OpenRigs.Devices.Rigs
     
         private SpoutPositions _lickSpoutDefaultPosition;
     
-        private ZapitServer _zapit;
+        private Zapit _zapit;
     
         private VideoEncoder _videoEncoder;
     
@@ -265,14 +265,15 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// Zapit optogenetics server endpoint; contacted only when the task enables optogenetics.
+        /// Zapit: MATLAB Zapit's server endpoint (contacted only when the task enables optogenetics), ZapitDaq's NI DAQ, laser limits and camera, or both; a rig without Zapit has none.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("zapit")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="zapit")]
-        [System.ComponentModel.DescriptionAttribute("Zapit optogenetics server endpoint; contacted only when the task enables optogene" +
-            "tics.")]
-        public ZapitServer Zapit
+        [System.ComponentModel.DescriptionAttribute("Zapit: MATLAB Zapit\'s server endpoint (contacted only when the task enables optog" +
+            "enetics), ZapitDaq\'s NI DAQ, laser limits and camera, or both; a rig without Zap" +
+            "it has none.")]
+        public Zapit Zapit
         {
             get
             {
@@ -3194,6 +3195,144 @@ namespace OpenRigs.Devices.Rigs
 
 
     /// <summary>
+    /// The laser safety layers this rig was scope-checked with (plan: Safety).
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
+    [System.ComponentModel.DescriptionAttribute("The laser safety layers this rig was scope-checked with (plan: Safety).")]
+    [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
+    [Bonsai.CombinatorAttribute(MethodName="Generate")]
+    public partial class SafetyGate
+    {
+    
+        private string _layer;
+    
+        private string _hardwareKind;
+    
+        private string _date;
+    
+        private string _scopeCapture;
+    
+        public SafetyGate()
+        {
+        }
+    
+        protected SafetyGate(SafetyGate other)
+        {
+            _layer = other._layer;
+            _hardwareKind = other._hardwareKind;
+            _date = other._date;
+            _scopeCapture = other._scopeCapture;
+        }
+    
+        /// <summary>
+        /// software: the scope check of the node's finite buffers and zero on stop, and the agent's backstop, passed; hardware: the NI AO watchdog or the OBIS enable line scoped too. The launching app refuses Go on a rig without it.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("layer", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="layer")]
+        [System.ComponentModel.DescriptionAttribute("software: the scope check of the node\'s finite buffers and zero on stop, and the " +
+            "agent\'s backstop, passed; hardware: the NI AO watchdog or the OBIS enable line s" +
+            "coped too. The launching app refuses Go on a rig without it.")]
+        public string Layer
+        {
+            get
+            {
+                return _layer;
+            }
+            set
+            {
+                _layer = value;
+            }
+        }
+    
+        /// <summary>
+        /// The hardware layer built, such as aoWatchdog or obisEnable.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("hardwareKind")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="hardwareKind")]
+        [System.ComponentModel.DescriptionAttribute("The hardware layer built, such as aoWatchdog or obisEnable.")]
+        public string HardwareKind
+        {
+            get
+            {
+                return _hardwareKind;
+            }
+            set
+            {
+                _hardwareKind = value;
+            }
+        }
+    
+        /// <summary>
+        /// The day of the scope check, YYYY-MM-DD.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("date")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="date")]
+        [System.ComponentModel.DescriptionAttribute("The day of the scope check, YYYY-MM-DD.")]
+        public string Date
+        {
+            get
+            {
+                return _date;
+            }
+            set
+            {
+                _date = value;
+            }
+        }
+    
+        /// <summary>
+        /// Where the scope capture is kept.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("scopeCapture")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="scopeCapture")]
+        [System.ComponentModel.DescriptionAttribute("Where the scope capture is kept.")]
+        public string ScopeCapture
+        {
+            get
+            {
+                return _scopeCapture;
+            }
+            set
+            {
+                _scopeCapture = value;
+            }
+        }
+    
+        public System.IObservable<SafetyGate> Generate()
+        {
+            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new SafetyGate(this)));
+        }
+    
+        public System.IObservable<SafetyGate> Generate<TSource>(System.IObservable<TSource> source)
+        {
+            return System.Reactive.Linq.Observable.Select(source, _ => new SafetyGate(this));
+        }
+    
+        protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
+        {
+            stringBuilder.Append("Layer = " + _layer + ", ");
+            stringBuilder.Append("HardwareKind = " + _hardwareKind + ", ");
+            stringBuilder.Append("Date = " + _date + ", ");
+            stringBuilder.Append("ScopeCapture = " + _scopeCapture);
+            return true;
+        }
+    
+        public override string ToString()
+        {
+            System.Text.StringBuilder stringBuilder = new System.Text.StringBuilder();
+            stringBuilder.Append(GetType().Name);
+            stringBuilder.Append(" { ");
+            if (PrintMembers(stringBuilder))
+            {
+                stringBuilder.Append(" ");
+            }
+            stringBuilder.Append("}");
+            return stringBuilder.ToString();
+        }
+    }
+
+
+    /// <summary>
     /// Which side of the animal a line serves.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
@@ -4336,14 +4475,19 @@ namespace OpenRigs.Devices.Rigs
 
 
     /// <summary>
-    /// TCP endpoint of the Zapit optogenetics server (tcpServer section of the Zapit settings file). The trigger line is the board's ZapitTrigger in wiring.
+    /// Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings
+    ///file; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the
+    ///Zapit-Bonsai fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
+    ///beside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("TCP endpoint of the Zapit optogenetics server (tcpServer section of the Zapit set" +
-        "tings file). The trigger line is the board\'s ZapitTrigger in wiring.")]
+    [System.ComponentModel.DescriptionAttribute(@"Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings
+    file; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the
+    Zapit-Bonsai fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)
+    beside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).")]
     [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
     [Bonsai.CombinatorAttribute(MethodName="Generate")]
-    public partial class ZapitServer
+    public partial class Zapit
     {
     
         private string _host;
@@ -4352,18 +4496,77 @@ namespace OpenRigs.Devices.Rigs
     
         private bool _hardwareTriggered;
     
-        public ZapitServer()
+        private string _device;
+    
+        private string _galvoXChannel;
+    
+        private string _galvoYChannel;
+    
+        private string _laserChannel;
+    
+        private string _ledChannel;
+    
+        private string _photodiodeChannel;
+    
+        private System.Collections.Generic.List<double> _blankingTimesMs;
+    
+        private string _triggerChannel;
+    
+        private double? _sampleRate;
+    
+        private System.Collections.Generic.List<double> _laserMinMaxMw;
+    
+        private System.Collections.Generic.List<double> _laserMinMaxControlVolts;
+    
+        private double? _ceilingMw;
+    
+        private double? _maxTrialSeconds;
+    
+        private double? _micronsPerPixel;
+    
+        private double? _voltsPerPixel;
+    
+        private bool _invertXScanner;
+    
+        private bool _invertYScanner;
+    
+        private SafetyGate _safetyGate;
+    
+        private ZapitCamera _camera;
+    
+        public Zapit()
         {
             _host = "127.0.0.1";
             _port = 1488;
             _hardwareTriggered = false;
+            _invertXScanner = false;
+            _invertYScanner = false;
         }
     
-        protected ZapitServer(ZapitServer other)
+        protected Zapit(Zapit other)
         {
             _host = other._host;
             _port = other._port;
             _hardwareTriggered = other._hardwareTriggered;
+            _device = other._device;
+            _galvoXChannel = other._galvoXChannel;
+            _galvoYChannel = other._galvoYChannel;
+            _laserChannel = other._laserChannel;
+            _ledChannel = other._ledChannel;
+            _photodiodeChannel = other._photodiodeChannel;
+            _blankingTimesMs = other._blankingTimesMs;
+            _triggerChannel = other._triggerChannel;
+            _sampleRate = other._sampleRate;
+            _laserMinMaxMw = other._laserMinMaxMw;
+            _laserMinMaxControlVolts = other._laserMinMaxControlVolts;
+            _ceilingMw = other._ceilingMw;
+            _maxTrialSeconds = other._maxTrialSeconds;
+            _micronsPerPixel = other._micronsPerPixel;
+            _voltsPerPixel = other._voltsPerPixel;
+            _invertXScanner = other._invertXScanner;
+            _invertYScanner = other._invertYScanner;
+            _safetyGate = other._safetyGate;
+            _camera = other._camera;
         }
     
         /// <summary>
@@ -4421,21 +4624,513 @@ namespace OpenRigs.Devices.Rigs
             }
         }
     
-        public System.IObservable<ZapitServer> Generate()
+        /// <summary>
+        /// ZapitDaq's NI device, as NI MAX names it; with it, every Zapit-Bonsai field below is given.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("device")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="device")]
+        [System.ComponentModel.DescriptionAttribute("ZapitDaq\'s NI device, as NI MAX names it; with it, every Zapit-Bonsai field below is gi" +
+            "ven.")]
+        public string Device
         {
-            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new ZapitServer(this)));
+            get
+            {
+                return _device;
+            }
+            set
+            {
+                _device = value;
+            }
         }
     
-        public System.IObservable<ZapitServer> Generate<TSource>(System.IObservable<TSource> source)
+        /// <summary>
+        /// The AO line driving the X galvo.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("galvoXChannel")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="galvoXChannel")]
+        [System.ComponentModel.DescriptionAttribute("The AO line driving the X galvo.")]
+        public string GalvoXChannel
         {
-            return System.Reactive.Linq.Observable.Select(source, _ => new ZapitServer(this));
+            get
+            {
+                return _galvoXChannel;
+            }
+            set
+            {
+                _galvoXChannel = value;
+            }
+        }
+    
+        /// <summary>
+        /// The AO line driving the Y galvo.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("galvoYChannel")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="galvoYChannel")]
+        [System.ComponentModel.DescriptionAttribute("The AO line driving the Y galvo.")]
+        public string GalvoYChannel
+        {
+            get
+            {
+                return _galvoYChannel;
+            }
+            set
+            {
+                _galvoYChannel = value;
+            }
+        }
+    
+        /// <summary>
+        /// The AO line setting the laser's power (its control volts).
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("laserChannel")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="laserChannel")]
+        [System.ComponentModel.DescriptionAttribute("The AO line setting the laser\'s power (its control volts).")]
+        public string LaserChannel
+        {
+            get
+            {
+                return _laserChannel;
+            }
+            set
+            {
+                _laserChannel = value;
+            }
+        }
+    
+        /// <summary>
+        /// The AO line driving the masking LED.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("ledChannel")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="ledChannel")]
+        [System.ComponentModel.DescriptionAttribute("The AO line driving the masking LED.")]
+        public string LedChannel
+        {
+            get
+            {
+                return _ledChannel;
+            }
+            set
+            {
+                _ledChannel = value;
+            }
+        }
+    
+        /// <summary>
+        /// The AI line reading the photodiode, for the laser curve.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("photodiodeChannel")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="photodiodeChannel")]
+        [System.ComponentModel.DescriptionAttribute("The AI line reading the photodiode, for the laser curve.")]
+        public string PhotodiodeChannel
+        {
+            get
+            {
+                return _photodiodeChannel;
+            }
+            set
+            {
+                _photodiodeChannel = value;
+            }
+        }
+    
+        /// <summary>
+        /// The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("blankingTimesMs")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="blankingTimesMs")]
+        [System.ComponentModel.DescriptionAttribute("The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads " +
+            "them. Absent, lib_zapit uses MATLAB\'s 0.3, -0.12, 0.25. Optional, and not part o" +
+            "f the Zapit-Bonsai fields a block gives together.")]
+        public System.Collections.Generic.List<double> BlankingTimesMs
+        {
+            get
+            {
+                return _blankingTimesMs;
+            }
+            set
+            {
+                _blankingTimesMs = value;
+            }
+        }
+    
+        /// <summary>
+        /// The PFI line the Behavior board's ZapitTrigger line is cabled to; each trial starts on it.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("triggerChannel")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="triggerChannel")]
+        [System.ComponentModel.DescriptionAttribute("The PFI line the Behavior board\'s ZapitTrigger line is cabled to; each trial star" +
+            "ts on it.")]
+        public string TriggerChannel
+        {
+            get
+            {
+                return _triggerChannel;
+            }
+            set
+            {
+                _triggerChannel = value;
+            }
+        }
+    
+        /// <summary>
+        /// AO samples a second, per channel; every bank is built at it.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("sampleRate")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="sampleRate")]
+        [System.ComponentModel.DescriptionAttribute("AO samples a second, per channel; every bank is built at it.")]
+        public double? SampleRate
+        {
+            get
+            {
+                return _sampleRate;
+            }
+            set
+            {
+                _sampleRate = value;
+            }
+        }
+    
+        /// <summary>
+        /// The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("laserMinMaxMw")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="laserMinMaxMw")]
+        [System.ComponentModel.DescriptionAttribute("The laser\'s lowest and highest power, in mW, at laserMinMaxControlVolts.")]
+        public System.Collections.Generic.List<double> LaserMinMaxMw
+        {
+            get
+            {
+                return _laserMinMaxMw;
+            }
+            set
+            {
+                _laserMinMaxMw = value;
+            }
+        }
+    
+        /// <summary>
+        /// The laser's control volts at its lowest and highest power.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("laserMinMaxControlVolts")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="laserMinMaxControlVolts")]
+        [System.ComponentModel.DescriptionAttribute("The laser\'s control volts at its lowest and highest power.")]
+        public System.Collections.Generic.List<double> LaserMinMaxControlVolts
+        {
+            get
+            {
+                return _laserMinMaxControlVolts;
+            }
+            set
+            {
+                _laserMinMaxControlVolts = value;
+            }
+        }
+    
+        /// <summary>
+        /// This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("ceilingMw")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="ceilingMw")]
+        [System.ComponentModel.DescriptionAttribute(@"This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")]
+        public double? CeilingMw
+        {
+            get
+            {
+                return _ceilingMw;
+            }
+            set
+            {
+                _ceilingMw = value;
+            }
+        }
+    
+        /// <summary>
+        /// The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("maxTrialSeconds")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="maxTrialSeconds")]
+        [System.ComponentModel.DescriptionAttribute("The longest trial buffer, in seconds: a task\'s laserCapSeconds above it is refuse" +
+            "d at Go, and a trial until the outcome is finite at it.")]
+        public double? MaxTrialSeconds
+        {
+            get
+            {
+                return _maxTrialSeconds;
+            }
+            set
+            {
+                _maxTrialSeconds = value;
+            }
+        }
+    
+        /// <summary>
+        /// The Zapit camera's scale at the sample, in microns a pixel.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("micronsPerPixel")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="micronsPerPixel")]
+        [System.ComponentModel.DescriptionAttribute("The Zapit camera\'s scale at the sample, in microns a pixel.")]
+        public double? MicronsPerPixel
+        {
+            get
+            {
+                return _micronsPerPixel;
+            }
+            set
+            {
+                _micronsPerPixel = value;
+            }
+        }
+    
+        /// <summary>
+        /// The galvos' volts a camera pixel, the scanner calibration's starting guess.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("voltsPerPixel")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="voltsPerPixel")]
+        [System.ComponentModel.DescriptionAttribute("The galvos\' volts a camera pixel, the scanner calibration\'s starting guess.")]
+        public double? VoltsPerPixel
+        {
+            get
+            {
+                return _voltsPerPixel;
+            }
+            set
+            {
+                _voltsPerPixel = value;
+            }
+        }
+    
+        /// <summary>
+        /// Whether the X galvo moves against the camera's X.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("invertXScanner")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="invertXScanner")]
+        [System.ComponentModel.DescriptionAttribute("Whether the X galvo moves against the camera\'s X.")]
+        public bool InvertXScanner
+        {
+            get
+            {
+                return _invertXScanner;
+            }
+            set
+            {
+                _invertXScanner = value;
+            }
+        }
+    
+        /// <summary>
+        /// Whether the Y galvo moves against the camera's Y.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("invertYScanner")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="invertYScanner")]
+        [System.ComponentModel.DescriptionAttribute("Whether the Y galvo moves against the camera\'s Y.")]
+        public bool InvertYScanner
+        {
+            get
+            {
+                return _invertYScanner;
+            }
+            set
+            {
+                _invertYScanner = value;
+            }
+        }
+    
+        /// <summary>
+        /// The laser safety layers this rig was scope-checked with.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("safetyGate")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="safetyGate")]
+        [System.ComponentModel.DescriptionAttribute("The laser safety layers this rig was scope-checked with.")]
+        public SafetyGate SafetyGate
+        {
+            get
+            {
+                return _safetyGate;
+            }
+            set
+            {
+                _safetyGate = value;
+            }
+        }
+    
+        /// <summary>
+        /// Zapit's Basler camera, Camera-Zapit in the data and live view.
+        /// </summary>
+        [System.Xml.Serialization.XmlIgnoreAttribute()]
+        [Newtonsoft.Json.JsonPropertyAttribute("camera")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="camera")]
+        [System.ComponentModel.DescriptionAttribute("Zapit\'s Basler camera, Camera-Zapit in the data and live view.")]
+        public ZapitCamera Camera
+        {
+            get
+            {
+                return _camera;
+            }
+            set
+            {
+                _camera = value;
+            }
+        }
+    
+        public System.IObservable<Zapit> Generate()
+        {
+            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new Zapit(this)));
+        }
+    
+        public System.IObservable<Zapit> Generate<TSource>(System.IObservable<TSource> source)
+        {
+            return System.Reactive.Linq.Observable.Select(source, _ => new Zapit(this));
         }
     
         protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
         {
             stringBuilder.Append("Host = " + _host + ", ");
             stringBuilder.Append("Port = " + _port + ", ");
-            stringBuilder.Append("HardwareTriggered = " + _hardwareTriggered);
+            stringBuilder.Append("HardwareTriggered = " + _hardwareTriggered + ", ");
+            stringBuilder.Append("Device = " + _device + ", ");
+            stringBuilder.Append("GalvoXChannel = " + _galvoXChannel + ", ");
+            stringBuilder.Append("GalvoYChannel = " + _galvoYChannel + ", ");
+            stringBuilder.Append("LaserChannel = " + _laserChannel + ", ");
+            stringBuilder.Append("LedChannel = " + _ledChannel + ", ");
+            stringBuilder.Append("PhotodiodeChannel = " + _photodiodeChannel + ", ");
+            stringBuilder.Append("BlankingTimesMs = " + _blankingTimesMs + ", ");
+            stringBuilder.Append("TriggerChannel = " + _triggerChannel + ", ");
+            stringBuilder.Append("SampleRate = " + _sampleRate + ", ");
+            stringBuilder.Append("LaserMinMaxMw = " + _laserMinMaxMw + ", ");
+            stringBuilder.Append("LaserMinMaxControlVolts = " + _laserMinMaxControlVolts + ", ");
+            stringBuilder.Append("CeilingMw = " + _ceilingMw + ", ");
+            stringBuilder.Append("MaxTrialSeconds = " + _maxTrialSeconds + ", ");
+            stringBuilder.Append("MicronsPerPixel = " + _micronsPerPixel + ", ");
+            stringBuilder.Append("VoltsPerPixel = " + _voltsPerPixel + ", ");
+            stringBuilder.Append("InvertXScanner = " + _invertXScanner + ", ");
+            stringBuilder.Append("InvertYScanner = " + _invertYScanner + ", ");
+            stringBuilder.Append("SafetyGate = " + _safetyGate + ", ");
+            stringBuilder.Append("Camera = " + _camera);
+            return true;
+        }
+    
+        public override string ToString()
+        {
+            System.Text.StringBuilder stringBuilder = new System.Text.StringBuilder();
+            stringBuilder.Append(GetType().Name);
+            stringBuilder.Append(" { ");
+            if (PrintMembers(stringBuilder))
+            {
+                stringBuilder.Append(" ");
+            }
+            stringBuilder.Append("}");
+            return stringBuilder.ToString();
+        }
+    }
+
+
+    /// <summary>
+    /// Zapit's Basler camera, opened with stock Bonsai.Pylon PylonCapture from a camera settings (.pfs) file. Its frames
+    ///are paired with the Behavior board camera trigger whose wiring line names Camera-Zapit in targets.
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
+    [System.ComponentModel.DescriptionAttribute("Zapit\'s Basler camera, opened with stock Bonsai.Pylon PylonCapture from a camera " +
+        "settings (.pfs) file. Its frames\nare paired with the Behavior board camera trigg" +
+        "er whose wiring line names Camera-Zapit in targets.")]
+    [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
+    [Bonsai.CombinatorAttribute(MethodName="Generate")]
+    public partial class ZapitCamera
+    {
+    
+        private string _serialNumber;
+    
+        private string _sessionPfsPath;
+    
+        private string _calibrationPfsPath;
+    
+        public ZapitCamera()
+        {
+            _sessionPfsPath = "calibration/Zapit-Session.pfs";
+            _calibrationPfsPath = "calibration/Zapit-Calibration.pfs";
+        }
+    
+        protected ZapitCamera(ZapitCamera other)
+        {
+            _serialNumber = other._serialNumber;
+            _sessionPfsPath = other._sessionPfsPath;
+            _calibrationPfsPath = other._calibrationPfsPath;
+        }
+    
+        /// <summary>
+        /// The Basler camera's serial number.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("serialNumber", Required=Newtonsoft.Json.Required.Always)]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="serialNumber")]
+        [System.ComponentModel.DescriptionAttribute("The Basler camera\'s serial number.")]
+        public string SerialNumber
+        {
+            get
+            {
+                return _serialNumber;
+            }
+            set
+            {
+                _serialNumber = value;
+            }
+        }
+    
+        /// <summary>
+        /// The session's camera settings (hardware triggered, ROI, ExposureAuto), relative to rig.yml's folder, from the camera set-up calibration.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("sessionPfsPath")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="sessionPfsPath")]
+        [System.ComponentModel.DescriptionAttribute("The session\'s camera settings (hardware triggered, ROI, ExposureAuto), relative t" +
+            "o rig.yml\'s folder, from the camera set-up calibration.")]
+        public string SessionPfsPath
+        {
+            get
+            {
+                return _sessionPfsPath;
+            }
+            set
+            {
+                _sessionPfsPath = value;
+            }
+        }
+    
+        /// <summary>
+        /// The calibration workflow's camera settings (fixed exposure, free running), relative to rig.yml's folder.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("calibrationPfsPath")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="calibrationPfsPath")]
+        [System.ComponentModel.DescriptionAttribute("The calibration workflow\'s camera settings (fixed exposure, free running), relati" +
+            "ve to rig.yml\'s folder.")]
+        public string CalibrationPfsPath
+        {
+            get
+            {
+                return _calibrationPfsPath;
+            }
+            set
+            {
+                _calibrationPfsPath = value;
+            }
+        }
+    
+        public System.IObservable<ZapitCamera> Generate()
+        {
+            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new ZapitCamera(this)));
+        }
+    
+        public System.IObservable<ZapitCamera> Generate<TSource>(System.IObservable<TSource> source)
+        {
+            return System.Reactive.Linq.Observable.Select(source, _ => new ZapitCamera(this));
+        }
+    
+        protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
+        {
+            stringBuilder.Append("SerialNumber = " + _serialNumber + ", ");
+            stringBuilder.Append("SessionPfsPath = " + _sessionPfsPath + ", ");
+            stringBuilder.Append("CalibrationPfsPath = " + _calibrationPfsPath);
             return true;
         }
     
@@ -4941,6 +5636,11 @@ namespace OpenRigs.Devices.Rigs
             return Process<RunningWheel>(source);
         }
 
+        public System.IObservable<string> Process(System.IObservable<SafetyGate> source)
+        {
+            return Process<SafetyGate>(source);
+        }
+
         public System.IObservable<string> Process(System.IObservable<Speaker> source)
         {
             return Process<Speaker>(source);
@@ -4976,9 +5676,14 @@ namespace OpenRigs.Devices.Rigs
             return Process<WiredLine>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<ZapitServer> source)
+        public System.IObservable<string> Process(System.IObservable<Zapit> source)
         {
-            return Process<ZapitServer>(source);
+            return Process<Zapit>(source);
+        }
+
+        public System.IObservable<string> Process(System.IObservable<ZapitCamera> source)
+        {
+            return Process<ZapitCamera>(source);
         }
 
         public System.IObservable<string> Process(System.IObservable<DO2> source)
@@ -5018,6 +5723,7 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutput>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutputs>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<RunningWheel>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SafetyGate>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Speaker>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SphericalPosition>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpinnakerCamera>))]
@@ -5025,7 +5731,8 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<StepperWiring>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<VideoEncoder>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<WiredLine>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<ZapitServer>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Zapit>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<ZapitCamera>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DO2>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DO3>))]
     public partial class DeserializeFromJson : Bonsai.Expressions.SingleArgumentExpressionBuilder
@@ -5278,6 +5985,11 @@ namespace OpenRigs.Devices.Rigs
             return Process<RunningWheel>(source);
         }
 
+        public System.IObservable<string> Process(System.IObservable<SafetyGate> source)
+        {
+            return Process<SafetyGate>(source);
+        }
+
         public System.IObservable<string> Process(System.IObservable<Speaker> source)
         {
             return Process<Speaker>(source);
@@ -5313,9 +6025,14 @@ namespace OpenRigs.Devices.Rigs
             return Process<WiredLine>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<ZapitServer> source)
+        public System.IObservable<string> Process(System.IObservable<Zapit> source)
         {
-            return Process<ZapitServer>(source);
+            return Process<Zapit>(source);
+        }
+
+        public System.IObservable<string> Process(System.IObservable<ZapitCamera> source)
+        {
+            return Process<ZapitCamera>(source);
         }
 
         public System.IObservable<string> Process(System.IObservable<DO2> source)
@@ -5355,6 +6072,7 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutput>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutputs>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<RunningWheel>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SafetyGate>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Speaker>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SphericalPosition>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpinnakerCamera>))]
@@ -5362,7 +6080,8 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<StepperWiring>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<VideoEncoder>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<WiredLine>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<ZapitServer>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Zapit>))]
+    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<ZapitCamera>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DO2>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<DO3>))]
     public partial class DeserializeFromYaml : Bonsai.Expressions.SingleArgumentExpressionBuilder

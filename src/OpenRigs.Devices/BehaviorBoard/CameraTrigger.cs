@@ -61,6 +61,17 @@ namespace OpenRigs.Devices
         /// <summary>The trigger that drives <paramref name="camera"/>, or an exception saying why there is none.</summary>
         public static CameraOnTrigger Find(NamedDevice<SpinnakerCamera> camera, NamedDevice<BehaviorBoard> board, double margin)
         {
+            double frequency;
+            var output = Line(camera.Name, board, out frequency);
+            CheckExposure(camera.Name, camera.Settings.ExposureUs, frequency, margin);
+            return new CameraOnTrigger(camera, output, frequency);
+        }
+
+        /// <summary>The output (0 or 1) and frequency of the trigger that drives the camera named <paramref name="cameraName"/>,
+        /// or an exception saying why there is none.</summary>
+        public static int Line(string cameraName, NamedDevice<BehaviorBoard> board, out double frequency)
+        {
+            var camera = new { Name = cameraName };
             var wiring = board.Settings.Wiring;
             var lines = wiring == null ? new string[0] : (
                 from property in typeof(BoardWiring).GetProperties()
@@ -88,9 +99,8 @@ namespace OpenRigs.Devices
                 throw new InvalidOperationException(string.Format(
                     "{0}'s camera trigger {1} drives {2} (wiring {3}), but its cameraTriggerController.trigger{1}Enabled is false in rig.yml.", board.Name, output, camera.Name, lines[0]));
             }
-            var frequency = output == 0 ? trigger.Trigger0Frequency : trigger.Trigger1Frequency;
-            CheckExposure(camera.Name, camera.Settings.ExposureUs, frequency, margin);
-            return new CameraOnTrigger(camera, output, frequency);
+            frequency = output == 0 ? trigger.Trigger0Frequency : trigger.Trigger1Frequency;
+            return output;
         }
 
         /// <summary>Throws, saying the longest exposure allowed, unless exposure + margin fits in one trigger period.</summary>
@@ -109,6 +119,32 @@ namespace OpenRigs.Devices
                     "for the camera). The camera would skip triggers and every frame would get the wrong time. Set rig.yml's exposureUs to {2} or less.",
                     camera, exposureUs, limit, frequency, 1e6 / frequency, margin));
             }
+        }
+    }
+
+    /// <summary>
+    /// The board trigger that drives a camera a workflow opens with no rig.yml camera entry (the Zapit camera,
+    /// Camera-Zapit): the CameraTrigger line whose targets name it, as <see cref="CameraTrigger"/> finds it, with no
+    /// exposure check (the exposure is in the camera's settings file).
+    /// </summary>
+    [Combinator]
+    [Description("The Behavior board trigger that drives the camera named Camera, from the board's wiring in rig.yml (the CameraTrigger line whose targets name it): its Output (0 or 1) and Frequency. Input: the board, as RigDevice gives it. Stops the workflow unless exactly one enabled trigger line names the camera.")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class CameraTriggerLine
+    {
+        /// <summary>Gets or sets the camera's name, such as Camera-Zapit.</summary>
+        [Description("The camera's name in the wiring's targets, such as Camera-Zapit.")]
+        public string Camera { get; set; }
+
+        /// <summary>Each board's trigger for the camera: (Output, Frequency).</summary>
+        public IObservable<Tuple<int, double>> Process(IObservable<NamedDevice<BehaviorBoard>> source)
+        {
+            return source.Select(board =>
+            {
+                double frequency;
+                var output = CameraTrigger.Line(Camera, board, out frequency);
+                return Tuple.Create(output, frequency);
+            });
         }
     }
 

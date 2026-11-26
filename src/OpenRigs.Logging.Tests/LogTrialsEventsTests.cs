@@ -143,6 +143,20 @@ namespace OpenRigs.Logging.Tests
         }
     }
 
+    /// <summary>TaskLogsZapitDaq: TaskLogs with ZapitDaq's events (Zapit.Events) in place of ZapitLogs.</summary>
+    [TestClass]
+    public class TaskLogsZapitDaqTests : TaskLogsTests
+    {
+        protected override string WorkflowFileName => "TaskLogsZapitDaqTest.bonsai";
+    }
+
+    /// <summary>ConditionedTaskLogsZapitDaq: ConditionedTaskLogs on TaskLogsZapitDaq.</summary>
+    [TestClass]
+    public class ConditionedTaskLogsZapitDaqTests : ConditionedTaskLogsTests
+    {
+        protected override string WorkflowFileName => "ConditionedTaskLogsZapitDaqTest.bonsai";
+    }
+
     /// <summary>
     /// CreateEvent and EventRow without Bonsai: what each kind of element becomes.
     /// </summary>

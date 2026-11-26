@@ -62,8 +62,8 @@ namespace OpenRigs.Video.Tests
             Check(WriterWorkflow, count, width, height, channels, takeCount: count);
         }
 
-        // The same through the include, grouped by the hour, its file name from PathPrefix. Stopped,
-        // the hour's writer is disposed by the include's Switch.
+        // The same through the include, its file name from PathPrefix. Stopped, the writer is disposed
+        // by the include's Switch.
         [DataTestMethod]
         [DataRow(3, 320, 240, 1)]
         [DataRow(200, 640, 480, 3)]
@@ -80,18 +80,47 @@ namespace OpenRigs.Video.Tests
             Check(IncludeWorkflow, count, width, height, channels, takeCount: count);
         }
 
-        // The experiment started an hour before HourEnds, so its first chunk ends 2 s (100 frames) into
-        // the run: the include's Switch disposes the first chunk's writer at the next chunk's first
-        // frame, and Bonsai exits soon after; both files must still hold every frame of their chunk.
+        const double HourEnds = 1083334 * 3600.0;  // 3900002400, the first whole hour after 3900000000
+
+        // ChunkSize 1, and the experiment started an hour before HourEnds, so its first chunk ends 2 s
+        // (100 frames) into the run: the include's Switch disposes the first chunk's writer at the next
+        // chunk's first frame, and Bonsai exits soon after; both files must still hold every frame of
+        // their chunk.
         [TestMethod]
-        public void LogVideoFfmpeg_AnHourRollover_EachHoursFramesInItsOwnVideoAndCsv()
+        public void LogVideoFfmpeg_ChunkSizeOne_AnHourRollover_EachHoursFramesInItsOwnVideoAndCsv()
+        {
+            var (videos, listing) = RunAcrossTheHour("1");
+            Assert.AreEqual(2, videos.Length, "Expected a .mkv for each hour." + listing);
+            var first = 0;
+            foreach (var (video, frames) in new[] { (videos[0], 100), (videos[1], 150) })
+            {
+                CheckVideo(video, frames, first, listing);
+                first += frames;
+            }
+        }
+
+        // The include's default, ChunkSize 0: the same frames, across the hour, in one video named by
+        // the experiment's start, as the first chunk was.
+        [TestMethod]
+        public void LogVideoFfmpeg_ChunkSizeZero_ARunPastAnHourIsOneVideoNamedByTheStart()
+        {
+            var (videos, listing) = RunAcrossTheHour(null);
+            Assert.AreEqual(1, videos.Length, "Expected one .mkv for the run." + listing);
+            var device = Path.GetFileName(Path.GetDirectoryName(videos[0]));
+            var start = OpenRigs.Core.FormatDate.FolderStart(Path.GetDirectoryName(Path.GetDirectoryName(videos[0])));
+            Assert.AreEqual(device + "_" + OpenRigs.Core.FormatDate.Format(start, TimeZoneInfo.Local) + ".mkv", Path.GetFileName(videos[0]), listing);
+            CheckVideo(videos[0], 250, 0, listing);
+        }
+
+        // 250 frames at 50 Hz from 2 s before HourEnds, the experiment started an hour before it; the
+        // include's ChunkSize given, or left at its default when null. The videos in name order.
+        (string[] Videos, string Listing) RunAcrossTheHour(string chunkSize)
         {
             if (ffmpeg == null) Assert.Inconclusive("ffmpeg.exe is not on PATH.");
             var data = Path.Combine(folder, "data");
             var configRoot = Path.Combine(folder, "config");
             Directory.CreateDirectory(configRoot);
-            const double HourEnds = 1083334 * 3600.0;  // 3900002400, the first whole hour after 3900000000
-            var result = BonsaiWorkflowRunner.Run(IncludeWorkflow, new Dictionary<string, string>
+            var properties = new Dictionary<string, string>
             {
                 { "PathPrefix", Experiment(data, HourEnds - 3600) },
                 { "ConfigRoot", configRoot },
@@ -101,22 +130,23 @@ namespace OpenRigs.Video.Tests
                 { "Channels", "1" },
                 { "StartSeconds", (HourEnds - 2).ToString("R", CultureInfo.InvariantCulture) },
                 { "TakeCount", "250" },
-            });
+            };
+            if (chunkSize != null) properties.Add("ChunkSize", chunkSize);
+            var result = BonsaiWorkflowRunner.Run(IncludeWorkflow, properties);
 
             var files = Directory.Exists(data) ? Directory.GetFiles(data, "*", SearchOption.AllDirectories) : new string[0];
             var listing = Environment.NewLine + "Files: " + string.Join(", ", files.Select(Path.GetFileName)) + result.Describe();
             Assert.AreEqual(0, files.Count(f => f.EndsWith(".error.txt", StringComparison.OrdinalIgnoreCase)), "A .error.txt." + listing);
-            var videos = files.Where(f => f.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase)).OrderBy(f => f, StringComparer.Ordinal).ToArray();
-            Assert.AreEqual(2, videos.Length, "Expected a .mkv for each hour." + listing);
-            var first = 0;
-            foreach (var (video, frames) in new[] { (videos[0], 100), (videos[1], 150) })
-            {
-                var rows = File.ReadAllLines(Path.ChangeExtension(video, ".csv")).Skip(1).ToArray();
-                Assert.AreEqual(frames, rows.Length, Path.GetFileName(video) + "'s CSV rows." + listing);
-                Assert.AreEqual(first.ToString(CultureInfo.InvariantCulture), rows[0].Split(',')[1], Path.GetFileName(video) + "'s first frameId." + listing);
-                Assert.AreEqual(frames, DecodedFrames(video), Path.GetFileName(video) + "'s decoded frames." + listing);
-                first += frames;
-            }
+            return (files.Where(f => f.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase)).OrderBy(f => f, StringComparer.Ordinal).ToArray(), listing);
+        }
+
+        // The video and its CSV hold the given frames, the first with the given frameId.
+        void CheckVideo(string video, int frames, int first, string listing)
+        {
+            var rows = File.ReadAllLines(Path.ChangeExtension(video, ".csv")).Skip(1).ToArray();
+            Assert.AreEqual(frames, rows.Length, Path.GetFileName(video) + "'s CSV rows." + listing);
+            Assert.AreEqual(first.ToString(CultureInfo.InvariantCulture), rows[0].Split(',')[1], Path.GetFileName(video) + "'s first frameId." + listing);
+            Assert.AreEqual(frames, DecodedFrames(video), Path.GetFileName(video) + "'s decoded frames." + listing);
         }
 
         // Bonsai's workflow process killed mid-run, as a crash would: ffmpeg, a child left

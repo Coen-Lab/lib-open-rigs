@@ -19,12 +19,20 @@
     <PackageReference Include="Bonsai.Scripting.Expressions" />
   </ItemGroup>
 
+  <!-- VendorGuardTests: the same metadata scan the Zapit tests use -->
+  <ItemGroup>
+    <Compile Include="..\OpenRigs.Zapit.Tests\VendorReferences.cs" Link="VendorReferences.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Trials\OpenRigs.Trials.csproj" />
     <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
     <!-- PlayPenaltyFlash, built here with BonVision's DrawQuad -->
     <ProjectReference Include="..\OpenRigs.Vision\OpenRigs.Vision.csproj" />
     <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
+    <!-- The loop's tests run it through both Zapit adapters (the behaviour guard of the Opto port), and the Zapit pieces' tests include theirs. -->
+    <ProjectReference Include="..\OpenRigs.Opto.ZapitBonsai\OpenRigs.Opto.ZapitBonsai.csproj" />
+    <ProjectReference Include="..\OpenRigs.Opto.ZapitMatlab\OpenRigs.Opto.ZapitMatlab.csproj" />
   </ItemGroup>
 
 </Project>

@@ -10,7 +10,7 @@
 ![LogVideo](~/assets/workflows/logging/LogVideo.svg){data-bonsai="~/src/OpenRigs.Logging/LogVideo.bonsai"}
 :::
 
-The workflow groups incoming frames into hourly chunks from the experiment start (`GroupByTime` with `ChunkSize = 1`), then writes two parallel outputs:
+The workflow keys every frame to the experiment start (`GroupByTime` with `ChunkSize = 0`, one chunk for the whole run; 1 cuts hourly chunks), then writes two parallel outputs:
 
 - **VideoWriter** - encodes frames to `.avi` using the FMP4 codec at the configured `FrameRate`.
 - **CsvWriter** - records per-frame metadata (timestamp, frame ID, exposure, gain) to a `.csv` file.

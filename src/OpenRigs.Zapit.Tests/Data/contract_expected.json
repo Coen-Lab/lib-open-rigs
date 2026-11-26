@@ -1,0 +1,38 @@
+{
+ "columns": [
+  "galvo_x",
+  "galvo_y",
+  "laser",
+  "led"
+ ],
+ "cases": [
+  {
+   "condition": 1,
+   "laser_on": true,
+   "power_mw": 8.0,
+   "cycles": 2,
+   "rows": 30000
+  },
+  {
+   "condition": 2,
+   "laser_on": true,
+   "power_mw": 40.0,
+   "cycles": 4,
+   "rows": 10000
+  },
+  {
+   "condition": 3,
+   "laser_on": true,
+   "power_mw": 2.0,
+   "cycles": 3,
+   "rows": 17500
+  },
+  {
+   "condition": 3,
+   "laser_on": false,
+   "power_mw": 2.0,
+   "cycles": 3,
+   "rows": 17500
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>The trial loop's opto adapter for MATLAB Zapit (Zapit-MATLAB, whose TCP client is OpenRigs.Devices.Zapit): its opto system for OpenRigs.Trials and each trial's StartStimulus. Deleted when MATLAB Zapit is retired.</Description>
+    <PackageTags>$(PackageTags) Opto Zapit</PackageTags>
+    <TargetFrameworks>net472</TargetFrameworks>
+    <Version>0.1.1-coen-lab.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="**\*.bonsai" />
+  </ItemGroup>
+
+  <!-- An adapter depends on the trial loop and its own driver (MATLAB Zapit's client, in OpenRigs.Devices), never the reverse. -->
+  <ItemGroup>
+    <ProjectReference Include="..\OpenRigs.Trials\OpenRigs.Trials.csproj" />
+    <ProjectReference Include="..\OpenRigs.Devices\OpenRigs.Devices.csproj" />
+  </ItemGroup>
+
+</Project>

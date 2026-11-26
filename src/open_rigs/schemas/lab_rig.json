@@ -869,14 +869,14 @@
         "zapit": {
           "anyOf": [
             {
-              "$ref": "#/$defs/ZapitServer"
+              "$ref": "#/$defs/Zapit"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Zapit optogenetics server endpoint; contacted only when the task enables optogenetics.",
+          "description": "Zapit: MATLAB Zapit's server endpoint (contacted only when the task enables optogenetics), ZapitDaq's NI DAQ, laser limits and camera, or both; a rig without Zapit has none.",
           "title": "Zapit"
         },
         "videoEncoder": {
@@ -1298,6 +1298,49 @@
         "wheelDiameterMm"
       ],
       "title": "RunningWheel",
+      "type": "object"
+    },
+    "SafetyGate": {
+      "description": "The laser safety layers this rig was scope-checked with (plan: Safety).",
+      "properties": {
+        "layer": {
+          "description": "software: the scope check of the node's finite buffers and zero on stop, and the agent's backstop, passed; hardware: the NI AO watchdog or the OBIS enable line scoped too. The launching app refuses Go on a rig without it.",
+          "pattern": "^(software|hardware)$",
+          "title": "Layer",
+          "type": "string"
+        },
+        "hardwareKind": {
+          "default": null,
+          "description": "The hardware layer built, such as aoWatchdog or obisEnable.",
+          "title": "HardwareKind",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "date": {
+          "default": null,
+          "description": "The day of the scope check, YYYY-MM-DD.",
+          "title": "Date",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scopeCapture": {
+          "default": null,
+          "description": "Where the scope capture is kept.",
+          "title": "ScopeCapture",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "layer"
+      ],
+      "title": "SafetyGate",
       "type": "object"
     },
     "Side": {
@@ -1730,8 +1773,8 @@
       "title": "WiredLine",
       "type": "object"
     },
-    "ZapitServer": {
-      "description": "TCP endpoint of the Zapit optogenetics server (tcpServer section of the Zapit settings file). The trigger line is the board's ZapitTrigger in wiring.",
+    "Zapit": {
+      "description": "Zapit on this rig: MATLAB Zapit's TCP endpoint (host, port, hardwareTriggered: the tcpServer section of its settings\nfile; the trigger line is the board's ZapitTrigger in wiring), ZapitDaq's NI DAQ wiring, laser limits and camera (the\nZapit-Bonsai fields, all given once device is), or both while a rig runs both. A channel is named on its own (ao0, PFI0)\nbeside the device; OpenRigs.Devices Rigs.Zapit gives the full paths ZapitDaq takes (Dev1/ao0, /Dev1/PFI0).",
       "properties": {
         "host": {
           "default": "127.0.0.1",
@@ -1752,9 +1795,323 @@
           "description": "True: Zapit arms its DAQ on the TCP command and the ZapitTrigger line starts the stimulus. False: Zapit starts the stimulus on receipt of the command.",
           "title": "HardwareTriggered",
           "type": "boolean"
+        },
+        "device": {
+          "anyOf": [
+            {
+              "pattern": "^\\S+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ZapitDaq's NI device, as NI MAX names it; with it, every Zapit-Bonsai field below is given.",
+          "examples": [
+            "Dev1"
+          ],
+          "title": "Device"
+        },
+        "galvoXChannel": {
+          "anyOf": [
+            {
+              "pattern": "^ao\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The AO line driving the X galvo.",
+          "examples": [
+            "ao0"
+          ],
+          "title": "GalvoXChannel"
+        },
+        "galvoYChannel": {
+          "anyOf": [
+            {
+              "pattern": "^ao\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The AO line driving the Y galvo.",
+          "examples": [
+            "ao1"
+          ],
+          "title": "GalvoYChannel"
+        },
+        "laserChannel": {
+          "anyOf": [
+            {
+              "pattern": "^ao\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The AO line setting the laser's power (its control volts).",
+          "examples": [
+            "ao2"
+          ],
+          "title": "LaserChannel"
+        },
+        "ledChannel": {
+          "anyOf": [
+            {
+              "pattern": "^ao\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The AO line driving the masking LED.",
+          "examples": [
+            "ao3"
+          ],
+          "title": "LedChannel"
+        },
+        "photodiodeChannel": {
+          "anyOf": [
+            {
+              "pattern": "^ai\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The AI line reading the photodiode, for the laser curve.",
+          "examples": [
+            "ai0"
+          ],
+          "title": "PhotodiodeChannel"
+        },
+        "blankingTimesMs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.",
+          "title": "BlankingTimesMs"
+        },
+        "triggerChannel": {
+          "anyOf": [
+            {
+              "pattern": "^PFI\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The PFI line the Behavior board's ZapitTrigger line is cabled to; each trial starts on it.",
+          "examples": [
+            "PFI0"
+          ],
+          "title": "TriggerChannel"
+        },
+        "sampleRate": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AO samples a second, per channel; every bank is built at it.",
+          "examples": [
+            100000
+          ],
+          "title": "SampleRate"
+        },
+        "laserMinMaxMw": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.",
+          "title": "LaserMinMaxMw"
+        },
+        "laserMinMaxControlVolts": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The laser's control volts at its lowest and highest power.",
+          "title": "LaserMinMaxControlVolts"
+        },
+        "ceilingMw": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.",
+          "title": "CeilingMw"
+        },
+        "maxTrialSeconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.",
+          "title": "MaxTrialSeconds"
+        },
+        "micronsPerPixel": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The Zapit camera's scale at the sample, in microns a pixel.",
+          "title": "MicronsPerPixel"
+        },
+        "voltsPerPixel": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The galvos' volts a camera pixel, the scanner calibration's starting guess.",
+          "title": "VoltsPerPixel"
+        },
+        "invertXScanner": {
+          "default": false,
+          "description": "Whether the X galvo moves against the camera's X.",
+          "title": "InvertXScanner",
+          "type": "boolean"
+        },
+        "invertYScanner": {
+          "default": false,
+          "description": "Whether the Y galvo moves against the camera's Y.",
+          "title": "InvertYScanner",
+          "type": "boolean"
+        },
+        "safetyGate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SafetyGate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The laser safety layers this rig was scope-checked with.",
+          "title": "SafetyGate"
+        },
+        "camera": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ZapitCamera"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Zapit's Basler camera, Camera-Zapit in the data and live view.",
+          "title": "Camera"
         }
       },
-      "title": "ZapitServer",
+      "title": "Zapit",
+      "type": "object"
+    },
+    "ZapitCamera": {
+      "description": "Zapit's Basler camera, opened with stock Bonsai.Pylon PylonCapture from a camera settings (.pfs) file. Its frames\nare paired with the Behavior board camera trigger whose wiring line names Camera-Zapit in targets.",
+      "properties": {
+        "serialNumber": {
+          "description": "The Basler camera's serial number.",
+          "minLength": 1,
+          "title": "SerialNumber",
+          "type": "string"
+        },
+        "sessionPfsPath": {
+          "default": "calibration/Zapit-Session.pfs",
+          "description": "The session's camera settings (hardware triggered, ROI, ExposureAuto), relative to rig.yml's folder, from the camera set-up calibration.",
+          "title": "SessionPfsPath",
+          "type": "string",
+          "x-rig-artefact": true
+        },
+        "calibrationPfsPath": {
+          "default": "calibration/Zapit-Calibration.pfs",
+          "description": "The calibration workflow's camera settings (fixed exposure, free running), relative to rig.yml's folder.",
+          "title": "CalibrationPfsPath",
+          "type": "string",
+          "x-rig-artefact": true
+        }
+      },
+      "required": [
+        "serialNumber"
+      ],
+      "title": "ZapitCamera",
       "type": "object"
     }
   },

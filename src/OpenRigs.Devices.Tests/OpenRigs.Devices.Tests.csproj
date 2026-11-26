@@ -16,11 +16,15 @@
   <!-- PiecesSubscribeTests: each piece built and subscribed here, so every assembly its workflow names -->
   <ItemGroup>
     <None Update="Pieces\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- ZapitSetupTests: OpenRigs.Zapit.Tests' contract bank -->
+    <None Include="..\OpenRigs.Zapit.Tests\Data\Settings_ZapitBank_T.json;..\OpenRigs.Zapit.Tests\Data\Settings_ZapitBank_T.bin.gz" Link="Pieces\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Bonsai.Scripting.Expressions" />
     <PackageReference Include="Bonsai.Mixer" />
+    <!-- ZapitLiveViewTests: ConnectForTaskZapitDaq's camera, ZapitDaq and StreamDevices -->
+    <PackageReference Include="Bonsai.Pylon" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +34,9 @@
     <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
     <ProjectReference Include="..\OpenRigs.Vision\OpenRigs.Vision.csproj" />
     <ProjectReference Include="..\OpenRigs.Control\OpenRigs.Control.csproj" />
+    <ProjectReference Include="..\OpenRigs.Zapit\OpenRigs.Zapit.csproj" />
+    <!-- DualZapitTests, ZapitLiveViewTests, ZapitSetupTests: ConnectForTaskZapitDaq, ZapitSetup and ZapitCamera are the Zapit-Bonsai adapter's -->
+    <ProjectReference Include="..\OpenRigs.Opto.ZapitBonsai\OpenRigs.Opto.ZapitBonsai.csproj" />
     <!-- WorkflowConfigRootTests: the nodes that read rig.yml when the workflow is built -->
     <ProjectReference Include="..\OpenRigs.LiveView\OpenRigs.LiveView.csproj" />
     <ProjectReference Include="..\OpenRigs.Streaming\OpenRigs.Streaming.csproj" />

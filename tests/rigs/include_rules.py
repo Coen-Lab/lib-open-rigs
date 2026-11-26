@@ -9,7 +9,9 @@ from open_rigs.rigs.workflow_lint import (
     SCRIPT,
     SPEAKER_MIXER_SOUNDS,
     XSI,
+    ZAPIT_CAMERA,
     ZAPIT_INCLUDE,
+    ZAPIT_SETUP,
     W,
     _name,  # pyright: ignore[reportPrivateUsage]
     _named,  # pyright: ignore[reportPrivateUsage]
@@ -93,6 +95,71 @@ def mixer_replay_problems(root: ET.Element) -> list[str]:
                             + ("" if sound == "RewardToneSounds" else f", fed by a CheckMixerStarted of {sound} and Mixer"))
     if not read_by_append_buffer("BackgroundNoise"):
         problems.append("BackgroundNoise is not read straight from its BehaviorSubject by the mixer")
+    return problems
+
+
+def zapit_daq_for_task_problems(root: ET.Element) -> list[str]:
+    """ConnectForTaskZapitDaq opens ZapitDaq, with every channel mapped from rig.yml's zapit block through Rigs.Zapit's full
+    paths, and ZapitSetup, in one SelectMany fed from ZapitRig (rig.yml's Zapit behind a Condition on its device, once
+    completed); ZapitCamera at its top
+    level, where its Camera-Zapit.Data reaches StreamDevices (a SelectMany is a subject scope of its own); and
+    publishes Optogenetics from optogenetics.enabled and OptogeneticsLaserEnabled. `root` is OpenRigs.Opto.ZapitBonsai's ConnectForTaskZapitDaq.bonsai."""
+    nodes, edges = nodes_and_edges(child(root, W + "Workflow"))
+    problems = []
+    groups = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:SelectMany" and _name(n) == "Zapit"]
+    if len(groups) != 1:
+        return ["ConnectForTaskZapitDaq has no one SelectMany named Zapit"]
+    # Fed from the AsyncSubject ZapitRig through a SubscribeSubject of it, so the group starts once it has completed.
+    rigs = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and n.findtext(W + "Name") == "ZapitRig"]
+    fed = [nodes[i] for i in upstream(edges, groups[0])]
+    if len(rigs) != 1 or not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "ZapitRig" for n in fed):
+        problems.append("ConnectForTaskZapitDaq's Zapit group is not fed from a SubscribeSubject of its one AsyncSubject ZapitRig")
+    feed = [nodes[i] for i in upstream(edges, rigs[0])] if len(rigs) == 1 else []
+    if not any(n.findtext(W + "Selector") == "Zapit" for n in feed) or not any(
+            n.get(XSI) == "rx:Condition" and "Item1.Device != null" in ET.tostring(n, encoding="unicode") for n in feed):
+        problems.append("ConnectForTaskZapitDaq's ZapitRig is not rig.yml's Zapit behind a Condition on its device")
+    # ...and on the task file at launch choosing this Zapit (OpenedBy, TaskFileSwitch on TaskPath): open only when its bool is
+    # true, and with no OpenedBy (EmptyPathValue true) on any rig with zapit.device, as before OpenedBy.
+    opened_by = [n for n in feed if n.findtext(W + "Name") == "OpenedBy" and "TaskFileSwitch" in ET.tostring(n, encoding="unicode")]
+    if not opened_by or not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "TaskPath" for n in feed):
+        problems.append("ConnectForTaskZapitDaq's ZapitRig is not behind OpenedBy, the task file at launch (TaskPath)")
+    elif not all(any(e.tag.endswith("}EmptyPathValue") and (e.text or "").strip() == "true" for e in n.iter()) for n in opened_by):
+        problems.append("ConnectForTaskZapitDaq's OpenedBy does not open with no OpenedBy (TaskFileSwitch EmptyPathValue true)")
+    gates = ["".join(e.itertext()) for n in feed if n.get(XSI) == "rx:Condition" for e in n.iter() if e.tag.endswith("}Expression") and e.get(XSI) is None]
+    if not any(g.replace(" ", "").endswith("Item1.Device!=null&&Item2") for g in gates):
+        problems.append("ConnectForTaskZapitDaq's ZapitRig Condition does not open only when OpenedBy is true (... && Item2)")
+    inner = child(nodes[groups[0]], W + "Workflow")
+    paths = {n.get("Path") for n in inner.iter(W + "Expression")}
+    if ZAPIT_SETUP not in paths:
+        problems.append(f"ConnectForTaskZapitDaq's Zapit group does not include {ZAPIT_SETUP}")
+    if not any(n.get("Path") == ZAPIT_CAMERA for n in nodes):
+        problems.append(f"ConnectForTaskZapitDaq does not include {ZAPIT_CAMERA} at its top level, where StreamDevices sees Camera-Zapit.Data")
+    daq = [n for n in inner.iter(W + "Expression") if kind(n).endswith(":ZapitDaq")]
+    mapped = {p.get("Name"): p.get("Selector") for n in inner.iter(W + "Expression") if n.get(XSI) == "PropertyMapping"
+              for p in n.iter(W + "Property")}
+    if len(daq) != 1:
+        problems.append("ConnectForTaskZapitDaq's Zapit group does not open one ZapitDaq")
+    for channel in ("GalvoXChannel", "GalvoYChannel", "LaserChannel", "LedChannel", "PhotodiodeChannel"):
+        if mapped.get(channel) != channel + "Path":
+            problems.append(f"ZapitDaq's {channel} is not mapped from {channel}Path")
+    for name in ("TriggerTerminal", "SampleRate", "MaxTrialSeconds"):
+        if mapped.get(name) != name:
+            problems.append(f"ZapitDaq's {name} is not mapped from rig.yml's zapit block")
+    if mapped.get("CeilingMw") != "LaserCeilingMw":
+        problems.append("ZapitDaq's CeilingMw is not mapped from LaserCeilingMw")
+    if mapped.get("LaserMaxVolts") != "LaserMaxControlVolts":
+        problems.append("ZapitDaq's LaserMaxVolts is not mapped from LaserMaxControlVolts")
+    if any(e.tag.endswith("}CeilingMw") and e.text != "0" for e in inner.iter()):
+        problems.append("ZapitDaq's CeilingMw default is not 0 (a lost mapping must fail safe)")
+    flags = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and _name(n) == "Optogenetics"]
+    if len(flags) != 1 or "TaskParameters.Optogenetics.Enabled" not in {nodes[a].findtext(W + "Selector") for a in upstream(edges, flags[0])}:
+        problems.append("ConnectForTaskZapitDaq does not publish Optogenetics from Optogenetics.Enabled")
+    # The condition of the files only a beam makes (workflow_lint.ZAPIT_LASER_FILES): Optogenetics and ceilingMw above 0.
+    laser = [i for i, n in enumerate(nodes) if n.get(XSI) == "rx:AsyncSubject" and _name(n) == "OptogeneticsLaserEnabled"]
+    feed = [nodes[a] for a in upstream(edges, laser[0])] if len(laser) == 1 else []
+    if not ({"Optogenetics", "RigConfigs"} <= {n.findtext(W + "Name") for n in feed if n.get(XSI) == "SubscribeSubject"}
+            and any("Item1 && Item2.Zapit != null && Item2.Zapit.LaserCeilingMw > 0" == n.findtext(SCRIPT + "Expression") for n in feed)):
+        problems.append("ConnectForTaskZapitDaq does not publish OptogeneticsLaserEnabled as Optogenetics with rig.yml's LaserCeilingMw above 0")
     return problems
 
 

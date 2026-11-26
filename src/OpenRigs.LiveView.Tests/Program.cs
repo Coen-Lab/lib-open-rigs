@@ -145,6 +145,17 @@ namespace OpenRigs.LiveView.Tests
                 Check("a published Camera-Balance.Data is streamed by the camera recipe, with no rig.yml",
                     extra != null && extra.Name == "Camera-Balance" && extra.Rate == 5 && extra.ImagePath == "it", extra == null ? string.Join(" | ", also.Skipped) : extra.ToString());
                 Check("a balance device not published is not mentioned", !none.Skipped.Any(s => s.Contains("Balance")), string.Join(" | ", none.Skipped));
+                Func<string, Type> zapitPublished = name => name == "Camera-Zapit.Data" ? typeof(OpenCV.Net.IplImage) : null;
+                var zapit = Plan(root, "zapit:\n  host: 127.0.0.1\n  device: Dev1\n", zapitPublished).Streamed.SingleOrDefault();
+                Check("a published Camera-Zapit.Data (rig.yml's zapit camera) is streamed by the camera recipe when zapit.device is set",
+                    zapit != null && zapit.Name == "Camera-Zapit", zapit == null ? "none" : zapit.ToString());
+                foreach (var zapitRig in new[] { "zapit:\n  host: 127.0.0.1\n  port: 1488\n", "zapit:\n  device: null\n", "camera:\n  overhead:\n    serialNumber: '1'\n" })
+                {
+                    var noDevice = Plan(root, zapitRig, zapitPublished);
+                    Check("... and not when rig.yml's zapit block names no NI device (no camera is opened), saying so: " + zapitRig.Replace("\n", " "),
+                        noDevice.Streamed.All(d => d.Name != "Camera-Zapit") && noDevice.Skipped.Any(s => s.StartsWith("Camera-Zapit: rig.yml's zapit block names no NI device")),
+                        string.Join(" | ", noDevice.Skipped));
+                }
                 var withRig = Plan(root, "camera:\n  overhead:\n    serialNumber: '1'\n",
                     name => name == "Camera-Balance.Data" || name == "Camera-Overhead.Data" ? typeof(OpenCV.Net.IplImage) : null);
                 var both = string.Join(", ", withRig.Streamed.Select(d => d.Stream));

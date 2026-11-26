@@ -53,7 +53,7 @@ namespace OpenRigs.Trials.Tests
     }
 
     /// <summary>A trial with a laser condition.</summary>
-    public class PieceTrial : IZapitTrial
+    public class PieceTrial : IOptoTrial
     {
         public int TrialNumber { get; set; }
         public int LaserCondition { get; set; }
@@ -146,22 +146,24 @@ namespace OpenRigs.Trials.Tests
     {
         public string Stop { get; set; }
         public bool HardwareTriggered { get; set; }
+        public bool ZapitDaq { get; set; }
         public double LaserCapSeconds { get; set; }
 
         public IObservable<PieceRules> Process()
         {
             return Observable.Defer(() =>
             {
-                var laser = Stop == "Duration" ? LaserTiming.ForDuration(HardwareTriggered, 0.5)
-                    : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(HardwareTriggered, 0, LaserCapSeconds)
-                    : Stop == "UntilStimulusOff" ? LaserTiming.UntilStimulusOff(HardwareTriggered, 0, LaserCapSeconds) : null;
+                var hardwareTriggered = ZapitDaq || HardwareTriggered;
+                var laser = Stop == "Duration" ? LaserTiming.ForDuration(hardwareTriggered, 0.5)
+                    : Stop == "UntilOutcome" ? LaserTiming.UntilOutcome(hardwareTriggered, 0, LaserCapSeconds)
+                    : Stop == "UntilStimulusOff" ? LaserTiming.UntilStimulusOff(hardwareTriggered, 0, LaserCapSeconds) : null;
                 return Observable.Timer(TimeSpan.FromSeconds(0.1)).Select(_ => new PieceRules { Laser = laser });
             });
         }
     }
 
     /// <summary>A laser trial with its own laser duration, 0.5 s (LaserTiming.ForDuration).</summary>
-    public class PieceTimedTrial : PieceTrial, ILaserDurationTrial
+    public class PieceTimedTrial : PieceTrial, IOptoDurationTrial
     {
         public double LaserDurationSeconds { get { return 0.5; } }
     }
@@ -236,6 +238,12 @@ namespace OpenRigs.Trials.Tests
         {
             return source.Select(c => "zapit " + c.Command + (c.Command == ZapitCommandType.StartStimulus
                 ? " condition " + c.ConditionNumber + " hardware " + c.HardwareTriggered + " duration " + c.StimDuration.GetValueOrDefault().ToString(System.Globalization.CultureInfo.InvariantCulture) : ""));
+        }
+
+        public IObservable<string> Process(IObservable<OpenRigs.Zapit.ZapitDaqCommand> source)
+        {
+            return source.Select(c => "zapit " + c.Kind + " trial " + c.Trial + (c.Kind == OpenRigs.Zapit.ZapitDaqCommandKind.Arm
+                ? " condition " + c.Condition + " duration " + c.DurationSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture) : ""));
         }
 
         public IObservable<string> Process(IObservable<HarpMessage> source) { return source.Select(m => m.Address == OutputSet.Address ? "line set" : m.Address == OutputClear.Address ? "line clear" : "board " + m.Address); }
@@ -421,11 +429,83 @@ namespace OpenRigs.Trials.Tests
             Assert.IsTrue(outputs.IndexOf("zapit StartStimulus condition 3 hardware False duration 0") < outputs.IndexOf("zapit StopStimulus"), "Stopped before it was started: " + string.Join(", ", outputs));
         }
 
-        // Rules with no laser: no Zapit command at all.
+        // Rules with no laser: no Zapit command, and the trigger line left alone even at a Trigger event, so a workflow can include
+        // ZapitTrials and ZapitDaqTrials and give its rules to one per session (26 Nov 2026; it was written at every Trigger).
         [TestMethod]
         public void ZapitTrialsWithoutALaserSendsNoCommand()
         {
-            CollectionAssert.AreEquivalent(new[] { "line set", "line clear" }, RunZapit("None", true, 0, 0.6));
+            CollectionAssert.AreEquivalent(new string[0], RunZapit("None", true, 0, 0.6));
+        }
+
+        // Every laser trial has its own duration (TIMED), so an Arm's duration 0 proves UntilStopped sent none.
+        static List<string> RunZapitDaq(string stop, double laserCapSeconds, double outcomeAt, double laserOffAt = 0, double laserCapAt = 0)
+        {
+            return Run("ZapitDaqTrials.bonsai", 1.6, xml => xml.Replace("TIMED", stop != "None" ? "true" : "false").Replace("STOP", stop)
+                .Replace("LASER_CAP_AT", laserCapAt.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("LASER_CAP", laserCapSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("OUTCOME_AT", outcomeAt.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("LASER_OFF_AT", laserOffAt.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
+        // ZapitDaqTrials, ForDuration: the Arm carries the duration, at the Arm event; nothing stops it at the outcome. Every
+        // trigger also sends ZapitDaq's Trigger (the simulated twin's edge; Audit F F4).
+        [TestMethod]
+        public void ZapitDaqTrialsForDurationArmsWithTheDurationAndNoStop()
+        {
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0.5", "line set", "zapit Trigger trial 0", "line clear" }, RunZapitDaq("Duration", 0, 0.6));
+        }
+
+        // UntilStimulusOff: the Arm with no duration, though the trial has its own; the outcome does not stop it, its LaserOff does.
+        [TestMethod]
+        public void ZapitDaqTrialsUntilStimulusOffStopsAtLaserOffNotTheOutcome()
+        {
+            var outputs = RunZapitDaq("UntilStimulusOff", 10, 0.6);
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "line clear" }, outputs, string.Join(", ", outputs));
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "zapit EarlyStop trial 1", "line clear" }, RunZapitDaq("UntilStimulusOff", 10, 0.6, 0.7));
+        }
+
+        // UntilStimulusOff with the stimulus still on at the LaserCap: the cap stops it, and the LaserOff after it sends nothing more.
+        [TestMethod]
+        public void ZapitDaqTrialsUntilStimulusOffStopsOnceAtTheLaserCap()
+        {
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "zapit EarlyStop trial 1", "line clear" }, RunZapitDaq("UntilStimulusOff", 10, 0.5, 0.7, 0.6));
+        }
+
+        // A stimulus already off at the trigger: the loop's Trigger and LaserOff in one tick; the early stop still comes.
+        [TestMethod]
+        public void ZapitDaqTrialsUntilStimulusOffStopsALaserOffInTheTriggersTick()
+        {
+            var outputs = RunZapitDaq("UntilStimulusOff", 10, 0.6, 0.4);
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "zapit EarlyStop trial 1", "line clear" }, outputs, string.Join(", ", outputs));
+        }
+
+        // UntilOutcome: the Arm with no duration, though the trial has its own, and one EarlyStop at the outcome.
+        [TestMethod]
+        public void ZapitDaqTrialsUntilOutcomeStopsEarlyAtTheOutcome()
+        {
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "zapit EarlyStop trial 1", "line clear" }, RunZapitDaq("UntilOutcome", 10, 0.6));
+        }
+
+        // No outcome and no LaserCap: LaserBackstop stops it LaserCapSeconds after the trigger on the computer's clock.
+        [TestMethod]
+        public void ZapitDaqTrialsUntilOutcomeWithNoOutcomeStopsAtTheBackstop()
+        {
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "zapit EarlyStop trial 1", "line clear" }, RunZapitDaq("UntilOutcome", 0.2, 0));
+        }
+
+        // No outcome, a 10 s cap: nothing stops it within the run. LaserBackstop was a Timer whose mapped DueTime never took,
+        // so it fired at the trigger and every until-outcome laser stopped as it started (found 25 Nov 2026).
+        [TestMethod]
+        public void ZapitDaqTrialsBackstopWaitsForTheLaserCap()
+        {
+            CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "line clear" }, RunZapitDaq("UntilOutcome", 10, 0));
+        }
+
+        // As ZapitTrialsWithoutALaserSendsNoCommand: no Arm, no twin's Trigger and no line.
+        [TestMethod]
+        public void ZapitDaqTrialsWithoutALaserSendsNoCommand()
+        {
+            CollectionAssert.AreEquivalent(new string[0], RunZapitDaq("None", 0, 0.6));
         }
     }
 }

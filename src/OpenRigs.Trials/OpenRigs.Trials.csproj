@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>A package providing the trial loop every Open Rigs task runs: its rules, timing, outcome and the trial row's shared columns.</Description>
+    <Description>A package providing the trial loop every Open Rigs task runs: its rules, timing, outcome, the trial row's shared columns, and the Opto port an opto system's adapter package (OpenRigs.Opto.*) implements.</Description>
     <PackageTags>$(PackageTags) Trials</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.24</Version>
+    <Version>0.1.1-coen-lab.25</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Devices\OpenRigs.Devices.csproj" />
+    <!-- TrialOutcomeEffects.bonsai includes OpenRigs.Audio:PlayPenaltySound.bonsai. No opto system: each is an adapter (OpenRigs.Opto.*) that depends on Trials. -->
+    <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
   </ItemGroup>
 
 </Project>

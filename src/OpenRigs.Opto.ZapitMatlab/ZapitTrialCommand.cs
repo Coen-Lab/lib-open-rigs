@@ -1,41 +1,18 @@
 using Bonsai;
 using OpenRigs.Devices.Zapit;
+using OpenRigs.Trials;
 using System;
 using System.ComponentModel;
 using System.Reactive.Linq;
 
-namespace OpenRigs.Trials
+namespace OpenRigs.Opto.ZapitMatlab
 {
-    /// <summary>What <see cref="ZapitTrialCommand"/> reads from a task's trial: the trial's number (ITrial) and its laser.</summary>
-    public interface IZapitTrial : ITrial
-    {
-        /// <summary>Gets the trial's condition in the conditions file, 1 to 254.</summary>
-        int LaserCondition { get; }
-
-        /// <summary>Gets where the condition aims the laser, its points in the conditions file as the trial log's laserPointsMm
-        /// (ZapitConditionsFile.PointsMm).</summary>
-        string LaserPointsMm { get; }
-
-        /// <summary>Gets whether the laser fires on this trial.</summary>
-        bool LaserOn { get; }
-
-        /// <summary>Gets the laser power on a laser-on trial, in mW.</summary>
-        double LaserPowerMw { get; }
-    }
-
-    /// <summary>A laser trial with its own laser duration (LaserTiming.ForDuration: each trial's, from its combination).</summary>
-    public interface ILaserDurationTrial : IZapitTrial
-    {
-        /// <summary>Gets how long the laser runs from the trigger, in seconds, above 0.</summary>
-        double LaserDurationSeconds { get; }
-    }
-
     /// <summary>A trial's StartStimulus (<see cref="ZapitTrial.Command"/>), sent when the rig's triggering needs it.</summary>
     [Combinator]
     [Description("A trial's Zapit StartStimulus: its condition, the laser on or off (galvos and masking light either way, 0 mW off). " +
         "Inputs: the trial as its laser may be armed, the trial at its trigger. On a hardware-triggered rig it is sent from the first, " +
         "as the DAQ then waits for the trigger line; otherwise from the second, as Zapit then starts the laser on receipt. " +
-        "The stimulus lasts the trial's laser duration (an ILaserDurationTrial), else, or with UntilStopped, until StopStimulus.")]
+        "The stimulus lasts the trial's laser duration (an IOptoDurationTrial), else, or with UntilStopped, until StopStimulus.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class ZapitTrialCommand
     {
@@ -48,7 +25,7 @@ namespace OpenRigs.Trials
         public bool UntilStopped { get; set; }
 
         /// <summary>Each trial's StartStimulus, from the input the rig's triggering needs; the properties are read at subscription.</summary>
-        public IObservable<ZapitCommand> Process<TTrial>(IObservable<TTrial> arm, IObservable<TTrial> trigger) where TTrial : IZapitTrial
+        public IObservable<ZapitCommand> Process<TTrial>(IObservable<TTrial> arm, IObservable<TTrial> trigger) where TTrial : IOptoTrial
         {
             return Observable.Defer(() =>
             {
@@ -60,9 +37,9 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>How long a trial's stimulus lasts, in seconds: its laser duration, or 0 (until StopStimulus) for a trial without one.</summary>
-        public static double DurationOf(IZapitTrial trial)
+        public static double DurationOf(IOptoTrial trial)
         {
-            var timed = trial as ILaserDurationTrial;
+            var timed = trial as IOptoDurationTrial;
             return timed != null ? timed.LaserDurationSeconds : 0;
         }
 

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                 xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:ctl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
+                 xmlns:t="clr-namespace:OpenRigs.Devices.Tests;assembly=OpenRigs.Devices.Tests"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>Both Zapits in one task workflow, chosen per session by the task file (decision-making's Zapit-Bonsai and Zapit-MATLAB): ConnectForTask and ZapitLogs on TaskParameters.Optogenetics.ZapitMatlab, ConnectForTask's switch published as OptogeneticsMatlab, and ConnectForTaskZapitDaq on TaskParameters.Optogenetics.ZapitBonsai, opened only for a session whose task file says optogenetics.zapitBonsai at launch (OpenedBy). DualZapitTests sets CONFIG_ROOT and builds it, never runs it.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>CONFIG_ROOT</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:String">
+        <rx:Name>PathPrefix</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="ctl:ControlEvent">
+        <rx:Name>ControlEvents</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject" TypeArguments="ctl:ControlEvent">
+        <rx:Name>ExperimentGo</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="sys:Double">
+        <rx:Name>Timestamp</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject" TypeArguments="t:DualZapitTask">
+        <rx:Name>TaskConfig</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject" TypeArguments="sys:String">
+        <rx:Name>TaskPath</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject" TypeArguments="sys:String">
+        <rx:Name>SubjectId</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:ReplaySubject" TypeArguments="harp:Timestamped(orl:EventRow)">
+        <rx:Name>Events</rx:Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>RigConfigs</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>BehaviorBoard</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="core:RigDevice">
+          <core:Name>BehaviorBoard-Main</core:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>BehaviorBoard-Main</Name>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>BehaviorBoard-Main.Data</rx:Name>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitBonsai:ConnectForTaskZapitDaq.bonsai">
+        <OpenedBy>optogenetics.zapitBonsai</OpenedBy>
+        <OptogeneticsSwitch>TaskParameters.Optogenetics.ZapitBonsai</OptogeneticsSwitch>
+        <NoZapitDaqMessage>Zapit-Bonsai is ticked, but this rig's rig.yml has no zapit block for Zapit-Bonsai: tick Zapit-MATLAB, or fill in the block.</NoZapitDaqMessage>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ConnectForTask.bonsai">
+        <OptogeneticsSwitch>TaskParameters.Optogenetics.ZapitMatlab</OptogeneticsSwitch>
+        <OptogeneticsSubjectName>OptogeneticsMatlab</OptogeneticsSubjectName>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitLogs.bonsai">
+        <OptogeneticsSwitch>TaskParameters.Optogenetics.ZapitMatlab</OptogeneticsSwitch>
+      </Expression>
+      <Expression xsi:type="lv:StreamDevices">
+        <Name>LiveView</Name>
+        <lv:DataPort>5556</lv:DataPort>
+        <lv:VideoPort>5558</lv:VideoPort>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="11" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
