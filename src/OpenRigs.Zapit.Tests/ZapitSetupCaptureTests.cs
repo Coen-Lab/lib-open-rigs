@@ -22,12 +22,32 @@ namespace OpenRigs.Zapit.Tests
             readonly IDisposable subscription;
             byte shade;
 
-            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10, double laserCeilingVolts = 5)
+            // As ZapitDaq: a Point answered Pointed and a Zero answered Zeroed, at once on the same thread.
+            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10, double laserCeilingVolts = 5, TimeSpan? aimTimeout = null)
             {
                 Directory.CreateDirectory(Pending);
-                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2), CeilingMw = ceilingMw, LaserMaxVolts = 5, LaserCeilingVolts = laserCeilingVolts }
+                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2), AimTimeout = aimTimeout ?? TimeSpan.FromSeconds(10), CeilingMw = ceilingMw, LaserMaxVolts = 5, LaserCeilingVolts = laserCeilingVolts }
                     .Process(Grids, Stills, Banks, Events, Frames, Aims)
-                    .Subscribe(step => { Steps.Add(step); if (step.Command?.Kind == ZapitDaqCommandKind.Point) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed }); }, e => Error = e);
+                    .Subscribe(step =>
+                    {
+                        lock (Steps) Steps.Add(step);
+                        if (step.Command?.Kind == ZapitDaqCommandKind.Point) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed });
+                        if (step.Command?.Kind == ZapitDaqCommandKind.Zero) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Zeroed });
+                    }, e => Error = e);
+            }
+
+            // Zapit-Main.LaserOff: CreateZapitDaqCommand's Zero straight to ZapitDaq, whose Zeroed this node sees.
+            public void LaserOff() => Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Zeroed });
+
+            public bool WaitFor(Func<ZapitSetupStep, bool> match, double seconds = 5)
+            {
+                var until = DateTime.UtcNow.AddSeconds(seconds);
+                while (DateTime.UtcNow < until)
+                {
+                    lock (Steps) if (Steps.Any(match)) return true;
+                    System.Threading.Thread.Sleep(10);
+                }
+                return false;
             }
 
             public string Run(string name, string grid)
@@ -426,6 +446,82 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual("Refused", step.Stage);
             StringAssert.Contains(step.Detail, "laser disabled");
             Assert.IsNull(step.Command);
+        }
+
+        // Laser Off during a grid run ends it: refused, the camera put back, the lines zeroed; no laser-on Point after it,
+        // however many frames come, until a new request.
+        [TestMethod]
+        public void LaserOffDuringAGridRunEndsItAndNoLaserPointFollows()
+        {
+            using var rig = new Rig();
+            var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2], [-1, 0.5], [2, 2]], \"laserVolts\": 0.3, \"skipFrames\": 0, \"backgrounds\": 1, \"camera\": {\"exposureUs\": 5000, \"gainDb\": 0}}");
+            rig.Grids.OnNext(folder);
+            rig.Frame();   // point 0 saved, point 1 pointed
+            var before = rig.Steps.Count;
+            rig.LaserOff();
+            for (int i = 0; i < 6; i++) rig.Frame();
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            var after = rig.Steps.Skip(before).ToList();
+            Assert.AreEqual(1, after.Count, string.Join("; ", after));
+            StringAssert.StartsWith(after[0].ToString(), "Refused Laser Off came during a setup step");
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, after[0].Command.Kind);
+            Assert.IsTrue(after[0].Camera.Restore, "the camera's own exposure and gain put back");
+            Assert.IsFalse(after.Any(s => s.Command?.Kind == ZapitDaqCommandKind.Point && s.Command.LaserVolts > 0));
+            Assert.AreEqual(1, Directory.GetFiles(folder, "*.png").Length, "the ended run saves nothing more");
+            rig.Grids.OnNext(rig.Run("Frames_U", "{\"volts\": [[1, 0]], \"laserVolts\": 0.3}"));
+            Assert.AreEqual("Pointing", rig.Steps.Last().Stage, "a new run may start");
+
+            using var still = new Rig();
+            still.Stills.OnNext(Path.Combine(still.Pending, "still.png"));
+            still.LaserOff();
+            still.Frame();
+            StringAssert.StartsWith(still.Steps.Last().ToString(), "Refused Laser Off came during a setup step");
+            Assert.IsFalse(File.Exists(Path.Combine(still.Pending, "still.png")));
+        }
+
+        // Laser Off clears the aim: Off Laser Off, and Go then sends no second Zero (BACKLOG C5).
+        [TestMethod]
+        public void LaserOffDuringAnAimClearsIt()
+        {
+            using var rig = new Rig();
+            rig.Aims.OnNext("1,1,0.4");
+            rig.LaserOff();
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            Assert.AreEqual("Off Laser Off", rig.Steps.Last().ToString());
+            Assert.IsTrue(rig.Steps.Last().Aim);
+            var count = rig.Steps.Count;
+            rig.LaserOff();
+            rig.Aims.OnCompleted();
+            Assert.AreEqual(count, rig.Steps.Count, string.Join("; ", rig.Steps));
+        }
+
+        // The aim watchdog: an aim not renewed within AimTimeout is turned off, the lines zeroed.
+        [TestMethod]
+        public void AnAimNotRenewedIsZeroedAfterTheTimeout()
+        {
+            using var rig = new Rig(aimTimeout: TimeSpan.FromMilliseconds(100));
+            rig.Aims.OnNext("1,1,0.4");
+            Assert.IsTrue(rig.WaitFor(s => s.Stage == "Off"), string.Join("; ", rig.Steps));
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            var off = rig.Steps.Last();
+            Assert.AreEqual("Off no aim for 0.1 s", off.ToString());
+            Assert.IsTrue(off.Aim);
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, off.Command.Kind);
+            System.Threading.Thread.Sleep(300);
+            Assert.AreEqual(1, rig.Steps.Count(s => s.Stage == "Off"), "turned off once");
+        }
+
+        // An aim renewed within AimTimeout stays on, however long in all; a grid run ends the watchdog with the aim.
+        [TestMethod]
+        public void ARenewedAimStaysOn()
+        {
+            using var rig = new Rig(aimTimeout: TimeSpan.FromMilliseconds(400));
+            for (int i = 0; i < 10; i++) { rig.Aims.OnNext("1,1,0.4"); System.Threading.Thread.Sleep(100); }
+            Assert.IsFalse(rig.Steps.Any(s => s.Stage == "Off"), string.Join("; ", rig.Steps));
+            rig.Grids.OnNext(rig.Run("Frames_T", "{\"volts\": [[1, 0]], \"laserVolts\": 0.3}"));
+            System.Threading.Thread.Sleep(800);
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            Assert.IsFalse(rig.Steps.Any(s => s.Stage == "Off"), "the grid run ended the aim: " + string.Join("; ", rig.Steps));
         }
 
         // Only Zero: nothing can send ZapitDaq an unchecked LoadBank.

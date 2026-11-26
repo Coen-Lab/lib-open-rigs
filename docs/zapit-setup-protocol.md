@@ -20,7 +20,7 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
   - `BankLoaded <json>`
   - `Refused <why>`
 
-  Hand aiming has its own metric, `status.metrics["Zapit-Main.Aim"]`: `Aiming <xVolts>,<yVolts>,<laserVolts>`, `Off Go` or `Refused <why>`, so an aim never overwrites `BankLoaded`.
+  Hand aiming has its own metric, `status.metrics["Zapit-Main.Aim"]`: `Aiming <xVolts>,<yVolts>,<laserVolts>`, `Off Go`, `Off Laser Off`, `Off no aim for 10 s` or `Refused <why>`, so an aim never overwrites `BankLoaded`.
 
   The metric keeps only the latest value. The agent sends one request, then polls until that request's terminal stage comes back: `FramesSaved`, `StillSaved`, `BankLoaded` or `Refused`.
 - **Live.** The camera `Camera-Zapit` is streamed by StreamDevices as the camera Zapit, on a rig whose `zapit` block names `zapit.device`. Its frames are on `Camera-Zapit.Data`, published at `ConnectForTaskZapitDaq`'s top level (a subject inside its `Zapit` SelectMany would be out of StreamDevices' reach), and they are the frames the setup phase saves.
@@ -69,7 +69,7 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
 ## Hand aiming
 
-Between a passed scanner fit and Go, the agent can point the beam by hand (its Point and Cat & Mouse). It sends `Zapit-Main.Aim <xVolts>,<yVolts>,<laserVolts>`: the galvo volts come from the sample mm through the scanner fit, and the laser volts from the scanner grid's power (2 mW by default, never above `ceilingMw`) through the laser curve, as `calibration_plan` makes them. The workflow points the galvos with the laser on (ZapitDaq `Point`) and reports `Aiming`. The beam stays there until the next aim, `Zapit-Main.LaserOff`, a grid run or a still. An aim or grid above the ceiling as volts (the launch property `LaserCeilingVolts`: `ceilingMw` through the laser curve) is refused, and ZapitDaq refuses any laser sample above it. Go ends a grid run or still still in progress (`Refused`, the lines zeroed), and once a trial is armed ZapitDaq answers any `Point` with `Refused`.
+Between a passed scanner fit and Go, the agent can point the beam by hand (its Point and Cat & Mouse). It sends `Zapit-Main.Aim <xVolts>,<yVolts>,<laserVolts>`: the galvo volts come from the sample mm through the scanner fit, and the laser volts from the scanner grid's power (2 mW by default, never above `ceilingMw`) through the laser curve, as `calibration_plan` makes them. The workflow points the galvos with the laser on (ZapitDaq `Point`) and reports `Aiming`. The beam stays there until the next aim, `Zapit-Main.LaserOff` (`Off Laser Off`), a grid run or a still, or until 10 s pass with no new aim: the workflow then zeroes the lines (`Off no aim for 10 s`), so a controller that dies never leaves the beam on. The agent re-sends its aim every 1 s while aiming and turns off an aim unrenewed for 5 s itself, so the 10 s backstop never ends normal aiming; a controller that sends one aim and nothing more must re-send it within 10 s. An aim or grid above the ceiling as volts (the launch property `LaserCeilingVolts`: `ceilingMw` through the laser curve) is refused, and ZapitDaq refuses any laser sample above it. Go ends a grid run or still still in progress (`Refused`, the lines zeroed), and once a trial is armed ZapitDaq answers any `Point` with `Refused`.
 
 The workflow refuses an aim, and keeps running, when:
 
@@ -93,7 +93,7 @@ The workflow reports `Refused <why>` and keeps running if a request:
 - arrives while another Setup or Still is in progress;
 - names a bank over the rig's ceiling: built under a higher `ceilingMw`, delivering more than it, or with laser samples above `LaserCeilingVolts` (0 when the launch has no laser curve). ZapitDaq answers `Refused` and keeps any bank loaded before.
 
-A bank that ZapitDaq refuses otherwise (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still`, `Zapit-Main.LoadBank` and `Zapit-Main.Aim`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
+A bank that ZapitDaq refuses otherwise (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still`, `Zapit-Main.LoadBank` and `Zapit-Main.Aim`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp. Before Go it also ends the setup step in progress: the workflow sees ZapitDaq's `Zeroed` for a Zero it did not send, and a grid run or still in progress is `Refused Laser Off came during a setup step ...` (the camera's own exposure and gain put back, as at a run's end, and the lines zeroed again past any point that crossed the Laser Off), and an aim ends (`Off Laser Off`). No point follows until a new request.
 
 ## Reruns
 

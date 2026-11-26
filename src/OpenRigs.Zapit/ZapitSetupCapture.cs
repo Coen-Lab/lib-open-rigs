@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Threading;
 using Bonsai;
 using Newtonsoft.Json.Linq;
 using OpenCV.Net;
@@ -70,6 +71,11 @@ namespace OpenRigs.Zapit
         /// refused and the lines zeroed, so a stalled camera never holds the beam on one spot. Tests shorten it.</summary>
         internal TimeSpan FrameTimeout { get; set; } = TimeSpan.FromSeconds(2);
 
+        /// <summary>How long an aim holds the beam unless a new aim comes: then the lines are zeroed (Off), so a controller
+        /// that dies never leaves the laser on. The agent re-sends its aim every 1 s and turns off one unrenewed for 5 s
+        /// itself; this backstop is twice that. Tests shorten it.</summary>
+        internal TimeSpan AimTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
         sealed class Run
         {
             public string Folder = "";
@@ -92,7 +98,10 @@ namespace OpenRigs.Zapit
         /// curve) points the galvos with the laser on until the next aim, LaserOff or setup step; it is refused at ceilingMw 0,
         /// above LaserMaxVolts or LaserCeilingVolts, outside +/-10 V or during a grid run or still; a grid's laserVolts is held
         /// to the same rules. A still with no frame within FrameTimeout is refused. When the aims end (Go), a grid run or still
-        /// in progress is refused and, as for a beam still aimed, the lines are zeroed.</summary>
+        /// in progress is refused and, as for a beam still aimed, the lines are zeroed. ZapitDaq's Zeroed not from a Zero of this
+        /// node's own (Zapit-Main.LaserOff, or any other Zero) ends a grid run or still in progress (refused, the camera put back,
+        /// the lines zeroed again past any Point that crossed it) and the aim (Off Laser Off): no Point follows until a new
+        /// request. An aim not renewed within AimTimeout is turned off (Off, the lines zeroed).</summary>
         public IObservable<ZapitSetupStep> Process(IObservable<string> gridRuns, IObservable<string> stills, IObservable<string> banks,
             IObservable<ZapitDaqEvent> events, IObservable<IplImage> frames, IObservable<string> aims) => Observable.Create<ZapitSetupStep>(observer =>
         {
@@ -102,10 +111,38 @@ namespace OpenRigs.Zapit
             string? still = null;
             var aiming = false;
             var loading = false;   // a LoadBank awaits ZapitDaq's BankLoaded or Refused
-            void Emit(ZapitSetupStep step) => observer.OnNext(step);
+            var ownZero = false;   // a Zero of this node's own is going out: its Zeroed (ZapitDaq answers at once) is not a Laser Off
+            void Emit(ZapitSetupStep step)
+            {
+                if (step.Command?.Kind != ZapitDaqCommandKind.Zero) { observer.OnNext(step); return; }
+                var outer = ownZero;
+                ownZero = true;
+                try { observer.OnNext(step); }
+                finally { ownZero = outer; }
+            }
             void Refuse(string why) => Emit(new ZapitSetupStep { Stage = "Refused", Detail = why });
             var watchdog = new SerialDisposable();
             var watch = 0;
+            var aimWatchdog = new SerialDisposable();
+            var aimWatch = 0;
+            void StopAiming()
+            {
+                aiming = false;
+                aimWatch++;
+                aimWatchdog.Disposable = Disposable.Empty;
+            }
+            void AimTimedOut(int id)
+            {
+                if (id != aimWatch || !aiming) return;
+                StopAiming();
+                Emit(new ZapitSetupStep
+                {
+                    Aim = true,
+                    Stage = "Off",
+                    Detail = string.Format(CultureInfo.InvariantCulture, "no aim for {0} s", AimTimeout.TotalSeconds),
+                    Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
+                });
+            }
             string? Inside(string path)
             {
                 string full;
@@ -183,7 +220,7 @@ namespace OpenRigs.Zapit
                     if (LaserProblem(r.LaserVolts) is string laser) throw new InvalidDataException(laser);
                     if (Directory.EnumerateFiles(folder!, "*.png").Any()) throw new InvalidDataException("the folder already holds frames");
                     run = r;
-                    aiming = false;
+                    StopAiming();
                 }
                 catch (Exception error) when (error is IOException || error is InvalidDataException || error is Newtonsoft.Json.JsonException || error is NullReferenceException || error is FormatException || error is ArgumentException)
                 {
@@ -203,7 +240,7 @@ namespace OpenRigs.Zapit
                     return;
                 }
                 still = path;
-                aiming = false;
+                StopAiming();
                 Watch();
                 Emit(new ZapitSetupStep { Stage = "Pointing", Detail = still, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
             }
@@ -235,6 +272,8 @@ namespace OpenRigs.Zapit
                 if (!(Math.Abs(volts[0]) <= ZapitBank.RangeVolts) || !(Math.Abs(volts[1]) <= ZapitBank.RangeVolts)) { No("the galvo volts must be within +/-10 V: " + request); return; }
                 if (LaserProblem(volts[2]) is string laser) { No(laser + ": " + request); return; }
                 aiming = true;
+                var id = ++aimWatch;   // the aim watchdog: a new aim restarts it
+                aimWatchdog.Disposable = Scheduler.Default.Schedule(AimTimeout, () => Locked<int>(AimTimedOut)(id));
                 Emit(new ZapitSetupStep
                 {
                     Aim = true,
@@ -264,13 +303,41 @@ namespace OpenRigs.Zapit
                         });
                     }
                     if (!aiming) return;
-                    aiming = false;
+                    StopAiming();
                     Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Go", Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
                 }
             }
 
+            // Lines zeroed by a Zero not this node's (Zapit-Main.LaserOff): the grid run or still and the aim end, no Point after.
+            void LaserOff()
+            {
+                if (run != null || still != null)
+                {
+                    var ended = run;
+                    var what = run?.Folder ?? still;
+                    run = null;
+                    still = null;
+                    watchdog.Disposable = Disposable.Empty;
+                    Emit(new ZapitSetupStep
+                    {
+                        Stage = "Refused",
+                        Detail = "Laser Off came during a setup step, so the lines are zeroed and it is refused: " + what,
+                        Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },   // again: past a Point that crossed the Laser Off
+                        Camera = ended == null ? null : Restore(ended),
+                    });
+                }
+                if (!aiming) return;
+                StopAiming();
+                Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Laser Off" });
+            }
+
             void OnEvent(ZapitDaqEvent e)
             {
+                if (e.Kind == ZapitDaqEventKind.Zeroed)
+                {
+                    if (!ownZero) LaserOff();
+                    return;
+                }
                 if (loading && (e.Kind == ZapitDaqEventKind.BankLoaded || e.Kind == ZapitDaqEventKind.Refused))
                 {
                     loading = false;
@@ -328,9 +395,20 @@ namespace OpenRigs.Zapit
                     catch (Exception error) { observer.OnError(error); }
                 }
             };
+            // ZapitDaq answers a command holding its own lock, so a Zeroed from another thread (Laser Off) never waits here on a
+            // thread that holds this lock and is sending ZapitDaq a Point: it is handled once this lock is free instead.
+            var onEvent = Locked<ZapitDaqEvent>(OnEvent);
+            void Event(ZapitDaqEvent e)
+            {
+                if (e.Kind != ZapitDaqEventKind.Zeroed) { onEvent(e); return; }
+                if (!Monitor.TryEnter(gate)) { Scheduler.Default.Schedule(() => onEvent(e)); return; }
+                try { onEvent(e); }
+                finally { Monitor.Exit(gate); }
+            }
             return new CompositeDisposable(
                 watchdog,
-                events.Subscribe(Locked<ZapitDaqEvent>(OnEvent), observer.OnError),
+                aimWatchdog,
+                events.Subscribe(Event, observer.OnError),
                 frames.Subscribe(Locked<IplImage>(OnFrame), observer.OnError),
                 gridRuns.Subscribe(Locked<string>(Start), observer.OnError),
                 stills.Subscribe(Locked<string>(Still), observer.OnError),
