@@ -17,7 +17,7 @@ A new rig kind needs: its rig list and its taps include in `OpenRigs.Devices` (`
 | Cameras (`SpinnakerCamera`: serial, `exposureUs`, `gainDb`, binning, `pixelFormat`, blank keeping the camera's stored format) and the machine's `VideoEncoder` | `camera`, `videoEncoder` | `video` |
 | A projector's mesh and gamma table | `projector` | `projector` |
 | Speakers, every one equalised, and the penalty sound's channel (`EqualisedSpeakerArray`) | `speakerArray` | `speakers` |
-| Zapit (`Zapit`: MATLAB Zapit's `host`, `port`, `hardwareTriggered`; ZapitDaq's NI device and lines, laser limits, `ceilingMw`, `maxTrialSeconds`, `earlyStopLeadSeconds`, `triggerFilterSeconds` (optional), `safetyGate`, `camera`; both on a rig running both) | `zapit` | `zapit` |
+| Zapit (`Zapit`: MATLAB Zapit's `host`, `port`, `hardwareTriggered`; ZapitDaq's NI device and lines, laser limits, `ceilingMw`, `maxTrialSeconds`, `safetyGate`, `camera`; both on a rig running both) | `zapit` | `zapit` |
 
 Reward valves and the Zapit trigger are found from the Behavior board's `wiring`:
 

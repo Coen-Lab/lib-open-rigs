@@ -24,8 +24,8 @@ namespace OpenRigs.Zapit
     /// ceiling comes from), and a bank holding one, built under a ceiling above <see cref="CeilingMw"/> (peak), or delivering
     /// more average power than it asked (average), is refused at LoadBank. The simulated twin starts a trial on a Trigger
     /// command, as the NI DAQ on its line. A trial that has played is noticed at the next Arm as well as by polling. The first
-    /// trial armed with no duration (until the outcome) is refused unless <see cref="EarlyStopLeadSeconds"/> reaches past the
-    /// device's onboard buffer and one scan cycle, so a lead too short fails at once, not at a random early stop.
+    /// armed trial of a session is refused unless <see cref="EarlyStopLeadSeconds"/> reaches past the device's onboard buffer
+    /// and the bank's longest scan cycle (any trial can stop early), so a lead too short fails at once, not at a random early stop.
     /// </summary>
     [Description("Runs Zapit trials and calibration steps on the rig's NI DAQ, or its simulated twin.")]
     public class ZapitDaq : Combinator<ZapitDaqCommand, ZapitDaqEvent>
@@ -85,14 +85,15 @@ namespace OpenRigs.Zapit
         public double MaxTrialSeconds { get; set; }
 
         /// <summary>How far ahead of the generated samples an early stop writes its ramp, in seconds: more than the device's
-        /// onboard buffer and one scan cycle, checked at the first trial that can stop early.</summary>
-        [Description("How far ahead of the generated samples an early stop writes its ramp, in seconds: more than the onboard buffer and one scan cycle.")]
-        public double EarlyStopLeadSeconds { get; set; }
+        /// onboard buffer plus the bank's longest scan cycle (a USB-6453's 4095 samples and a 2500-sample cycle at 100000
+        /// samples/s need above 0.066 s), checked at the first armed trial of a session. A lab constant, not a rig.yml
+        /// setting; TrialRules' hold and laser-cap limits read it too.</summary>
+        public const double EarlyStopLeadSeconds = 0.1;
 
-        /// <summary>The minimum pulse width of the NI digital filter on the trigger line, in seconds: 0 turns it off. The filter delays
-        /// the recognised edge by up to this width; the trigger is a level held about 1 s, so 1 ms rejects glitches without missing triggers.</summary>
-        [Description("Minimum pulse width of the digital filter on the trigger line, in seconds: a glitch shorter than it does not start a trial. 0 turns the filter off.")]
-        public double TriggerFilterSeconds { get; set; } = 0.001;
+        /// <summary>The minimum pulse width of the NI digital filter on the trigger line, in seconds, always applied: an EMI
+        /// spike (about 10 ns on B2's PFI0) does not start a trial. The trigger is a level held about 1 s; the filter delays the
+        /// recognised edge by about its width. A lab constant, not a rig.yml setting.</summary>
+        public const double TriggerFilterSeconds = 1e-4;
 
         /// <summary>Tests replace the device; null takes <see cref="Simulated"/>.</summary>
         [XmlIgnore, Browsable(false)]
@@ -108,9 +109,8 @@ namespace OpenRigs.Zapit
         /// <summary>Runs each command in order and reports what the DAQ did.</summary>
         public override IObservable<ZapitDaqEvent> Process(IObservable<ZapitDaqCommand> source) => Observable.Create<ZapitDaqEvent>(observer =>
         {
-            if (!(SampleRate > 0) || !(MaxTrialSeconds > 0) || !(EarlyStopLeadSeconds > 0))
-                throw new InvalidOperationException("ZapitDaq needs SampleRate, MaxTrialSeconds and EarlyStopLeadSeconds above 0 (rig.yml's zapit block).");
-            ZapitDeviceChecks.TriggerFilter(TriggerFilterSeconds);
+            if (!(SampleRate > 0) || !(MaxTrialSeconds > 0))
+                throw new InvalidOperationException("ZapitDaq needs SampleRate and MaxTrialSeconds above 0 (rig.yml's zapit block).");
             var wiring = new ZapitWiring
             {
                 AnalogOutputs = new[] { GalvoXChannel, GalvoYChannel, LaserChannel, LedChannel },
@@ -244,19 +244,20 @@ namespace OpenRigs.Zapit
 
             // An early stop writes its ramp from the cycle boundary at or after generated + lead, so the ramp is kept
             // whenever the lead passes the onboard FIFO; one scan cycle more is the margin for samples NI has already sent
-            // the device beyond it (USB transfers). Fixed per rig and bank, so it is checked once, at the first trial
-            // that can stop early, the task armed (NI knows its onboard buffer only then).
+            // the device beyond it (USB transfers). Fixed per rig and bank, and any trial can stop early, so it is checked
+            // once, at the first armed trial of a session, the task armed (NI knows its onboard buffer only then).
             void CheckLead(ZapitBank loaded)
             {
-                long lead = (long)Math.Ceiling(node.EarlyStopLeadSeconds * loaded.SampleRate);
+                long lead = (long)Math.Ceiling(EarlyStopLeadSeconds * loaded.SampleRate);
                 long cycle = loaded.Conditions.Max(c => c.ScanCycle.Length);
                 long onboard = device.OnboardSamples;   // read with the task armed: NI has no onboard buffer once it is deleted
                 long minimum = onboard + cycle;
                 if (lead > minimum) return;
                 device.WriteOnDemand(Zeros);   // deletes the armed task: the lines at 0 V
                 throw new InvalidOperationException(string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "rig.yml's zapit.earlyStopLeadSeconds ({0} s, {1} samples) must be more than the DAQ's onboard buffer ({2} samples per channel) plus one scan cycle ({3} samples): above {4} s at {5} samples/s. Raise earlyStopLeadSeconds before running trials that stop early.",
-                    node.EarlyStopLeadSeconds, lead, onboard, cycle, minimum / loaded.SampleRate, loaded.SampleRate));
+                    "The DAQ's onboard buffer ({0} samples per channel) plus the bank's longest scan cycle ({1} samples) is {2} samples ({3} s at {4} samples/s), " +
+                    "not under the early-stop lead ({5} samples): lib-open-rigs' ZapitDaq.EarlyStopLeadSeconds ({6} s) must be raised above {3} s before trials run on this DAQ.",
+                    onboard, cycle, minimum, minimum / loaded.SampleRate, loaded.SampleRate, lead, EarlyStopLeadSeconds));
             }
 
             void Arm(ZapitDaqCommand command)
@@ -275,8 +276,8 @@ namespace OpenRigs.Zapit
                 var samples = loaded.Assemble(command.Condition, variant, cycles);
                 RefuseLaser(Laser(samples), $"Trial {command.Trial}'s bank samples");
                 device.WriteOnDemand(Zeros);
-                device.ArmFinite(samples, loaded.SampleRate, node.TriggerTerminal, node.TriggerFilterSeconds);
-                if (!(command.DurationSeconds > 0) && !leadChecked)
+                device.ArmFinite(samples, loaded.SampleRate, node.TriggerTerminal);
+                if (!leadChecked)
                 {
                     CheckLead(loaded);
                     leadChecked = true;
@@ -298,7 +299,7 @@ namespace OpenRigs.Zapit
                 var loaded = bank!;
                 var condition = trial.Command.Condition;
                 int cycleRows = loaded.Conditions[condition - 1].ScanCycle.Length;
-                var from = device.SamplesGenerated + (long)Math.Ceiling(node.EarlyStopLeadSeconds * loaded.SampleRate);
+                var from = device.SamplesGenerated + (long)Math.Ceiling(EarlyStopLeadSeconds * loaded.SampleRate);
                 // The ramp starts on a cycle boundary, so the laser stays in phase with the scan: the trial cut to fewer cycles.
                 var cycles = (int)((from + trial.Variant.TailReplaces + cycleRows - 1) / cycleRows);
                 trial.Stopping = true;

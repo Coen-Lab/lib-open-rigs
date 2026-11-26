@@ -4522,10 +4522,6 @@ namespace OpenRigs.Devices.Rigs
     
         private double? _maxTrialSeconds;
     
-        private double? _earlyStopLeadSeconds;
-    
-        private double _triggerFilterSeconds;
-    
         private double? _micronsPerPixel;
     
         private double? _voltsPerPixel;
@@ -4543,7 +4539,6 @@ namespace OpenRigs.Devices.Rigs
             _host = "127.0.0.1";
             _port = 1488;
             _hardwareTriggered = false;
-            _triggerFilterSeconds = 0.001D;
             _invertXScanner = false;
             _invertYScanner = false;
         }
@@ -4566,8 +4561,6 @@ namespace OpenRigs.Devices.Rigs
             _laserMinMaxControlVolts = other._laserMinMaxControlVolts;
             _ceilingMw = other._ceilingMw;
             _maxTrialSeconds = other._maxTrialSeconds;
-            _earlyStopLeadSeconds = other._earlyStopLeadSeconds;
-            _triggerFilterSeconds = other._triggerFilterSeconds;
             _micronsPerPixel = other._micronsPerPixel;
             _voltsPerPixel = other._voltsPerPixel;
             _invertXScanner = other._invertXScanner;
@@ -4874,42 +4867,6 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// How far ahead of the samples generated an early stop writes its ramp, in seconds: more than the DAQ's onboard buffer plus the bank's longest scan cycle, which ZapitDaq checks at the first trial armed with no duration. The lab's is 0.08 (a USB-6453's 4095 samples per channel and a 40 Hz cycle at 100000 samples/s need above 0.06595).
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("earlyStopLeadSeconds")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="earlyStopLeadSeconds")]
-        [System.ComponentModel.DescriptionAttribute(@"How far ahead of the samples generated an early stop writes its ramp, in seconds: more than the DAQ's onboard buffer plus the bank's longest scan cycle, which ZapitDaq checks at the first trial armed with no duration. The lab's is 0.08 (a USB-6453's 4095 samples per channel and a 40 Hz cycle at 100000 samples/s need above 0.06595).")]
-        public double? EarlyStopLeadSeconds
-        {
-            get
-            {
-                return _earlyStopLeadSeconds;
-            }
-            set
-            {
-                _earlyStopLeadSeconds = value;
-            }
-        }
-    
-        /// <summary>
-        /// Minimum pulse width of the NI card's digital filter on the trigger line (triggerChannel), in seconds: an edge pair closer than this is a glitch and does not start a trial. The filter delays the recognised edge by up to this width; the trigger is a level held about 1 s, so the default 1 ms rejects glitches without missing triggers. 0 turns the filter off. Optional, and not part of the native fields a block gives together.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("triggerFilterSeconds")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="triggerFilterSeconds")]
-        [System.ComponentModel.DescriptionAttribute(@"Minimum pulse width of the NI card's digital filter on the trigger line (triggerChannel), in seconds: an edge pair closer than this is a glitch and does not start a trial. The filter delays the recognised edge by up to this width; the trigger is a level held about 1 s, so the default 1 ms rejects glitches without missing triggers. 0 turns the filter off. Optional, and not part of the native fields a block gives together.")]
-        public double TriggerFilterSeconds
-        {
-            get
-            {
-                return _triggerFilterSeconds;
-            }
-            set
-            {
-                _triggerFilterSeconds = value;
-            }
-        }
-    
-        /// <summary>
         /// The Zapit camera's scale at the sample, in microns a pixel.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("micronsPerPixel")]
@@ -5047,8 +5004,6 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("LaserMinMaxControlVolts = " + _laserMinMaxControlVolts + ", ");
             stringBuilder.Append("CeilingMw = " + _ceilingMw + ", ");
             stringBuilder.Append("MaxTrialSeconds = " + _maxTrialSeconds + ", ");
-            stringBuilder.Append("EarlyStopLeadSeconds = " + _earlyStopLeadSeconds + ", ");
-            stringBuilder.Append("TriggerFilterSeconds = " + _triggerFilterSeconds + ", ");
             stringBuilder.Append("MicronsPerPixel = " + _micronsPerPixel + ", ");
             stringBuilder.Append("VoltsPerPixel = " + _voltsPerPixel + ", ");
             stringBuilder.Append("InvertXScanner = " + _invertXScanner + ", ");

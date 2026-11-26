@@ -92,8 +92,8 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>ZapitDaq's (OpenRigs.Zapit) laser on until the outcome, as <see cref="UntilOutcome(bool, double, double)"/> with every trial
-        /// armed during its interval and started by the trigger line; triggerHoldSeconds at least the bank's longest ramp plus rig.yml's
-        /// earlyStopLeadSeconds (ZapitBank.LongestRampSeconds).</summary>
+        /// armed during its interval and started by the trigger line; triggerHoldSeconds at least the bank's longest ramp plus
+        /// ZapitDaq.EarlyStopLeadSeconds (ZapitBank.LongestRampSeconds).</summary>
         public static LaserTiming UntilOutcome(double triggerHoldSeconds, double laserCapSeconds)
         {
             return UntilOutcome(true, triggerHoldSeconds, laserCapSeconds);

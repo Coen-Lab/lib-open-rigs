@@ -161,7 +161,7 @@ namespace OpenRigs.Trials.Tests
             var bank = ZapitDaqTrialTests.UnpackBank();
             double clock = 0;
             var device = new SimulatedZapitDevice { AutoTrigger = false, Clock = () => System.Threading.Volatile.Read(ref clock) };
-            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, EarlyStopLeadSeconds = 0.05, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
             var commands = new Subject<ZapitDaqCommand>();
             var zapitEvents = new System.Collections.Concurrent.ConcurrentQueue<ZapitDaqEvent>();
             Exception error = null;
@@ -207,7 +207,7 @@ namespace OpenRigs.Trials.Tests
 
             // The old moment, trigger + laserDurationSeconds + ramp, with the edge a tick after the trigger tick.
             var old = new SimulatedZapitDevice { AutoTrigger = false, Clock = () => System.Threading.Volatile.Read(ref clock) };
-            var oldNode = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, EarlyStopLeadSeconds = 0.05, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => old };
+            var oldNode = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => old };
             Exception stop = null;
             using (oldNode.Process(commands).Subscribe(_ => { }, e => stop = e))
             {
@@ -243,7 +243,7 @@ namespace OpenRigs.Trials.Tests
             }
 
             public void WriteOnDemand(double[] volts) { Twin.WriteOnDemand(volts); }
-            public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal, double triggerFilterSeconds) { Twin.ArmFinite(samples, sampleRate, triggerTerminal, triggerFilterSeconds); }
+            public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal) { Twin.ArmFinite(samples, sampleRate, triggerTerminal); }
             public long SamplesGenerated { get { return Twin.SamplesGenerated; } }
             public long OnboardSamples { get { return Twin.OnboardSamples; } }
             public bool HasClockedTask { get { return Twin.HasClockedTask; } }
@@ -264,8 +264,8 @@ namespace OpenRigs.Trials.Tests
             double clock = 0;
             var device = new NiWriteDevice(new SimulatedZapitDevice { AutoTrigger = false, Clock = () => System.Threading.Volatile.Read(ref clock) },
                 () => System.Threading.Volatile.Write(ref clock, System.Threading.Volatile.Read(ref clock) + 0.001));
-            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, EarlyStopLeadSeconds = 0.05, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
-            var hold = ZapitDaqTrial.FreeAfterLaserSeconds(ZapitBank.Load(bank)) + node.EarlyStopLeadSeconds;
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
+            var hold = ZapitDaqTrial.FreeAfterLaserSeconds(ZapitBank.Load(bank)) + ZapitDaq.EarlyStopLeadSeconds;
             var commands = new Subject<ZapitDaqCommand>();
             var zapitEvents = new System.Collections.Concurrent.ConcurrentQueue<ZapitDaqEvent>();
             var ended = new List<ZapitDaqEvent>();
