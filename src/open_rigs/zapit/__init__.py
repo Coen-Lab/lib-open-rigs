@@ -26,7 +26,7 @@ def _installed_commit() -> str | None:
 def source() -> str:
     """The code that ran, for the records it writes: ``<version>+g<commit12>[-dirty]``. The version is the
     distribution's without its local part. The commit comes from the install record when the package was installed
-    from git (it has no .git beside it), else from the checkout it runs in (-dirty for local edits); the version
+    from git (it has no .git beside it), else from the checkout that tracks this folder (-dirty for local edits); the version
     alone when neither is there."""
     import subprocess
     from pathlib import Path
@@ -41,6 +41,9 @@ def source() -> str:
                               text=True, timeout=5, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
     try:
+        # Only a checkout that tracks this folder says which code ran (not an install inside another repo).
+        if git("ls-files", "--error-unmatch", "__init__.py").returncode:
+            return base
         head = git("rev-parse", "--short=12", "HEAD")
         if head.returncode:
             return base

@@ -188,6 +188,26 @@ def test_source_reads_the_commit_of_a_git_installed_package(monkeypatch):
     assert z.source() == "0.1.dev7+g0123456789ab"
 
 
+def test_source_gives_the_version_alone_when_this_folder_is_not_tracked(monkeypatch):
+    """An install inside some other repo must not take that repo's HEAD for its own commit."""
+    import subprocess
+    from importlib import metadata
+
+    import open_rigs.zapit as z
+
+    class Done:
+        def __init__(self, returncode, stdout=""):
+            self.returncode, self.stdout = returncode, stdout
+
+    def fake_run(cmd, **kwargs):
+        return Done(1) if "ls-files" in cmd else Done(0, "abcdef123456\n")
+
+    monkeypatch.setattr(metadata, "distribution", lambda name: (_ for _ in ()).throw(metadata.PackageNotFoundError(name)))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(z, "__version__", "0.1.dev7")
+    assert z.source() == "0.1.dev7"
+
+
 def test_source_of_an_editable_install_falls_back_to_the_checkout(monkeypatch):
     from importlib import metadata
 

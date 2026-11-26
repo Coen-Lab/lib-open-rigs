@@ -152,7 +152,8 @@ def test_the_real_pair_registers_both_ways_and_the_round_trip_lands_within_25_um
     np.testing.assert_allclose(np.linalg.det(ab.transform[:2, :2]), 1.0, atol=1e-9)   # rigid: no scale
     pts = np.c_[np.array(B2_CLICKS, float), np.ones(2)]
     back = pts @ (ab.transform @ ba.transform)[:2].T
-    assert np.linalg.norm(back - pts[:, :2], axis=1).max() * B2.microns_per_pixel < 25
+    err_um = np.linalg.norm(back - pts[:, :2], axis=1).max() * B2.microns_per_pixel
+    assert err_um < 25, (err_um, [(r.inliers, r.correlation, r.rotation_deg, r.scale, r.transform) for r in (ab, ba)])
 
 
 def _same_plate(skull_inside):
