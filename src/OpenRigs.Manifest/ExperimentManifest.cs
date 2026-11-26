@@ -36,8 +36,8 @@ namespace OpenRigs.Manifest
         }
 
         // Its settings, externalized in its inner workflow so an include can map a property onto them
-        // (OpenRigs.Logging's ExperimentRecords: IngestScript, ExpectedFiles).
-        static readonly string[] Externalized = { "IngestScript", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns" };
+        // (OpenRigs.Logging's ExperimentRecords: IngestScripts, ExpectedFiles).
+        static readonly string[] Externalized = { "IngestScripts", "IngestScript", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns" };
 
         /// <summary>
         /// Initializes a copy with the given inner workflow. Bonsai copies a group by this
@@ -52,12 +52,27 @@ namespace OpenRigs.Manifest
             GroupNode.Externalize(Workflow, Settings, Externalized);
         }
 
-        /// <summary>Gets or sets the name of the server's ingest script for this kind of data.</summary>
-        [Description("The name of the server's ingest script for this kind of data, as the server's registry has it. Blank: the server runs nothing but the copy.")]
+        /// <summary>Gets or sets the names of the server's ingest scripts for this kind of data, separated by commas.</summary>
+        [Description("The names of the server's ingest scripts for this kind of data, as the server's registry has them, separated by commas, in the order the server runs them (letters, digits, _ - and ., starting with a letter or digit). Blank: the server runs nothing but the copy.")]
+        public string IngestScripts
+        {
+            get { return Settings.IngestScripts; }
+            set { Settings.IngestScripts = value; }
+        }
+
+        /// <summary>Gets or sets the one ingest script name of a workflow saved before manifest version 5; read as IngestScripts, never written.</summary>
+        [Description("Before manifest version 5: the name of the server's one ingest script. Read as IngestScripts.")]
         public string IngestScript
         {
             get { return Settings.IngestScript; }
             set { Settings.IngestScript = value; }
+        }
+
+        /// <summary>Tells the serializer to leave IngestScript out: IngestScripts holds it.</summary>
+        /// <returns>False.</returns>
+        public bool ShouldSerializeIngestScript()
+        {
+            return false;
         }
 
         /// <summary>Gets or sets the configuration files the workflow runs with, separated by ;.</summary>
@@ -142,7 +157,7 @@ namespace OpenRigs.Manifest
             }
             var conditions = Expression.Call(typeof(ManifestRecorder).GetMethod(nameof(ManifestRecorder.Conditions)),
                 Expression.Constant(names.ToArray()), Expression.NewArrayInit(typeof(IObservable<bool>), subjects));
-            var recorder = Expression.Constant(new ManifestRecorder(IngestScript, ConfigFiles, configRoot, expected, TrialColumns, StreamColumns));
+            var recorder = Expression.Constant(new ManifestRecorder(ManifestWriter.IngestScriptNames(IngestScripts), ConfigFiles, configRoot, expected, TrialColumns, StreamColumns));
             var observablePath = Expression.Convert(path, typeof(IObservable<string>));
             var run = arguments.FirstOrDefault();
             if (run == null)
@@ -159,11 +174,32 @@ namespace OpenRigs.Manifest
     /// ExperimentManifest's settings, kept as a node in its inner workflow so that they survive
     /// Bonsai's copies of the group. Set them on ExperimentManifest; this node builds to nothing.
     /// </summary>
-    [Description("ExperimentManifest's settings (IngestScript, ConfigFiles, ExpectedFiles, TrialColumns, StreamColumns), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
+    [Description("ExperimentManifest's settings (IngestScripts, ConfigFiles, ExpectedFiles, TrialColumns, StreamColumns), kept here so Bonsai's copies of the group keep them. Set them on ExperimentManifest.")]
     public class ExperimentManifestSettings : ZeroArgumentExpressionBuilder
     {
-        /// <summary>Gets or sets ExperimentManifest's IngestScript.</summary>
-        public string IngestScript { get; set; }
+        string ingestScripts;
+        string ingestScript;
+
+        /// <summary>Gets or sets ExperimentManifest's IngestScripts. A workflow saved before manifest version 5 holds one name in IngestScript: it reads as the list, and is saved as it.</summary>
+        public string IngestScripts
+        {
+            get { return string.IsNullOrWhiteSpace(ingestScripts) ? ingestScript : ingestScripts; }
+            set { ingestScripts = value; }
+        }
+
+        /// <summary>Gets or sets the IngestScript of a workflow saved before manifest version 5, which IngestScripts replaces.</summary>
+        public string IngestScript
+        {
+            get { return ingestScript; }
+            set { ingestScript = value; }
+        }
+
+        /// <summary>Tells the serializer to leave IngestScript out: IngestScripts holds it.</summary>
+        /// <returns>False.</returns>
+        public bool ShouldSerializeIngestScript()
+        {
+            return false;
+        }
 
         /// <summary>Gets or sets ExperimentManifest's ConfigFiles.</summary>
         public string ConfigFiles { get; set; } = ManifestWriter.RigFilesToken;
@@ -190,7 +226,7 @@ namespace OpenRigs.Manifest
     class ExperimentManifestTypeDescriptionProvider : ShownPropertiesProvider
     {
         public ExperimentManifestTypeDescriptionProvider()
-            : base("IngestScript", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns")
+            : base("IngestScripts", "IngestScript", "ConfigFiles", "ExpectedFiles", "TrialColumns", "StreamColumns")
         {
         }
     }

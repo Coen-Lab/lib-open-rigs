@@ -126,6 +126,8 @@ namespace OpenRigs.Devices.Tests
             Assert.IsNotNull(records.ArgumentRange);
             var properties = System.ComponentModel.TypeDescriptor.GetProperties(records);
             Assert.IsNotNull(properties["IngestScript"], "ExperimentRecords' workflow did not load");
+            Assert.IsNotNull(properties["IngestScripts"], "ExperimentRecords takes no IngestScripts");
+            // The include above sets the old one-name IngestScript, which still loads.
             Assert.IsNull(properties["ConfigRoot"], "ExperimentRecords has a ConfigRoot");
         }
 
