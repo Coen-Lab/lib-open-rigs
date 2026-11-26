@@ -4,7 +4,7 @@
     <Description>The trial loop's opto adapter for MATLAB Zapit (Zapit-MATLAB, whose TCP client is OpenRigs.Devices.Zapit): its opto system for OpenRigs.Trials and each trial's StartStimulus. Deleted when MATLAB Zapit is retired.</Description>
     <PackageTags>$(PackageTags) Opto Zapit</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-zapit-native.29</Version>
+    <Version>0.1.1-coen-lab.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -4,7 +4,7 @@
     <Description>A package providing the trial loop every Open Rigs task runs: its rules, timing, outcome, the trial row's shared columns, and the Opto port an opto system's adapter package (OpenRigs.Opto.*) implements.</Description>
     <PackageTags>$(PackageTags) Trials</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-zapit-native.29</Version>
+    <Version>0.1.1-coen-lab.25</Version>
   </PropertyGroup>
 
   <ItemGroup>
