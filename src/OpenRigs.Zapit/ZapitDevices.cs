@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using NationalInstruments.DAQmx;
 using NiTask = NationalInstruments.DAQmx.Task;
 
@@ -42,20 +43,32 @@ namespace OpenRigs.Zapit
         void WriteOnDemand(double[] volts);
 
         /// <summary>Writes <paramref name="samples"/> (one row per AO line) to a new finite clocked task and starts it,
-        /// generating on the first rising edge of <paramref name="triggerTerminal"/> (at once when empty). Refused while a
-        /// clocked task exists. NI's puts its digital filter of minimum pulse width <see cref="ZapitDaq.TriggerFilterSeconds"/>
-        /// on the start trigger, so a glitch shorter than it does not start the task; the filter delays the recognised edge by about that width.</summary>
+        /// generating on the first rising edge of <paramref name="triggerTerminal"/> (at once when empty): a trial whose end
+        /// is fixed at Arm, written whole, regeneration allowed. Refused while a clocked task exists. NI's puts its digital
+        /// filter of minimum pulse width <see cref="ZapitDaq.TriggerFilterSeconds"/> on the start trigger, so a glitch shorter
+        /// than it does not start the task; the filter delays the recognised edge by about that width.</summary>
         void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal);
 
-        /// <summary>Overwrites the clocked task's buffer from sample <paramref name="firstSample"/>, which must not yet be
-        /// generated nor already in the device's onboard FIFO (whose samples cannot be overwritten): one too late is refused
-        /// with an error, never written in part.</summary>
-        void WriteAt(double[,] samples, long firstSample);
+        /// <summary>Creates, not starts, a finite clocked task of <paramref name="samples"/> per channel that does not
+        /// regenerate: its samples are streamed with <see cref="Write"/>, the first before <see cref="StartClocked"/>. A
+        /// generation that catches up with the samples written stops with an error (NI: "to prevent the regeneration of old
+        /// samples"), the lines holding the last sample generated. The trigger and its filter as <see cref="ArmFinite"/>'s.
+        /// Refused while a clocked task exists.</summary>
+        void CreateFinite(long samples, double sampleRate, string triggerTerminal);
+
+        /// <summary>Appends <paramref name="samples"/> to the streamed task's samples. Once started, a write returns only when
+        /// its last sample is within about the onboard FIFO and the USB transfers in flight of the generation (about 8000
+        /// samples on B2's USB-6453; a 27000-sample write blocked about 240 ms), so ZapitDaq writes small chunks.</summary>
+        void Write(double[,] samples);
+
+        /// <summary>Starts the streamed task: it generates from its trigger, or at once with none.</summary>
+        void StartClocked();
 
         /// <summary>The clocked task's samples per channel generated so far (0 before its trigger).</summary>
         long SamplesGenerated { get; }
 
-        /// <summary>The clocked task's onboard FIFO, in samples per channel, beyond reach of <see cref="WriteAt"/> (0 with no task).</summary>
+        /// <summary>The clocked task's onboard FIFO, in samples per channel (0 with no task): a streamed trial keeps more
+        /// than it written ahead of the generation.</summary>
         long OnboardSamples { get; }
 
         /// <summary>Whether a clocked task exists.</summary>
@@ -86,13 +99,6 @@ namespace OpenRigs.Zapit
             foreach (var v in samples) if (!(Math.Abs(v) <= ZapitBank.RangeVolts)) throw new InvalidOperationException($"Zapit clocked samples exceed +/-{ZapitBank.RangeVolts} V.");
         }
 
-        public static void InTime(long firstSample, long generated, long onboard)
-        {
-            if (firstSample < generated + onboard)
-                throw new InvalidOperationException($"A Zapit early stop wrote its ramp from sample {firstSample}, but {generated} were generated and the next {onboard} already sit in the device's onboard buffer, " +
-                    $"so the ramp could not be kept: lib-open-rigs' ZapitDaq.EarlyStopLeadSeconds ({ZapitDaq.EarlyStopLeadSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} s) must be raised above the onboard buffer plus one scan cycle (their samples per channel over the sample rate).");
-        }
-
         public static InvalidOperationException Reserved() =>
             new InvalidOperationException("The Zapit AO lines are reserved by a clocked task; it must be stopped and deleted first.");
     }
@@ -102,6 +108,7 @@ namespace OpenRigs.Zapit
     {
         readonly ZapitWiring wiring;
         NiTask? clocked;
+        AnalogMultiChannelWriter? writer;   // the streamed task's
 
         public NiZapitDevice(ZapitWiring wiring) => this.wiring = wiring;
 
@@ -116,19 +123,71 @@ namespace OpenRigs.Zapit
         public void WriteOnDemand(double[] volts)
         {
             ZapitDeviceChecks.Range(volts);
-            StopClocked();
-            using var task = AnalogOutputTask("ZapitOnDemand");
-            new AnalogMultiChannelWriter(task.Stream).WriteSingleSample(true, volts);
+            try { StopClocked(); }   // a failed generation is reported here: the lines are written all the same
+            finally
+            {
+                using var task = AnalogOutputTask("ZapitOnDemand");
+                new AnalogMultiChannelWriter(task.Stream).WriteSingleSample(true, volts);
+            }
         }
 
         public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal)
         {
             ZapitDeviceChecks.Range(samples);
             if (clocked != null) throw ZapitDeviceChecks.Reserved();
+            var task = TrialTask(samples.GetLength(1), sampleRate, triggerTerminal);
+            try
+            {
+                task.Stream.WriteRegenerationMode = WriteRegenerationMode.AllowRegeneration;
+                new AnalogMultiChannelWriter(task.Stream).WriteMultiSample(false, samples);
+                task.Start();
+                clocked = task;
+            }
+            catch
+            {
+                task.Dispose();
+                throw;
+            }
+        }
+
+        public void CreateFinite(long samples, double sampleRate, string triggerTerminal)
+        {
+            if (clocked != null) throw ZapitDeviceChecks.Reserved();
+            var task = TrialTask(samples, sampleRate, triggerTerminal);
+            try
+            {
+                task.Stream.WriteRegenerationMode = WriteRegenerationMode.DoNotAllowRegeneration;
+                task.Stream.Timeout = 2000;   // a write never waits on a streamed trial: one that does is an error, not a hang
+                task.Control(TaskAction.Verify);
+                writer = new AnalogMultiChannelWriter(task.Stream);
+                clocked = task;
+            }
+            catch
+            {
+                task.Dispose();
+                throw;
+            }
+        }
+
+        public void Write(double[,] samples)
+        {
+            ZapitDeviceChecks.Range(samples);
+            if (clocked == null || writer == null) throw new InvalidOperationException("No streamed Zapit task to write to.");
+            writer.WriteMultiSample(false, samples);
+        }
+
+        public void StartClocked()
+        {
+            if (clocked == null) throw new InvalidOperationException("No Zapit clocked task to start.");
+            clocked.Start();
+        }
+
+        NiTask TrialTask(long samples, double sampleRate, string triggerTerminal)
+        {
             var task = AnalogOutputTask("ZapitTrial");
             try
             {
-                task.Timing.ConfigureSampleClock("", sampleRate, SampleClockActiveEdge.Rising, SampleQuantityMode.FiniteSamples, samples.GetLength(1));
+                task.Timing.ConfigureSampleClock("", sampleRate, SampleClockActiveEdge.Rising, SampleQuantityMode.FiniteSamples, checked((int)samples));
                 if (!string.IsNullOrEmpty(triggerTerminal))
                 {
                     task.Triggers.StartTrigger.ConfigureDigitalEdgeTrigger(triggerTerminal, DigitalEdgeStartTriggerEdge.Rising);
@@ -146,26 +205,13 @@ namespace OpenRigs.Zapit
                             $"(lib-open-rigs' fixed ZapitDaq.TriggerFilterSeconds, {ZapitDaq.TriggerFilterSeconds} s): this card or line cannot filter its start trigger. {e.Message}", e);
                     }
                 }
-                task.Stream.WriteRegenerationMode = WriteRegenerationMode.AllowRegeneration;
-                new AnalogMultiChannelWriter(task.Stream).WriteMultiSample(false, samples);
-                task.Start();
-                clocked = task;
+                return task;
             }
             catch
             {
                 task.Dispose();
                 throw;
             }
-        }
-
-        public void WriteAt(double[,] samples, long firstSample)
-        {
-            ZapitDeviceChecks.Range(samples);
-            if (clocked == null) throw new InvalidOperationException("No Zapit clocked task to write into.");
-            ZapitDeviceChecks.InTime(firstSample, clocked.Stream.TotalSamplesGeneratedPerChannel, clocked.Stream.Buffer.OutputOnBoardBufferSize);
-            clocked.Stream.WriteRelativeTo = WriteRelativeTo.FirstSample;
-            clocked.Stream.WriteOffset = checked((int)firstSample);
-            new AnalogMultiChannelWriter(clocked.Stream).WriteMultiSample(false, samples);
         }
 
         public long SamplesGenerated => clocked?.Stream.TotalSamplesGeneratedPerChannel ?? 0;
@@ -184,6 +230,7 @@ namespace OpenRigs.Zapit
             {
                 clocked.Dispose();
                 clocked = null;
+                writer = null;
             }
         }
 
@@ -215,21 +262,32 @@ namespace OpenRigs.Zapit
         public void Dispose() => StopClocked();
     }
 
+
     /// <summary>
     /// The simulated twin of the NI DAQ: keeps state only, with NI's refusals. A finite task generates at its rate on
-    /// <see cref="Clock"/> from its trigger, which comes at arming when <see cref="AutoTrigger"/> is set and otherwise
-    /// from <see cref="Trigger"/>.
+    /// <see cref="Clock"/> from its trigger, which comes at its start when <see cref="AutoTrigger"/> is set and otherwise
+    /// from <see cref="Trigger"/>. A streamed task (<see cref="CreateFinite"/>) does not regenerate, as NI's: a generation
+    /// that catches up with the samples written stops there with an error (reported by <see cref="IsDone"/>, a write, or
+    /// <see cref="StopClocked"/>), the lines holding the last sample generated (<see cref="Outputs"/>); a write after the
+    /// start ending more than <see cref="WriteAheadLimitSamples"/> past the generation is refused, where NI's would block.
     /// </summary>
     public sealed class SimulatedZapitDevice : IZapitDevice
     {
+        readonly object sync = new object();   // ZapitDaq calls from its threads, a test triggers and waits from its own
         readonly Stopwatch stopwatch = Stopwatch.StartNew();
         double rate;
         double? triggeredAt;
+        bool started, streamed, underflowReported;
+        long total, written;
+        double lastWrite;   // host ms
+        const double QuietMs = 30;
+        long? underflowAt;
+        double[] held = new double[4];   // the lines when no clocked task generates
 
         /// <summary>The simulated time, in seconds; the host's stopwatch unless a test sets it.</summary>
         public Func<double> Clock { get; set; }
 
-        /// <summary>Whether an armed task triggers at once (a desk run with no Harp line); tests clear it and call <see cref="Trigger"/>.</summary>
+        /// <summary>Whether a started task triggers at once (a desk run with no Harp line); tests clear it and call <see cref="Trigger"/>.</summary>
         public bool AutoTrigger { get; set; } = true;
 
         /// <summary>The photodiode volts for a laser control volts.</summary>
@@ -241,14 +299,16 @@ namespace OpenRigs.Zapit
         /// <summary>How many clocked tasks an on-demand write deleted.</summary>
         public int ClockedTasksDeleted { get; private set; }
 
-        /// <summary>The last clocked task's buffer, with what <see cref="WriteAt"/> changed.</summary>
+        /// <summary>The last clocked task's samples: all of an armed one, a streamed one's as written (unwritten ones 0).</summary>
         public double[,]? LastBuffer { get; private set; }
 
         /// <summary>The samples the last clocked task had generated when it was stopped.</summary>
         public long LastSamplesGenerated { get; private set; }
 
-        /// <summary>The onboard FIFO's samples per channel, already beyond reach of <see cref="WriteAt"/>, as NI's: 0 with no
-        /// clocked task (whatever is set); 0 by default.</summary>
+        /// <summary>The samples per channel the clocked task holds (written, for a streamed one).</summary>
+        public long SamplesWritten { get { lock (sync) return HasClockedTask ? written : 0; } }
+
+        /// <summary>The onboard FIFO's samples per channel, as NI's: 0 with no clocked task (whatever is set); 0 by default.</summary>
         public long OnboardSamples
         {
             get { return HasClockedTask ? onboardSamples : 0; }
@@ -256,6 +316,41 @@ namespace OpenRigs.Zapit
         }
 
         long onboardSamples;
+
+        /// <summary>The most samples a write after the start may end past the generation (0, the default: no limit); NI's
+        /// write blocks beyond about the onboard FIFO and the USB transfers in flight (about 8000 on B2's USB-6453).</summary>
+        public long WriteAheadLimitSamples { get; set; }
+
+        /// <summary>The most samples one write held once its streamed task had started.</summary>
+        public int LargestStartedWrite { get; private set; }
+
+        /// <summary>The highest laser volts any streamed write ended on: the sample a DAQ that ran out of samples there would hold.</summary>
+        public double MaxLaserAtWriteEnd { get; private set; }
+
+        /// <summary>The sample the lines held when a streamed task last ran out of samples (null before any did).</summary>
+        public double[]? HeldAtUnderflow { get; private set; }
+
+        /// <summary>How many streamed tasks ran out of samples.</summary>
+        public int Underflows { get; private set; }
+
+        /// <summary>How far short of the samples written <see cref="SamplesGenerated"/> stays once a streamed task has run out
+        /// of samples (0 by default): on B2's USB-6453 NI's count once stayed short of a cut trial's end (26 Nov 2026; forced
+        /// underflows read about 52 past the samples written), so only <see cref="IsDone"/>, a write
+        /// or the stop reported the end.</summary>
+        public long UnderflowCountShortSamples { get; set; }
+
+        /// <summary>What the four lines hold now: the clocked task's last sample generated, held once it stops, or the last on-demand write.</summary>
+        public double[] Outputs
+        {
+            get
+            {
+                lock (sync)
+                {
+                    var generated = Generated();
+                    return HasClockedTask && generated > 0 ? Column(generated - 1) : (double[])held.Clone();
+                }
+            }
+        }
 
         /// <summary>The last clocked task's trigger terminal.</summary>
         public string? LastTriggerTerminal { get; private set; }
@@ -266,64 +361,186 @@ namespace OpenRigs.Zapit
         /// <summary>The trigger's rising edge.</summary>
         public void Trigger()
         {
-            if (HasClockedTask && triggeredAt == null) triggeredAt = Clock();
+            lock (sync)
+                if (HasClockedTask && started && triggeredAt == null) triggeredAt = Clock();
+        }
+
+        /// <summary>Waits until a streamed task holds <paramref name="aheadSamples"/> past its generation (or all its samples),
+        /// or is not generating, or its writer has written nothing for 30 ms with samples still to generate (its stream ends
+        /// there): a test moving <see cref="Clock"/> by steps lets ZapitDaq's feeder keep up, as the host's clock does. False
+        /// when <paramref name="timeoutMs"/> passes first.</summary>
+        public bool AwaitWritesAhead(long aheadSamples, int timeoutMs = 5000)
+        {
+            var watch = Stopwatch.StartNew();
+            while (true)
+            {
+                lock (sync)
+                {
+                    if (!HasClockedTask || !streamed || triggeredAt == null) return true;
+                    var generated = Generated();
+                    if (underflowAt != null || written >= Math.Min(total, generated + aheadSamples)) return true;
+                    // The writer stopped short of that with samples still to generate: its stream ends there (an early stop).
+                    if (written > generated && watch.ElapsedMilliseconds > QuietMs && stopwatch.Elapsed.TotalMilliseconds - lastWrite > QuietMs) return true;
+                }
+                if (watch.ElapsedMilliseconds > timeoutMs) return false;
+                Thread.Sleep(0);
+            }
         }
 
         /// <inheritdoc/>
         public void WriteOnDemand(double[] volts)
         {
             ZapitDeviceChecks.Range(volts);
-            if (HasClockedTask)
+            lock (sync)
             {
-                ClockedTasksDeleted++;
-                StopClocked();
+                try
+                {
+                    if (HasClockedTask)
+                    {
+                        ClockedTasksDeleted++;
+                        StopClocked();
+                    }
+                }
+                finally
+                {
+                    held = (double[])volts.Clone();
+                    OnDemandWrites.Add((double[])volts.Clone());
+                }
             }
-            OnDemandWrites.Add((double[])volts.Clone());
         }
 
         /// <inheritdoc/>
         public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal)
         {
             ZapitDeviceChecks.Range(samples);
+            lock (sync)
+            {
+                Create(samples.GetLength(1), sampleRate, triggerTerminal);
+                LastBuffer = (double[,])samples.Clone();
+                written = total;
+                StartClocked();
+            }
+        }
+
+        /// <inheritdoc/>
+        public void CreateFinite(long samples, double sampleRate, string triggerTerminal)
+        {
+            lock (sync)
+            {
+                if (samples < 1) throw new InvalidOperationException("A Zapit clocked task needs at least one sample.");
+                Create(samples, sampleRate, triggerTerminal);
+                LastBuffer = new double[4, samples];
+                streamed = true;
+            }
+        }
+
+        void Create(long samples, double sampleRate, string triggerTerminal)
+        {
             if (HasClockedTask) throw ZapitDeviceChecks.Reserved();
             if (!(sampleRate > 0)) throw new InvalidOperationException("A Zapit clocked task needs a sample rate above 0.");
             rate = sampleRate;
-            LastBuffer = (double[,])samples.Clone();
+            total = samples;
+            written = 0;
+            streamed = started = underflowReported = false;
+            underflowAt = null;
+            triggeredAt = null;
             LastTriggerTerminal = triggerTerminal;
             HasClockedTask = true;
-            triggeredAt = AutoTrigger ? Clock() : (double?)null;
         }
 
         /// <inheritdoc/>
-        public void WriteAt(double[,] samples, long firstSample)
+        public void Write(double[,] samples)
         {
             ZapitDeviceChecks.Range(samples);
-            if (!HasClockedTask) throw new InvalidOperationException("No Zapit clocked task to write into.");
-            var buffer = LastBuffer!;
-            if (firstSample < SamplesGenerated) throw new InvalidOperationException($"Zapit sample {firstSample} was already generated.");
-            ZapitDeviceChecks.InTime(firstSample, SamplesGenerated, OnboardSamples);
-            if (firstSample + samples.GetLength(1) > buffer.GetLength(1)) throw new InvalidOperationException("A Zapit write runs past the end of the buffer.");
-            for (int channel = 0; channel < 4; channel++)
-                for (int i = 0; i < samples.GetLength(1); i++) buffer[channel, firstSample + i] = samples[channel, i];
+            lock (sync)
+            {
+                if (!HasClockedTask || !streamed) throw new InvalidOperationException("No streamed Zapit task to write to.");
+                int count = samples.GetLength(1);
+                if (triggeredAt != null)
+                {
+                    var generated = Generated();
+                    if (underflowAt != null) throw ReportUnderflow();
+                    if (WriteAheadLimitSamples > 0 && written + count - generated > WriteAheadLimitSamples)
+                        throw new InvalidOperationException($"A Zapit write of {count} samples would end {written + count - generated} samples past the generation, beyond the twin's WriteAheadLimitSamples ({WriteAheadLimitSamples}): NI's write would block.");
+                }
+                if (written + count > total) throw new InvalidOperationException("A Zapit write runs past the end of the task's samples.");
+                if (started) LargestStartedWrite = Math.Max(LargestStartedWrite, count);
+                MaxLaserAtWriteEnd = Math.Max(MaxLaserAtWriteEnd, samples[2, count - 1]);
+                var buffer = LastBuffer!;
+                for (int channel = 0; channel < 4; channel++)
+                    for (int i = 0; i < count; i++) buffer[channel, written + i] = samples[channel, i];
+                written += count;
+                lastWrite = stopwatch.Elapsed.TotalMilliseconds;
+            }
         }
 
         /// <inheritdoc/>
-        public long SamplesGenerated => !HasClockedTask || triggeredAt == null ? 0
-            : Math.Min(LastBuffer!.GetLength(1), (long)Math.Floor((Clock() - triggeredAt.Value) * rate + 1e-9));
+        public void StartClocked()
+        {
+            lock (sync)
+            {
+                if (!HasClockedTask) throw new InvalidOperationException("No Zapit clocked task to start.");
+                if (written == 0) throw new InvalidOperationException("A streamed Zapit task cannot start with no samples written.");
+                started = true;
+                triggeredAt = AutoTrigger ? Clock() : (double?)null;
+            }
+        }
+
+        // The samples generated, noting an underflow: a streamed task stops where its samples run out.
+        long Generated()
+        {
+            if (!HasClockedTask || triggeredAt == null) return 0;
+            if (underflowAt != null) return Math.Max(0, underflowAt.Value - UnderflowCountShortSamples);
+            var generated = Math.Min(total, (long)Math.Floor((Clock() - triggeredAt.Value) * rate + 1e-9));
+            if (generated <= written) return generated;
+            underflowAt = written;
+            HeldAtUnderflow = written > 0 ? Column(written - 1) : new double[4];
+            Underflows++;
+            return written;
+        }
+
+        InvalidOperationException ReportUnderflow()
+        {
+            underflowReported = true;
+            return new InvalidOperationException($"The twin's generation caught up with the {underflowAt} samples written of {total} and stopped, the lines holding the last sample (NI: the generation has stopped to prevent the regeneration of old samples).");
+        }
+
+        double[] Column(long i) => Enumerable.Range(0, 4).Select(c => LastBuffer![c, i]).ToArray();
+
+        /// <inheritdoc/>
+        public long SamplesGenerated { get { lock (sync) return Generated(); } }
 
         /// <inheritdoc/>
         public bool HasClockedTask { get; private set; }
 
         /// <inheritdoc/>
-        public bool IsDone => !HasClockedTask || SamplesGenerated >= LastBuffer!.GetLength(1);
+        public bool IsDone
+        {
+            get
+            {
+                lock (sync)
+                {
+                    if (!HasClockedTask) return true;
+                    var generated = Generated();
+                    if (underflowAt != null) throw ReportUnderflow();
+                    return generated >= total;
+                }
+            }
+        }
 
         /// <inheritdoc/>
         public void StopClocked()
         {
-            if (!HasClockedTask) return;
-            LastSamplesGenerated = SamplesGenerated;
-            HasClockedTask = false;
-            triggeredAt = null;
+            lock (sync)
+            {
+                if (!HasClockedTask) return;
+                var generated = Generated();
+                LastSamplesGenerated = generated;
+                if (generated > 0) held = Column(generated - 1);   // NI's lines hold the last sample
+                HasClockedTask = false;
+                triggeredAt = null;
+                if (underflowAt != null && !underflowReported) throw ReportUnderflow();   // NI's Stop reports the error
+            }
         }
 
         /// <inheritdoc/>

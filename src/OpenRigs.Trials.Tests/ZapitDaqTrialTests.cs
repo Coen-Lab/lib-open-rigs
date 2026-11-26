@@ -48,10 +48,11 @@ namespace OpenRigs.Trials.Tests
         {
             var timed = new TimedTrial { TrialNumber = 1, LaserCondition = 3, LaserOn = true, LaserPowerMw = 4.5 };
             var untimed = new Trial { TrialNumber = 2, LaserCondition = 2, LaserOn = false, LaserPowerMw = 4.5 };
-            CollectionAssert.AreEqual(new[] { "Arm(trial=1, condition=3, laserOn=True, power=4.5, duration=1.5)", "Arm(trial=2, condition=2, laserOn=False, power=0, duration=0)" },
+            CollectionAssert.AreEqual(new[] { "Arm(trial=1, condition=3, laserOn=True, power=4.5, duration=1.5, untilStopped=False)", "Arm(trial=2, condition=2, laserOn=False, power=0, duration=0, untilStopped=False)" },
                 Arms(false, ArmEvent(timed, 0), ArmEvent(untimed, 0)));
-            // Played until stopped: the Arm event's LaserSeconds (its cap, or its stimulus's own off), not the trial's own duration.
-            CollectionAssert.AreEqual(new[] { "Arm(trial=1, condition=3, laserOn=True, power=4.5, duration=1.6)", "Arm(trial=2, condition=2, laserOn=False, power=0, duration=0)" },
+            // Played until stopped: the Arm event's LaserSeconds (its cap, or its stimulus's own off), not the trial's own duration, and
+            // UntilStopped, so ZapitDaq streams it for its early stop.
+            CollectionAssert.AreEqual(new[] { "Arm(trial=1, condition=3, laserOn=True, power=4.5, duration=1.6, untilStopped=True)", "Arm(trial=2, condition=2, laserOn=False, power=0, duration=0, untilStopped=True)" },
                 Arms(true, ArmEvent(timed, 1.6), ArmEvent(untimed, 0)));
             var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitDaqTrial.Arm(new Trial { TrialNumber = 4, LaserCondition = 0 }));
             StringAssert.Contains(ex.Message, "Trial 4 has laser condition 0");

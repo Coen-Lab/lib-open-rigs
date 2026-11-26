@@ -40,7 +40,8 @@ namespace OpenRigs.Trials
 
         /// <summary>A trial's Arm command: its condition, the laser on at its power or off, for its laser duration (an
         /// ILaserDurationTrial) unless untilStopped (LaserTiming.UntilStopped), else for laserSeconds, the most it plays before an
-        /// early stop (its Arm event's LaserSeconds; 0 until the early stop, at most maxTrialSeconds).</summary>
+        /// early stop (its Arm event's LaserSeconds; 0 until the early stop, at most maxTrialSeconds). With untilStopped the
+        /// Arm says UntilStopped, so ZapitDaq streams the trial and its early stop ramps within ZapitDaq.EarlyStopLeadSeconds.</summary>
         public static ZapitDaqCommand Arm(IZapitTrial trial, bool untilStopped = false, double laserSeconds = 0)
         {
             if (trial.LaserCondition < 1) throw new InvalidOperationException(string.Format("Trial {0} has laser condition {1}; a laser trial's is from 1.", trial.TrialNumber, trial.LaserCondition));
@@ -53,6 +54,7 @@ namespace OpenRigs.Trials
                 LaserOn = trial.LaserOn,
                 PowerMw = trial.LaserOn ? trial.LaserPowerMw : 0,
                 DurationSeconds = timed != null && !untilStopped ? timed.LaserDurationSeconds : laserSeconds,
+                UntilStopped = untilStopped,
             };
         }
 

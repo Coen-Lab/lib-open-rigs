@@ -57,6 +57,11 @@ namespace OpenRigs.Zapit
         /// <summary>Arm: the stimulus before its ramp, in seconds; 0 runs until the outcome, finite at maxTrialSeconds.</summary>
         public double DurationSeconds { get; set; }
 
+        /// <summary>Arm: whether an EarlyStop may end the trial before DurationSeconds (a laser played until stopped:
+        /// LaserTiming.UntilStopped). Such a trial, and one with DurationSeconds 0, is streamed, so an early stop ramps within
+        /// <see cref="ZapitDaq.EarlyStopLeadSeconds"/>; any other is written whole before its trigger and ends where it was armed to.</summary>
+        public bool UntilStopped { get; set; }
+
         /// <summary>Point, Staircase: galvo X, in volts.</summary>
         public double GalvoXVolts { get; set; }
 
@@ -76,7 +81,7 @@ namespace OpenRigs.Zapit
         public override string ToString() => Kind switch
         {
             ZapitDaqCommandKind.LoadBank => $"LoadBank({Path})",
-            ZapitDaqCommandKind.Arm => $"Arm(trial={Trial}, condition={Condition}, laserOn={LaserOn}, power={PowerMw}, duration={DurationSeconds})",
+            ZapitDaqCommandKind.Arm => $"Arm(trial={Trial}, condition={Condition}, laserOn={LaserOn}, power={PowerMw}, duration={DurationSeconds}, untilStopped={UntilStopped})",
             ZapitDaqCommandKind.EarlyStop => $"EarlyStop(trial={Trial})",
             ZapitDaqCommandKind.Point => $"Point({GalvoXVolts}, {GalvoYVolts}, laser={LaserVolts})",
             ZapitDaqCommandKind.Staircase => $"Staircase({LaserLevelsVolts?.Length} levels x {SamplesPerLevel})",
@@ -105,6 +110,12 @@ namespace OpenRigs.Zapit
         StaircaseRead,
         /// <summary>A command was refused and nothing written; the session runs on (<see cref="ZapitDaqEvent.Detail"/> says why).</summary>
         Refused,
+        /// <summary>A streamed trial's DAQ ran out of samples, or failed, before its ramp's end: every line was zeroed at once,
+        /// so the laser ended without its ramp (from 0 V: every write ends on a laser sample at 0 V, which the DAQ held). This
+        /// is the trial's last event. After an underflow the session runs on, unless it is the session's
+        /// <see cref="ZapitDaq.UnderflowLimit"/>th (<see cref="ZapitDaqEvent.Underflows"/>) or the DAQ failed otherwise: then
+        /// the workflow's error follows. <see cref="ZapitDaqEvent.Detail"/> says which, and what the DAQ reported.</summary>
+        Underflowed,
     }
 
     /// <summary>One event from <see cref="ZapitDaq"/>.</summary>
@@ -146,13 +157,31 @@ namespace OpenRigs.Zapit
         /// <summary>Armed: how long building, writing and starting the task took, in seconds.</summary>
         public double ArmSeconds { get; set; }
 
+        /// <summary>Trial events: whether the trial is streamed (an Arm with UntilStopped or no duration) or written whole.</summary>
+        public bool Streamed { get; set; }
+
+        /// <summary>Ended, Stopped of a streamed trial: the fewest samples per channel written ahead of the generation the
+        /// feeder saw while samples were still to write (an underflow is 0); -1 for a trial written whole.</summary>
+        public long MinSamplesAhead { get; set; } = -1;
+
+        /// <summary>Stopped by an early stop of a streamed trial: the samples generated when the EarlyStop came (-1 otherwise).
+        /// Its ramp starts at <see cref="RampFrom"/>, less than <see cref="ZapitDaq.EarlyStopLeadSeconds"/> later.</summary>
+        public long EarlyStopAt { get; set; } = -1;
+
+        /// <summary>Stopped by an early stop of a streamed trial: the sample its ramp starts at, a scan-cycle boundary (-1 otherwise).</summary>
+        public long RampFrom { get; set; } = -1;
+
+        /// <summary>The session's underflows so far, an Underflowed event's own included; the
+        /// <see cref="ZapitDaq.UnderflowLimit"/>th stops the workflow.</summary>
+        public int Underflows { get; set; }
+
         /// <summary>BankLoaded: the bank.</summary>
         public ZapitBank? Bank { get; set; }
 
         /// <summary>StaircaseRead: the photodiode volts, one per AO sample.</summary>
         public double[]? AnalogIn { get; set; }
 
-        /// <summary>Refused: why.</summary>
+        /// <summary>Refused: why. Underflowed: what the DAQ reported, and whether the session runs on.</summary>
         public string? Detail { get; set; }
 
         /// <inheritdoc/>

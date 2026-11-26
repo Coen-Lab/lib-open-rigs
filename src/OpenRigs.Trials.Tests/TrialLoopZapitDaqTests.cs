@@ -61,6 +61,28 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(2, rig.RunTo(TrialEventKind.Arm).Trial.TrialNumber);
         }
 
+        // 26 Nov 2026, zero, log and carry on: a streamed trial that ran out of samples ends on ZapitDaq's Underflowed
+        // event (logged by TaskLogsZapitDaq), and the loop runs on: the trial's outcome and the next trial's arm and trigger
+        // come as without it. ZapitDaq itself stops the workflow at its UnderflowLimit.
+        [TestMethod]
+        public void AnUnderflowedTrialLeavesTheLoopRunning()
+        {
+            var rig = new LoopRig(Rules(), zapitDaq: true);
+            var arm = rig.RunTo(TrialEventKind.Arm);
+            rig.Armed(arm.Trial, 1.5);
+            rig.RunTo(TrialEventKind.Trigger);
+            rig.Started(arm.Trial);
+            rig.Loop.OnZapitEvent(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Underflowed, Trial = arm.Trial.TrialNumber, Streamed = true, MinSamplesAhead = 0, Underflows = 1 });
+            rig.RunTo(TrialEventKind.Stimulus);
+            rig.Lick(0);
+            var times = rig.Of(TrialEventKind.Outcome).Single().Outcome.Times;
+            Assert.IsTrue(times.LaserStarted, "its samples were generated");
+            var next = rig.RunTo(TrialEventKind.Arm);
+            Assert.AreEqual(2, next.Trial.TrialNumber);
+            rig.Armed(next.Trial, 1.5);
+            Assert.AreEqual(2, rig.RunTo(TrialEventKind.Trigger).Trial.TrialNumber);
+        }
+
         // Audit 24 Nov 2026 C1: the trigger line went up but ZapitDaq never generated the trial (no Started; it ends Stopped
         // or Zeroed with 0 samples), so the row must not claim the laser fired.
         [TestMethod]
@@ -223,47 +245,18 @@ namespace OpenRigs.Trials.Tests
             StringAssert.Contains(stop.Message, "Trial 2 cannot arm while trial 1 still plays");
         }
 
-        /// <summary>The simulated twin with NI-DAQmx's write into a running buffer: DAQmx waits for space in the buffer, so a
-        /// WriteAt returns only once the samples it would overwrite have been generated, too late to change them (the clock moves
-        /// on to then, as the workflow's thread waited on the rig).</summary>
-        sealed class NiWriteDevice : IZapitDevice
-        {
-            public readonly SimulatedZapitDevice Twin;
-            readonly Action advance;
-
-            public NiWriteDevice(SimulatedZapitDevice twin, Action advance)
-            {
-                Twin = twin;
-                this.advance = advance;
-            }
-
-            public void WriteAt(double[,] samples, long firstSample)
-            {
-                while (!Twin.IsDone && Twin.SamplesGenerated < firstSample + samples.GetLength(1)) advance();
-            }
-
-            public void WriteOnDemand(double[] volts) { Twin.WriteOnDemand(volts); }
-            public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal) { Twin.ArmFinite(samples, sampleRate, triggerTerminal); }
-            public long SamplesGenerated { get { return Twin.SamplesGenerated; } }
-            public long OnboardSamples { get { return Twin.OnboardSamples; } }
-            public bool HasClockedTask { get { return Twin.HasClockedTask; } }
-            public bool IsDone { get { return Twin.IsDone; } }
-            public void StopClocked() { Twin.StopClocked(); }
-            public double[] Staircase(double[,] samples, double sampleRate) { return Twin.Staircase(samples, sampleRate); }
-            public void Dispose() { Twin.Dispose(); }
-        }
-
         // Rig, 25 Nov 2026 (laserEnd stimulusOff, laserDurationSeconds 2, maxTrialSeconds 3): the loop's LaserOff and so the
         // EarlyStop came at StimulusOff, but every trial was Armed with no duration and NI could not rewrite its buffer in time, so
         // the laser played the whole 3 s buffer (Stopped at 297901 of 300000 samples, logged at the next trial's Arm, at the
         // outcome). A stimulus with its own off is armed to end there: its samples and ramp end by themselves, early stop or not.
+        // Such a trial (UntilStopped) is streamed now, so an EarlyStop sooner would ramp within ZapitDaq.EarlyStopLeadSeconds;
+        // the twin moves by 1 ms ticks, each once the feeder has 5000 samples written ahead, as the host clock lets it.
         [TestMethod]
-        public void AStimulusOffLaserEndsAtItsStimulusOffThoughNiCannotRewriteTheBuffer()
+        public void AStimulusOffLaserEndsAtItsStimulusOff()
         {
             var bank = ZapitDaqTrialTests.UnpackBank();
             double clock = 0;
-            var device = new NiWriteDevice(new SimulatedZapitDevice { AutoTrigger = false, Clock = () => System.Threading.Volatile.Read(ref clock) },
-                () => System.Threading.Volatile.Write(ref clock, System.Threading.Volatile.Read(ref clock) + 0.001));
+            var device = new SimulatedZapitDevice { AutoTrigger = false, WriteAheadLimitSamples = 8000, Clock = () => System.Threading.Volatile.Read(ref clock) };
             var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 3, TriggerTerminal = "/Dev1/PFI0", CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
             var hold = ZapitDaqTrial.FreeAfterLaserSeconds(ZapitBank.Load(bank)) + ZapitDaq.EarlyStopLeadSeconds;
             var commands = new Subject<ZapitDaqCommand>();
@@ -286,7 +279,8 @@ namespace OpenRigs.Trials.Tests
                     var before = rig.Events.Count;
                     rig.Tick();
                     System.Threading.Volatile.Write(ref clock, Math.Max(System.Threading.Volatile.Read(ref clock), rig.Now));
-                    if (trigger) device.Twin.Trigger();   // the line's edge, a tick late
+                    Assert.IsTrue(device.AwaitWritesAhead(5000), "the feeder fell behind");
+                    if (trigger) device.Trigger();   // the line's edge, a tick late
                     trigger = false;
                     foreach (var e in rig.Events.Skip(before).ToList())
                     {
