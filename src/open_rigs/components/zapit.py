@@ -31,7 +31,6 @@ ZAPIT_MAX_RAMP_DOWN_SECONDS = 0.5
 # The validation context key a task model reads its conditions file's largest ramp-down from (open_rigs.rigs.check_task
 # puts it there on the rig, where the file is); without it the workflow checks the file at Go.
 RAMP_DOWN_CONTEXT = "zapit_ramp_down_seconds"
-SAFETY_LAYERS = ("software", "hardware")
 
 
 def ramp_down_from(context) -> float:
@@ -67,24 +66,6 @@ def bank_ramp_down_seconds(bank: str | Path) -> float:
     return max(ramps)
 
 
-class SafetyGate(BaseSchema):
-    """The laser safety layers this rig was scope-checked with (plan: Safety)."""
-
-    layer: str = Field(
-        pattern="^(software|hardware)$",
-        description="software: the scope check of the node's finite buffers and zero on stop, and the agent's backstop, passed; hardware: the NI AO watchdog or the OBIS enable line scoped too. The launching app refuses Go on a rig without it.",
-    )
-    hardware_kind: Optional[str] = Field(default=None, description="The hardware layer built, such as aoWatchdog or obisEnable.")
-    date: Optional[str] = Field(default=None, description="The day of the scope check, YYYY-MM-DD.")
-    scope_capture: Optional[str] = Field(default=None, description="Where the scope capture is kept.")
-
-    @field_validator("date", mode="before")
-    @classmethod
-    def _date_as_text(cls, value):
-        # An unquoted YAML date loads as a date in Python and as text in the workflow's reader.
-        return value.isoformat() if isinstance(value, datetime.date) else value
-
-
 class ZapitCamera(BaseSchema):
     """Zapit's Basler camera, opened with stock Bonsai.Pylon PylonCapture from a camera settings (.pfs) file. Its frames
     are paired with the Behavior board camera trigger whose wiring line names Camera-Zapit in targets."""
@@ -103,7 +84,7 @@ class ZapitCamera(BaseSchema):
 # The Zapit-Bonsai fields a block naming its NI device (zapit.device) must all give.
 ZAPIT_DAQ_REQUIRED = ("device", "galvo_x_channel", "galvo_y_channel", "laser_channel", "led_channel", "photodiode_channel",
                       "trigger_channel", "sample_rate", "laser_min_max_mw", "laser_min_max_control_volts", "ceiling_mw",
-                      "max_trial_seconds", "microns_per_pixel", "volts_per_pixel", "safety_gate", "camera")
+                      "max_trial_seconds", "microns_per_pixel", "volts_per_pixel", "camera")
 
 
 class Zapit(BaseSchema):
@@ -135,7 +116,6 @@ class Zapit(BaseSchema):
     volts_per_pixel: Optional[float] = Field(default=None, gt=0, description="The galvos' volts a camera pixel, the scanner calibration's starting guess.")
     invert_x_scanner: bool = Field(default=False, description="Whether the X galvo moves against the camera's X.")
     invert_y_scanner: bool = Field(default=False, description="Whether the Y galvo moves against the camera's Y.")
-    safety_gate: Optional[SafetyGate] = Field(default=None, description="The laser safety layers this rig was scope-checked with.")
     camera: Optional[ZapitCamera] = Field(default=None, description="Zapit's Basler camera, Camera-Zapit in the data and live view.")
 
     @property

@@ -45,7 +45,6 @@ namespace OpenRigs.Devices.Tests
             CollectionAssert.AreEqual(new[] { 0.3, -0.12, 0.25 }, zapit.BlankingTimesMs.ToArray());
             Assert.AreEqual("/Dev1/PFI0", zapit.TriggerTerminal);
             Assert.AreEqual(100000.0, zapit.SampleRate);
-            Assert.AreEqual("software", zapit.SafetyGate.Layer);
             Assert.AreEqual("calibration/Zapit-Session.pfs", zapit.Camera.SessionPfsPath);
             Assert.AreEqual(5.0, zapit.LaserMaxControlVolts);
         }

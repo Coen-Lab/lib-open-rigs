@@ -16,11 +16,9 @@ import yaml
 
 from open_rigs.zapit.laser import LaserCalibration
 
-SAFETY_LAYERS = ("software", "hardware")
-
 _REQUIRED = ("device", "galvoXChannel", "galvoYChannel", "laserChannel", "ledChannel", "photodiodeChannel",
              "triggerChannel", "sampleRate", "laserMinMaxMw", "laserMinMaxControlVolts", "ceilingMw",
-             "maxTrialSeconds", "micronsPerPixel", "voltsPerPixel", "safetyGate", "camera")
+             "maxTrialSeconds", "micronsPerPixel", "voltsPerPixel", "camera")
 _OPTIONAL = ("invertXScanner", "invertYScanner", "blankingTimesMs")
 _LEGACY = ("host", "port", "hardwareTriggered")
 MATLAB_BLANKING_MS = (0.3, -0.12, 0.25)
@@ -29,14 +27,6 @@ _CAMERA = ("serialNumber", "sessionPfsPath", "calibrationPfsPath")
 
 class ZapitConfigError(ValueError):
     pass
-
-
-@dataclass(frozen=True)
-class SafetyGate:
-    layer: str                      # "software" or "hardware"
-    hardware_kind: str | None = None
-    date: str | None = None
-    scope_capture: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,7 +52,6 @@ class ZapitRig:
     max_trial_seconds: float        # a task's LaserCapSeconds above this is refused at Go
     microns_per_pixel: float
     volts_per_pixel: float
-    safety_gate: SafetyGate
     camera: ZapitCamera
     invert_x_scanner: bool = False
     invert_y_scanner: bool = False
@@ -111,11 +100,6 @@ class ZapitRig:
                     isinstance(x, bool) or not isinstance(x, (int, float)) for x in v) or v[0] <= 0):
                 raise ZapitConfigError("zapit.blankingTimesMs must be three numbers, the first positive")
             blanking = (float(v[0]), float(v[1]), float(v[2]))
-        g = b["safetyGate"]
-        if not isinstance(g, dict) or g.get("layer") not in SAFETY_LAYERS:
-            raise ZapitConfigError(f"zapit.safetyGate.layer must be one of {', '.join(SAFETY_LAYERS)}")
-        gate = SafetyGate(g["layer"], g.get("hardwareKind"), None if g.get("date") is None else str(g["date"]),
-                          g.get("scopeCapture"))
         c = b["camera"]
         if not isinstance(c, dict) or set(c) - set(_CAMERA) or any(
                 not isinstance(c.get(k, "x"), str) or not c.get(k, "x").strip() for k in _CAMERA):
@@ -127,7 +111,7 @@ class ZapitRig:
         rig = cls(text("device"), text("galvoXChannel"), text("galvoYChannel"), text("laserChannel"),
                   text("ledChannel"), text("photodiodeChannel"), text("triggerChannel"), num("sampleRate"), mw, cv,
                   num("ceilingMw", positive=False), num("maxTrialSeconds"),
-                  num("micronsPerPixel"), num("voltsPerPixel"), gate, camera, flag("invertXScanner"),
+                  num("micronsPerPixel"), num("voltsPerPixel"), camera, flag("invertXScanner"),
                   flag("invertYScanner"), blanking)
         return rig
 

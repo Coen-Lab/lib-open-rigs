@@ -1300,49 +1300,6 @@
       "title": "RunningWheel",
       "type": "object"
     },
-    "SafetyGate": {
-      "description": "The laser safety layers this rig was scope-checked with (plan: Safety).",
-      "properties": {
-        "layer": {
-          "description": "software: the scope check of the node's finite buffers and zero on stop, and the agent's backstop, passed; hardware: the NI AO watchdog or the OBIS enable line scoped too. The launching app refuses Go on a rig without it.",
-          "pattern": "^(software|hardware)$",
-          "title": "Layer",
-          "type": "string"
-        },
-        "hardwareKind": {
-          "default": null,
-          "description": "The hardware layer built, such as aoWatchdog or obisEnable.",
-          "title": "HardwareKind",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "date": {
-          "default": null,
-          "description": "The day of the scope check, YYYY-MM-DD.",
-          "title": "Date",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "scopeCapture": {
-          "default": null,
-          "description": "Where the scope capture is kept.",
-          "title": "ScopeCapture",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "layer"
-      ],
-      "title": "SafetyGate",
-      "type": "object"
-    },
     "Side": {
       "description": "Which side of the animal a line serves.",
       "enum": [
@@ -2053,19 +2010,6 @@
           "description": "Whether the Y galvo moves against the camera's Y.",
           "title": "InvertYScanner",
           "type": "boolean"
-        },
-        "safetyGate": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SafetyGate"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The laser safety layers this rig was scope-checked with.",
-          "title": "SafetyGate"
         },
         "camera": {
           "anyOf": [

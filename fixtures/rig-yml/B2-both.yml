@@ -153,7 +153,6 @@ zapit:
   micronsPerPixel: 19.3
   voltsPerPixel: 0.001
   blankingTimesMs: [0.3, -0.12, 0.25]
-  safetyGate: { layer: software, date: 2026-11-23 }
   camera:
     serialNumber: "00000000"
 
