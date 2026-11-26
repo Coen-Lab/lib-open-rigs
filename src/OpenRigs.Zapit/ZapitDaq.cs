@@ -504,6 +504,12 @@ namespace OpenRigs.Zapit
 
             void Staircase(ZapitDaqCommand command)
             {
+                // Between trials too: the staircase is not held to the ceiling's volts (below), so it is calibration only.
+                if (trialsArmed)
+                {
+                    Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "ZapitDaq takes no Staircase once trials are armed (after Go)." });
+                    return;
+                }
                 RefuseWhilePlaying(command);
                 var levels = command.LaserLevelsVolts;
                 if (levels == null || levels.Length == 0 || command.SamplesPerLevel < 1)

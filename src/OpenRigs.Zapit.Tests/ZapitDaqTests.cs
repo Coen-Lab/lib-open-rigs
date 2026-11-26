@@ -840,6 +840,11 @@ namespace OpenRigs.Zapit.Tests
             h.Next(ZapitDaqEventKind.Armed);
             h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 });
             StringAssert.Contains(h.Next(ZapitDaqEventKind.Refused).Detail, "no Point once trials are armed");
+            h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero });
+            h.Next(ZapitDaqEventKind.Zeroed);
+            // Between trials: the staircase is held only to LaserMaxVolts, not the ceiling's volts, so it is refused after Go.
+            h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Staircase, LaserLevelsVolts = new[] { 0.0, 1 }, SamplesPerLevel = 10 });
+            StringAssert.Contains(h.Next(ZapitDaqEventKind.Refused).Detail, "no Staircase once trials are armed");
             Assert.IsNull(h.Error);
         }
 
