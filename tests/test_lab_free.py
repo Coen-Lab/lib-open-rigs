@@ -43,7 +43,6 @@ NAMES_THE_LAB = {
     "patches/README.md": 1,
     "src/OpenRigs.Control/OpenRigs.Control.csproj": 1,
     "src/OpenRigs.Audio/OpenRigs.Audio.csproj": 1,
-    "src/OpenRigs.Core/OpenRigs.Core.csproj": 1,
     "src/OpenRigs.HarpDevices/OpenRigs.HarpDevices.csproj": 1,
     "src/OpenRigs.Manifest/OpenRigs.Manifest.csproj": 1,
     "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj": 1,
