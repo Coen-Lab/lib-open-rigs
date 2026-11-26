@@ -2,14 +2,13 @@
 trial over TCP (host, port, hardwareTriggered), and ZapitDaq (OpenRigs.Zapit), the workflow's own NI DAQ driving two
 galvos, the laser and the masking LED, with its Basler camera (the Zapit-Bonsai fields, open_rigs.zapit's key names). A blue rig
 running both carries both sets in its one zapit block."""
-import datetime
 import json
 import re
 from pathlib import Path
 from typing import List, Optional
 
 import yaml
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 from swc.aeon.schema import BaseSchema
 
 from open_rigs.core.artefacts import ArtefactPath
