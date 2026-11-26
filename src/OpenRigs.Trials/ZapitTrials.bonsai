@@ -6,7 +6,7 @@
                  xmlns:trl="clr-namespace:OpenRigs.Trials;assembly=OpenRigs.Trials"
                  xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit's trials, the same in every task: give it the trials' rules (TrialRules, once, at Go). In an optogenetics experiment (the rules' Laser, a LaserTiming, is set) each trial's StartStimulus (ArmZapit: its condition, laser on at the trial's power or off at 0 mW) goes into ZapitCommands, at the trial's Arm event on a hardware-triggered rig, else at its Trigger, all as the rules' Laser gives it. The laser's stop is the rules' Laser too: LaserTiming.ForDuration plays it for its laserDurationSeconds; LaserTiming.UntilOutcome and UntilStimulusOff (no duration) play it until StopZapit, sent once per trial from its trigger at whichever comes first of its outcome (UntilOutcome) or LaserOff (UntilStimulusOff: its StimulusOff, else its outcome), its LaserCap (the rules' LaserCapSeconds on the Harp clock) or LaserBackstop (LaserCapSeconds on the computer's clock, should the board stall: the one wall-clock wait). The ZapitTrigger line is raised at each Trigger and cleared at each TriggerOff (SetZapitTriggerLine, on BehaviorBoard-Main.Commands). TrialLoop checks Zapit's replies. Needs TrialEvents, ZapitCommands (OpenRigs.Devices ConnectForTask) and ZapitTriggerLine from the workflow.</Description>
+  <Description>Zapit's trials, the same in every task: give it the trials' rules (TrialRules, once, at Go). In an optogenetics experiment (the rules' Laser, a LaserTiming, is set) each trial's StartStimulus (ArmZapit: its condition, laser on at the trial's power or off at 0 mW) goes into ZapitCommands, at the trial's Arm event on a hardware-triggered rig, else at its Trigger, all as the rules' Laser gives it. The laser's stop is the rules' Laser too: LaserTiming.ForDuration plays it for its laserDurationSeconds; LaserTiming.UntilOutcome and UntilStimulusOff (no duration) play it until StopZapit, sent once per trial from its trigger at whichever comes first of its outcome (UntilOutcome) or LaserOff (UntilStimulusOff: its StimulusOff, else its outcome), its LaserCap (the rules' LaserCapSeconds on the Harp clock) or LaserBackstop (LaserCapSeconds on the computer's clock, should the board stall: the one wall-clock wait). In the Zapit SelectMany too, so only once given rules with a laser, the ZapitTrigger line is raised at each Trigger and cleared at each TriggerOff (SetZapitTriggerLine, on BehaviorBoard-Main.Commands): a workflow that includes ZapitTrials and ZapitDaqTrials and gives its rules to one per session writes the line once. TrialLoop checks Zapit's replies. Needs TrialEvents, ZapitCommands (OpenRigs.Devices ConnectForTask) and ZapitTriggerLine from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -215,6 +215,30 @@
                 </Edges>
               </Workflow>
             </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>TrialEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="trl:PickTrialEvents">
+                <trl:Kind>Trigger</trl:Kind>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SetZapitTriggerLine.bonsai">
+              <Set>true</Set>
+              <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>TrialEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="trl:PickTrialEvents">
+                <trl:Kind>TriggerOff</trl:Kind>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SetZapitTriggerLine.bonsai">
+              <Set>false</Set>
+              <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+            </Expression>
           </Nodes>
           <Edges>
             <Edge From="0" To="1" Label="Source1" />
@@ -233,42 +257,18 @@
             <Edge From="14" To="15" Label="Source1" />
             <Edge From="15" To="16" Label="Source1" />
             <Edge From="16" To="17" Label="Source1" />
+            <Edge From="18" To="19" Label="Source1" />
+            <Edge From="19" To="20" Label="Source1" />
+            <Edge From="21" To="22" Label="Source1" />
+            <Edge From="22" To="23" Label="Source1" />
           </Edges>
         </Workflow>
-      </Expression>
-      <Expression xsi:type="SubscribeSubject">
-        <Name>TrialEvents</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="trl:PickTrialEvents">
-          <trl:Kind>Trigger</trl:Kind>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SetZapitTriggerLine.bonsai">
-        <Set>true</Set>
-        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
-      </Expression>
-      <Expression xsi:type="SubscribeSubject">
-        <Name>TrialEvents</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="trl:PickTrialEvents">
-          <trl:Kind>TriggerOff</trl:Kind>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SetZapitTriggerLine.bonsai">
-        <Set>false</Set>
-        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
       </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
-      <Edge From="4" To="5" Label="Source1" />
-      <Edge From="5" To="6" Label="Source1" />
-      <Edge From="7" To="8" Label="Source1" />
-      <Edge From="8" To="9" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

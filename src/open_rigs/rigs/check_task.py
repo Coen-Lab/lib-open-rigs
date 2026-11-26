@@ -38,9 +38,10 @@ def model() -> type[BaseModel]:
 def context(parameters: dict, bank: str | None = None) -> dict:
     """The validation context from files the task names, where they are (the rig): with optogenetics on, the largest
     ramp-down (RAMP_DOWN_CONTEXT) of the ZapitDaq session's bank when given, else of its Zapit conditions file. None
-    readable: {}, and the workflow checks at Go."""
+    readable: {}, and the workflow checks at Go. Optogenetics is on with the lab's enabled, or with either box of a task that
+    chooses its Zapit per session (decision-making's zapitBonsai and zapitMatlab)."""
     opto = parameters.get("optogenetics") or {}
-    if not opto.get("enabled"):
+    if not (opto.get("enabled") or opto.get("zapitBonsai") or opto.get("zapitMatlab")):
         return {}
     if bank:
         try:

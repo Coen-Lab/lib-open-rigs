@@ -429,11 +429,12 @@ namespace OpenRigs.Trials.Tests
             Assert.IsTrue(outputs.IndexOf("zapit StartStimulus condition 3 hardware False duration 0") < outputs.IndexOf("zapit StopStimulus"), "Stopped before it was started: " + string.Join(", ", outputs));
         }
 
-        // Rules with no laser: no Zapit command at all.
+        // Rules with no laser: no Zapit command, and the trigger line left alone even at a Trigger event, so a workflow can include
+        // ZapitTrials and ZapitDaqTrials and give its rules to one per session (26 Nov 2026; it was written at every Trigger).
         [TestMethod]
         public void ZapitTrialsWithoutALaserSendsNoCommand()
         {
-            CollectionAssert.AreEquivalent(new[] { "line set", "line clear" }, RunZapit("None", true, 0, 0.6));
+            CollectionAssert.AreEquivalent(new string[0], RunZapit("None", true, 0, 0.6));
         }
 
         // Every laser trial has its own duration (TIMED), so an Arm's duration 0 proves UntilStopped sent none.
@@ -500,10 +501,11 @@ namespace OpenRigs.Trials.Tests
             CollectionAssert.AreEquivalent(new[] { "zapit Arm trial 1 condition 3 duration 0", "line set", "zapit Trigger trial 0", "line clear" }, RunZapitDaq("UntilOutcome", 10, 0));
         }
 
+        // As ZapitTrialsWithoutALaserSendsNoCommand: no Arm, no twin's Trigger and no line.
         [TestMethod]
         public void ZapitDaqTrialsWithoutALaserSendsNoCommand()
         {
-            CollectionAssert.AreEquivalent(new[] { "line set", "zapit Trigger trial 0", "line clear" }, RunZapitDaq("None", 0, 0.6));
+            CollectionAssert.AreEquivalent(new string[0], RunZapitDaq("None", 0, 0.6));
         }
     }
 }

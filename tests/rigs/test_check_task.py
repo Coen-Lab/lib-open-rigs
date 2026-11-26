@@ -76,3 +76,12 @@ def test_a_zapit_daq_bank_s_longest_ramp_down_is_the_context_when_given(tmp_path
     assert check_task.context(on, str(tmp_path / "gone.json")) == {}
     bank.write_text(json.dumps({"version": 1}), encoding="utf-8")  # the workflow refuses it at Go
     assert check_task.context(on, str(bank)) == {}
+
+
+def test_either_zapit_box_is_optogenetics_on(tmp_path):
+    # decision-making's two boxes in place of enabled (Zapit-Bonsai, Zapit-MATLAB; 26 Nov 2026): either ticked reads the file.
+    path = tmp_path / "conditions.yml"
+    path.write_text("stimLocations01:\n  offRampDownDuration_ms: 250\n", encoding="utf-8")
+    for box in ("zapitBonsai", "zapitMatlab"):
+        assert check_task.context({"optogenetics": {box: True, "zapitConditionsPath": str(path)}}) == {"zapit_ramp_down_seconds": 0.25}
+    assert check_task.context({"optogenetics": {"zapitBonsai": False, "zapitMatlab": False, "zapitConditionsPath": str(path)}}) == {}

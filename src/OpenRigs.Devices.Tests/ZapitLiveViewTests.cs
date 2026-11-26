@@ -101,7 +101,7 @@ namespace OpenRigs.Devices.Tests
         }
 
         // An include anywhere in the workflow, loaded (its public ArgumentRange loads it), so its nodes can be changed before the build.
-        static IncludeWorkflowBuilder Included(ExpressionBuilderGraph workflow, string path)
+        internal static IncludeWorkflowBuilder Included(ExpressionBuilderGraph workflow, string path)
         {
             var include = Nested(workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<IncludeWorkflowBuilder>().Single(b => b.Path == path);
             var range = include.ArgumentRange;
@@ -110,7 +110,7 @@ namespace OpenRigs.Devices.Tests
         }
 
         // Every node, however deep in groups and loaded includes.
-        static System.Collections.Generic.IEnumerable<Bonsai.Dag.Node<ExpressionBuilder, ExpressionBuilderArgument>> Nested(ExpressionBuilderGraph workflow)
+        internal static System.Collections.Generic.IEnumerable<Bonsai.Dag.Node<ExpressionBuilder, ExpressionBuilderArgument>> Nested(ExpressionBuilderGraph workflow)
         {
             return workflow.SelectMany(n =>
             {

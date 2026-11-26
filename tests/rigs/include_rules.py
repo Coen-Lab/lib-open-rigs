@@ -116,8 +116,12 @@ def zapit_daq_for_task_problems(root: ET.Element) -> list[str]:
         problems.append("ConnectForTaskZapitDaq's Zapit group is not fed from a SubscribeSubject of its one AsyncSubject ZapitRig")
     feed = [nodes[i] for i in upstream(edges, rigs[0])] if len(rigs) == 1 else []
     if not any(n.findtext(W + "Selector") == "Zapit" for n in feed) or not any(
-            n.get(XSI) == "rx:Condition" and "it.Device != null" in ET.tostring(n, encoding="unicode") for n in feed):
+            n.get(XSI) == "rx:Condition" and "Item1.Device != null" in ET.tostring(n, encoding="unicode") for n in feed):
         problems.append("ConnectForTaskZapitDaq's ZapitRig is not rig.yml's Zapit behind a Condition on its device")
+    # ...and on the task file at launch handing the session to no other Zapit (ClosedBy, TaskFileSwitch on TaskPath).
+    if not any(n.findtext(W + "Name") == "ClosedBy" and "TaskFileSwitch" in ET.tostring(n, encoding="unicode") for n in feed) or not any(
+            n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "TaskPath" for n in feed):
+        problems.append("ConnectForTaskZapitDaq's ZapitRig is not behind ClosedBy, the task file at launch (TaskPath)")
     inner = child(nodes[groups[0]], W + "Workflow")
     paths = {n.get("Path") for n in inner.iter(W + "Expression")}
     if ZAPIT_SETUP not in paths:
