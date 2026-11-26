@@ -8,6 +8,10 @@ Changes considered and not made, with the reason, so they are not proposed again
 - The agent's Zapit backstop skips while another Bonsai runs: not changed, as a running Bonsai may own the NI lines and zeroing them under it would fight it.
 - No backstop for a Zapit-Bonsai workflow that dies before Ready (the agent marks it Zapit-Bonsai only at Ready): not changed, as before Ready no command has driven the lines, and ZapitDaq zeroes them when it opens.
 
+## Sample registration margin, 26 Nov 2026 (open)
+
+The real B2 pair (`tests/zapit/data`, the two skull stills) registers on 33 to 36 ORB inliers on Windows and 32 on Linux CI, against `MIN_INLIERS` 30; its round trip is 19 um on Windows and 56 um on Linux (limit 25), with the same opencv lock. So a small change in the matched set moves the rigid fit by a few pixels, and `test_the_real_pair_registers_both_ways_and_the_round_trip_lands_within_25_um` is Windows-only until this is fixed. Candidates: more ORB features, or a subpixel refinement (ECC on the contrast-equalised stills) after the rigid refit. Either changes rig behaviour, so test it on B2 before merging, then drop the skip.
+
 ## Streamed early stop, 26 Nov 2026 (open)
 
 - One hang after a streamed trial ran dry, cause unknown: on B2's USB-6453 (Dev1), a trial cut short ran out of samples at its ramp's end, but NI's count of samples generated stayed short of the samples written, so nothing ended the trial (no Stopped in 6 s). Patched, not explained: with all its samples written, ZapitDaq's feeder asks the card whether the task is done (`IsDone`, which reports the run-out), and `ACutTrialEndsThoughTheDaqsCountStaysShortOfItsEnd` holds that. Seen once in the first idle hardware run, not in the 80 trials after the patch or in the 42-trial Bonsai session. Keep the patch; find the cause if a Stopped is ever late again.
