@@ -47,6 +47,7 @@
         <LogName>Camera-Test</LogName>
         <FrameRate>50</FrameRate>
         <ConfigRoot>C:\nowhere</ConfigRoot>
+        <ChunkSize>0</ChunkSize>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Count" DisplayName="TakeCount" />
@@ -57,6 +58,9 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="ChunkSize" />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -68,6 +72,7 @@
       <Edge From="7" To="9" Label="Source1" />
       <Edge From="8" To="9" Label="Source2" />
       <Edge From="9" To="10" Label="Source1" />
+      <Edge From="11" To="7" Label="Source3" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

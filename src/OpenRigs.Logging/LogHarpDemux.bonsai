@@ -16,6 +16,7 @@
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="LogName" />
+        <Property Name="ChunkSize" />
       </Expression>
       <Expression xsi:type="rx:SelectMany">
         <Name>LogRegisters</Name>
@@ -64,7 +65,7 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:GroupByTime">
-                <p1:ChunkSize>1</p1:ChunkSize>
+                <p1:ChunkSize>0</p1:ChunkSize>
               </Combinator>
             </Expression>
             <Expression xsi:type="rx:CreateObservable">
@@ -138,6 +139,9 @@
             <Expression xsi:type="SubscribeSubject">
               <Name>PathPrefix</Name>
             </Expression>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="ChunkSize" />
+            </Expression>
           </Nodes>
           <Edges>
             <Edge From="0" To="1" Label="Source1" />
@@ -154,6 +158,7 @@
             <Edge From="13" To="14" Label="Source1" />
             <Edge From="14" To="15" Label="Source1" />
             <Edge From="16" To="12" Label="Source2" />
+            <Edge From="17" To="12" Label="Source3" />
           </Edges>
         </Workflow>
       </Expression>

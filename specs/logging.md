@@ -74,7 +74,9 @@ Rationale: a single file per device per session does not scale to video or elect
 
 Loggers MAY expose `ChunkSize` so that a rig can choose a different whole-hour chunk size. They MUST NOT offer an option to disable chunking.
 
-Exception in this fork: the workflow's own logs, a row per trial or event, are small, so they are one file per experiment. They are written by `LogWorkflowData` (`GroupByExperiment` in place of `GroupByTime`) into `WorkflowData/WorkflowData_<What>_<DateTime>.csv`, where `<DateTime>` is the session directory's own start time, not a chunk's: `WorkflowData_Trials` (`LogTrials`), `WorkflowData_Events` (`LogEvents`) and a task's own, such as `WorkflowData_StimulusState`. Device logs keep the chunks.
+Exception in this fork: `ChunkSize` 0 is one chunk for the whole run, every record keyed to the start, so each device writes one file named as chunk 0 is, `<Device>_<start>`. It is the default of every logger here (`LogHarp`, `LogHarpDemux`, `LogData`, `LogVideo`, `LogVideoFfmpeg`, `LogRawVideo`); a workflow can still give 1. A video cut short by a crash keeps what was written (`LogVideoFfmpeg`'s Matroska all but its last cluster, about a second; an `.avi` all but its last frame), but has no index: read it frame by frame, or remux it (`ffmpeg -i in.mkv -c copy out.mkv`) before seeking to a frame.
+
+Exception in this fork: the workflow's own logs, a row per trial or event, are small, so they are one file per experiment. They are written by `LogWorkflowData` (`GroupByExperiment` in place of `GroupByTime`) into `WorkflowData/WorkflowData_<What>_<DateTime>.csv`, where `<DateTime>` is the session directory's own start time, not a chunk's: `WorkflowData_Trials` (`LogTrials`), `WorkflowData_Events` (`LogEvents`) and a task's own, such as `WorkflowData_StimulusState`.
 
 ## 4. Timestamps
 
