@@ -1,7 +1,7 @@
-"""Regenerates this folder's bank fixture from lib_zapit's contract fixture (app-zapit/lib_zapit/tests/data).
+"""Regenerates this folder's bank fixture from the contract fixture in tests/zapit/data.
 
-Not run by CI. Run whenever lib_zapit's bank layout changes, with lib_zapit's own environment:
-    <app-zapit>/lib_zapit/.venv/Scripts/python <this file> <app-zapit>/lib_zapit
+Not run by CI. Run whenever open_rigs.zapit's bank layout changes, from the repository root:
+    uv run python src/OpenRigs.Zapit.Tests/Data/make_fixture.py tests/zapit
 Writes Settings_ZapitBank_T.json, Settings_ZapitBank_T.bin.gz, contract_conditions.yml and, for a few of the contract's
 cases, the app's own trial waveforms (contract_expected.npz) as float32 in contract_expected.bin.gz with an index
 contract_expected.json. Gzipped to keep the repo small; the tests unpack them.
@@ -15,13 +15,13 @@ from pathlib import Path
 import numpy as np
 
 LIB = Path(sys.argv[1]).resolve()
-sys.path.insert(0, str(LIB / "tests"))
-from test_bank import rig  # noqa: E402  # pyright: ignore[reportMissingImports]  the contract's rig, as lib_zapit's own test builds it
+sys.path.insert(0, str(LIB))
+from test_zapit_bank import rig  # noqa: E402  the contract's rig, as the library's own test builds it
 
-from lib_zapit import bank  # noqa: E402  # pyright: ignore[reportMissingImports]
+from open_rigs.zapit import bank  # noqa: E402
 
 HERE = Path(__file__).parent
-DATA = LIB / "tests" / "data"
+DATA = LIB / "data"
 CASES = [(1, True, 8.0, 2), (2, True, 40.0, 4), (3, True, 2.0, 3), (3, False, 2.0, 3)]
 
 inputs = json.loads((DATA / "contract_inputs.json").read_text())

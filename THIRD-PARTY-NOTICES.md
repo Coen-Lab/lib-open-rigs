@@ -62,3 +62,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## open_rigs.zapit
+
+`src/open_rigs/zapit/` is LGPL-2.1-only, not BSD-3-Clause; its licence text is `src/open_rigs/zapit/LICENSE`. Its transforms, waveforms and calibration scheme are ports of [Zapit-Optostim/zapit](https://github.com/Zapit-Optostim/zapit) by Maja Skretowska and Rob Campbell (Sainsbury Wellcome Centre), whose `LICENSE` is LGPL-2.1 and whose source files carry no header granting "or later".
+
+Decision (the repository maintainer, 26 Nov 2026): keep upstream's terms, LGPL-2.1-only, because only upstream's authors can relicense their design, and the moved code is a port of it. The rest of this repository stays BSD-3-Clause. The wheel's `License-Expression` is `BSD-3-Clause AND LGPL-2.1-only`.

@@ -32,11 +32,11 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
 | File | Writer | Content |
 | --- | --- | --- |
-| `pending\ZapitScanner\Frames_<DT>\grid.json` | agent | `{"volts": [[x, y], ...], "laserVolts": v, "skipFrames": 3, "backgrounds": 4, "camera": {"exposureUs": 2000, "gainDb": 0}}`. The values come from lib_zapit `calibration_plan` (volts, and laser volts capped at `ceilingMw`). `camera` is optional: the Zapit camera takes that exposure and gain, auto exposure and auto gain off, from the run's first point, and its session settings back once the run ends or is refused; without it the session's settings stay. |
-| `pending\ZapitScanner\Frames_<DT>\point_NNNN.png`, `background_K.png` | workflow | One lossless frame per plan point (a 4-digit, 0-based index), then the laser-off backgrounds. This is lib_zapit's frame folder. |
+| `pending\ZapitScanner\Frames_<DT>\grid.json` | agent | `{"volts": [[x, y], ...], "laserVolts": v, "skipFrames": 3, "backgrounds": 4, "camera": {"exposureUs": 2000, "gainDb": 0}}`. The values come from open_rigs.zapit `calibration_plan` (volts, and laser volts capped at `ceilingMw`). `camera` is optional: the Zapit camera takes that exposure and gain, auto exposure and auto gain off, from the run's first point, and its session settings back once the run ends or is refused; without it the session's settings stay. |
+| `pending\ZapitScanner\Frames_<DT>\point_NNNN.png`, `background_K.png` | workflow | One lossless frame per plan point (a 4-digit, 0-based index), then the laser-off backgrounds. This is open_rigs.zapit's frame folder. |
 | `pending\ZapitScanner\Accuracy_<DT>\` | both | The same layout, from `accuracy_plan`, for Measure Accuracy. |
 | `pending\<any>.png` | workflow | A sample still, taken with the laser off. |
-| `pending\Settings_ZapitBank_<DT>.json` and `.bin` | agent | lib_zapit `build_bank`, index version 2. |
+| `pending\Settings_ZapitBank_<DT>.json` and `.bin` | agent | open_rigs.zapit `build_bank`, index version 2. |
 
 ## Order
 
@@ -51,7 +51,7 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
    With `ceilingMw` 0 (laser disabled) there is no beam: the agent sends no grid, takes the nominal scanner mapping as the fit and has no accuracy.
 5. **Sample.** The agent registers the still against the mouse's last reference, or asks for bregma and lambda clicks.
-6. **Bank.** The agent builds the bank into `pending\` and checks it with lib_zapit's `read_bank`. It then sends `Zapit-Main.LoadBank <json>`, and the workflow reports `Loading <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
+6. **Bank.** The agent builds the bank into `pending\` and checks it with open_rigs.zapit's `read_bank`. It then sends `Zapit-Main.LoadBank <json>`, and the workflow reports `Loading <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
 7. **Go.** Readiness requires all of the following:
    - the metric reads `BankLoaded` with the bank the agent built;
    - the fit, accuracy and sample have been accepted;

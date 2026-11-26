@@ -1,6 +1,6 @@
 """Zapit, a rig's optostimulation, in either of two forms while both run: MATLAB Zapit, the server a rig's tasks arm each
 trial over TCP (host, port, hardwareTriggered), and ZapitDaq (OpenRigs.Zapit), the workflow's own NI DAQ driving two
-galvos, the laser and the masking LED, with its Basler camera (the Zapit-Bonsai fields, lib_zapit's key names). A blue rig
+galvos, the laser and the masking LED, with its Basler camera (the Zapit-Bonsai fields, open_rigs.zapit's key names). A blue rig
 running both carries both sets in its one zapit block."""
 import datetime
 import json
@@ -53,7 +53,7 @@ def max_ramp_down_seconds(path: str | Path) -> float:
 
 
 def bank_ramp_down_seconds(bank: str | Path) -> float:
-    """A ZapitDaq bank's longest laser ramp-down, in seconds, from its index (lib_zapit's version 2): each laser-on variant's
+    """A ZapitDaq bank's longest laser ramp-down, in seconds, from its index (open_rigs.zapit's version 2): each laser-on variant's
     tail_cycles scan cycles at the bank's sample rate (OpenRigs.Zapit ZapitBank.LongestRampSeconds, the same rule).
     ValueError for a bank of another version or with no laser-on variant."""
     index = json.loads(Path(bank).read_text(encoding="utf-8"))
@@ -124,12 +124,12 @@ class Zapit(BaseSchema):
     laser_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao2"], description="The AO line setting the laser's power (its control volts).")
     led_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao3"], description="The AO line driving the masking LED.")
     photodiode_channel: Optional[str] = Field(default=None, pattern=r"^ai\d+$", examples=["ai0"], description="The AI line reading the photodiode, for the laser curve.")
-    blanking_times_ms: Optional[List[float]] = Field(default=None, min_length=3, max_length=3, description="The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.")
+    blanking_times_ms: Optional[List[float]] = Field(default=None, min_length=3, max_length=3, description="The laser blanking time, onset shift and offset shift, in ms, as open_rigs.zapit reads them. Absent, open_rigs.zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.")
     trigger_channel: Optional[str] = Field(default=None, pattern=r"^PFI\d+$", examples=["PFI0"], description="The PFI line the Behavior board's ZapitTrigger line is cabled to; each trial starts on it.")
     sample_rate: Optional[float] = Field(default=None, gt=0, examples=[100000], description="AO samples a second, per channel; every bank is built at it.")
     laser_min_max_mw: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.")
     laser_min_max_control_volts: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's control volts at its lowest and highest power.")
-    ceiling_mw: Optional[float] = Field(default=None, ge=0, description="This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
+    ceiling_mw: Optional[float] = Field(default=None, ge=0, description="This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): open_rigs.zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
     max_trial_seconds: Optional[float] = Field(default=None, gt=0, description="The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.")
     microns_per_pixel: Optional[float] = Field(default=None, gt=0, description="The Zapit camera's scale at the sample, in microns a pixel.")
     volts_per_pixel: Optional[float] = Field(default=None, gt=0, description="The galvos' volts a camera pixel, the scanner calibration's starting guess.")

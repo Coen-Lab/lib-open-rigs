@@ -88,7 +88,7 @@ namespace OpenRigs.Zapit
         [Description("The highest laser control volts (rig.yml's laserMinMaxControlVolts[1]). Any laser sample above it or below 0 V is refused.")]
         public double LaserMaxVolts { get; set; }
 
-        /// <summary>The laser ceiling as control volts: rig.yml's zapit.ceilingMw through the rig's laser curve (lib_zapit's
+        /// <summary>The laser ceiling as control volts: rig.yml's zapit.ceilingMw through the rig's laser curve (open_rigs.zapit's
         /// max_control_volts, passed at launch). ZapitDaq refuses any laser sample above it, and any bank holding one. The
         /// default, 0, refuses any laser sample above 0 V, so a lost mapping fails safe.</summary>
         [Description("The laser ceiling as control volts (ceilingMw through the laser curve, from the launch). Any laser sample above it is refused; 0, the default, refuses any above 0 V.")]
@@ -122,7 +122,7 @@ namespace OpenRigs.Zapit
 
         static readonly double[] Zeros = new double[4];
 
-        // The bank stores float32 volts from lib_zapit's float maths: some rows come out a few microvolts below 0 (-2e-6 V
+        // The bank stores float32 volts from open_rigs.zapit's float maths: some rows come out a few microvolts below 0 (-2e-6 V
         // in the contract bank), and a maximum such as 4.9 V reads back 1e-7 V above it. The laser limits allow that rounding and no more.
         internal const double FloatSlackVolts = 1e-4;   // ZapitSetupCapture's too
         const double FloatSlackMw = 1e-3;   // the bank's powers come from the same float maths
