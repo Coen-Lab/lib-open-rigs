@@ -891,9 +891,8 @@ def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_pat
     own = workflow(tmp_path / "c", logs + include("OpenRigs.Logging:LogControlEvents.bonsai") + manifest_node("auto")
                    + include(lint.EXPERIMENT_RECORDS, "<ExpectedFiles>auto</ExpectedFiles>"))
     assert lint.experiment_records_problems(own) == [
-        "the workflow has its own ExperimentManifest (ExperimentRecords does)", "the workflow has its own LogControlEvents (ExperimentRecords does)",
-        "ExperimentRecords has no IngestScripts"]
-    # IngestScripts, or the older one-name IngestScript, satisfies it.
+        "the workflow has its own ExperimentManifest (ExperimentRecords does)", "the workflow has its own LogControlEvents (ExperimentRecords does)"]
+    # IngestScripts blank is none (the include's own rule); a list is fine too.
     plural = workflow(tmp_path / "p", logs + include(lint.EXPERIMENT_RECORDS, "<IngestScripts>a,b</IngestScripts><ExpectedFiles>auto</ExpectedFiles>") + LIVE)
     assert lint.experiment_records_problems(plural) == []
     # The rig.yml is ReadLabRig's: a ConfigRoot on the include (or on StreamDevices) is one Bonsai stops the build on.

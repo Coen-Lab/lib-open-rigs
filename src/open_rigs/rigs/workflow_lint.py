@@ -805,7 +805,7 @@ def background_noise_problems(wf: Workflow) -> list[str]:
 
 def experiment_records_problems(wf: Workflow) -> list[str]:
     """The experiment's records are OpenRigs.Logging's ExperimentRecords (LogControlEvents, RecordHarpDevices,
-    ExperimentManifest), included once with IngestScripts (or the older IngestScript) and ExpectedFiles set, as the last top-level node but
+    ExperimentManifest), included once with ExpectedFiles set (IngestScripts blank means none), as the last top-level node but
     StreamDevices: RecordHarpDevices and ExperimentManifest find each device by the subjects published before them. Their
     rig.yml is the workflow's, ReadLabRig's, so the include takes no ConfigRoot (Bonsai stops the build on one).
     The workflow has none of the three of its own. Rewards are not records: Rewards is the workflow's own include."""
@@ -822,8 +822,6 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
         problems.append("ExperimentRecords is not the last top-level node (StreamDevices alone may follow)")
     else:
         props = _properties(top[at])
-        if not (props.get("IngestScripts") or props.get("IngestScript")):
-            problems.append("ExperimentRecords has no IngestScripts")
         if not props.get("ExpectedFiles"):
             problems.append("ExperimentRecords has no ExpectedFiles")
         if "ConfigRoot" in props:
