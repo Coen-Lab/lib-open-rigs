@@ -3195,144 +3195,6 @@ namespace OpenRigs.Devices.Rigs
 
 
     /// <summary>
-    /// The laser safety layers this rig was scope-checked with (plan: Safety).
-    /// </summary>
-    [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
-    [System.ComponentModel.DescriptionAttribute("The laser safety layers this rig was scope-checked with (plan: Safety).")]
-    [Bonsai.WorkflowElementCategoryAttribute(Bonsai.ElementCategory.Source)]
-    [Bonsai.CombinatorAttribute(MethodName="Generate")]
-    public partial class SafetyGate
-    {
-    
-        private string _layer;
-    
-        private string _hardwareKind;
-    
-        private string _date;
-    
-        private string _scopeCapture;
-    
-        public SafetyGate()
-        {
-        }
-    
-        protected SafetyGate(SafetyGate other)
-        {
-            _layer = other._layer;
-            _hardwareKind = other._hardwareKind;
-            _date = other._date;
-            _scopeCapture = other._scopeCapture;
-        }
-    
-        /// <summary>
-        /// software: the scope check of the node's finite buffers and zero on stop, and the agent's backstop, passed; hardware: the NI AO watchdog or the OBIS enable line scoped too. The launching app refuses Go on a rig without it.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("layer", Required=Newtonsoft.Json.Required.Always)]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="layer")]
-        [System.ComponentModel.DescriptionAttribute("software: the scope check of the node\'s finite buffers and zero on stop, and the " +
-            "agent\'s backstop, passed; hardware: the NI AO watchdog or the OBIS enable line s" +
-            "coped too. The launching app refuses Go on a rig without it.")]
-        public string Layer
-        {
-            get
-            {
-                return _layer;
-            }
-            set
-            {
-                _layer = value;
-            }
-        }
-    
-        /// <summary>
-        /// The hardware layer built, such as aoWatchdog or obisEnable.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("hardwareKind")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="hardwareKind")]
-        [System.ComponentModel.DescriptionAttribute("The hardware layer built, such as aoWatchdog or obisEnable.")]
-        public string HardwareKind
-        {
-            get
-            {
-                return _hardwareKind;
-            }
-            set
-            {
-                _hardwareKind = value;
-            }
-        }
-    
-        /// <summary>
-        /// The day of the scope check, YYYY-MM-DD.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("date")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="date")]
-        [System.ComponentModel.DescriptionAttribute("The day of the scope check, YYYY-MM-DD.")]
-        public string Date
-        {
-            get
-            {
-                return _date;
-            }
-            set
-            {
-                _date = value;
-            }
-        }
-    
-        /// <summary>
-        /// Where the scope capture is kept.
-        /// </summary>
-        [Newtonsoft.Json.JsonPropertyAttribute("scopeCapture")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="scopeCapture")]
-        [System.ComponentModel.DescriptionAttribute("Where the scope capture is kept.")]
-        public string ScopeCapture
-        {
-            get
-            {
-                return _scopeCapture;
-            }
-            set
-            {
-                _scopeCapture = value;
-            }
-        }
-    
-        public System.IObservable<SafetyGate> Generate()
-        {
-            return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new SafetyGate(this)));
-        }
-    
-        public System.IObservable<SafetyGate> Generate<TSource>(System.IObservable<TSource> source)
-        {
-            return System.Reactive.Linq.Observable.Select(source, _ => new SafetyGate(this));
-        }
-    
-        protected virtual bool PrintMembers(System.Text.StringBuilder stringBuilder)
-        {
-            stringBuilder.Append("Layer = " + _layer + ", ");
-            stringBuilder.Append("HardwareKind = " + _hardwareKind + ", ");
-            stringBuilder.Append("Date = " + _date + ", ");
-            stringBuilder.Append("ScopeCapture = " + _scopeCapture);
-            return true;
-        }
-    
-        public override string ToString()
-        {
-            System.Text.StringBuilder stringBuilder = new System.Text.StringBuilder();
-            stringBuilder.Append(GetType().Name);
-            stringBuilder.Append(" { ");
-            if (PrintMembers(stringBuilder))
-            {
-                stringBuilder.Append(" ");
-            }
-            stringBuilder.Append("}");
-            return stringBuilder.ToString();
-        }
-    }
-
-
-    /// <summary>
     /// Which side of the animal a line serves.
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Bonsai.Sgen", "0.9.0.0 (Newtonsoft.Json v13.0.0.0, YamlDotNet v16.0.0.0)")]
@@ -4530,8 +4392,6 @@ namespace OpenRigs.Devices.Rigs
     
         private bool _invertYScanner;
     
-        private SafetyGate _safetyGate;
-    
         private ZapitCamera _camera;
     
         public Zapit()
@@ -4565,7 +4425,6 @@ namespace OpenRigs.Devices.Rigs
             _voltsPerPixel = other._voltsPerPixel;
             _invertXScanner = other._invertXScanner;
             _invertYScanner = other._invertYScanner;
-            _safetyGate = other._safetyGate;
             _camera = other._camera;
         }
     
@@ -4939,25 +4798,6 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The laser safety layers this rig was scope-checked with.
-        /// </summary>
-        [System.Xml.Serialization.XmlIgnoreAttribute()]
-        [Newtonsoft.Json.JsonPropertyAttribute("safetyGate")]
-        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="safetyGate")]
-        [System.ComponentModel.DescriptionAttribute("The laser safety layers this rig was scope-checked with.")]
-        public SafetyGate SafetyGate
-        {
-            get
-            {
-                return _safetyGate;
-            }
-            set
-            {
-                _safetyGate = value;
-            }
-        }
-    
-        /// <summary>
         /// Zapit's Basler camera, Camera-Zapit in the data and live view.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
@@ -5008,7 +4848,6 @@ namespace OpenRigs.Devices.Rigs
             stringBuilder.Append("VoltsPerPixel = " + _voltsPerPixel + ", ");
             stringBuilder.Append("InvertXScanner = " + _invertXScanner + ", ");
             stringBuilder.Append("InvertYScanner = " + _invertYScanner + ", ");
-            stringBuilder.Append("SafetyGate = " + _safetyGate + ", ");
             stringBuilder.Append("Camera = " + _camera);
             return true;
         }
@@ -5636,11 +5475,6 @@ namespace OpenRigs.Devices.Rigs
             return Process<RunningWheel>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<SafetyGate> source)
-        {
-            return Process<SafetyGate>(source);
-        }
-
         public System.IObservable<string> Process(System.IObservable<Speaker> source)
         {
             return Process<Speaker>(source);
@@ -5723,7 +5557,6 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutput>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutputs>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<RunningWheel>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SafetyGate>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Speaker>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SphericalPosition>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpinnakerCamera>))]
@@ -5985,11 +5818,6 @@ namespace OpenRigs.Devices.Rigs
             return Process<RunningWheel>(source);
         }
 
-        public System.IObservable<string> Process(System.IObservable<SafetyGate> source)
-        {
-            return Process<SafetyGate>(source);
-        }
-
         public System.IObservable<string> Process(System.IObservable<Speaker> source)
         {
             return Process<Speaker>(source);
@@ -6072,7 +5900,6 @@ namespace OpenRigs.Devices.Rigs
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutput>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<PulseOutputs>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<RunningWheel>))]
-    [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SafetyGate>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<Speaker>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SphericalPosition>))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(Bonsai.Expressions.TypeMapping<SpinnakerCamera>))]

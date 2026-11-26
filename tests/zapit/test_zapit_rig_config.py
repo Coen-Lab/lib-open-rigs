@@ -7,14 +7,13 @@ BLOCK = {"device": "Dev1", "galvoXChannel": "ao0", "galvoYChannel": "ao1", "lase
          "photodiodeChannel": "ai0", "triggerChannel": "PFI0", "sampleRate": 100000,
          "laserMinMaxMw": [0.0, 75.0], "laserMinMaxControlVolts": [0.0, 5.0], "ceilingMw": 20.0,
          "maxTrialSeconds": 3.0, "micronsPerPixel": 11.7, "voltsPerPixel": 0.0015,
-         "invertXScanner": True, "safetyGate": {"layer": "software", "date": "2026-11-22"},
+         "invertXScanner": True,
          "camera": {"serialNumber": "40123456"}}
 
 
 def test_a_full_block_reads():
     r = ZapitRig.from_dict(BLOCK)
     assert r.device == "Dev1" and r.ceiling_mw == 20.0 and r.invert_x_scanner and not r.invert_y_scanner
-    assert r.safety_gate.layer == "software" and r.safety_gate.date == "2026-11-22"
     assert r.laser().max_mw == 75.0
     assert r.camera.serial_number == "40123456" and r.camera.session_pfs_path == "calibration/Zapit-Session.pfs"
 
@@ -27,7 +26,7 @@ def test_a_missing_required_field_is_refused_by_name(key):
 
 
 @pytest.mark.parametrize("change", [{"ceilingMw": -1}, {"ceilingMw": True}, {"sampleRate": "fast"}, {"laserMinMaxMw": [5, 1]},
-                                    {"safetyGate": {"layer": "none"}}, {"safetyGate": {}}, {"extra": 1},
+                                    {"safetyGate": {"layer": "software"}}, {"extra": 1},
                                     {"invertXScanner": "yes"}, {"earlyStopLeadSeconds": 0.1}, {"triggerFilterSeconds": 1e-4},
                                     {"camera": {}}, {"camera": {"serialNumber": "1", "x": "y"}},
                                     {"camera": {"serialNumber": ""}}, {"invertXscanner": True}, {"device": ""}])
