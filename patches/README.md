@@ -20,7 +20,7 @@ Upstream column: an issue where reported, else "Not reported" for a fix upstream
 | Logging | `CsvWriter`'s `AutoFlush`, `PublishRows`, `LoggedRows`, `ColumnNames`, and a `harpTime` first column for a Harp-timestamped record | Not reported |
 | Logging | `BinaryLogWriter` for `LogHarp` and `LogHarpDemux` in place of `MatrixWriter`, on a foreground thread so headless Bonsai stays open until each file is closed | Not reported |
 | Logging | `LogTrials`, `LogEvents`, `CreateEvent`, `ExperimentLogs`, `LogControlEvents`, `LogRngSeed`, `TaskLogs` (no `WorkflowOutput`), `LogVideoFfmpeg`, `ExperimentRecords`, `NoExperimentFolder` | Own |
-| Manifest | `ExperimentManifest` (`manifest.json` version 4, `ExpectedFiles`, `{RigFiles}`, the trial columns from `schemas\trial-columns.yml`) | Own |
+| Manifest | `ExperimentManifest` (`manifest.json` version 5, `ExpectedFiles`, `{RigFiles}`, the trial columns from `schemas\trial-columns.yml`) | Own |
 | Streaming | Stream controllers on the task pool, so Stop cannot hang; otherwise upstream's at the base commit | Not reported |
 | Video | `TriggeredSpinnaker`: the region reset to full frame after binning; the chunk fields copied inside the camera callback; a new `ExposureTime` or `Gain` sent to the open camera, both per frame in `VideoChunkData`; `Name`, `CamerasOpen` once streaming, frame gaps filled | ucl-open/ucl-open#66, #67 |
 | Video | `FfmpegVideoWriter` (a kill-safe .mkv on rig.yml's `videoEncoder`, every frame written at Stop, a frame CSV); `UsbCamera` | Own |

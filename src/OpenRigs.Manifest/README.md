@@ -52,4 +52,4 @@ Each write is `manifest.json.<pid>.tmp`, then a rename over the old one, so no r
 
 ## Tested
 
-`dotnet run --project src\OpenRigs.Manifest.Tests` runs the writer, the recorder and the editor's copy of the node against a temporary folder, with no hardware and no Bonsai editor: exit 0 when every check passes. It also builds each manifest in [`fixtures/manifest/v4/`](../../fixtures/manifest/v4/) from fixed inputs and compares it byte for byte with the file there; readers in other repositories test themselves on those files. `-- --write-fixtures` rewrites them after a deliberate change to the format.
+`dotnet run --project src\OpenRigs.Manifest.Tests` runs the writer, the recorder and the editor's copy of the node against a temporary folder, with no hardware and no Bonsai editor: exit 0 when every check passes. It also builds each manifest in [`fixtures/manifest/v5/`](../../fixtures/manifest/v5/) from fixed inputs and compares it byte for byte with the file there; readers in other repositories test themselves on those files. `-- --write-fixtures` rewrites them after a deliberate change to the format.

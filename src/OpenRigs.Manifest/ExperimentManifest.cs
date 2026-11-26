@@ -53,7 +53,7 @@ namespace OpenRigs.Manifest
         }
 
         /// <summary>Gets or sets the names of the server's ingest scripts for this kind of data, separated by commas.</summary>
-        [Description("The names of the server's ingest scripts for this kind of data, as the server's registry has them, separated by commas, in the order the server runs them (letters, digits, _ - and ., starting with a letter or digit). Blank: the server runs nothing but the copy.")]
+        [Description("The names of the server's ingest scripts for this kind of data, as the server's registry has them, separated by commas, in the order the server runs them (letters, digits, _ - and ., starting with a letter or digit). Blank: the server runs nothing but the copy. A workflow saved before manifest version 5 may still hold an old IngestScript, which this falls back to while it is blank: to run nothing, clear IngestScript too.")]
         public string IngestScripts
         {
             get { return Settings.IngestScripts; }
