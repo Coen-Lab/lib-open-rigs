@@ -10,22 +10,26 @@ namespace OpenRigs.Devices
 {
     /// <summary>
     /// A bool of the task file at a path, read from the file itself, for a choice the workflow makes at launch, before the
-    /// task file is read at Go (TaskConfig): ConnectForTaskZapitDaq keeps ZapitDaq closed when its ClosedBy bool is true.
+    /// task file is read at Go (TaskConfig): ConnectForTaskZapitDaq opens ZapitDaq only when its OpenedBy bool is true.
     /// </summary>
     [Combinator]
     [DefaultProperty("Path")]
-    [Description("Reads a bool from the task file at each input path (TaskPath at launch): the value at Path under its taskParameters, true or false; false when the file leaves it out. Empty Path: false, the file not read.")]
+    [Description("Reads a bool from the task file at each input path (TaskPath at launch): the value at Path under its taskParameters, true or false; false when the file leaves it out. Empty Path: EmptyPathValue, the file not read.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class TaskFileSwitch
     {
-        /// <summary>Gets or sets the bool's dotted path under the task file's taskParameters, such as optogenetics.zapitMatlab; empty for none.</summary>
-        [Description("The bool's dotted path under the task file's taskParameters, such as optogenetics.zapitMatlab. Empty: false, the file not read.")]
+        /// <summary>Gets or sets the bool's dotted path under the task file's taskParameters, such as optogenetics.zapitBonsai; empty for none.</summary>
+        [Description("The bool's dotted path under the task file's taskParameters, such as optogenetics.zapitBonsai. Empty: EmptyPathValue, the file not read.")]
         public string Path { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the value for an empty Path, the file then not read: false by default.</summary>
+        [Description("The value for an empty Path, the file then not read: false by default. ConnectForTaskZapitDaq sets it true, so a piece with no OpenedBy opens as before.")]
+        public bool EmptyPathValue { get; set; }
 
         /// <summary>The bool at Path in the task file at each path.</summary>
         public IObservable<bool> Process(IObservable<string> source)
         {
-            return source.Select(taskPath => Read(taskPath, Path));
+            return source.Select(taskPath => Read(taskPath, Path, EmptyPathValue));
         }
 
         /// <summary>The bool at <paramref name="switchPath"/> under the taskParameters of the task file at <paramref name="taskPath"/>:
@@ -33,7 +37,15 @@ namespace OpenRigs.Devices
         /// the path, for a file that cannot be read or a value that is not true or false.</summary>
         public static bool Read(string taskPath, string switchPath)
         {
-            if (string.IsNullOrWhiteSpace(switchPath)) return false;
+            return Read(taskPath, switchPath, false);
+        }
+
+        /// <summary>The bool at <paramref name="switchPath"/> under the taskParameters of the task file at <paramref name="taskPath"/>:
+        /// false when the file leaves it out; <paramref name="emptyPathValue"/> for an empty switchPath, without reading the file.
+        /// Throws, naming the file and the path, for a file that cannot be read or a value that is not true or false.</summary>
+        public static bool Read(string taskPath, string switchPath, bool emptyPathValue)
+        {
+            if (string.IsNullOrWhiteSpace(switchPath)) return emptyPathValue;
             string text;
             try
             {

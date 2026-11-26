@@ -4,6 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.IO;
 using System.Linq;
+using System.Reactive.Linq;
 using System.Security;
 using System.Xml;
 
@@ -13,7 +14,7 @@ namespace OpenRigs.Devices.Tests
     /// Both Zapits in one task workflow, chosen per session by the task file (26 Nov 2026: decision-making's Zapit-Bonsai and
     /// Zapit-MATLAB boxes): Pieces\DualZapit.bonsai gives ConnectForTask, ZapitLogs and ConnectForTaskZapitDaq each its own
     /// switch on a task whose optogenetics block has no Enabled, ConnectForTask's subject another name and
-    /// ConnectForTaskZapitDaq its ClosedBy; built, never run.
+    /// ConnectForTaskZapitDaq its OpenedBy; built, never run.
     /// </summary>
     [TestClass]
     public class DualZapitTests
@@ -36,24 +37,82 @@ namespace OpenRigs.Devices.Tests
             // it), ConnectForTask's OptogeneticsMatlab.
             Assert.AreEqual(1, Declared(builder.Workflow, "Optogenetics"));
             Assert.AreEqual(1, Declared(builder.Workflow, "OptogeneticsMatlab"));
-            var closedBy = ZapitLiveViewTests.Nested(native.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<TaskFileSwitch>().Single();
-            Assert.AreEqual("optogenetics.zapitMatlab", closedBy.Path);
+            var openedBy = Switch(native.Workflow);
+            Assert.AreEqual("optogenetics.zapitBonsai", openedBy.Path);
+            Assert.IsTrue(openedBy.EmptyPathValue);
             var require = ZapitLiveViewTests.Nested(native.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<OpenRigs.Core.RequireValue>().Single();
             StringAssert.StartsWith(require.Message, "Zapit-Bonsai is ticked");
         }
 
         // The defaults are unchanged for a workflow that includes one Zapit (a task workflow with ConnectForTask on optogenetics.enabled).
         [TestMethod]
-        public void ThePiecesDefaultsAreTheEnabledSwitchAndNoClosedBy()
+        public void ThePiecesDefaultsAreTheEnabledSwitchAndNoOpenedBy()
         {
-            WorkflowBuilder builder;
+            var native = ZapitLiveViewTests.Included(LiveView().Workflow, "OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai");
+            CollectionAssert.AreEquivalent(new[] { "TaskParameters.Optogenetics.Enabled", "TaskParameters.Optogenetics.Enabled" }, Selectors(native.Workflow, "Optogenetics.Enabled"));
+            // No OpenedBy opens, the file not read: a workflow with one Zapit opens it on any rig with zapit.device, as before.
+            var openedBy = Switch(native.Workflow);
+            Assert.AreEqual("", openedBy.Path);
+            Assert.IsTrue(openedBy.EmptyPathValue);
+            Assert.IsTrue(openedBy.Process(Observable.Return(Path.Combine(Path.GetTempPath(), "no-such-task-file.yml"))).Wait());
+        }
+
+        // 26 Nov 2026: ZapitRig, which opens ZapitDaq, the Zapit camera and the setup phase, gets rig.yml's zapit block only when
+        // it names the NI device and OpenedBy is true; a session whose task file leaves the box unticked or out leaves them closed.
+        [TestMethod]
+        public void ZapitDaqOpensOnlyWhenOpenedByIsTrue()
+        {
+            var native = ZapitLiveViewTests.Included(LiveView().Workflow, "OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai");
+            var gate = ZapitLiveViewTests.Nested(native.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<Bonsai.Scripting.Expressions.ExpressionTransform>()
+                .Single(t => t.Expression != null && t.Expression.Contains("Item1.Device"));
+            var withDevice = new OpenRigs.Devices.Rigs.Zapit { Device = "Dev1" };
+            var matlabOnly = new OpenRigs.Devices.Rigs.Zapit();
+            Assert.IsTrue(Opens(gate, withDevice, true), "native block, OpenedBy true: open");
+            Assert.IsFalse(Opens(gate, withDevice, false), "native block, OpenedBy false or left out: closed");
+            Assert.IsFalse(Opens(gate, matlabOnly, true), "no zapit.device: closed");
+            Assert.IsFalse(Opens(gate, null, true), "no zapit block: closed");
+
+            var file = Path.Combine(Path.GetTempPath(), "TaskFileSwitchTests-" + Guid.NewGuid().ToString("N") + ".yml");
+            try
+            {
+                var openedBy = new TaskFileSwitch { Path = "optogenetics.zapitBonsai", EmptyPathValue = true };
+                File.WriteAllText(file, "taskParameters:\n  optogenetics:\n    zapitBonsai: true\n    zapitMatlab: false\n");
+                Assert.IsTrue(Opens(gate, withDevice, openedBy.Process(Observable.Return(file)).Wait()), "Zapit-Bonsai ticked: open");
+                File.WriteAllText(file, "taskParameters:\n  optogenetics:\n    zapitBonsai: false\n    zapitMatlab: true\n");
+                Assert.IsFalse(Opens(gate, withDevice, openedBy.Process(Observable.Return(file)).Wait()), "Zapit-MATLAB ticked: closed");
+                File.WriteAllText(file, "taskParameters:\n  optogenetics:\n    zapitBonsai: false\n    zapitMatlab: false\n");
+                Assert.IsFalse(Opens(gate, withDevice, openedBy.Process(Observable.Return(file)).Wait()), "neither: closed");
+                File.WriteAllText(file, "taskParameters:\n  optogenetics:\n    enabled: true\n");
+                Assert.IsFalse(Opens(gate, withDevice, openedBy.Process(Observable.Return(file)).Wait()), "the box left out (an old file): closed");
+            }
+            finally
+            {
+                File.Delete(file);
+            }
+        }
+
+        // The gate's verdict on rig.yml's zapit block and the OpenedBy bool, as the Condition sees them (Zip of the two).
+        static bool Opens(Bonsai.Scripting.Expressions.ExpressionTransform gate, OpenRigs.Devices.Rigs.Zapit zapit, bool openedBy)
+        {
+            var source = System.Linq.Expressions.Expression.Constant(Observable.Return(Tuple.Create(zapit, openedBy)), typeof(IObservable<Tuple<OpenRigs.Devices.Rigs.Zapit, bool>>));
+            var built = gate.Build(new System.Linq.Expressions.Expression[] { source });
+            var run = System.Linq.Expressions.Expression.Lambda<Func<IObservable<bool>>>(built).Compile();
+            return run().Wait();
+        }
+
+        // The include's one TaskFileSwitch (OpenedBy), however deep.
+        static TaskFileSwitch Switch(ExpressionBuilderGraph workflow)
+        {
+            return ZapitLiveViewTests.Nested(workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<TaskFileSwitch>().Single();
+        }
+
+        // Pieces\ZapitLiveView.bonsai, ConnectForTaskZapitDaq with its defaults, loaded, not built.
+        static WorkflowBuilder LiveView()
+        {
             using (var reader = XmlReader.Create(Path.Combine(Folder, "ZapitLiveView.bonsai")))
             {
-                builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+                return (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
             }
-            var native = ZapitLiveViewTests.Included(builder.Workflow, "OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai");
-            CollectionAssert.AreEquivalent(new[] { "TaskParameters.Optogenetics.Enabled", "TaskParameters.Optogenetics.Enabled" }, Selectors(native.Workflow, "Optogenetics.Enabled"));
-            Assert.AreEqual("", ZapitLiveViewTests.Nested(native.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<TaskFileSwitch>().Single().Path);
         }
 
         [TestMethod]
@@ -68,6 +127,9 @@ namespace OpenRigs.Devices.Tests
                 Assert.IsFalse(TaskFileSwitch.Read(file, "optogenetics.missing"), "a bool the file leaves out is false");
                 Assert.IsFalse(TaskFileSwitch.Read(file, "spouts.alwaysIn"), "a block the file leaves out is false");
                 Assert.IsFalse(TaskFileSwitch.Read(Path.Combine(Path.GetTempPath(), "no-such-task-file.yml"), ""), "no path: the file is not read");
+                Assert.IsTrue(TaskFileSwitch.Read(Path.Combine(Path.GetTempPath(), "no-such-task-file.yml"), " ", true), "no path: EmptyPathValue, the file not read");
+                Assert.IsFalse(TaskFileSwitch.Read(file, "optogenetics.missing", true), "a bool the file leaves out is false, whatever EmptyPathValue");
+                Assert.IsFalse(TaskFileSwitch.Read(file, "optogenetics.zapitBonsai", true));
                 StringAssert.Contains(Refusal(() => TaskFileSwitch.Read(file, "optogenetics.laserPowerMw")), "is 2, not true or false");
                 StringAssert.Contains(Refusal(() => TaskFileSwitch.Read(file, "optogenetics")), "is not true or false");
                 StringAssert.Contains(Refusal(() => TaskFileSwitch.Read(file + ".missing", "optogenetics.zapitMatlab")), "could not be read for optogenetics.zapitMatlab");

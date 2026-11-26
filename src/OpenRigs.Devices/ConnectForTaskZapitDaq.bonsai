@@ -7,7 +7,7 @@
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit for a task on ZapitDaq (OpenRigs.Zapit, no MATLAB Zapit; ConnectForTask is MATLAB Zapit's). Declares Zapit.Commands (a BehaviorSubject of ZapitDaq commands: a task multicasts each trial's Arm into it from a graph per trial, which a PublishSubject would close), Zapit.Events (ZapitDaq's events, a PublishSubject: a trial must not be handed the last trial's Armed), Zapit.Bank (the bank ZapitDaq loaded last) and Camera-Zapit.Settings (a grid run's camera exposure and gain, from ZapitSetup to ZapitCamera). On a rig whose rig.yml zapit block names the NI device (zapit.device, published as the AsyncSubject ZapitRig), from launch: opens ZapitDaq on its NI channels (Rigs.Zapit's paths), sample rate, maxTrialSeconds, ceilingMw (0, the laser disabled, when missing) and laserMinMaxControlVolts[1] (the highest laser volts), and from its own properties LaserCeilingVolts (ceilingMw through the laser curve, a launch property; 0, the default, refuses any laser; published as the AsyncSubject Zapit.LaserCeilingVolts, which ZapitSetup reads too) and Simulated (the twin, for a desk run; false by default), carrying Zapit.Commands into it and its events onto Zapit.Events; opens the Zapit camera (ZapitCamera, at this top level so its Camera-Zapit.Data reaches the workflow's StreamDevices; recorded in an optogenetics experiment); and runs Zapit's setup phase before Go (ZapitSetup, docs/zapit-setup-protocol.md). A rig without one (no zapit block, or MATLAB Zapit's host and port alone) opens neither, and nor does a session handed to another Zapit: ClosedBy names a bool of the task file, read from TaskPath's file at launch (TaskFileSwitch), whose true keeps ZapitDaq, the camera and the setup phase closed, as MATLAB Zapit holds the NI card and the camera (empty, the default: none; goes when MATLAB Zapit is retired). Publishes the task file's optogenetics.enabled (or the member OptogeneticsSwitch names, read at Go) as the AsyncSubject Optogenetics, the condition of Zapit's files in ExperimentManifest's ExpectedFiles (?Optogenetics), and as the AsyncSubject OptogeneticsLaserEnabled whether that experiment's laser is enabled too (rig.yml zapit.ceilingMw above 0), the condition of the files only a beam makes: ZapitScanner/, Settings_ZapitAccuracy_ and Settings_ZapitLaserCurve_ (?OptogeneticsLaserEnabled; at ceilingMw 0 the agent makes none of them). At Go, in an optogenetics experiment, stops the workflow if rig.yml has no zapit block naming the NI device (NoZapitDaqMessage), and checks the loaded bank against the task (ZapitBankForTask: built from its conditions file, holding its laserPowerMw); with no bank loaded the first Arm stops it. Needs TaskConfig (with TaskParameters.Optogenetics), TaskPath, RigConfigs, RigFile, ConfigRoot, ControlEvents, ExperimentGo, Timestamp, PathPrefix and BehaviorBoard-Main from the workflow.</Description>
+  <Description>Zapit for a task on ZapitDaq (OpenRigs.Zapit, no MATLAB Zapit; ConnectForTask is MATLAB Zapit's). Declares Zapit.Commands (a BehaviorSubject of ZapitDaq commands: a task multicasts each trial's Arm into it from a graph per trial, which a PublishSubject would close), Zapit.Events (ZapitDaq's events, a PublishSubject: a trial must not be handed the last trial's Armed), Zapit.Bank (the bank ZapitDaq loaded last) and Camera-Zapit.Settings (a grid run's camera exposure and gain, from ZapitSetup to ZapitCamera). On a rig whose rig.yml zapit block names the NI device (zapit.device, published as the AsyncSubject ZapitRig), from launch: opens ZapitDaq on its NI channels (Rigs.Zapit's paths), sample rate, maxTrialSeconds, ceilingMw (0, the laser disabled, when missing) and laserMinMaxControlVolts[1] (the highest laser volts), and from its own properties LaserCeilingVolts (ceilingMw through the laser curve, a launch property; 0, the default, refuses any laser; published as the AsyncSubject Zapit.LaserCeilingVolts, which ZapitSetup reads too) and Simulated (the twin, for a desk run; false by default), carrying Zapit.Commands into it and its events onto Zapit.Events; opens the Zapit camera (ZapitCamera, at this top level so its Camera-Zapit.Data reaches the workflow's StreamDevices; recorded in an optogenetics experiment); and runs Zapit's setup phase before Go (ZapitSetup, docs/zapit-setup-protocol.md). A rig without one (no zapit block, or MATLAB Zapit's host and port alone) opens neither, and nor does a session whose task file does not choose this Zapit: OpenedBy names a bool of the task file, read from TaskPath's file at launch (TaskFileSwitch), and ZapitDaq, the camera and the setup phase open only when it is true (false, or left out of the file: closed for the session, so a session with no Zapit, or with MATLAB Zapit, which holds the NI card and the camera, leaves them free); empty, the default: they open on any rig with zapit.device. Publishes the task file's optogenetics.enabled (or the member OptogeneticsSwitch names, read at Go) as the AsyncSubject Optogenetics, the condition of Zapit's files in ExperimentManifest's ExpectedFiles (?Optogenetics), and as the AsyncSubject OptogeneticsLaserEnabled whether that experiment's laser is enabled too (rig.yml zapit.ceilingMw above 0), the condition of the files only a beam makes: ZapitScanner/, Settings_ZapitAccuracy_ and Settings_ZapitLaserCurve_ (?OptogeneticsLaserEnabled; at ceilingMw 0 the agent makes none of them). At Go, in an optogenetics experiment, stops the workflow if rig.yml has no zapit block naming the NI device (NoZapitDaqMessage), and checks the loaded bank against the task (ZapitBankForTask: built from its conditions file, holding its laserPowerMw); with no bank loaded the first Arm stops it. Needs TaskConfig (with TaskParameters.Optogenetics), TaskPath, RigConfigs, RigFile, ConfigRoot, ControlEvents, ExperimentGo, Timestamp, PathPrefix and BehaviorBoard-Main from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -44,14 +44,14 @@
       </Expression>
       <Expression xsi:type="rx:Condition">
         <Name>RigHasZapit?</Name>
-        <Description>rig.yml's zapit block names the NI device (MATLAB Zapit's host and port alone are not ZapitDaq), and the task file at launch does not hand the session to another Zapit (ClosedBy).</Description>
+        <Description>rig.yml's zapit block names the NI device (MATLAB Zapit's host and port alone are not ZapitDaq), and the task file at launch chooses this Zapit (OpenedBy true, or no OpenedBy).</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="WorkflowInput">
               <Name>Source1</Name>
             </Expression>
             <Expression xsi:type="scr:ExpressionTransform">
-              <scr:Expression>Item1 != null &amp;&amp; Item1.Device != null &amp;&amp; !Item2</scr:Expression>
+              <scr:Expression>Item1 != null &amp;&amp; Item1.Device != null &amp;&amp; Item2</scr:Expression>
             </Expression>
             <Expression xsi:type="WorkflowOutput" />
           </Nodes>
@@ -275,10 +275,11 @@
         <Name>TaskPath</Name>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Name>ClosedBy</Name>
-        <Description>The task file at launch (TaskPath, the launcher's copy) read for the ClosedBy bool: true hands the session to another Zapit, which holds the NI card and the camera. No ClosedBy (the default): false, the file not read.</Description>
+        <Name>OpenedBy</Name>
+        <Description>The task file at launch (TaskPath, the launcher's copy) read for the OpenedBy bool: true opens ZapitDaq, the camera and the setup phase; false, or left out of the file, keeps them closed. No OpenedBy (the default): true, the file not read.</Description>
         <Combinator xsi:type="dev:TaskFileSwitch">
           <dev:Path />
+          <dev:EmptyPathValue>true</dev:EmptyPathValue>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
@@ -288,7 +289,7 @@
         <Selector>Item1</Selector>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="Path" DisplayName="ClosedBy" Description="A bool of the task file that hands the session to another Zapit (MATLAB Zapit, which holds the NI card and the camera), as a dotted path under taskParameters, such as optogenetics.zapitMatlab: true in TaskPath's file at launch, ZapitDaq, the Zapit camera and the setup phase stay closed for the session. Empty (the default): they open on any rig with zapit.device. Goes when MATLAB Zapit is retired." />
+        <Property Name="Path" DisplayName="OpenedBy" Description="A bool of the task file that chooses this Zapit for the session, as a dotted path under taskParameters, such as optogenetics.zapitBonsai: read from TaskPath's file at launch, ZapitDaq, the Zapit camera and the setup phase open only when it is true (false, or left out of the file: closed for the session, leaving the NI card and the camera free). Empty (the default): they open on any rig with zapit.device." />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="Selector" DisplayName="OptogeneticsSwitch" Description="The task's bool that makes the session an optogenetics experiment on ZapitDaq, a member of TaskConfig read at Go: TaskParameters.Optogenetics.Enabled by default; another, such as TaskParameters.Optogenetics.ZapitBonsai, in a workflow that chooses between Zapits per session." />

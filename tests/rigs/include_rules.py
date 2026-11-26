@@ -118,10 +118,16 @@ def zapit_daq_for_task_problems(root: ET.Element) -> list[str]:
     if not any(n.findtext(W + "Selector") == "Zapit" for n in feed) or not any(
             n.get(XSI) == "rx:Condition" and "Item1.Device != null" in ET.tostring(n, encoding="unicode") for n in feed):
         problems.append("ConnectForTaskZapitDaq's ZapitRig is not rig.yml's Zapit behind a Condition on its device")
-    # ...and on the task file at launch handing the session to no other Zapit (ClosedBy, TaskFileSwitch on TaskPath).
-    if not any(n.findtext(W + "Name") == "ClosedBy" and "TaskFileSwitch" in ET.tostring(n, encoding="unicode") for n in feed) or not any(
-            n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "TaskPath" for n in feed):
-        problems.append("ConnectForTaskZapitDaq's ZapitRig is not behind ClosedBy, the task file at launch (TaskPath)")
+    # ...and on the task file at launch choosing this Zapit (OpenedBy, TaskFileSwitch on TaskPath): open only when its bool is
+    # true, and with no OpenedBy (EmptyPathValue true) on any rig with zapit.device, as before OpenedBy.
+    opened_by = [n for n in feed if n.findtext(W + "Name") == "OpenedBy" and "TaskFileSwitch" in ET.tostring(n, encoding="unicode")]
+    if not opened_by or not any(n.get(XSI) == "SubscribeSubject" and n.findtext(W + "Name") == "TaskPath" for n in feed):
+        problems.append("ConnectForTaskZapitDaq's ZapitRig is not behind OpenedBy, the task file at launch (TaskPath)")
+    elif not all(any(e.tag.endswith("}EmptyPathValue") and (e.text or "").strip() == "true" for e in n.iter()) for n in opened_by):
+        problems.append("ConnectForTaskZapitDaq's OpenedBy does not open with no OpenedBy (TaskFileSwitch EmptyPathValue true)")
+    gates = ["".join(e.itertext()) for n in feed if n.get(XSI) == "rx:Condition" for e in n.iter() if e.tag.endswith("}Expression") and e.get(XSI) is None]
+    if not any(g.replace(" ", "").endswith("Item1.Device!=null&&Item2") for g in gates):
+        problems.append("ConnectForTaskZapitDaq's ZapitRig Condition does not open only when OpenedBy is true (... && Item2)")
     inner = child(nodes[groups[0]], W + "Workflow")
     paths = {n.get("Path") for n in inner.iter(W + "Expression")}
     if ZAPIT_SETUP not in paths:

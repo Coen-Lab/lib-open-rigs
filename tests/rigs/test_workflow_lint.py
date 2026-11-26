@@ -711,6 +711,13 @@ def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
     lost = text.replace("<zap:CeilingMw>0<", "<zap:CeilingMw>INF<").replace(' Selector="LaserMaxControlVolts"', ' Selector="X"')
     assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(lost)) == [
         "ZapitDaq's LaserMaxVolts is not mapped from LaserMaxControlVolts", "ZapitDaq's CeilingMw default is not 0 (a lost mapping must fail safe)"]
+    # OpenedBy: ZapitDaq opens only when the task file's bool is true at launch, and with no OpenedBy on any native rig.
+    closed_by = text.replace("Item1.Device != null &amp;&amp; Item2<", "Item1.Device != null &amp;&amp; !Item2<")
+    assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(closed_by)) == [
+        "ConnectForTaskZapitDaq's ZapitRig Condition does not open only when OpenedBy is true (... && Item2)"]
+    shut = text.replace("<dev:EmptyPathValue>true</dev:EmptyPathValue>", "")
+    assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(shut)) == [
+        "ConnectForTaskZapitDaq's OpenedBy does not open with no OpenedBy (TaskFileSwitch EmptyPathValue true)"]
     assert rules.manual_rewards_drop_problems(root("RewardValve.bonsai")) == []
     group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
     wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.REWARDS) + VALVES + group)
