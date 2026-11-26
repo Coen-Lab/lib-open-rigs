@@ -36,7 +36,7 @@ from open_rigs.rigs import conditions
 LOG = "WorkflowData_Trials"
 MANIFEST = "manifest.json"
 # Every version keeps `trial_columns` and `source.commit` as they were; any other is refused (records.md, rule 3).
-MANIFEST_VERSIONS = (1, 2, 3, 4)  # 4 is what OpenRigs.Manifest writes (ManifestWriter.Version)
+MANIFEST_VERSIONS = (1, 2, 3, 4, 5)  # 5 is what OpenRigs.Manifest writes (ManifestWriter.Version)
 REPO_FILE = "schemas/trial-columns.yml"
 TASK_FILE = ("Settings", "Settings_Task", ".json")  # written beside the trial log at Go
 COMBINATIONS_FILE = ("Settings", "Settings_Combinations", ".json")  # every combination built at Go, one row each

@@ -14,7 +14,7 @@ namespace OpenRigs.Manifest
     /// </summary>
     public class ManifestRecorder
     {
-        readonly string ingestScript;
+        readonly IList<string> ingestScripts;
         readonly string configFiles;
         readonly string configRoot;
         readonly ExpectedPlan expected;
@@ -52,9 +52,9 @@ namespace OpenRigs.Manifest
             return true;
         }
 
-        internal ManifestRecorder(string ingestScript, string configFiles, string configRoot, ExpectedPlan expected, string trialColumns = null, string streamColumns = null)
+        internal ManifestRecorder(IList<string> ingestScripts, string configFiles, string configRoot, ExpectedPlan expected, string trialColumns = null, string streamColumns = null)
         {
-            this.ingestScript = ingestScript;
+            this.ingestScripts = ingestScripts;
             this.configFiles = configFiles;
             this.configRoot = configRoot;
             this.expected = expected;
@@ -118,7 +118,7 @@ namespace OpenRigs.Manifest
                 // Each run starts with no condition known: a value from an earlier run is not this one's.
                 expected.ClearConditions();
                 // At Start: the launch, the workflow's commit and the config files, as they are now.
-                var writer = new ManifestWriter(ingestScript, ManifestWriter.Snapshot(configFiles, configRoot, run != null, trialColumns, streamColumns), expected);
+                var writer = new ManifestWriter(ingestScripts, ManifestWriter.Snapshot(configFiles, configRoot, run != null, trialColumns, streamColumns), expected);
                 var gate = new object();
                 var items = 0L;
                 var begun = false;
