@@ -19,6 +19,11 @@
     <PackageReference Include="Bonsai.Scripting.Expressions" />
   </ItemGroup>
 
+  <!-- VendorGuardTests: the same metadata scan the Zapit tests use -->
+  <ItemGroup>
+    <Compile Include="..\OpenRigs.Zapit.Tests\VendorReferences.cs" Link="VendorReferences.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Trials\OpenRigs.Trials.csproj" />
     <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
