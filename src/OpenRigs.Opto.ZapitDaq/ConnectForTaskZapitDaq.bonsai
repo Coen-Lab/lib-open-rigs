@@ -64,7 +64,7 @@
       <Expression xsi:type="rx:AsyncSubject">
         <Name>ZapitRig</Name>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitCamera.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:ZapitCamera.bonsai" />
       <Expression xsi:type="SubscribeSubject">
         <Name>ZapitRig</Name>
       </Expression>
@@ -117,7 +117,7 @@
               <Name>Zapit.Events</Name>
             </Expression>
             <Expression xsi:type="WorkflowOutput" />
-            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitSetup.bonsai" />
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:ZapitSetup.bonsai" />
             <Expression xsi:type="ExternalizedMapping">
               <Property Name="Simulated" />
             </Expression>

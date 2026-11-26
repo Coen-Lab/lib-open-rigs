@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using OpenRigs.Opto.ZapitDaq;
 using OpenRigs.Zapit;
 
 namespace OpenRigs.Trials.Tests
@@ -9,7 +10,7 @@ namespace OpenRigs.Trials.Tests
     [TestClass]
     public class ZapitDaqTrialTests
     {
-        class Trial : IZapitTrial
+        class Trial : IOptoTrial
         {
             public int TrialNumber { get; set; }
             public int LaserCondition { get; set; }
@@ -18,7 +19,7 @@ namespace OpenRigs.Trials.Tests
             public double LaserPowerMw { get; set; }
         }
 
-        class TimedTrial : Trial, ILaserDurationTrial
+        class TimedTrial : Trial, IOptoDurationTrial
         {
             public double LaserDurationSeconds { get { return 1.5; } }
         }

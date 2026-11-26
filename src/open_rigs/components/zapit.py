@@ -18,10 +18,10 @@ from open_rigs.core.artefacts import ArtefactPath
 # every task using Zapit leaves this much between arming Zapit and the trigger.
 ZAPIT_REPLY_MARGIN_SECONDS = 0.2
 # The most ZapitDaq's Arm may take, in seconds: building the trial's buffer, writing it and starting the task (its Armed
-# event's ArmSeconds; OpenRigs.Trials ZapitDaqTrial.ArmSeconds). Every task on ZapitDaq arms at least this long before its
+# event's ArmSeconds; OpenRigs.Opto.ZapitDaq ZapitDaqTrial.ArmSeconds). Every task on ZapitDaq arms at least this long before its
 # trigger. To be measured on a rig (a 2.8 s trial at 100 kS/s).
 ZAPIT_ARM_SECONDS = 0.2
-# How long after a timed ZapitDaq trial's last sample is due the next is armed, in seconds (OpenRigs.Trials
+# How long after a timed ZapitDaq trial's last sample is due the next is armed, in seconds (OpenRigs.Opto.ZapitDaq
 # ZapitDaqTrial.FreeMarginSeconds): the trigger line's edge comes after the loop's trigger tick. The loop frees ZapitDaq at
 # the trigger plus the trial's whole length (whole scan cycles and the ramp) plus this, so a laserDurationSeconds limit
 # subtracts this, the ramp and one scan cycle.

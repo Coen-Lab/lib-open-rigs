@@ -113,7 +113,7 @@
       <Expression xsi:type="rx:AsyncSubject">
         <Name>TrialRules</Name>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:ConditionedTaskLogsZapitDaq.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:ConditionedTaskLogsZapitDaq.bonsai" />
     </Nodes>
     <Edges>
       <Edge From="0" To="3" Label="Source1" />

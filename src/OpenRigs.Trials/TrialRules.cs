@@ -1,4 +1,3 @@
-using OpenRigs.Devices.Zapit;
 using System;
 using System.Collections.Generic;
 
@@ -9,11 +8,11 @@ namespace OpenRigs.Trials
     {
         /// <summary>The trial was drawn and its inter-trial interval began; Seconds is the interval's start (itiStartTime), exactly.</summary>
         Iti,
-        /// <summary>On a hardware-triggered rig, a laser trial's StartStimulus goes now, during its interval.</summary>
+        /// <summary>On a hardware-triggered rig, a laser trial is armed now, during its interval (the opto system's Arm).</summary>
         Arm,
         /// <summary>The trial starts; Seconds is the start, exactly: the interval's end less the lead, or later until the quiet waits hold.</summary>
         Start,
-        /// <summary>A laser trial's trigger: the trigger line rises; on a rig without hardware triggering its StartStimulus goes now.</summary>
+        /// <summary>A laser trial's trigger: the trigger line rises; on a rig without hardware triggering the opto system is armed now.</summary>
         Trigger,
         /// <summary>The stimulus goes on, at the first tick at or after the trial start plus the lead.</summary>
         Stimulus,
@@ -23,24 +22,24 @@ namespace OpenRigs.Trials
         Cue,
         /// <summary>The trial ended, its outcome in Outcome.</summary>
         Outcome,
-        /// <summary>The laser has run to its cap (LaserTiming.LaserCapSeconds from the trigger) with no outcome yet: stop it.</summary>
+        /// <summary>The laser has run to its cap (LaserTiming.LaserCapSeconds from the trigger) with no outcome yet: end it now.</summary>
         LaserCap,
         /// <summary>The trigger line falls.</summary>
         TriggerOff,
         /// <summary>The trial's stimulus goes off (StimulusTiming): once per trial whose stimulus came on and whose timing has a
         /// StimulusDurationSeconds or ResponseToStimulusOffSeconds, at the first tick at or after StimulusTiming.Time, or at the outcome itself when that is the time.</summary>
         StimulusOff,
-        /// <summary>A LaserTiming.UntilStimulusOff laser ends (stop Zapit): just after its trial's StimulusOff, or at its outcome when
+        /// <summary>A LaserTiming.UntilStimulusOff laser ends (end it now): just after its trial's StimulusOff, or at its outcome when
         /// its stimulus is not on (never came on), whichever is first; at the trigger when the stimulus was already off. Never after its LaserCap.</summary>
         LaserOff
     }
 
-    /// <summary>When a trial's laser ends, and so when the next trial's StartStimulus may go.</summary>
+    /// <summary>When a trial's laser ends, and so when the next trial may be armed.</summary>
     public enum LaserEnd
     {
         /// <summary>The laser runs until the outcome (or LaserCap); the trigger line falls TriggerHoldSeconds after the outcome.</summary>
         AtOutcome,
-        /// <summary>The laser runs the trial's LaserDurationSeconds (ILaserDurationTrial) from the trigger, outcome or not; the line falls then.</summary>
+        /// <summary>The laser runs the trial's LaserDurationSeconds (IOptoDurationTrial) from the trigger, outcome or not; the line falls then.</summary>
         AfterDuration,
         /// <summary>The laser runs until the trial's StimulusOff, even past the outcome (or its outcome when its stimulus never came on,
         /// or LaserCap), then LaserOff; the trigger line falls TriggerHoldSeconds after the laser's end.</summary>
@@ -49,7 +48,8 @@ namespace OpenRigs.Trials
 
     /// <summary>
     /// An experiment's laser timing: the triggering, when the laser and its trigger line end, and when the next trial
-    /// may be armed (the line fallen, plus any ramp-down Zapit plays before it takes another StartStimulus).
+    /// may be armed (the line fallen, plus any ramp-down the opto system plays before it takes another Arm). Experiment design, the same on every
+    /// opto system; the system's own needs are its IOptoSystem's.
     /// </summary>
     public sealed class LaserTiming
     {
@@ -57,27 +57,27 @@ namespace OpenRigs.Trials
         {
         }
 
-        /// <summary>Gets whether the Zapit DAQ waits for the trigger line: its StartStimulus goes during the interval (Arm), else at the trigger.</summary>
+        /// <summary>Gets whether the opto system waits for the trigger line: it is armed during the interval (Arm), else at the trigger.</summary>
         public bool HardwareTriggered { get; private set; }
 
         /// <summary>Gets when the laser ends.</summary>
         public LaserEnd End { get; private set; }
 
-        /// <summary>Gets whether the laser plays until StopStimulus (AtOutcome, AtStimulusOff), its StartStimulus with no duration
-        /// (ZapitTrialCommand.UntilStopped), even for a trial with its own laser duration.</summary>
+        /// <summary>Gets whether the laser plays until ended now (AtOutcome, AtStimulusOff), armed with no duration of its own,
+        /// even for a trial with its own laser duration.</summary>
         public bool UntilStopped { get { return End != LaserEnd.AfterDuration; } }
 
         /// <summary>Gets how long the trigger line stays up past the laser's end, in seconds (AtOutcome: the outcome; AtStimulusOff).</summary>
         public double TriggerHoldSeconds { get; private set; }
 
-        /// <summary>Gets how long after the line falls Zapit takes the next StartStimulus, in seconds (AfterDuration).</summary>
+        /// <summary>Gets how long after the line falls the opto system takes the next Arm, in seconds (AfterDuration).</summary>
         public double RampDownSeconds { get; private set; }
 
         /// <summary>Gets how long after the trigger LaserCap comes with the laser still on, in seconds (AtOutcome, AtStimulusOff: a trial that is an
-        /// ILaserDurationTrial its own LaserDurationSeconds when shorter); infinity for none.</summary>
+        /// IOptoDurationTrial its own LaserDurationSeconds when shorter); infinity for none.</summary>
         public double LaserCapSeconds { get; private set; }
 
-        /// <summary>The laser on until the outcome, stopped by LaserCap laserCapSeconds after the trigger; the line held triggerHoldSeconds past the outcome (the conditions file's MaxRampDownSeconds, ZapitConditions.Check).</summary>
+        /// <summary>The laser on until the outcome, stopped by LaserCap laserCapSeconds after the trigger; the line held triggerHoldSeconds past the outcome (at least the system's longest ramp-down).</summary>
         public static LaserTiming UntilOutcome(bool hardwareTriggered, double triggerHoldSeconds, double laserCapSeconds)
         {
             Check("triggerHoldSeconds", triggerHoldSeconds, false);
@@ -91,24 +91,24 @@ namespace OpenRigs.Trials
             };
         }
 
-        /// <summary>ZapitDaq's (OpenRigs.Zapit) laser on until the outcome, as <see cref="UntilOutcome(bool, double, double)"/> with every trial
-        /// armed during its interval and started by the trigger line; triggerHoldSeconds at least the bank's longest ramp plus
-        /// ZapitDaq.EarlyStopLeadSeconds (ZapitBank.LongestRampSeconds): such a trial is streamed, and its early stop's ramp
-        /// starts within that lead, so it has played out before the next trial is armed.</summary>
+        /// <summary>A hardware-triggered laser on until the outcome, as <see cref="UntilOutcome(bool, double, double)"/> with every trial
+        /// armed during its interval and started by the trigger line (a system that arms every trial before its trigger takes only these);
+        /// triggerHoldSeconds at least the system's longest ramp plus its early stop's lead (OpenRigs.Opto.ZapitDaq: ZapitBank.LongestRampSeconds
+        /// plus ZapitDaq.EarlyStopLeadSeconds), so an early-stopped trial has played out before the next trial is armed.</summary>
         public static LaserTiming UntilOutcome(double triggerHoldSeconds, double laserCapSeconds)
         {
             return UntilOutcome(true, triggerHoldSeconds, laserCapSeconds);
         }
 
-        /// <summary>ZapitDaq's (OpenRigs.Zapit) laser on until its trial's stimulus goes off, as <see cref="UntilStimulusOff(bool, double, double)"/>
+        /// <summary>A hardware-triggered laser on until its trial's stimulus goes off, as <see cref="UntilStimulusOff(bool, double, double)"/>
         /// with every trial armed during its interval and started by the trigger line; triggerHoldSeconds as <see cref="UntilOutcome(double, double)"/>'s.</summary>
         public static LaserTiming UntilStimulusOff(double triggerHoldSeconds, double laserCapSeconds)
         {
             return UntilStimulusOff(true, triggerHoldSeconds, laserCapSeconds);
         }
 
-        /// <summary>ZapitDaq's (OpenRigs.Zapit) laser on for each trial's own duration, as <see cref="ForDuration(bool, double)"/> with every
-        /// trial armed during its interval and started by the trigger line; rampDownSeconds the bank's longest ramp.</summary>
+        /// <summary>A hardware-triggered laser on for each trial's own duration, as <see cref="ForDuration(bool, double)"/> with every
+        /// trial armed during its interval and started by the trigger line; rampDownSeconds the system's longest ramp.</summary>
         public static LaserTiming ForDuration(double rampDownSeconds)
         {
             return ForDuration(true, rampDownSeconds);
@@ -116,7 +116,7 @@ namespace OpenRigs.Trials
 
         /// <summary>The laser on until its trial's stimulus goes off (StimulusOff, which can come after the outcome), or its outcome when its
         /// stimulus never came on, stopped by LaserCap laserCapSeconds after the trigger (a trial's own LaserDurationSeconds when it is an
-        /// ILaserDurationTrial and that is shorter); the line held triggerHoldSeconds past the laser's end, the next trial armed then.
+        /// IOptoDurationTrial and that is shorter); the line held triggerHoldSeconds past the laser's end, the next trial armed then.
         /// Every laser trial's timing must give its stimulus an off time (TrialTiming.StimulusDurationSeconds or ResponseToStimulusOffSeconds).</summary>
         public static LaserTiming UntilStimulusOff(bool hardwareTriggered, double triggerHoldSeconds, double laserCapSeconds)
         {
@@ -126,15 +126,15 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>A trial's LaserCap under UntilStimulusOff, in seconds from its trigger: LaserCapSeconds, or the trial's own
-        /// LaserDurationSeconds when it is an ILaserDurationTrial and that is shorter.</summary>
+        /// LaserDurationSeconds when it is an IOptoDurationTrial and that is shorter.</summary>
         public double CapOf(ITrial trial)
         {
-            var timed = trial as ILaserDurationTrial;
+            var timed = trial as IOptoDurationTrial;
             return timed == null ? LaserCapSeconds : Math.Min(LaserCapSeconds, DurationOf(trial));
         }
 
         /// <summary>How long a laser played until stopped (AtOutcome, AtStimulusOff) runs from its trigger before its own ramp, in
-        /// seconds, as ZapitDaq arms it: under AtStimulusOff with a timed stimulus its stimulus's own off (laserToStimulusSeconds plus
+        /// seconds, as a system that arms every trial before its trigger is armed for it (IOptoSystem.ArmCarriesLaserSeconds): under AtStimulusOff with a timed stimulus its stimulus's own off (laserToStimulusSeconds plus
         /// StimulusDurationSeconds), at most its LaserCap; else its LaserCap; 0 with no cap (until stopped, at most maxTrialSeconds).
         /// The samples end there with no early stop, so a laser never outlasts its cap or its stimulus's own off; an early stop
         /// ends it sooner (an off after the answer, an outcome before the stimulus).</summary>
@@ -146,7 +146,7 @@ namespace OpenRigs.Trials
             return double.IsInfinity(seconds) ? 0 : seconds;
         }
 
-        /// <summary>The laser on for each trial's own duration from the trigger (every laser trial an ILaserDurationTrial); the next trial armed rampDownSeconds after the line falls.</summary>
+        /// <summary>The laser on for each trial's own duration from the trigger (every laser trial an IOptoDurationTrial); the next trial armed rampDownSeconds after the line falls.</summary>
         public static LaserTiming ForDuration(bool hardwareTriggered, double rampDownSeconds)
         {
             Check("rampDownSeconds", rampDownSeconds, false);
@@ -159,11 +159,11 @@ namespace OpenRigs.Trials
             };
         }
 
-        /// <summary>A trial's laser duration under ForDuration: its ILaserDurationTrial's, a finite number above 0; throws, naming the trial, otherwise.</summary>
+        /// <summary>A trial's laser duration under ForDuration: its IOptoDurationTrial's, a finite number above 0; throws, naming the trial, otherwise.</summary>
         public static double DurationOf(ITrial trial)
         {
-            var timed = trial as ILaserDurationTrial;
-            if (timed == null) throw new InvalidOperationException(string.Format("Trial {0} is a laser trial of a LaserTiming.ForDuration task, but has no laser duration of its own (ILaserDurationTrial).", trial.TrialNumber));
+            var timed = trial as IOptoDurationTrial;
+            if (timed == null) throw new InvalidOperationException(string.Format("Trial {0} is a laser trial of a LaserTiming.ForDuration task, but has no laser duration of its own (IOptoDurationTrial).", trial.TrialNumber));
             Check("trial " + trial.TrialNumber + "'s laserDurationSeconds", timed.LaserDurationSeconds, true);
             return timed.LaserDurationSeconds;
         }
@@ -315,12 +315,12 @@ namespace OpenRigs.Trials
         /// <summary>Gets or sets the tick the trigger line rose (laserTriggerTime); NaN if it has not.</summary>
         public double LaserTriggerTime { get; set; }
 
-        /// <summary>Gets or sets the power ZapitDaq armed the trial with, in mW (its Armed event's CappedPowerMw; 0 with the laser
-        /// off); NaN on MATLAB Zapit, whose trial row logs the trial's own LaserPowerMw.</summary>
+        /// <summary>Gets or sets the power the opto system armed the trial with, in mW (its Armed's PowerMw; 0 with the laser
+        /// off), on a system that confirms its starts (IOptoSystem.ConfirmsStart); NaN on another, whose trial row logs the trial's own LaserPowerMw.</summary>
         public double LaserPowerMw { get; set; } = double.NaN;
 
-        /// <summary>Gets or sets whether ZapitDaq's Started for the trial came after its trigger by Now (laserStarted): its
-        /// samples, laser on or off, began. False without ZapitDaq.</summary>
+        /// <summary>Gets or sets whether the opto system's Started for the trial came after its trigger by Now (laserStarted): its
+        /// samples, laser on or off, began. False on a system that does not confirm its starts.</summary>
         public bool LaserStarted { get; set; }
 
         /// <summary>Gets or sets the Harp clock's latest tick: an outcome given now is timed then (outcomeTime).</summary>
@@ -341,7 +341,7 @@ namespace OpenRigs.Trials
         public bool Responding { get { return Now >= ResponseStartTime - TrialLoop.Tolerance; } }
     }
 
-    /// <summary>A trial as the loop needs it: its number. A laser trial's is also an <see cref="IZapitTrial"/>.</summary>
+    /// <summary>A trial as the loop needs it: its number. A laser trial's is also an <see cref="IOptoTrial"/>.</summary>
     public interface ITrial
     {
         /// <summary>Gets the trial's number, from 1.</summary>
@@ -359,7 +359,7 @@ namespace OpenRigs.Trials
     /// A task's own part of its trials, which <see cref="TrialLoop{TTrial, TUpdate, TOutcome}"/> runs: the draw, each
     /// trial's timing, and the response rule, called with each input from the trial's start to its outcome. A method
     /// returns the outcome when the trial ends, else null; changes the task shows (TUpdate) go into updates, in order.
-    /// Called under the loop's lock, one call at a time. A laser trial (TrialTiming.Laser) must be an IZapitTrial.
+    /// Called under the loop's lock, one call at a time. A laser trial (TrialTiming.Laser) must be an IOptoTrial.
     /// </summary>
     public interface ITrialRules<TTrial, TUpdate, TOutcome>
         where TTrial : class, ITrial
@@ -436,8 +436,8 @@ namespace OpenRigs.Trials
         /// <summary>Gets the outcome (Outcome).</summary>
         public TOutcome Outcome { get; private set; }
 
-        /// <summary>Gets how long the trial's laser runs from its trigger before its ramp as Zapit is armed (Arm, with a laser
-        /// played until stopped: LaserTiming.ArmedSecondsOf); 0 otherwise.</summary>
+        /// <summary>Gets how long the trial's laser runs from its trigger before its ramp as the opto system is armed (Arm, with a laser
+        /// played until stopped, on a system whose Arm carries it: IOptoSystem.ArmCarriesLaserSeconds, LaserTiming.ArmedSecondsOf); 0 otherwise.</summary>
         public double LaserSeconds { get; internal set; }
     }
 }

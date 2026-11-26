@@ -30,6 +30,9 @@
     <!-- PlayPenaltyFlash, built here with BonVision's DrawQuad -->
     <ProjectReference Include="..\OpenRigs.Vision\OpenRigs.Vision.csproj" />
     <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
+    <!-- The loop's tests run it through both Zapit adapters (the behaviour guard of the Opto port), and the Zapit pieces' tests include theirs. -->
+    <ProjectReference Include="..\OpenRigs.Opto.ZapitDaq\OpenRigs.Opto.ZapitDaq.csproj" />
+    <ProjectReference Include="..\OpenRigs.Opto.ZapitMatlab\OpenRigs.Opto.ZapitMatlab.csproj" />
   </ItemGroup>
 
 </Project>

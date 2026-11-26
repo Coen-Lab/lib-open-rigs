@@ -56,6 +56,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Zapit", "src\OpenR
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Zapit.Tests", "src\OpenRigs.Zapit.Tests\OpenRigs.Zapit.Tests.csproj", "{50F64BB4-DF0F-4D6B-ABE7-009BD766C157}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Opto.ZapitDaq", "src\OpenRigs.Opto.ZapitDaq\OpenRigs.Opto.ZapitDaq.csproj", "{99FBBE92-DB07-4433-B58E-188EBD3E99CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenRigs.Opto.ZapitMatlab", "src\OpenRigs.Opto.ZapitMatlab\OpenRigs.Opto.ZapitMatlab.csproj", "{3A77BBF1-F322-4258-895A-A641014A9671}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -146,6 +150,14 @@ Global
 		{50F64BB4-DF0F-4D6B-ABE7-009BD766C157}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{50F64BB4-DF0F-4D6B-ABE7-009BD766C157}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{50F64BB4-DF0F-4D6B-ABE7-009BD766C157}.Release|Any CPU.Build.0 = Release|Any CPU
+		{99FBBE92-DB07-4433-B58E-188EBD3E99CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{99FBBE92-DB07-4433-B58E-188EBD3E99CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{99FBBE92-DB07-4433-B58E-188EBD3E99CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{99FBBE92-DB07-4433-B58E-188EBD3E99CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A77BBF1-F322-4258-895A-A641014A9671}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A77BBF1-F322-4258-895A-A641014A9671}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A77BBF1-F322-4258-895A-A641014A9671}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A77BBF1-F322-4258-895A-A641014A9671}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -166,5 +178,7 @@ Global
 		{5E010C28-141C-4783-AAB7-F4755BEBB48D} = {B2E5F084-2FFD-4476-8510-764F7006418F}
 		{10BBDC45-2121-4E42-A573-252E2FC580D3} = {B2E5F084-2FFD-4476-8510-764F7006418F}
 		{50F64BB4-DF0F-4D6B-ABE7-009BD766C157} = {B2E5F084-2FFD-4476-8510-764F7006418F}
+		{99FBBE92-DB07-4433-B58E-188EBD3E99CE} = {B2E5F084-2FFD-4476-8510-764F7006418F}
+		{3A77BBF1-F322-4258-895A-A641014A9671} = {B2E5F084-2FFD-4476-8510-764F7006418F}
 	EndGlobalSection
 EndGlobal

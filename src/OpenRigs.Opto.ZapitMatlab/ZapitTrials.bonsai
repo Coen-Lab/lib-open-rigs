@@ -4,6 +4,7 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:trl="clr-namespace:OpenRigs.Trials;assembly=OpenRigs.Trials"
+                 xmlns:zml="clr-namespace:OpenRigs.Opto.ZapitMatlab;assembly=OpenRigs.Opto.ZapitMatlab"
                  xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Description>Zapit's trials, the same in every task: give it the trials' rules (TrialRules, once, at Go). In an optogenetics experiment (the rules' Laser, a LaserTiming, is set) each trial's StartStimulus (ArmZapit: its condition, laser on at the trial's power or off at 0 mW) goes into ZapitCommands, at the trial's Arm event on a hardware-triggered rig, else at its Trigger, all as the rules' Laser gives it. The laser's stop is the rules' Laser too: LaserTiming.ForDuration plays it for its laserDurationSeconds; LaserTiming.UntilOutcome and UntilStimulusOff (no duration) play it until StopZapit, sent once per trial from its trigger at whichever comes first of its outcome (UntilOutcome) or LaserOff (UntilStimulusOff: its StimulusOff, else its outcome), its LaserCap (the rules' LaserCapSeconds on the Harp clock) or LaserBackstop (LaserCapSeconds on the computer's clock, should the board stall: the one wall-clock wait). In the Zapit SelectMany too, so only once given rules with a laser, the ZapitTrigger line is raised at each Trigger and cleared at each TriggerOff (SetZapitTriggerLine, on BehaviorBoard-Main.Commands): a workflow that includes ZapitTrials and ZapitDaqTrials and gives its rules to one per session writes the line once. TrialLoop checks Zapit's replies. Needs TrialEvents, ZapitCommands (OpenRigs.Devices ConnectForTask) and ZapitTriggerLine from the workflow.</Description>
@@ -79,8 +80,8 @@
             <Expression xsi:type="Combinator">
               <Name>ArmZapit</Name>
               <Description>Each trial's StartStimulus (its condition, laser on with the trial's power or off at 0 mW, for the trial's own laser duration (an ILaserDurationTrial) unless the rules' laser plays until stopped (UntilStopped), else until StopZapit). On a hardware-triggered rig sent at Arm, during the interval; without, Zapit starts the laser on receipt, so it is sent at the Trigger.</Description>
-              <Combinator xsi:type="trl:ZapitTrialCommand">
-                <trl:HardwareTriggered>false</trl:HardwareTriggered>
+              <Combinator xsi:type="zml:ZapitTrialCommand">
+                <zml:HardwareTriggered>false</zml:HardwareTriggered>
               </Combinator>
             </Expression>
             <Expression xsi:type="MulticastSubject">

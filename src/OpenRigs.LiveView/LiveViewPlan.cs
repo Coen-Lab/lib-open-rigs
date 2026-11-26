@@ -181,7 +181,7 @@ namespace OpenRigs.LiveView
         public const string BalanceInstance = "Balance";
 
         /// <summary>
-        /// The instance name of the Zapit camera, which OpenRigs.Devices' ZapitCamera opens from rig.yml's zapit block, not
+        /// The instance name of the Zapit camera, which OpenRigs.Opto.ZapitDaq's ZapitCamera opens from rig.yml's zapit block, not
         /// its camera list: published as Camera-Zapit.Data, it is streamed as the Balance camera is, but only when rig.yml's
         /// zapit block names its NI device (zapit.device), the rule by which ConnectForTaskZapitDaq opens the camera at all.
         /// </summary>

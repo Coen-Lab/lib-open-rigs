@@ -1,6 +1,6 @@
 # Zapit setup protocol
 
-Zapit's setup phase runs inside the session workflow, between launch and Go, on a rig whose rig.yml `zapit` block names ZapitDaq's NI device (`zapit.device`). The workflow side is OpenRigs.Devices' `ConnectForTaskZapitDaq`, which includes `ZapitSetup` and `ZapitCamera`. The agent is the launching app. Both use only the existing channels: ControlServer commands and status (port 5561), and StreamDevices (data port 5556, video port 5558).
+Zapit's setup phase runs inside the session workflow, between launch and Go, on a rig whose rig.yml `zapit` block names ZapitDaq's NI device (`zapit.device`). The workflow side is ZapitDaq's opto adapter's `ConnectForTaskZapitDaq` (`OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai`; `OpenRigs.Devices:` until .26), which includes `ZapitSetup` and `ZapitCamera` (the adapter's too). The agent is the launching app. Both use only the existing channels: ControlServer commands and status (port 5561), and StreamDevices (data port 5556, video port 5558).
 
 ## Channels
 
@@ -110,7 +110,7 @@ The workflow keeps no setup state of its own beyond the loaded bank.
 | Subject | Declared by | Type |
 | --- | --- | --- |
 | `Zapit.Commands` | ConnectForTaskZapitDaq | BehaviorSubject of ZapitDaqCommand |
-| `Zapit.Events` | ConnectForTaskZapitDaq | PublishSubject of ZapitDaqEvent; TrialLoop.Observe takes it |
+| `Zapit.Events` | ConnectForTaskZapitDaq | PublishSubject of ZapitDaqEvent; ZapitDaqOpto.Observe takes it (the trial loop's opto feedback) |
 | `Zapit.Bank` | ConnectForTaskZapitDaq | BehaviorSubject of ZapitBank; the task's draw takes it at Go (`ZapitDaqTrial.Draw`) |
 | `Camera-Zapit.Data` | ZapitCamera | PublishSubject of Harp-timestamped frames |
 | `Optogenetics` | ConnectForTaskZapitDaq | AsyncSubject of bool; the condition of Zapit's ExpectedFiles |

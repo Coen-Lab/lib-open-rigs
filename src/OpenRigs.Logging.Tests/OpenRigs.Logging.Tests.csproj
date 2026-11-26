@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net472</TargetFrameworks>
@@ -27,8 +27,9 @@
     <ProjectReference Include="..\OpenRigs.Logging\OpenRigs.Logging.csproj" />
     <!-- TaskLogs includes Zapit's logs (OpenRigs.Devices ZapitLogs) -->
     <ProjectReference Include="..\OpenRigs.Devices\OpenRigs.Devices.csproj" />
-    <!-- TaskLogsZapitDaq logs ZapitDaq's events (OpenRigs.Zapit) -->
+    <!-- TaskLogsZapitDaq and ConditionedTaskLogsZapitDaq (the ZapitDaq adapter's) log ZapitDaq's events (OpenRigs.Zapit) -->
     <ProjectReference Include="..\OpenRigs.Zapit\OpenRigs.Zapit.csproj" />
+    <ProjectReference Include="..\OpenRigs.Opto.ZapitDaq\OpenRigs.Opto.ZapitDaq.csproj" />
     <ProjectReference Include="..\OpenRigs.Tests\OpenRigs.Tests.csproj" />
   </ItemGroup>
 

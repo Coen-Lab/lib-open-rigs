@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using OpenRigs.Opto.ZapitMatlab;
 
 namespace OpenRigs.Trials.Tests
 {
     [TestClass]
     public class ZapitTrialCommandTests
     {
-        class Trial : ILaserDurationTrial
+        class Trial : IOptoDurationTrial
         {
             public double LaserDurationSeconds { get { return 1.5; } }
             public int TrialNumber { get; set; }

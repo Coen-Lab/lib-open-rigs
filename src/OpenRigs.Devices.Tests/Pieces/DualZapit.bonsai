@@ -57,7 +57,7 @@
       <Expression xsi:type="rx:PublishSubject" TypeArguments="harp:HarpMessage">
         <rx:Name>BehaviorBoard-Main.Data</rx:Name>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai">
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai">
         <OpenedBy>optogenetics.zapitBonsai</OpenedBy>
         <OptogeneticsSwitch>TaskParameters.Optogenetics.ZapitBonsai</OptogeneticsSwitch>
         <NoZapitDaqMessage>Zapit-Bonsai is ticked, but this rig's rig.yml has no native zapit block: tick Zapit-MATLAB, or fill in the block.</NoZapitDaqMessage>

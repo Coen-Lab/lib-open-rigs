@@ -44,7 +44,7 @@ namespace OpenRigs.Devices.Tests
             {
                 builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
             }
-            var include = Included(builder.Workflow, "OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai");
+            var include = Included(builder.Workflow, "OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai");
             var properties = System.ComponentModel.TypeDescriptor.GetProperties(include);
             var daq = Nested(include.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<OpenRigs.Zapit.ZapitDaq>().Single();
             var ceiling = Nested(include.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator).OfType<DoubleProperty>().Single();
@@ -54,7 +54,7 @@ namespace OpenRigs.Devices.Tests
             properties["LaserCeilingVolts"].SetValue(include, 1.25);
             Assert.IsTrue(daq.Simulated);
             Assert.AreEqual(1.25, ceiling.Value);
-            Included(include.Workflow, "OpenRigs.Devices:ZapitSetup.bonsai");
+            Included(include.Workflow, "OpenRigs.Opto.ZapitDaq:ZapitSetup.bonsai");
             Assert.IsTrue(MappedFrom(include.Workflow, typeof(OpenRigs.Zapit.ZapitDaq), "LaserCeilingVolts", "Zapit.LaserCeilingVolts"));
             Assert.IsTrue(MappedFrom(include.Workflow, typeof(OpenRigs.Zapit.ZapitSetupCapture), "LaserCeilingVolts", "Zapit.LaserCeilingVolts"));
         }
@@ -86,7 +86,7 @@ namespace OpenRigs.Devices.Tests
                 {
                     builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
                 }
-                var camera = Included(Included(builder.Workflow, "OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai").Workflow, "OpenRigs.Devices:ZapitCamera.bonsai").Workflow;
+                var camera = Included(Included(builder.Workflow, "OpenRigs.Opto.ZapitDaq:ConnectForTaskZapitDaq.bonsai").Workflow, "OpenRigs.Opto.ZapitDaq:ZapitCamera.bonsai").Workflow;
                 var pylon = Nested(camera).Select(n => n.Value).OfType<CombinatorBuilder>().Single(c => c.Combinator.GetType().FullName == "OpenRigs.Zapit.ZapitPylonCapture");
                 pylon.Combinator = new StandInPylonCapture();
                 builder.Workflow.Build();

@@ -39,7 +39,7 @@
           <test:LaserCapSeconds>LASER_CAP</test:LaserCapSeconds>
         </Combinator>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Trials:ZapitDaqTrials.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:ZapitDaqTrials.bonsai" />
       <Expression xsi:type="SubscribeSubject">
         <Name>Zapit.Commands</Name>
       </Expression>

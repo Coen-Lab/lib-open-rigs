@@ -4,8 +4,9 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:trl="clr-namespace:OpenRigs.Trials;assembly=OpenRigs.Trials"
+                 xmlns:zdq="clr-namespace:OpenRigs.Opto.ZapitDaq;assembly=OpenRigs.Opto.ZapitDaq"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit's trials on ZapitDaq (ZapitTrials is MATLAB Zapit's), the same in every task: give it the trials' rules (TrialRules, once, at Go). In an optogenetics experiment (the rules' Laser, a LaserTiming, is set) each trial is armed at its Arm event, during the interval (ArmZapit: a ZapitDaq Arm with its condition, laser on at the trial's power or off), into Zapit.Commands; ZapitDaq builds the buffer from the session's bank and the trigger line starts it. The laser's stop is the rules' Laser: LaserTiming.ForDuration plays it for its laserDurationSeconds; LaserTiming.UntilOutcome and UntilStimulusOff (UntilStopped) are armed for the Arm event's LaserSeconds (the cap, or under UntilStimulusOff with a timed stimulus its stimulus's own off, so the samples end there with their ramp should the early stop not be written in time; 0 for no cap) and play until an early stop (ZapitEarlyStop: the ramp, then laser and LED at 0 V), sent once per trial from its trigger at whichever comes first of its outcome (UntilOutcome) or LaserOff (UntilStimulusOff: its StimulusOff, else its outcome), its LaserCap (the rules' LaserCapSeconds on the Harp clock) or LaserBackstop (LaserCapSeconds on the computer's clock, should the board stall: the one wall-clock wait). In the Zapit SelectMany too, so only once given rules with a laser, the ZapitTrigger line is raised at each Trigger and cleared at each TriggerOff (SetZapitTriggerLine, on BehaviorBoard-Main.Commands), with the twin's trigger (TwinTrigger): a workflow that includes ZapitTrials and ZapitDaqTrials and gives its rules to one per session writes the line once. TrialLoop checks ZapitDaq's Armed events (Zapit.Events). Needs TrialEvents, Zapit.Commands (OpenRigs.Devices ConnectForTaskZapitDaq) and ZapitTriggerLine from the workflow.</Description>
+  <Description>Zapit's trials on ZapitDaq (ZapitTrials is MATLAB Zapit's), the same in every task: give it the trials' rules (TrialRules, once, at Go). In an optogenetics experiment (the rules' Laser, a LaserTiming, is set) each trial is armed at its Arm event, during the interval (ArmZapit: a ZapitDaq Arm with its condition, laser on at the trial's power or off), into Zapit.Commands; ZapitDaq builds the buffer from the session's bank and the trigger line starts it. The laser's stop is the rules' Laser: LaserTiming.ForDuration plays it for its laserDurationSeconds; LaserTiming.UntilOutcome and UntilStimulusOff (UntilStopped) are armed for the Arm event's LaserSeconds (the cap, or under UntilStimulusOff with a timed stimulus its stimulus's own off, so the samples end there with their ramp should the early stop not be written in time; 0 for no cap) and play until an early stop (ZapitEarlyStop: the ramp, then laser and LED at 0 V), sent once per trial from its trigger at whichever comes first of its outcome (UntilOutcome) or LaserOff (UntilStimulusOff: its StimulusOff, else its outcome), its LaserCap (the rules' LaserCapSeconds on the Harp clock) or LaserBackstop (LaserCapSeconds on the computer's clock, should the board stall: the one wall-clock wait). In the Zapit SelectMany too, so only once given rules with a laser, the ZapitTrigger line is raised at each Trigger and cleared at each TriggerOff (SetZapitTriggerLine, on BehaviorBoard-Main.Commands), with the twin's trigger (TwinTrigger): a workflow that includes ZapitTrials and ZapitDaqTrials and gives its rules to one per session writes the line once. TrialLoop checks ZapitDaq's Armed events (Zapit.Events). Needs TrialEvents, Zapit.Commands (ConnectForTaskZapitDaq) and ZapitTriggerLine from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">
@@ -55,7 +56,7 @@
             <Expression xsi:type="Combinator">
               <Name>ArmZapit</Name>
               <Description>Each trial's Arm (its condition, laser on at the trial's power or off, for the trial's own laser duration (an ILaserDurationTrial) unless the rules' laser plays until stopped (UntilStopped), else for its Arm event's LaserSeconds, the early stop ending it sooner), sent during the interval: ZapitDaq builds the buffer and waits on the trigger line.</Description>
-              <Combinator xsi:type="trl:ZapitDaqTrialCommand" />
+              <Combinator xsi:type="zdq:ZapitDaqTrialCommand" />
             </Expression>
             <Expression xsi:type="MulticastSubject">
               <Name>Zapit.Commands</Name>
@@ -108,7 +109,7 @@
                   <Expression xsi:type="Combinator">
                     <Name>LaserBackstop</Name>
                     <Description>The trial again the rules' LaserCapSeconds after the trigger on the computer's clock, should the Harp board stall so that LaserCap never comes: the one wall-clock wait. Whichever comes first stops the laser.</Description>
-                    <Combinator xsi:type="trl:ZapitLaserBackstop" />
+                    <Combinator xsi:type="trl:OptoBackstop" />
                   </Expression>
                   <Expression xsi:type="SubscribeSubject">
                     <Name>TrialEvents</Name>
@@ -163,7 +164,7 @@
                     </Combinator>
                   </Expression>
                   <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="trl:ZapitEarlyStop" />
+                    <Combinator xsi:type="zdq:ZapitEarlyStop" />
                   </Expression>
                   <Expression xsi:type="MulticastSubject">
                     <Name>Zapit.Commands</Name>
@@ -227,7 +228,7 @@
             <Expression xsi:type="Combinator">
               <Name>TwinTrigger</Name>
               <Description>The same trigger as ZapitDaq's Trigger command: the simulated twin's edge, so a desk run starts each trial at the loop's trigger as a rig's line does. The NI DAQ ignores it.</Description>
-              <Combinator xsi:type="trl:ZapitTwinTrigger" />
+              <Combinator xsi:type="zdq:ZapitTwinTrigger" />
             </Expression>
             <Expression xsi:type="MulticastSubject">
               <Name>Zapit.Commands</Name>

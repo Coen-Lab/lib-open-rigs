@@ -96,7 +96,7 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:LogEvents.bonsai" />
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:TaskLogsZapitDaq.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:TaskLogsZapitDaq.bonsai" />
     </Nodes>
     <Edges>
       <Edge From="0" To="3" Label="Source1" />

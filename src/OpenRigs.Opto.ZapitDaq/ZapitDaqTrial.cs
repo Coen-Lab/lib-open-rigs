@@ -1,12 +1,13 @@
 using Bonsai;
+using OpenRigs.Trials;
 using OpenRigs.Zapit;
 using System;
 using System.ComponentModel;
 using System.Reactive.Linq;
 
-namespace OpenRigs.Trials
+namespace OpenRigs.Opto.ZapitDaq
 {
-    /// <summary>The rules every task's laser trials share with ZapitDaq (MATLAB Zapit's are OpenRigs.Devices.Zapit ZapitTrial), and the checks the loop makes of its Armed events.</summary>
+    /// <summary>The rules every task's laser trials share with ZapitDaq (MATLAB Zapit's are OpenRigs.Devices.Zapit ZapitTrial), and the checks ZapitDaqOptoSystem makes of its Armed events for the loop.</summary>
     public static class ZapitDaqTrial
     {
         /// <summary>The most ZapitDaq's Arm may take, in seconds (its Armed event's ArmSeconds): every task arms at least this
@@ -39,13 +40,13 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>A trial's Arm command: its condition, the laser on at its power or off, for its laser duration (an
-        /// ILaserDurationTrial) unless untilStopped (LaserTiming.UntilStopped), else for laserSeconds, the most it plays before an
+        /// IOptoDurationTrial) unless untilStopped (LaserTiming.UntilStopped), else for laserSeconds, the most it plays before an
         /// early stop (its Arm event's LaserSeconds; 0 until the early stop, at most maxTrialSeconds). With untilStopped the
         /// Arm says UntilStopped, so ZapitDaq streams the trial and its early stop ramps within ZapitDaq.EarlyStopLeadSeconds.</summary>
-        public static ZapitDaqCommand Arm(IZapitTrial trial, bool untilStopped = false, double laserSeconds = 0)
+        public static ZapitDaqCommand Arm(IOptoTrial trial, bool untilStopped = false, double laserSeconds = 0)
         {
             if (trial.LaserCondition < 1) throw new InvalidOperationException(string.Format("Trial {0} has laser condition {1}; a laser trial's is from 1.", trial.TrialNumber, trial.LaserCondition));
-            var timed = trial as ILaserDurationTrial;
+            var timed = trial as IOptoDurationTrial;
             return new ZapitDaqCommand
             {
                 Kind = ZapitDaqCommandKind.Arm,
@@ -61,11 +62,17 @@ namespace OpenRigs.Trials
         /// <summary>Throws unless an Armed event is the trial's, as asked: its number, condition and laser.</summary>
         public static void CheckArmed(ZapitDaqEvent armed, int trialNumber, int laserCondition, bool laserOn)
         {
-            if (armed.Trial != trialNumber || armed.Condition != laserCondition || armed.LaserOn != laserOn)
+            CheckArmed(armed.Trial, armed.Condition, armed.LaserOn, trialNumber, laserCondition, laserOn);
+        }
+
+        /// <summary>Throws unless what ZapitDaq armed (its Armed event's trial, condition and laser) is the trial's, as asked.</summary>
+        public static void CheckArmed(int armedTrial, int armedCondition, bool armedLaserOn, int trialNumber, int laserCondition, bool laserOn)
+        {
+            if (armedTrial != trialNumber || armedCondition != laserCondition || armedLaserOn != laserOn)
             {
                 throw new InvalidOperationException(string.Format(
                     "ZapitDaq armed trial {0} (condition {1}, laser {2}) when trial {3} asked for condition {4}, laser {5}, so the workflow stopped.",
-                    armed.Trial, armed.Condition, armed.LaserOn ? "on" : "off", trialNumber, laserCondition, laserOn ? "on" : "off"));
+                    armedTrial, armedCondition, armedLaserOn ? "on" : "off", trialNumber, laserCondition, laserOn ? "on" : "off"));
             }
         }
 
@@ -76,10 +83,7 @@ namespace OpenRigs.Trials
         /// </summary>
         public static string LeadProblem(double laserToStimulusSeconds, double itiMinSeconds)
         {
-            if (laserToStimulusSeconds + ArmSeconds <= itiMinSeconds + 1e-9) return null;
-            return string.Format(
-                "optogenetics.laserToStimulusSeconds ({0} s) plus Zapit's {1} s arm time must be at most trialStructure.itiMinSeconds ({2} s), the shortest interval",
-                laserToStimulusSeconds, ArmSeconds, itiMinSeconds);
+            return ZapitDaqOptoSystem.Limits(0).LeadProblem(laserToStimulusSeconds, itiMinSeconds);
         }
 
         /// <summary>The stop for a trial whose trigger came before ZapitDaq armed it: the task stops rather than move the trigger.</summary>
@@ -108,7 +112,7 @@ namespace OpenRigs.Trials
     /// <summary>Each trial's Arm for ZapitDaq (<see cref="ZapitDaqTrial.Arm"/>), sent as the loop arms it during the interval.</summary>
     [Combinator]
     [Description("Each laser trial's ZapitDaq Arm: its condition, the laser on at its power or off (galvos and masking light either way), " +
-        "for the trial's laser duration (an ILaserDurationTrial), else, or with UntilStopped, for the Arm event's LaserSeconds (its cap, or its stimulus's own off), " +
+        "for the trial's laser duration (an IOptoDurationTrial), else, or with UntilStopped, for the Arm event's LaserSeconds (its cap, or its stimulus's own off), " +
         "the early stop ending it sooner. Input: the loop's Arm events.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitDaqTrialCommand
@@ -118,7 +122,7 @@ namespace OpenRigs.Trials
         public bool UntilStopped { get; set; }
 
         /// <summary>Each Arm event's Arm; UntilStopped is read at subscription.</summary>
-        public IObservable<ZapitDaqCommand> Process<TTrial, TUpdate, TOutcome>(IObservable<TrialEvent<TTrial, TUpdate, TOutcome>> source) where TTrial : IZapitTrial
+        public IObservable<ZapitDaqCommand> Process<TTrial, TUpdate, TOutcome>(IObservable<TrialEvent<TTrial, TUpdate, TOutcome>> source) where TTrial : IOptoTrial
         {
             return Observable.Defer(() =>
             {
@@ -138,21 +142,6 @@ namespace OpenRigs.Trials
         public IObservable<ZapitDaqCommand> Process<TSource>(IObservable<TSource> source)
         {
             return source.Select(_ => new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Trigger });
-        }
-    }
-
-    /// <summary>Each triggered trial again its rules' LaserCapSeconds later on the computer's clock (never with no cap): the backstop
-    /// that stops ZapitDaq should the Harp board stall so that LaserCap never comes.</summary>
-    [Combinator]
-    [Description("Each input trial (with the rules' laser timing, at its trigger) again LaserCapSeconds later on the computer's clock, never with no cap: the backstop should the Harp board stall.")]
-    [WorkflowElementCategory(ElementCategory.Combinator)]
-    public class ZapitLaserBackstop
-    {
-        /// <summary>Each trial at its cap.</summary>
-        public IObservable<TTrial> Process<TTrial>(IObservable<Tuple<TTrial, LaserTiming>> source)
-        {
-            return source.SelectMany(t => double.IsInfinity(t.Item2.LaserCapSeconds) ? Observable.Never<TTrial>()
-                : Observable.Timer(TimeSpan.FromSeconds(t.Item2.LaserCapSeconds)).Select(_ => t.Item1));
         }
     }
 

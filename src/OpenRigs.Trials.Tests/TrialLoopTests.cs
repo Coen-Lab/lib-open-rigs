@@ -5,10 +5,12 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenRigs.Devices.Zapit;
+using OpenRigs.Opto.ZapitDaq;
+using OpenRigs.Opto.ZapitMatlab;
 
 namespace OpenRigs.Trials.Tests
 {
-    class StubTrial : ILaserDurationTrial
+    class StubTrial : IOptoDurationTrial
     {
         public int TrialNumber { get; set; }
         public int LaserCondition { get; set; }
@@ -73,9 +75,10 @@ namespace OpenRigs.Trials.Tests
         public double? StopReplySeconds = 0;
         double stopReplyDue = double.NaN;
 
-        public LoopRig(StubRules rules, double first = 100.001, bool zapitDaq = false)
+        /// <summary>The loop on <paramref name="opto"/>; by default MATLAB Zapit's, or with <paramref name="zapitDaq"/> ZapitDaq's.</summary>
+        public LoopRig(StubRules rules, double first = 100.001, bool zapitDaq = false, IOptoSystem opto = null)
         {
-            Loop = new TrialLoop<StubTrial, string, StubOutcome>(rules, true, zapitDaq);
+            Loop = new TrialLoop<StubTrial, string, StubOutcome>(rules, true, opto ?? (zapitDaq ? (IOptoSystem)ZapitDaqOptoSystem.Instance : ZapitMatlabOptoSystem.Instance));
             Now = Math.Round(first - 0.001, 6);
         }
 
@@ -503,7 +506,7 @@ namespace OpenRigs.Trials.Tests
         [TestMethod]
         public void UntilStimulusOffTheCapStopsALaserStillOn()
         {
-            // The stimulus stays on to the answer in a 30 s window: the cap stops the laser, the trial's own 2.5 s (ILaserDurationTrial)
+            // The stimulus stays on to the answer in a 30 s window: the cap stops the laser, the trial's own 2.5 s (IOptoDurationTrial)
             // under the timing's 10 s, then 1 s when that is the shorter; no LaserOff after it.
             foreach (var cap in new[] { 10.0, 1.0 })
             {
@@ -715,7 +718,7 @@ namespace OpenRigs.Trials.Tests
             var events = new List<TrialEvent<StubTrial, string, StubOutcome>>();
             Exception error = null;
             var stub = new StubRules { Plan = n => Timing(0.5, true), Laser = LaserTiming.UntilOutcome(true, 0, double.PositiveInfinity) };
-            using (TrialLoop.Observe(rules, clock, new[] { left, right }, replies, wheel).Subscribe(events.Add, e => error = e))
+            using (ZapitMatlabOpto.Observe(rules, clock, new[] { left, right }, replies, wheel).Subscribe(events.Add, e => error = e))
             {
                 rules.OnNext(stub);
                 var now = 50.0;
@@ -743,7 +746,7 @@ namespace OpenRigs.Trials.Tests
                 var wheel = new Subject<double>();
                 var completed = false;
                 Exception error = null;
-                using (TrialLoop.Observe(Observable.Return(new StubRules()), clock, new[] { lick }, Observable.Never<ZapitReply>(), wheel)
+                using (ZapitMatlabOpto.Observe(Observable.Return(new StubRules()), clock, new[] { lick }, Observable.Never<ZapitReply>(), wheel)
                     .Subscribe(e => { }, e => error = e, () => completed = true))
                 {
                     clock.OnNext(100);
@@ -763,7 +766,7 @@ namespace OpenRigs.Trials.Tests
             Exception error = null;
             var clock = new Subject<double>();
             var stub = new StubRules { Plan = n => new TrialTiming { ItiSeconds = 2, WheelQuietSeconds = 1, WheelQuietCm = 1, ResponseWindowSeconds = 1.5 } };
-            using (TrialLoop.Observe(Observable.Return(stub), clock, new[] { Observable.Never<bool>() }, Observable.Never<ZapitReply>()).Subscribe(e => { }, e => error = e))
+            using (ZapitMatlabOpto.Observe(Observable.Return(stub), clock, new[] { Observable.Never<bool>() }, Observable.Never<ZapitReply>()).Subscribe(e => { }, e => error = e))
             {
                 clock.OnNext(100);
             }
@@ -771,7 +774,7 @@ namespace OpenRigs.Trials.Tests
 
             var outcomes = 0;
             stub = new StubRules { Plan = n => Timing() };
-            using (TrialLoop.Observe(Observable.Return(stub), clock, new[] { Observable.Never<bool>() }, Observable.Never<ZapitReply>())
+            using (ZapitMatlabOpto.Observe(Observable.Return(stub), clock, new[] { Observable.Never<bool>() }, Observable.Never<ZapitReply>())
                 .Subscribe(e => { if (e.Kind == TrialEventKind.Outcome) outcomes++; }, e => error = e))
             {
                 for (var s = 100.0; s < 104; s = Math.Round(s + 0.001, 6)) clock.OnNext(s);
@@ -860,7 +863,7 @@ namespace OpenRigs.Trials.Tests
                     if (n > 1)
                     {
                         var stop = rig.Of(laser.End == LaserEnd.AtStimulusOff ? TrialEventKind.LaserOff : TrialEventKind.Outcome).Last().Seconds;
-                        Assert.AreEqual(stop + 1.0 + 0.001 + TrialLoop.StopReplyMarginSeconds, arm.Seconds, 1e-9, "the reply, then the margin from the next tick");
+                        Assert.AreEqual(stop + 1.0 + 0.001 + ZapitMatlabOptoSystem.StopReplyMarginSeconds, arm.Seconds, 1e-9, "the reply, then the margin from the next tick");
                     }
                     rig.Reply(arm.Trial);
                     Assert.AreEqual(n, rig.RunTo(TrialEventKind.Trigger).Trial.TrialNumber, "armed in time, so triggered");
@@ -900,7 +903,7 @@ namespace OpenRigs.Trials.Tests
             rig.RunTo(TrialEventKind.Trigger);
             rig.StopReply();
             var laserOff = rig.RunTo(TrialEventKind.LaserOff);
-            Assert.AreEqual(laserOff.Seconds + TrialLoop.StopReplyMarginSeconds, rig.RunTo(TrialEventKind.Arm).Seconds, 1e-9);
+            Assert.AreEqual(laserOff.Seconds + ZapitMatlabOptoSystem.StopReplyMarginSeconds, rig.RunTo(TrialEventKind.Arm).Seconds, 1e-9);
         }
 
         [TestMethod]
@@ -972,14 +975,14 @@ namespace OpenRigs.Trials.Tests
         [TestMethod]
         public void ATrialNeedsZapitsFieldsOnlyWhenItIsALaserTrial()
         {
-            // A task without a laser need not be an IZapitTrial.
+            // A task without a laser need not be an IOptoTrial.
             var plain = new TrialLoop<PlainTrial, string, StubOutcome>(new PlainRules(), true);
             var events = new List<TrialEvent<PlainTrial, string, StubOutcome>>();
             for (var s = 100.0; s < 104; s = Math.Round(s + 0.001, 6)) events.AddRange(plain.OnClock(s));
             Assert.AreEqual(1, events.Count(e => e.Kind == TrialEventKind.Outcome));
 
-            var laser = new TrialLoop<PlainTrial, string, StubOutcome>(new PlainRules { LaserTrials = true }, true);
-            StringAssert.Contains(Refusal(() => laser.OnClock(100)), "is not an IZapitTrial");
+            var laser = new TrialLoop<PlainTrial, string, StubOutcome>(new PlainRules { LaserTrials = true }, true, ZapitMatlabOptoSystem.Instance);
+            StringAssert.Contains(Refusal(() => laser.OnClock(100)), "is not an IOptoTrial");
         }
     }
 }

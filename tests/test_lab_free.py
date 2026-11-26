@@ -48,7 +48,6 @@ NAMES_THE_LAB = {
     "src/OpenRigs.Manifest/OpenRigs.Manifest.csproj": 1,
     "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj": 1,
     "src/OpenRigs.Video/OpenRigs.Video.csproj": 1,
-    "src/OpenRigs.Vision/OpenRigs.Vision.csproj": 1,  # the lab's package version, as every lab package's
     "src/open_rigs/rigs/workflow_checks.py": 1,  # the lab's ConfigRoot, which every task's check holds it to
     "tests/rigs/test_workflow_checks.py": 1,
 }

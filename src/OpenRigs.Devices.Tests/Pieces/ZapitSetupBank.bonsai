@@ -58,7 +58,7 @@
       <Expression xsi:type="rx:AsyncSubject">
         <Name>ZapitRig</Name>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ZapitSetup.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:ZapitSetup.bonsai" />
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="DoubleProperty">
           <Value>5</Value>

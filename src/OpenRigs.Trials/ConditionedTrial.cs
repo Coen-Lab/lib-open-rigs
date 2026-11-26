@@ -5,15 +5,15 @@ namespace OpenRigs.Trials
     /// <summary>
     /// A conditioned task's trial as every such task draws it (open_rigs.rigs.trials CONDITIONS_COLUMNS, STIMULUS_COLUMNS,
     /// AUTO_REWARD_COLUMNS and the laser): a task's trial derives from it and adds its own fields. The field names are the trial
-    /// log's columns, so a task's row copies them by name. A laser trial is an IZapitTrial through it.
+    /// log's columns, so a task's row copies them by name. A laser trial is an IOptoTrial through it.
     /// </summary>
-    public class ConditionedTrial : IZapitTrial
+    public class ConditionedTrial : IOptoTrial
     {
         int ITrial.TrialNumber { get { return trialNumber; } }
-        int IZapitTrial.LaserCondition { get { return laserCondition; } }
-        string IZapitTrial.LaserPointsMm { get { return laserPointsMm; } }
-        bool IZapitTrial.LaserOn { get { return laserOn; } }
-        double IZapitTrial.LaserPowerMw { get { return laserPowerMw; } }
+        int IOptoTrial.LaserCondition { get { return laserCondition; } }
+        string IOptoTrial.LaserPointsMm { get { return laserPointsMm; } }
+        bool IOptoTrial.LaserOn { get { return laserOn; } }
+        double IOptoTrial.LaserPowerMw { get { return laserPowerMw; } }
 
         /// <summary>The trial's number, from 1, repeats counted.</summary>
         public int trialNumber;
@@ -39,9 +39,9 @@ namespace OpenRigs.Trials
         public double auditoryInitialAzimuthDeg;
         /// <summary>That speaker's elevation as the trial starts, in degrees; NaN when mute or at "all".</summary>
         public double auditoryInitialElevationDeg;
-        /// <summary>Its Zapit condition, from 1; 0 without optogenetics.</summary>
+        /// <summary>Its opto condition (the opto system's), from 1; 0 without optogenetics.</summary>
         public int laserCondition;
-        /// <summary>Its condition's points (ZapitConditionsFile.PointsMm), the trial log's laserPointsMm; null without optogenetics.</summary>
+        /// <summary>Its condition's points in the opto system's notation (Zapit: ZapitConditionsFile.PointsMm), the trial log's laserPointsMm; null without optogenetics.</summary>
         public string laserPointsMm;
         /// <summary>Whether the laser fires on it.</summary>
         public bool laserOn;

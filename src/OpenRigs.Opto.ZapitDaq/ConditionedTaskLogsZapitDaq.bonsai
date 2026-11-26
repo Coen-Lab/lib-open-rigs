@@ -17,7 +17,7 @@
       <Expression xsi:type="WorkflowInput">
         <Name>Source1</Name>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:TaskLogsZapitDaq.bonsai" />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Opto.ZapitDaq:TaskLogsZapitDaq.bonsai" />
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />

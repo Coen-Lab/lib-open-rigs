@@ -53,7 +53,7 @@ namespace OpenRigs.Trials.Tests
     }
 
     /// <summary>A trial with a laser condition.</summary>
-    public class PieceTrial : IZapitTrial
+    public class PieceTrial : IOptoTrial
     {
         public int TrialNumber { get; set; }
         public int LaserCondition { get; set; }
@@ -163,7 +163,7 @@ namespace OpenRigs.Trials.Tests
     }
 
     /// <summary>A laser trial with its own laser duration, 0.5 s (LaserTiming.ForDuration).</summary>
-    public class PieceTimedTrial : PieceTrial, ILaserDurationTrial
+    public class PieceTimedTrial : PieceTrial, IOptoDurationTrial
     {
         public double LaserDurationSeconds { get { return 0.5; } }
     }

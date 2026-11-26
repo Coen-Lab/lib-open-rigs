@@ -38,17 +38,18 @@ SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
 SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
 ZAPIT_INCLUDE = "OpenRigs.Devices:ConnectZapit.bonsai"
 ZAPIT_FOR_TASK = "OpenRigs.Devices:ConnectForTask.bonsai"
-# ZapitDaq's blocks (OpenRigs.Zapit, no MATLAB Zapit), beside MATLAB Zapit's until no workflow uses it: a workflow takes
-# one set or the other, never both.
-ZAPIT_DAQ_FOR_TASK = "OpenRigs.Devices:ConnectForTaskZapitDaq.bonsai"  # includes ZapitCamera and ZapitSetup
-ZAPIT_CAMERA = "OpenRigs.Devices:ZapitCamera.bonsai"
-ZAPIT_SETUP = "OpenRigs.Devices:ZapitSetup.bonsai"
-ZAPIT_DAQ_TRIALS = "OpenRigs.Trials:ZapitDaqTrials.bonsai"  # includes SetZapitTriggerLine
-TASK_LOGS_ZAPIT_DAQ = "OpenRigs.Logging:TaskLogsZapitDaq.bonsai"
-CONDITIONED_TASK_LOGS_ZAPIT_DAQ = "OpenRigs.Logging:ConditionedTaskLogsZapitDaq.bonsai"
+# ZapitDaq's blocks (OpenRigs.Zapit, no MATLAB Zapit), all in its opto adapter package OpenRigs.Opto.ZapitDaq, beside
+# MATLAB Zapit's until no workflow uses it: a workflow takes one set or the other, never both.
+ZAPIT_DAQ = "OpenRigs.Opto.ZapitDaq:"
+ZAPIT_DAQ_FOR_TASK = ZAPIT_DAQ + "ConnectForTaskZapitDaq.bonsai"  # includes ZapitCamera and ZapitSetup
+ZAPIT_CAMERA = ZAPIT_DAQ + "ZapitCamera.bonsai"
+ZAPIT_SETUP = ZAPIT_DAQ + "ZapitSetup.bonsai"
+ZAPIT_DAQ_TRIALS = ZAPIT_DAQ + "ZapitDaqTrials.bonsai"  # includes SetZapitTriggerLine
+TASK_LOGS_ZAPIT_DAQ = ZAPIT_DAQ + "TaskLogsZapitDaq.bonsai"
+CONDITIONED_TASK_LOGS_ZAPIT_DAQ = ZAPIT_DAQ + "ConditionedTaskLogsZapitDaq.bonsai"
 # MATLAB Zapit's blocks a ZapitDaq workflow may not include.
 MATLAB_ZAPIT_INCLUDES = (ZAPIT_FOR_TASK, "OpenRigs.Devices:ConnectZapit.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai",
-                         "OpenRigs.Trials:ZapitTrials.bonsai", "OpenRigs.Logging:TaskLogs.bonsai", "OpenRigs.Logging:ConditionedTaskLogs.bonsai")
+                         "OpenRigs.Opto.ZapitMatlab:ZapitTrials.bonsai", "OpenRigs.Logging:TaskLogs.bonsai", "OpenRigs.Logging:ConditionedTaskLogs.bonsai")
 # Zapit's files in a ZapitDaq experiment, each written only in an optogenetics experiment (the ingest names the same): the
 # Zapit camera's video (ZapitCamera), the scanner frames, and the agent's settings files. The scanner frames, the
 # accuracy and the laser curve the bank was built from need the laser, so at ceilingMw 0 (laser disabled) the agent
@@ -73,7 +74,7 @@ TASK_LOGS = "OpenRigs.Logging:TaskLogs.bonsai"
 # TaskLogs with Settings_Combinations, its one writer: a conditioned task includes it in place of TaskLogs.
 CONDITIONED_TASK_LOGS = "OpenRigs.Logging:ConditionedTaskLogs.bonsai"
 TRIAL_OUTCOME_EFFECTS = "OpenRigs.Trials:TrialOutcomeEffects.bonsai"  # includes PlayPenaltySound, sends into RewardRequests
-ZAPIT_TRIALS = "OpenRigs.Trials:ZapitTrials.bonsai"  # includes SetZapitTriggerLine
+ZAPIT_TRIALS = "OpenRigs.Opto.ZapitMatlab:ZapitTrials.bonsai"  # MATLAB Zapit's opto adapter's; includes SetZapitTriggerLine
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
 DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
