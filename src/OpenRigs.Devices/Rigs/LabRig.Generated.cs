@@ -4629,8 +4629,8 @@ namespace OpenRigs.Devices.Rigs
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("device")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="device")]
-        [System.ComponentModel.DescriptionAttribute("ZapitDaq\'s NI device, as NI MAX names it; with it, every Zapit-Bonsai field below is gi" +
-            "ven.")]
+        [System.ComponentModel.DescriptionAttribute("ZapitDaq\'s NI device, as NI MAX names it; with it, every Zapit-Bonsai field below" +
+            " is given.")]
         public string Device
         {
             get
@@ -4734,14 +4734,14 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads them. Absent, lib_zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.
+        /// The laser blanking time, onset shift and offset shift, in ms, as open_rigs.zapit reads them. Absent, open_rigs.zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.
         /// </summary>
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         [Newtonsoft.Json.JsonPropertyAttribute("blankingTimesMs")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="blankingTimesMs")]
-        [System.ComponentModel.DescriptionAttribute("The laser blanking time, onset shift and offset shift, in ms, as lib_zapit reads " +
-            "them. Absent, lib_zapit uses MATLAB\'s 0.3, -0.12, 0.25. Optional, and not part o" +
-            "f the Zapit-Bonsai fields a block gives together.")]
+        [System.ComponentModel.DescriptionAttribute("The laser blanking time, onset shift and offset shift, in ms, as open_rigs.zapit " +
+            "reads them. Absent, open_rigs.zapit uses MATLAB\'s 0.3, -0.12, 0.25. Optional, an" +
+            "d not part of the Zapit-Bonsai fields a block gives together.")]
         public System.Collections.Generic.List<double> BlankingTimesMs
         {
             get
@@ -4830,11 +4830,11 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.
+        /// This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): open_rigs.zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("ceilingMw")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="ceilingMw")]
-        [System.ComponentModel.DescriptionAttribute(@"This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): lib_zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")]
+        [System.ComponentModel.DescriptionAttribute(@"This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): open_rigs.zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")]
         public double? CeilingMw
         {
             get

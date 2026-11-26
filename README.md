@@ -39,3 +39,7 @@ A workflow builds its rig from device pieces, one include per device instance ([
 uv sync
 uv run pytest
 ```
+
+## Licence
+
+`open_rigs.zapit` (`src/open_rigs/zapit/`, the `zapit` extra) is LGPL-2.1-only, upstream Zapit's terms; the rest is BSD-3-Clause. See `THIRD-PARTY-NOTICES.md`.

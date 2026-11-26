@@ -16,7 +16,7 @@ namespace OpenRigs.Zapit.Tests
         const string Trigger = "/Dev1/PFI0";
         static readonly string DataFolder = Path.Combine(AppContext.BaseDirectory, "Data");
 
-        // The contract bank (lib_zapit's contract fixture, Data/make_fixture.py) unpacked into a new folder.
+        // The contract bank (the contract fixture, Data/make_fixture.py) unpacked into a new folder.
         static string Unpack()
         {
             var folder = Path.Combine(Path.GetTempPath(), "ZapitDaqTests_" + Guid.NewGuid().ToString("N"));

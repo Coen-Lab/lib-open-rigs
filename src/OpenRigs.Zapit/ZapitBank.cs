@@ -9,9 +9,9 @@ using Newtonsoft.Json.Linq;
 namespace OpenRigs.Zapit
 {
     /// <summary>
-    /// A bank lib_zapit built for one session (<c>Settings_ZapitBank_&lt;DateTime&gt;.json</c> and its <c>.bin</c>, index
+    /// A bank open_rigs.zapit built for one session (<c>Settings_ZapitBank_&lt;DateTime&gt;.json</c> and its <c>.bin</c>, index
     /// version 2): every scan and laser cycle and ramp tail a task can draw, so a trial is only selected and concatenated
-    /// here, as lib_zapit's <c>bank.assemble</c> does it. Everything is read through the index's offsets and lengths; a
+    /// here, as open_rigs.zapit's <c>bank.assemble</c> does it. Everything is read through the index's offsets and lengths; a
     /// .bin that does not match the index's hash, or a trial that would not end with laser and LED at 0 V, is refused.
     /// </summary>
     public sealed class ZapitBank
@@ -233,7 +233,7 @@ namespace OpenRigs.Zapit
         /// <summary>The condition's number, from 1.</summary>
         public int Condition { get; }
 
-        /// <summary>The condition's points on the sample, in mm, one pair per point in lib_zapit's order.</summary>
+        /// <summary>The condition's points on the sample, in mm, one pair per point in open_rigs.zapit's order.</summary>
         public double[][] PointsMm { get; }
 
         /// <summary>The condition's points in the conditions file, in mm from bregma, one [ML, AP] pair per point.</summary>

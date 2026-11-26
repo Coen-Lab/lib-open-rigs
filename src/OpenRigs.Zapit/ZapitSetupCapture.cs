@@ -37,11 +37,11 @@ namespace OpenRigs.Zapit
     /// <summary>
     /// The per-session scanner grid and sample still of Zapit's setup phase (docs/zapit-setup-protocol.md). A grid run is a
     /// folder in the rig's pending folder holding the agent's <c>grid.json</c> ({"volts": [[x, y], ...], "laserVolts",
-    /// "skipFrames", "backgrounds", and optionally "camera": {"exposureUs", "gainDb"}}, volts from lib_zapit's calibration plan):
+    /// "skipFrames", "backgrounds", and optionally "camera": {"exposureUs", "gainDb"}}, volts from open_rigs.zapit's calibration plan):
     /// with a camera block the run's first step carries those settings for ZapitPylonCapture (auto exposure and gain off)
     /// and its last (FramesSaved, or a refusal) puts the camera's own back; per point it points the galvos with the laser
     /// on, skips skipFrames camera frames and saves the next as <c>point_NNNN.png</c>, then with the laser off saves
-    /// backgrounds frames as <c>background_K.png</c> (lossless PNG, as lib_zapit's fit reads them), zeroes the lines and
+    /// backgrounds frames as <c>background_K.png</c> (lossless PNG, as open_rigs.zapit's fit reads them), zeroes the lines and
     /// reports FramesSaved. A run with no camera frame within 2 s of Pointed (or of its last frame) is refused and zeroed. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
     /// </summary>
     [Combinator]

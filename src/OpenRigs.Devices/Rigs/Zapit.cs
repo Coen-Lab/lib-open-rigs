@@ -3,7 +3,7 @@ using YamlDotNet.Serialization;
 
 namespace OpenRigs.Devices.Rigs
 {
-    // rig.yml's zapit block names each channel on its own beside the device, as lib_zapit reads it; ZapitDaq takes NI's
+    // rig.yml's zapit block names each channel on its own beside the device, as open_rigs.zapit reads it; ZapitDaq takes NI's
     // full paths. The one place they are joined: map ZapitDaq's channels from these.
     public partial class Zapit
     {
