@@ -22,8 +22,45 @@ namespace OpenRigs.Zapit
         /// <summary>True to put back the settings the camera had before the grid run (its session .pfs), not apply these.</summary>
         public bool Restore { get; set; }
 
+        /// <summary>True for a crop of the shown frame (CropX, CropY, CropWidth, CropHeight), not an exposure: the window's
+        /// and the mp4's picture only; the camera itself and the stills are left whole. A CropWidth of 0 is the whole frame.</summary>
+        public bool SetCrop { get; set; }
+
+        /// <summary>The crop's left edge, in pixels of the camera's frame.</summary>
+        public int CropX { get; set; }
+
+        /// <summary>The crop's top edge, in pixels of the camera's frame.</summary>
+        public int CropY { get; set; }
+
+        /// <summary>The crop's width in pixels; 0 for the whole frame.</summary>
+        public int CropWidth { get; set; }
+
+        /// <summary>The crop's height in pixels; 0 for the whole frame.</summary>
+        public int CropHeight { get; set; }
+
         /// <summary>The settings as text, for the Zapit-Main.Setup metric's readers.</summary>
-        public override string ToString() => Restore ? "restore" : $"exposure {ExposureUs} us, gain {GainDb} dB";
+        public override string ToString() => SetCrop
+            ? (CropWidth > 0 ? $"crop {CropX},{CropY},{CropWidth},{CropHeight}" : "crop full frame")
+            : Restore ? "restore" : $"exposure {ExposureUs} us, gain {GainDb} dB";
+    }
+
+    /// <summary>
+    /// One Zapit camera frame, two ways (Pip, 27 Nov 2026: a grid run's frames were nearly black in the window): Image, what
+    /// the window streams and the mp4 records, always the session's stretched picture, cut to the crop (ZapitFrameDepth.Crop);
+    /// Still, what Zapit's setup saves (stills, a grid run's point and background frames), the whole frame, the stretched
+    /// picture too except during a grid run, when it is Mono8's scale (counts / 16), which the spot detection's 90 %-of-peak
+    /// threshold and 500 px size limit were tuned on. A Mono8 camera's frame is both, as it comes (Image cropped).
+    /// </summary>
+    public class ZapitFrame
+    {
+        /// <summary>The shown frame: stretched, cropped; streamed and recorded.</summary>
+        public OpenCV.Net.IplImage? Image { get; set; }
+
+        /// <summary>The whole frame Zapit's setup saves: stretched, or Mono8's scale during a grid run.</summary>
+        public OpenCV.Net.IplImage? Still { get; set; }
+
+        /// <summary>The grab (its ID and camera timestamp), as PylonCapture's frame carries it.</summary>
+        public IGrabResult? GrabResult { get; set; }
     }
 
     /// <summary>The camera features a grid run sets, by GenICam name: a Basler camera's, or a test's.</summary>
@@ -97,15 +134,18 @@ namespace OpenRigs.Zapit
     /// The Zapit camera: Bonsai.Pylon's PylonCapture (its serial number and session .pfs), whose exposure and gain the
     /// setup phase sets for a grid run's frames while it grabs, and puts back after. PylonCapture loads its .pfs only as
     /// the camera opens and has no exposure or gain property; its Configure hands over the opened camera, kept here.
-    /// Every frame is 8-bit (ZapitFrameDepth): a Mono12 .pfs's frames are its raw counts saturating at 255, a grid run's
-    /// over 16 as Mono8; a Mono8 .pfs's frames pass through.
+    /// Every frame is 8-bit (ZapitFrameDepth), given two ways (ZapitFrame): Image, the shown and recorded picture, a Mono12
+    /// frame stretched to its StretchTop always, cut to the crop the setup sent (SetCrop; the whole frame until one comes);
+    /// Still, the whole frame Zapit's setup saves, stretched too except during a grid run, when it is Mono8's scale
+    /// (counts over 16) for the spot detection. A Mono8 .pfs's frames pass through (Image cropped).
     /// </summary>
-    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs), each frame 8-bit (Mono12: raw counts saturating at 255, a grid run's over 16; Mono8 as it comes). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), or the camera's own put back (Restore).")]
+    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs), each frame 8-bit (Mono12: stretched to the frame's StretchTop; Mono8 as it comes) as Image, cut to the crop, and whole as Still (a grid run's Mono12 frames at Mono8's scale, counts over 16, there). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), the camera's own put back (Restore), or the shown frame's crop (SetCrop).")]
     public class ZapitPylonCapture : PylonCapture
     {
         readonly object cameraLock = new object();
         CameraExposure? exposure;
-        volatile bool gridApplied;   // a grid run's exposure is on the camera: Mono12 frames go to Mono8's scale
+        volatile bool gridApplied;   // a grid run's exposure is on the camera: Mono12 stills go to Mono8's scale
+        OpenCV.Net.Rect crop;        // the shown frame's crop; empty for the whole frame (under cameraLock)
 
         /// <summary>Loads the .pfs as PylonCapture does and keeps the opened camera for the settings.</summary>
         protected override void Configure(Camera camera)
@@ -114,25 +154,49 @@ namespace OpenRigs.Zapit
             lock (cameraLock) exposure = new CameraExposure(new BaslerFeatures(camera.Parameters));
         }
 
-        /// <summary>The camera's frames as PylonCapture grabs them, each made 8-bit (ZapitFrameDepth).</summary>
+        /// <summary>The camera's frames as PylonCapture grabs them, each made 8-bit and stretched (ZapitFrameDepth), whole.</summary>
         public override IObservable<PylonDataFrame> Generate() => base.Generate().Select(frame =>
         {
             if (frame.Image == null || frame.Image.Depth == OpenCV.Net.IplDepth.U8) return frame;
-            var grid = gridApplied;
-            var top = grid ? 0 : ZapitFrameDepth.StretchTop(frame.Image);
-            return new PylonDataFrame(ZapitFrameDepth.ToEightBit(frame.Image, grid, top), frame.GrabResult);
+            return new PylonDataFrame(ZapitFrameDepth.ToEightBit(frame.Image, false, ZapitFrameDepth.StretchTop(frame.Image)), frame.GrabResult);
         });
 
-        /// <summary>The camera's frames, with each of <paramref name="settings"/> applied to it while it grabs.</summary>
-        public IObservable<PylonDataFrame> Generate(IObservable<ZapitCameraSettings> settings) => Observable.Create<PylonDataFrame>(observer =>
+        /// <summary>A grabbed frame as the shown image (stretched, cropped) and the still Zapit's setup saves (whole; Mono8's
+        /// scale in a grid run), each null for a null frame.</summary>
+        internal static void Split(OpenCV.Net.IplImage? image, bool grid, OpenCV.Net.Rect crop, out OpenCV.Net.IplImage? shown, out OpenCV.Net.IplImage? still)
+        {
+            shown = still = image;
+            if (image == null) return;
+            if (image.Depth != OpenCV.Net.IplDepth.U8)
+            {
+                shown = ZapitFrameDepth.ToEightBit(image, false, ZapitFrameDepth.StretchTop(image));
+                still = grid ? ZapitFrameDepth.ToEightBit(image, true, 0) : shown;
+            }
+            shown = ZapitFrameDepth.Crop(shown!, crop);
+        }
+
+        /// <summary>The camera's frames, with each of <paramref name="settings"/> applied to it while it grabs: each frame
+        /// shown stretched and cropped (Image), and whole for Zapit's setup (Still).</summary>
+        public IObservable<ZapitFrame> Generate(IObservable<ZapitCameraSettings> settings) => Observable.Create<ZapitFrame>(observer =>
             new CompositeDisposable(
-                Generate().Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; } }).Subscribe(observer),
+                base.Generate().Select(frame =>
+                {
+                    OpenCV.Net.Rect cut;
+                    lock (cameraLock) cut = crop;
+                    Split(frame.Image, gridApplied, cut, out var shown, out var still);
+                    return new ZapitFrame { Image = shown, Still = still, GrabResult = frame.GrabResult };
+                }).Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; crop = default; } }).Subscribe(observer),
                 settings.Subscribe(s =>
                 {
                     lock (cameraLock)
                     {
                         try
                         {
+                            if (s.SetCrop)   // the shown frame only: from the next frame, whatever the camera does
+                            {
+                                crop = s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default;
+                                return;
+                            }
                             if (exposure == null) throw new InvalidOperationException("The Zapit camera is not open, so the grid's exposure cannot be set.");
                             exposure.Apply(s);
                             gridApplied = exposure.GridApplied;

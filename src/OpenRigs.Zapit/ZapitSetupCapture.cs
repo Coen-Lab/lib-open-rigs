@@ -350,6 +350,46 @@ namespace OpenRigs.Zapit
             source.Select(_ => new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero });
     }
 
+    /// <summary>
+    /// Zapit-Main.Crop's args as the Zapit camera's crop (Pip, 27 Nov 2026: the window and the mp4 cut to the brain, the
+    /// agent's crop round the grid area): "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
+    /// h even and from 16) is Stage Cropped with that crop on Camera; "" or "full" is Stage Full (Detail "Frame") with the
+    /// whole frame; anything else is Refused, saying why, with no Camera. Reported as the metric Zapit-Main.Crop. The
+    /// frame's own size is the camera's to keep to (ZapitFrameDepth.Crop). Taken until Go only (ZapitSetup): the mp4
+    /// starts at Go, so its frame size never changes.
+    /// </summary>
+    [Combinator]
+    [Description("Zapit-Main.Crop's args (x,y,w,h in pixels of the camera's frame, or \"\" / full for the whole frame) as the Zapit camera's crop for the shown and recorded frame: Cropped, Full or Refused, the crop on Camera.")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class ZapitCropRequest
+    {
+        /// <summary>The smallest crop side, in pixels.</summary>
+        public const int LeastSide = 16;
+
+        /// <summary>Each request as a setup step: Cropped, Full or Refused.</summary>
+        public IObservable<ZapitSetupStep> Process(IObservable<string> source) => source.Select(Parse);
+
+        /// <summary>One request as a setup step (Process).</summary>
+        public static ZapitSetupStep Parse(string request)
+        {
+            var text = (request ?? "").Trim().Trim('"').Trim();
+            if (text.Length == 0 || text.Equals("full", StringComparison.OrdinalIgnoreCase))
+                return new ZapitSetupStep { Stage = "Full", Detail = "Frame", Camera = new ZapitCameraSettings { SetCrop = true } };
+            var parts = text.Split(',');
+            var v = new int[4];
+            if (parts.Length != 4 || Enumerable.Range(0, 4).Any(i => !int.TryParse(parts[i].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out v[i])))
+                return new ZapitSetupStep { Stage = "Refused", Detail = "a crop is x,y,w,h in whole pixels, or full: " + request };
+            if (v[0] < 0 || v[1] < 0 || v[2] < LeastSide || v[3] < LeastSide || v[2] % 2 != 0 || v[3] % 2 != 0)
+                return new ZapitSetupStep { Stage = "Refused", Detail = $"a crop's x and y are from 0, its w and h even and from {LeastSide}: " + request };
+            var detail = string.Join(",", v.Select(n => n.ToString(CultureInfo.InvariantCulture)));
+            return new ZapitSetupStep
+            {
+                Stage = "Cropped", Detail = detail,
+                Camera = new ZapitCameraSettings { SetCrop = true, CropX = v[0], CropY = v[1], CropWidth = v[2], CropHeight = v[3] },
+            };
+        }
+    }
+
     /// <summary>The loaded bank, checked at Go against the task's conditions file and the trials' rules.</summary>
     [Combinator]
     [Description("Checks the bank ZapitDaq loaded before Go against the task: built from the task's conditions file (its SHA-256), " +

@@ -435,6 +435,72 @@ namespace OpenRigs.Zapit.Tests
             CollectionAssert.AreEqual(new[] { 255 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 4000), false, top)));
         }
 
+        // The display and the measurement split (Pip, 27 Nov 2026): a grid run's shown frame is the stretched picture, cut to
+        // the crop, while its still stays whole at Mono8's scale for the spot detection; outside a grid run the still is
+        // the stretched picture, whole.
+        [TestMethod]
+        public void AFrameIsShownStretchedAndCroppedItsStillWholeAtMono8sScaleInAGridRun()
+        {
+            var frame = new IplImage(new Size(64, 48), IplDepth.U16, 1);
+            frame.Set(new Scalar(48));
+            frame[20, 30] = new Scalar(1600);   // the beam
+            var crop = new Rect(16, 8, 32, 24);
+            ZapitPylonCapture.Split(frame, true, crop, out var shown, out var still);
+            Assert.AreEqual(new Size(32, 24), shown!.Size);
+            Assert.AreEqual(255, (int)shown[20 - 8, 30 - 16].Val0);   // stretched: the beam white
+            Assert.AreEqual(255, (int)shown[0, 0].Val0);               // and the skull's 48 at the stretch's top
+            Assert.AreEqual(new Size(64, 48), still!.Size);
+            Assert.AreEqual(100, (int)still[20, 30].Val0);             // counts over 16
+            Assert.AreEqual(3, (int)still[0, 0].Val0);
+            ZapitPylonCapture.Split(frame, false, default, out shown, out still);
+            Assert.AreEqual(new Size(64, 48), shown!.Size);
+            Assert.AreSame(shown, still);
+            var mono8 = new IplImage(new Size(64, 48), IplDepth.U8, 1);
+            ZapitPylonCapture.Split(mono8, true, crop, out shown, out still);
+            Assert.AreSame(mono8, still);
+            Assert.AreEqual(new Size(32, 24), shown!.Size);
+        }
+
+        // A crop is kept inside the frame with an even size (an mp4's frame must be); none, or one leaving nothing, is the
+        // frame itself.
+        [TestMethod]
+        public void ACropStaysInsideTheFrameEven()
+        {
+            var frame = new IplImage(new Size(100, 60), IplDepth.U8, 1);
+            frame.Set(new Scalar(0));
+            frame[30, 50] = new Scalar(9);
+            Assert.AreSame(frame, ZapitFrameDepth.Crop(frame, default));
+            Assert.AreSame(frame, ZapitFrameDepth.Crop(frame, new Rect(0, 0, 100, 60)));
+            var cut = ZapitFrameDepth.Crop(frame, new Rect(40, 20, 21, 17));
+            Assert.AreEqual(new Size(20, 16), cut.Size);
+            Assert.AreEqual(9, (int)cut[10, 10].Val0);
+            Assert.AreEqual(new Size(30, 20), ZapitFrameDepth.Crop(frame, new Rect(70, 40, 64, 48)).Size);   // the frame's edge
+        }
+
+        // Zapit-Main.Crop's args: x,y,w,h in pixels, or "" / full for the whole frame; anything else refused, not fatal.
+        [TestMethod]
+        public void ACropRequestIsPixelsOrFullElseRefused()
+        {
+            var cropped = ZapitCropRequest.Parse("392,232,1152,864");
+            Assert.AreEqual("Cropped 392,232,1152,864", cropped.ToString());
+            Assert.IsTrue(cropped.Camera!.SetCrop);
+            Assert.AreEqual(1152, cropped.Camera.CropWidth);
+            Assert.AreEqual("crop 392,232,1152,864", cropped.Camera.ToString());
+            foreach (var full in new[] { "", "full", " \"Full\" " })
+            {
+                var step = ZapitCropRequest.Parse(full);
+                Assert.AreEqual("Full Frame", step.ToString());
+                Assert.IsTrue(step.Camera!.SetCrop);
+                Assert.AreEqual(0, step.Camera.CropWidth);
+            }
+            foreach (var bad in new[] { "1,2,3", "a,b,c,d", "-2,0,64,48", "0,0,63,48", "0,0,8,8" })
+            {
+                var step = ZapitCropRequest.Parse(bad);
+                Assert.AreEqual("Refused", step.Stage, bad);
+                Assert.IsNull(step.Camera, bad);
+            }
+        }
+
         // A Mono8 .pfs (every other rig): the frame itself, untouched, in a grid run or not.
         [TestMethod]
         public void Mono8FramesPassThroughUnchanged()

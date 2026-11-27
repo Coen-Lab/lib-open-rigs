@@ -54,6 +54,23 @@ namespace OpenRigs.Zapit
             return eight;
         }
 
+        /// <summary><paramref name="image"/> cut to <paramref name="crop"/> (pixels of the frame), a new image: the crop kept
+        /// inside the frame and its size even (an mp4's frame must be), else <paramref name="image"/> itself for no crop
+        /// (an empty one) or one that leaves nothing. The Zapit camera's shown frame (Pip, 27 Nov 2026: the window and the
+        /// mp4 cropped to the brain; the stills stay whole, so every fit stays in the whole frame's pixels).</summary>
+        public static IplImage Crop(IplImage image, Rect crop)
+        {
+            if (image == null || crop.Width <= 0 || crop.Height <= 0) return image!;
+            var x = Math.Max(0, Math.Min(crop.X, image.Width - 2));
+            var y = Math.Max(0, Math.Min(crop.Y, image.Height - 2));
+            var w = Math.Min(crop.Width, image.Width - x) & ~1;
+            var h = Math.Min(crop.Height, image.Height - y) & ~1;
+            if (w < 2 || h < 2 || (x == 0 && y == 0 && w == image.Width && h == image.Height)) return image;
+            var cut = new IplImage(new Size(w, h), image.Depth, image.Channels);
+            CV.Copy(image.GetSubRect(new Rect(x, y, w, h)), cut);
+            return cut;
+        }
+
         /// <summary>As ToEightBit with a top, a session frame stretched to its own brightest pixel (tests).</summary>
         public static IplImage ToEightBit(IplImage image, bool mono8Scale)
         {
