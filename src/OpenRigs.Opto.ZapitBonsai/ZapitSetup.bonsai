@@ -5,8 +5,9 @@
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns:zap="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:zdq="clr-namespace:OpenRigs.Opto.ZapitBonsai;assembly=OpenRigs.Opto.ZapitBonsai"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTaskZapitDaq's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the device Zapit-Main's commands (DeclareDeviceControls): Zapit-Main.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit-Main.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit-Main.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json in pending) loads it into ZapitDaq (ZapitSetupCapture checks the path), which publishes it on Zapit.Bank; Zapit-Main.LaserOff zeroes every line at once, before or after Go. Zapit-Main.Aim (args: xVolts,yVolts,laserVolts) points the beam by hand, reported on its own metric Zapit-Main.Aim ("Aiming &lt;volts&gt;", "Off Go" or "Refused &lt;why&gt;") so the Setup metric keeps BankLoaded; refused at rig.yml zapit.ceilingMw 0, above laserMinMaxControlVolts[1] (both from ZapitRig), above the ceiling's volts (Zapit.LaserCeilingVolts, ConnectForTaskZapitDaq's launch property LaserCeilingVolts) or during a grid run or still; a grid's laserVolts is held to the same rules; at Go a beam still aimed is zeroed, and a grid run or still in progress refused with the lines zeroed. A still with no camera frame in 2 s is refused. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit-Main.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "Loading &lt;json&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;", each stage before its command goes to ZapitDaq, whose answer (BankLoaded comes back inside LoadBank) must not be overwritten by it; a refused request leaves the workflow running. A grid.json camera block's exposure and gain go to the Zapit camera with the run's first point, and its session settings back with the run's end, on Camera-Zapit.Settings (ZapitCamera's ZapitPylonCapture). A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, ZapitRig, Zapit.LaserCeilingVolts, Zapit.Commands, Zapit.Events, Zapit.Bank, Camera-Zapit.Settings and Camera-Zapit.Data from the workflow.</Description>
+  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTaskZapitDaq's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the device Zapit-Main's commands (DeclareDeviceControls): Zapit-Main.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit-Main.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit-Main.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json in pending) loads it into ZapitDaq (ZapitSetupCapture checks the path), which publishes it on Zapit.Bank; Zapit-Main.LaserOff zeroes every line at once, before or after Go. Zapit-Main.Aim (args: xVolts,yVolts,laserVolts) points the beam by hand, reported on its own metric Zapit-Main.Aim ("Aiming &lt;volts&gt;", "Off Go" or "Refused &lt;why&gt;") so the Setup metric keeps BankLoaded; refused at rig.yml zapit.ceilingMw 0, above laserMinMaxControlVolts[1] (both from ZapitRig), above the ceiling's volts (Zapit.LaserCeilingVolts, ConnectForTaskZapitDaq's launch property LaserCeilingVolts) or during a grid run or still; a grid's laserVolts is held to the same rules; at Go a beam still aimed is zeroed, and a grid run or still in progress refused with the lines zeroed. A still with no camera frame in 2 s is refused. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit-Main.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "Loading &lt;json&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;", each stage before its command goes to ZapitDaq, whose answer (BankLoaded comes back inside LoadBank) must not be overwritten by it; a refused request leaves the workflow running. A grid.json camera block's exposure and gain go to the Zapit camera with the run's first point, and its session settings back with the run's end, on Camera-Zapit.Settings (ZapitCamera's ZapitPylonCapture). Zapit-Main.Play (args: condition,powerMw,seconds) is Play Condition (ZapitPlay; open_rigs.zapit.play drives the sequence): ZapitDaq's own Arm of that condition from the loaded bank as trial 0, refused (never an error) with no bank, a play already armed, the laser disabled, or a condition, power or duration the bank and maxTrialSeconds cannot play, reported on the metric Zapit-Main.Play (Arming, Armed, Playing, Ended, Off or Refused); Zapit-Main.Trigger (args: on, else off) raises or clears the ZapitTrigger line on BehaviorBoard-Main.Commands (SetZapitTriggerLine; the twin's trigger with on), which starts the armed play on the NI DAQ's trigger terminal as a trial's trigger does; the line is cleared by LaserOff, by the play's end (its own, a stop or a Zero) and at Go with a play still armed (its lines zeroed), and when the workflow stops (the board piece's ClearOutputsOnStop). Play and Trigger are taken until Go and ignored after it. A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, ZapitRig, Zapit.LaserCeilingVolts, Zapit.Commands, Zapit.Events, Zapit.Bank, Camera-Zapit.Settings, Camera-Zapit.Data, ZapitTriggerLine and BehaviorBoard-Main.Commands from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -184,6 +185,14 @@
               <orcl:Name>Aim</orcl:Name>
               <orcl:Description>Point the beam by hand: args xVolts,yVolts,laserVolts (the agent's, through the scanner fit and laser curve). Refused at ceilingMw 0, above laserMinMaxControlVolts[1] or during a grid run or still; LaserOff ends it. Before Go only.</orcl:Description>
             </orcl:Command>
+            <orcl:Command>
+              <orcl:Name>Play</orcl:Name>
+              <orcl:Description>Play Condition: args condition,powerMw,seconds. Arms that condition's trial from the loaded bank as ZapitDaq arms a task's (trial 0), at one of its powers (at most ceilingMw), lasting seconds with its ramp; Trigger on starts it. Reported on the metric Zapit-Main.Play (Arming, Armed, Playing, Ended, Off or Refused). Before Go only.</orcl:Description>
+            </orcl:Command>
+            <orcl:Command>
+              <orcl:Name>Trigger</orcl:Name>
+              <orcl:Description>The ZapitTrigger line (and the masking light): args on raises it, starting an armed play; anything else clears it. Cleared too by LaserOff and when the play ends. Before Go only.</orcl:Description>
+            </orcl:Command>
           </orcl:Commands>
         </Combinator>
       </Expression>
@@ -308,6 +317,173 @@
           <Property Name="LaserCeilingVolts" />
         </PropertyMappings>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>Zapit-Main</orcl:Name>
+          <orcl:Command>Play</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeUntil" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Zapit.Events</Name>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ZapitRig</Name>
+      </Expression>
+      <Expression xsi:type="PropertyMapping">
+        <PropertyMappings>
+          <Property Name="MaxTrialSeconds" Selector="MaxTrialSeconds" />
+          <Property Name="CeilingMw" Selector="LaserCeilingMw" />
+        </PropertyMappings>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Name>PlayCondition</Name>
+        <Description>Play Condition before Go (open_rigs.zapit.play drives it): each Zapit-Main.Play request (condition,powerMw,seconds) becomes ZapitDaq's own Arm of that condition from the loaded bank (trial 0), or is refused; its stages reported as Zapit-Main.Play before the Arm goes to ZapitDaq.</Description>
+        <Combinator xsi:type="zap:ZapitPlay">
+          <zap:MaxTrialSeconds>0</zap:MaxTrialSeconds>
+          <zap:CeilingMw>0</zap:CeilingMw>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>Zapit-Main.Play</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>HasCommand?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>Command != null</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Command</Selector>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>PlayOver?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>Stage == "Ended" || Stage == "Off"</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SetZapitTriggerLine.bonsai">
+        <Description>The play over (Ended, or Off at Go): the ZapitTrigger line cleared here, a backstop to the agent's own clear.</Description>
+        <Set>false</Set>
+        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>Zapit-Main</orcl:Name>
+          <orcl:Command>Trigger</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeUntil" />
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>On?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>it.Trim() == "on"</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SetZapitTriggerLine.bonsai">
+        <Description>Play Condition's start: the ZapitTrigger line raised, as a trial's trigger raises it (the masking light with it).</Description>
+        <Set>true</Set>
+        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Name>TwinTrigger</Name>
+        <Description>The simulated twin's trigger edge with the line, as ZapitDaqTrials sends it; the NI DAQ ignores it.</Description>
+        <Combinator xsi:type="zdq:ZapitTwinTrigger" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>Off?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>it.Trim() != "on"</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SetZapitTriggerLine.bonsai">
+        <Description>Zapit-Main.Trigger off (anything but on): the ZapitTrigger line cleared.</Description>
+        <Set>false</Set>
+        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeUntil" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:SetZapitTriggerLine.bonsai">
+        <Description>Zapit-Main.LaserOff before Go: the ZapitTrigger line cleared with the outputs zeroed.</Description>
+        <Set>false</Set>
+        <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -357,6 +533,31 @@
       <Edge From="46" To="47" Label="Source1" />
       <Edge From="49" To="50" Label="Source1" />
       <Edge From="50" To="14" Label="Source9" />
+      <Edge From="51" To="52" Label="Source1" />
+      <Edge From="52" To="54" Label="Source1" />
+      <Edge From="53" To="54" Label="Source2" />
+      <Edge From="56" To="57" Label="Source1" />
+      <Edge From="54" To="58" Label="Source1" />
+      <Edge From="55" To="58" Label="Source2" />
+      <Edge From="57" To="58" Label="Source3" />
+      <Edge From="58" To="59" Label="Source1" />
+      <Edge From="59" To="60" Label="Source1" />
+      <Edge From="60" To="61" Label="Source1" />
+      <Edge From="61" To="62" Label="Source1" />
+      <Edge From="59" To="63" Label="Source1" />
+      <Edge From="63" To="64" Label="Source1" />
+      <Edge From="65" To="66" Label="Source1" />
+      <Edge From="66" To="68" Label="Source1" />
+      <Edge From="67" To="68" Label="Source2" />
+      <Edge From="68" To="69" Label="Source1" />
+      <Edge From="69" To="70" Label="Source1" />
+      <Edge From="70" To="71" Label="Source1" />
+      <Edge From="71" To="72" Label="Source1" />
+      <Edge From="68" To="73" Label="Source1" />
+      <Edge From="73" To="74" Label="Source1" />
+      <Edge From="24" To="76" Label="Source1" />
+      <Edge From="75" To="76" Label="Source2" />
+      <Edge From="76" To="77" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

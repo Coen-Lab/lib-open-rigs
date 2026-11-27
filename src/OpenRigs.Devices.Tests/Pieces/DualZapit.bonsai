@@ -9,6 +9,7 @@
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns:t="clr-namespace:OpenRigs.Devices.Tests;assembly=OpenRigs.Devices.Tests"
+                 xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Description>Both Zapits in one task workflow, chosen per session by the task file (decision-making's Zapit-Bonsai and Zapit-MATLAB): ConnectForTask and ZapitLogs on TaskParameters.Optogenetics.ZapitMatlab, ConnectForTask's switch published as OptogeneticsMatlab, and ConnectForTaskZapitDaq on TaskParameters.Optogenetics.ZapitBonsai, opened only for a session whose task file says optogenetics.zapitBonsai at launch (OpenedBy). DualZapitTests sets CONFIG_ROOT and builds it, never runs it.</Description>
   <Workflow>
@@ -73,6 +74,12 @@
         <Name>LiveView</Name>
         <lv:DataPort>5556</lv:DataPort>
         <lv:VideoPort>5558</lv:VideoPort>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject" TypeArguments="beh:DigitalOutputs">
+        <rx:Name>ZapitTriggerLine</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>BehaviorBoard-Main.Commands</rx:Name>
       </Expression>
     </Nodes>
     <Edges>

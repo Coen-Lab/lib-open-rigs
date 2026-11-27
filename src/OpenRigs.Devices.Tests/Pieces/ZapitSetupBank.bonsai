@@ -4,6 +4,8 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:zap="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit"
                  xmlns:t="clr-namespace:OpenRigs.Devices.Tests;assembly=OpenRigs.Devices.Tests"
+                 xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
+                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Description>ZapitSetup with a simulated ZapitDaq and the controller, as ConnectForTaskZapitDaq has them: ZapitSetupTests sets CONFIG_ROOT, sends Zapit-Main.LoadBank and Zapit-Main.Aim and reads the Zapit-Main.Setup and Zapit-Main.Aim metrics; ZapitRig is the test rig.yml's zapit block.</Description>
   <Workflow>
@@ -71,6 +73,12 @@
       </Expression>
       <Expression xsi:type="rx:AsyncSubject">
         <Name>Zapit.LaserCeilingVolts</Name>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject" TypeArguments="beh:DigitalOutputs">
+        <rx:Name>ZapitTriggerLine</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>BehaviorBoard-Main.Commands</rx:Name>
       </Expression>
     </Nodes>
     <Edges>

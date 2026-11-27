@@ -1099,5 +1099,126 @@ namespace OpenRigs.Zapit.Tests
             Assert.ThrowsException<InvalidOperationException>(() => device.Write(new[,] { { 0.0 }, { 0 }, { 10.5 }, { 0 } }));
             Assert.ThrowsException<InvalidOperationException>(() => device.Write(new double[4, 11]));   // past the task's end
         }
+
+        // Play Condition (ZapitPlay, before Go): trial 0 plays as a task's trial, leaves Point open after it, and a Point,
+        // Staircase or LoadBank while it is armed is Refused, never an error.
+        [TestMethod]
+        public void PlayConditionsTrialLeavesAimingOpenAndRefusesSetupCommandsWhileArmed()
+        {
+            using var h = new Harness();
+            var path = Unpack();
+            h.Send(Load(path));
+            h.Next(ZapitDaqEventKind.BankLoaded);
+            h.Send(Arm(ZapitPlay.SetupTrial, 2, true, 2.0, 0.05));
+            h.Next(ZapitDaqEventKind.Armed);
+            StringAssert.Contains(h.Refusal(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 }), "cannot Point while trial 0 is armed");
+            StringAssert.Contains(h.Refusal(Load(path)), "cannot LoadBank while trial 0 is armed");
+            StringAssert.Contains(h.Refusal(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Staircase, LaserLevelsVolts = new[] { 0.0, 1 }, SamplesPerLevel = 10 }), "cannot Staircase while trial 0 is armed");
+            Assert.IsTrue(h.Device.HasClockedTask);   // the armed trial untouched
+            h.Device.Trigger();
+            h.Now = 0.001;
+            Assert.AreEqual(0, h.Next(ZapitDaqEventKind.Started).Trial);
+            h.Now = 1;
+            h.Next(ZapitDaqEventKind.Ended);
+            AssertZeros(h.Device.OnDemandWrites.Last());
+            h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, GalvoXVolts = 1, LaserVolts = 0.3 });
+            h.Next(ZapitDaqEventKind.Pointed);   // aiming stays open after a play
+            h.Send(Arm(1, 1, true, 2.0, 0.05));
+            h.Next(ZapitDaqEventKind.Armed);
+            h.Send(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero });
+            h.Next(ZapitDaqEventKind.Zeroed);
+            StringAssert.Contains(h.Refusal(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 }), "no Point once trials are armed");
+            Assert.IsNull(h.Error);
+        }
+
+        // ZapitPlay's steps for requests and ZapitDaq's events, the node driven by hand.
+        sealed class PlayHarness : IDisposable
+        {
+            public readonly Subject<string> Requests = new Subject<string>();
+            public readonly Subject<ZapitDaqEvent> Events = new Subject<ZapitDaqEvent>();
+            public readonly System.Collections.Generic.List<ZapitSetupStep> Steps = new System.Collections.Generic.List<ZapitSetupStep>();
+            public Exception Error;
+            readonly IDisposable subscription;
+
+            public PlayHarness(double ceilingMw = 30, double maxTrialSeconds = 1)
+            {
+                subscription = new ZapitPlay { CeilingMw = ceilingMw, MaxTrialSeconds = maxTrialSeconds }.Process(Requests, Events).Subscribe(Steps.Add, e => Error = e);
+            }
+
+            public ZapitSetupStep Ask(string request)
+            {
+                Requests.OnNext(request);
+                return Steps.Last();
+            }
+
+            public void Loaded() => Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.BankLoaded, Bank = ZapitBank.Load(Unpack()) });
+
+            public void Dispose() => subscription.Dispose();
+        }
+
+        [TestMethod]
+        public void PlayArmsTheConditionAsATrialAndReportsItsStages()
+        {
+            using var p = new PlayHarness();
+            StringAssert.Contains(p.Ask("1,2,0.05").Detail, "no Zapit bank is loaded");
+            p.Loaded();
+            var arming = p.Ask("2,2.0,0.05");
+            Assert.AreEqual("Arming", arming.Stage);
+            var arm = arming.Command;
+            Assert.AreEqual(ZapitDaqCommandKind.Arm, arm.Kind);
+            Assert.AreEqual(ZapitPlay.SetupTrial, arm.Trial);
+            Assert.AreEqual(2, arm.Condition);
+            Assert.IsTrue(arm.LaserOn);
+            Assert.AreEqual(2.0, arm.PowerMw);
+            Assert.AreEqual(0.05, arm.DurationSeconds);
+            Assert.IsFalse(arm.UntilStopped);   // written whole: its end is fixed at Arm
+            StringAssert.Contains(p.Ask("1,2,0.05").Detail, "condition 2 is still armed or playing");
+            p.Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Armed, Trial = 0 });
+            Assert.AreEqual("Armed 2", p.Steps.Last().ToString());
+            p.Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Started, Trial = 0 });
+            Assert.AreEqual("Playing 2", p.Steps.Last().ToString());
+            p.Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Started, Trial = 3 });   // not the play's
+            Assert.AreEqual("Playing 2", p.Steps.Last().ToString());
+            p.Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Ended, Trial = 0 });
+            Assert.AreEqual("Ended 2 Ended", p.Steps.Last().ToString());
+            Assert.AreEqual("Arming", p.Ask("1,8,0.05").Stage);
+            p.Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Zeroed });   // LaserOff ends it
+            Assert.AreEqual("Ended 1 Zeroed", p.Steps.Last().ToString());
+            Assert.IsNull(p.Error);
+        }
+
+        [TestMethod]
+        public void PlayRefusesWhatTheBankOrTheRigCannotPlayAsAStep()
+        {
+            using var p = new PlayHarness(ceilingMw: 5);
+            p.Loaded();
+            StringAssert.Contains(p.Ask("1,2").Detail, "a play is condition,powerMw,seconds");
+            StringAssert.Contains(p.Ask("1.5,2,0.05").Detail, "a play is condition,powerMw,seconds");
+            StringAssert.Contains(p.Ask("4,2,0.05").Detail, "no condition 4");
+            StringAssert.Contains(p.Ask("1,3,0.05").Detail, "with the laser on at 3 mW");
+            StringAssert.Contains(p.Ask("1,8,0.05").Detail, "at most ceilingMw (5 mW)");
+            StringAssert.Contains(p.Ask("1,2,0").Detail, "more than 0 s");
+            StringAssert.Contains(p.Ask("1,2,5").Detail, "longer than maxTrialSeconds (1 s)");
+            Assert.IsTrue(p.Steps.All(s => s.Stage == "Refused" && s.Command == null));
+            Assert.IsNull(p.Error);
+            using var off = new PlayHarness(ceilingMw: 0);
+            off.Loaded();
+            StringAssert.Contains(off.Ask("1,2,0.05").Detail, "laser disabled");
+        }
+
+        [TestMethod]
+        public void GoWithAPlayArmedZeroesTheLines()
+        {
+            using var p = new PlayHarness();
+            p.Loaded();
+            p.Requests.OnCompleted();   // Go with nothing armed: nothing
+            Assert.AreEqual(0, p.Steps.Count);
+            using var q = new PlayHarness();
+            q.Loaded();
+            q.Ask("1,2,0.05");
+            q.Requests.OnCompleted();
+            Assert.AreEqual("Off Go", q.Steps.Last().ToString());
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, q.Steps.Last().Command.Kind);
+        }
     }
 }

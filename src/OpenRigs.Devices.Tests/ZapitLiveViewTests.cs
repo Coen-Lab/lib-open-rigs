@@ -59,6 +59,28 @@ namespace OpenRigs.Devices.Tests
             Assert.IsTrue(MappedFrom(include.Workflow, typeof(OpenRigs.Zapit.ZapitSetupCapture), "LaserCeilingVolts", "Zapit.LaserCeilingVolts"));
         }
 
+        // Play Condition: ZapitPlay takes ZapitDaq's own limits from ZapitRig (so it refuses what ZapitDaq's Arm would stop the
+        // workflow over), and the setup declares Zapit-Main.Play and Zapit-Main.Trigger for the agent. The workflow builds
+        // with them (TheZapitCameraIsStreamedOnARigWithZapitDaq builds it whole).
+        [TestMethod]
+        public void PlayConditionIsWiredWithZapitDaqsLimitsAndItsCommandsDeclared()
+        {
+            WorkflowBuilder builder;
+            using (var reader = XmlReader.Create(Path.Combine(Folder, "ZapitLiveView.bonsai")))
+            {
+                builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+            }
+            var include = Included(builder.Workflow, "OpenRigs.Opto.ZapitBonsai:ConnectForTaskZapitDaq.bonsai");
+            Included(include.Workflow, "OpenRigs.Opto.ZapitBonsai:ZapitSetup.bonsai");
+            Assert.IsTrue(MappedFrom(include.Workflow, typeof(OpenRigs.Zapit.ZapitPlay), "MaxTrialSeconds", "ZapitRig"));
+            Assert.IsTrue(MappedFrom(include.Workflow, typeof(OpenRigs.Zapit.ZapitDaq), "MaxTrialSeconds", "ZapitRig"));
+            Assert.IsTrue(MappedFrom(include.Workflow, typeof(OpenRigs.Zapit.ZapitPlay), "CeilingMw", "ZapitRig"));
+            var declared = Nested(include.Workflow).Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<CombinatorBuilder>().Select(c => c.Combinator)
+                .OfType<OpenRigs.Control.DeclareDeviceControls>().Single(d => d.Name == "Zapit-Main");
+            var names = declared.Commands.Select(c => c.Name).ToArray();
+            CollectionAssert.IsSubsetOf(new[] { "Play", "Trigger", "LaserOff" }, names);
+        }
+
         // Whether the combinator's property is mapped from the subject (SubscribeSubject, PropertyMapping, the combinator), at any depth.
         static bool MappedFrom(ExpressionBuilderGraph workflow, Type combinator, string property, string subject)
         {

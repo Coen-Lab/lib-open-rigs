@@ -32,7 +32,9 @@ namespace OpenRigs.Zapit
     /// and deleted and every line zeroed on a short-lived on-demand task.
     /// Calibration: on-demand points, and a laser staircase read back through the photodiode on the AO clock. Every line is
     /// zeroed on subscribe and on unsubscribe, however the workflow stops. A Point once trials are armed, and a bank over the
-    /// ceiling, are Refused (an event; the session runs on); any other refusal or DAQ error is an error. No laser sample above
+    /// ceiling, are Refused (an event; the session runs on), as are a Point, Staircase or LoadBank while a trial is armed;
+    /// any other refusal or DAQ error is an error. Play Condition's trial (<see cref="ZapitPlay.SetupTrial"/>, trial 0, armed
+    /// only before Go) is a trial like any other but leaves Point and Staircase open after it. No laser sample above
     /// <see cref="LaserCeilingVolts"/> is written except by the staircase (the calibration that measures the laser curve the
     /// ceiling comes from), and a bank holding one, built under a ceiling above <see cref="CeilingMw"/> (peak), or delivering
     /// more average power than it asked (average), is refused at LoadBank. The simulated twin starts a trial on a Trigger
@@ -288,7 +290,7 @@ namespace OpenRigs.Zapit
             ZapitBank? bank;
             Trial? trial;
             Feed? feed;   // under the device gate: the streamed trial the feeder tops up
-            bool trialsArmed;   // a trial was armed: Point is refused for the rest of the session
+            bool trialsArmed;   // a task's trial was armed (not Play Condition's): Point is refused for the rest of the session
             ZapitBank? planned;   // the bank plan is for
             StreamPlan? plan;
             bool leadChecked;   // plan passed CheckLead on this DAQ
@@ -345,7 +347,7 @@ namespace OpenRigs.Zapit
 
             void LoadBank(ZapitDaqCommand command)
             {
-                RefuseWhilePlaying(command);
+                if (RefusedWhileArmed(command)) return;
                 var loaded = ZapitBank.Load(command.Path ?? throw new InvalidOperationException("LoadBank needs the bank's Path."));
                 if (loaded.SampleRate != node.SampleRate)
                     throw new InvalidOperationException($"The Zapit bank was built for {loaded.SampleRate} samples/s; the rig runs {node.SampleRate}.");
@@ -403,7 +405,7 @@ namespace OpenRigs.Zapit
                     throw new InvalidOperationException($"Trial {command.Trial} cannot arm while trial {trial.Command.Trial} still plays.");
                 if (trial != null) Finish(ZapitDaqEventKind.Stopped);   // armed but never triggered
                 if (disposed) return;   // a subscriber disposed the node inside that event: the lines are zeroed
-                trialsArmed = true;
+                if (command.Trial != ZapitPlay.SetupTrial) trialsArmed = true;   // Play Condition's, before Go, leaves aiming open
                 var watch = Stopwatch.StartNew();
                 var variant = loaded.Variant(command.Condition, command.LaserOn, command.PowerMw);
                 var cycles = loaded.Cycles(command.Condition, variant, command.DurationSeconds, node.MaxTrialSeconds);
@@ -496,7 +498,7 @@ namespace OpenRigs.Zapit
                     Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "ZapitDaq takes no Point once trials are armed (after Go)." });
                     return;
                 }
-                RefuseWhilePlaying(command);
+                if (RefusedWhileArmed(command)) return;
                 RefuseLaser(new[] { command.LaserVolts }, "The aiming point");
                 lock (deviceGate) device.WriteOnDemand(new[] { command.GalvoXVolts, command.GalvoYVolts, command.LaserVolts, 0 });
                 Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed });
@@ -510,7 +512,7 @@ namespace OpenRigs.Zapit
                     Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "ZapitDaq takes no Staircase once trials are armed (after Go)." });
                     return;
                 }
-                RefuseWhilePlaying(command);
+                if (RefusedWhileArmed(command)) return;
                 var levels = command.LaserLevelsVolts;
                 if (levels == null || levels.Length == 0 || command.SamplesPerLevel < 1)
                     throw new InvalidOperationException("A Zapit staircase needs laser levels and at least one sample per level.");
@@ -547,9 +549,14 @@ namespace OpenRigs.Zapit
 
             static double[] Laser(double[,] samples) => Enumerable.Range(0, samples.GetLength(1)).Select(i => samples[2, i]).ToArray();
 
-            void RefuseWhilePlaying(ZapitDaqCommand command)
+            // A Point, Staircase or LoadBank while a trial is armed (Play Condition's, before Go) is Refused, an event: the
+            // session runs on, the trial untouched.
+            bool RefusedWhileArmed(ZapitDaqCommand command)
             {
-                if (trial != null) throw new InvalidOperationException($"ZapitDaq cannot {command.Kind} while trial {trial.Command.Trial} is armed.");
+                if (trial != null) Poll(trial);   // it may have ended since the monitor's last look
+                if (disposed || trial == null) return disposed;
+                Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = $"ZapitDaq cannot {command.Kind} while trial {trial.Command.Trial} is armed." });
+                return true;
             }
 
             // Stops and deletes any clocked task and zeroes every line, the zero written even when the stop reports an error;

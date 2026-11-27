@@ -4,12 +4,14 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
 
 ## Channels
 
-- **Commands.** The agent sends `{"cmd": "command", "name": <name>, "args": <path>}`. The device `Zapit-Main` declares five commands, and only on a rig with a `zapit` block:
+- **Commands.** The agent sends `{"cmd": "command", "name": <name>, "args": <path>}`. The device `Zapit-Main` declares seven commands, and only on a rig with a `zapit` block:
   - `Zapit-Main.Setup`
   - `Zapit-Main.Still`
   - `Zapit-Main.LoadBank`
   - `Zapit-Main.LaserOff`
   - `Zapit-Main.Aim`
+  - `Zapit-Main.Play`
+  - `Zapit-Main.Trigger`
 
   A rig without the block declares none of them, so the agent finds out whether the rig has Zapit from `status.commands`.
 - **State.** `status.metrics["Zapit-Main.Setup"]` holds the latest stage as `<Stage> <detail>`. The stages are:
@@ -20,7 +22,7 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
   - `BankLoaded <json>`
   - `Refused <why>`
 
-  Hand aiming has its own metric, `status.metrics["Zapit-Main.Aim"]`: `Aiming <xVolts>,<yVolts>,<laserVolts>`, `Off Go` or `Refused <why>`, so an aim never overwrites `BankLoaded`.
+  Hand aiming has its own metric, `status.metrics["Zapit-Main.Aim"]`: `Aiming <xVolts>,<yVolts>,<laserVolts>`, `Off Go` or `Refused <why>`, so an aim never overwrites `BankLoaded`. Play Condition has its own too, `status.metrics["Zapit-Main.Play"]` (below).
 
   The metric keeps only the latest value. The agent sends one request, then polls until that request's terminal stage comes back: `FramesSaved`, `StillSaved`, `BankLoaded` or `Refused`.
 - **Live.** The camera `Camera-Zapit` is streamed by StreamDevices as the camera Zapit, on a rig whose `zapit` block names `zapit.device`. Its frames are on `Camera-Zapit.Data`, published at `ConnectForTaskZapitDaq`'s top level (a subject inside its `Zapit` SelectMany would be out of StreamDevices' reach), and they are the frames the setup phase saves.
@@ -79,6 +81,16 @@ The workflow refuses an aim, and keeps running, when:
 - a grid run or still is in progress.
 
 After Go it ignores aims. If the beam is still aimed at Go, it zeroes the lines (`Off Go`).
+
+## Play Condition
+
+Once the bank is loaded and the sample accepted, before Go, the agent can play one condition's real trial, as the task's trials play it (open_rigs.zapit `play`: `plan_play` chooses it, `ConditionPlay` runs the sequence). There is no new ZapitDaq command:
+
+1. `Zapit-Main.Play <condition>,<powerMw>,<seconds>`: the workflow's `ZapitPlay` sends ZapitDaq its own `Arm` of that condition from the loaded bank as trial 0, laser on at that power (one of the bank's, at most `ceilingMw`), for that long with its ramp (it must fit ZapitDaq's `MaxTrialSeconds`). It reports on `status.metrics["Zapit-Main.Play"]`: `Arming <args>`, `Armed <condition>`, `Playing <condition>`, `Ended <condition> <how>`, `Off Go` or `Refused <why>`. With no bank, a play already armed, the laser disabled, or a condition, power or duration the bank cannot play, it answers `Refused` and runs on.
+2. Once `Armed`, `Zapit-Main.Trigger on` raises the ZapitTrigger line (the masking light with it), which starts the trial on ZapitDaq's trigger terminal, as a trial's trigger does (the simulated twin gets its `Trigger` with it).
+3. After the trial with its ramp, `Zapit-Main.Trigger off` clears the line and `Zapit-Main.LaserOff` zeroes every output.
+
+`Zapit-Main.LaserOff` before Go also clears the line, and so does the play's own end (`Ended`: its end, a stop or a Zero), whatever the agent does; at Go a play still armed is zeroed (`Off Go`), and when the workflow stops the board piece clears the line. ZapitDaq answers a `Point`, `Staircase` or `LoadBank` while the play is armed with `Refused` (the session runs on), and after it aiming stays open: only a task's trial (1 on) closes `Point`. After Go the workflow ignores `Play` and `Trigger`.
 
 ## Refusals
 
