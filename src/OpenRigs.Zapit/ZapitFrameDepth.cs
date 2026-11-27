@@ -28,7 +28,19 @@ namespace OpenRigs.Zapit
                 throw new InvalidOperationException(
                     $"The Zapit camera gave a {image.Depth} image with {image.Channels} channels; it must be Mono8 or Mono12 (set PixelFormat in its .pfs).");
             var eight = new IplImage(image.Size, IplDepth.U8, 1);
-            CV.ConvertScale(image, eight, mono8Scale ? 1.0 / Mono12PerMono8 : 1.0, 0);   // saturates at 255
+            if (mono8Scale)
+            {
+                CV.ConvertScale(image, eight, 1.0 / Mono12PerMono8, 0);   // saturates at 255
+                return eight;
+            }
+            // Session frames: stretched darkest to 0, brightest to 255, as MATLAB Zapit's mat2gray, before anything shrinks
+            // or encodes them (Pip, 27 Nov 2026: sent as raw counts, B2's dim view had ~23 grey levels at the live view's
+            // 320 x 240, flat patches however the window stretched them). A flat frame is its raw counts.
+            double min, max;
+            Point minAt, maxAt;
+            CV.MinMaxLoc(image, out min, out max, out minAt, out maxAt);
+            if (max > min) CV.ConvertScale(image, eight, 255.0 / (max - min), -min * 255.0 / (max - min));
+            else CV.ConvertScale(image, eight, 1.0, 0);
             return eight;
         }
     }

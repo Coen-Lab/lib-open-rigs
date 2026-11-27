@@ -404,16 +404,18 @@ namespace OpenRigs.Zapit.Tests
 
         static int[] Values(IplImage image) => Enumerable.Range(0, image.Width).Select(i => (int)image[0, i].Val0).ToArray();
 
-        // Mono12 as Bonsai.Pylon gives it (16-bit, raw 0-4095 counts): session frames keep every count up to 255 and
-        // saturate there (B2's dim view peaks near 46); a grid run's frames are Mono8's scale, counts over 16.
+        // Mono12 as Bonsai.Pylon gives it (16-bit, raw 0-4095 counts): session frames stretched darkest to 0, brightest to
+        // 255 (MATLAB's mat2gray; B2's dim view peaks near 46); a grid run's frames are Mono8's scale, counts over 16.
         [TestMethod]
-        public void Mono12FramesAreRawCountsSaturatingAt255AndAGridRunsOver16()
+        public void Mono12FramesAreStretchedMinToMaxAndAGridRunsOver16()
         {
-            var mono12 = Row(IplDepth.U16, 0, 1, 2, 45, 46, 255, 256, 4095);
-            var session = ZapitFrameDepth.ToEightBit(mono12, mono8Scale: false);
+            var dim = Row(IplDepth.U16, 10, 11, 28, 46);
+            var session = ZapitFrameDepth.ToEightBit(dim, mono8Scale: false);
             Assert.AreEqual(IplDepth.U8, session.Depth);
             Assert.AreEqual(1, session.Channels);
-            CollectionAssert.AreEqual(new[] { 0, 1, 2, 45, 46, 255, 255, 255 }, Values(session));
+            CollectionAssert.AreEqual(new[] { 0, 7, 128, 255 }, Values(session));
+            CollectionAssert.AreEqual(new[] { 7, 7 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 7, 7), false)));
+            var mono12 = Row(IplDepth.U16, 0, 1, 2, 45, 46, 255, 256, 4095);
             var grid = ZapitFrameDepth.ToEightBit(mono12, mono8Scale: true);
             Assert.AreEqual(IplDepth.U8, grid.Depth);
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 3, 3, 16, 16, 255 }, Values(grid));
