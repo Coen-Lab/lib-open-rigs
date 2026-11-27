@@ -116,8 +116,12 @@ namespace OpenRigs.Zapit
 
         /// <summary>The camera's frames as PylonCapture grabs them, each made 8-bit (ZapitFrameDepth).</summary>
         public override IObservable<PylonDataFrame> Generate() => base.Generate().Select(frame =>
-            frame.Image == null || frame.Image.Depth == OpenCV.Net.IplDepth.U8 ? frame
-                : new PylonDataFrame(ZapitFrameDepth.ToEightBit(frame.Image, gridApplied), frame.GrabResult));
+        {
+            if (frame.Image == null || frame.Image.Depth == OpenCV.Net.IplDepth.U8) return frame;
+            var grid = gridApplied;
+            var top = grid ? 0 : ZapitFrameDepth.StretchTop(frame.Image);
+            return new PylonDataFrame(ZapitFrameDepth.ToEightBit(frame.Image, grid, top), frame.GrabResult);
+        });
 
         /// <summary>The camera's frames, with each of <paramref name="settings"/> applied to it while it grabs.</summary>
         public IObservable<PylonDataFrame> Generate(IObservable<ZapitCameraSettings> settings) => Observable.Create<PylonDataFrame>(observer =>

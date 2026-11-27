@@ -421,6 +421,20 @@ namespace OpenRigs.Zapit.Tests
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 3, 3, 16, 16, 255 }, Values(grid));
         }
 
+        // The stretch's top is the brightest of the frame averaged 8 x 8: one hot pixel (4000 in a field of 40) moves it
+        // by its 1/64 share, not to 4000 (Pip, 27 Nov 2026: the view brightened and dimmed with single pixels).
+        [TestMethod]
+        public void StretchTopIsTheBrightestOfTheFrameAveragedEightByEight()
+        {
+            var frame = new IplImage(new Size(64, 64), IplDepth.U16, 1);
+
+            frame.Set(new Scalar(40));
+            frame[10, 10] = new Scalar(4000);
+            var top = ZapitFrameDepth.StretchTop(frame);
+            Assert.AreEqual(40 + (4000 - 40) / 64.0, top, 0.01);
+            CollectionAssert.AreEqual(new[] { 255 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 4000), false, top)));
+        }
+
         // A Mono8 .pfs (every other rig): the frame itself, untouched, in a grid run or not.
         [TestMethod]
         public void Mono8FramesPassThroughUnchanged()
