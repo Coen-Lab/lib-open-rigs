@@ -195,7 +195,7 @@
             </orcl:Command>
             <orcl:Command>
               <orcl:Name>Crop</orcl:Name>
-              <orcl:Description>The Zapit camera's shown and recorded frame cut to args x,y,w,h (pixels of the camera's frame; w and h even), or the whole frame for full or none; the stills stay whole. Reported on the metric Zapit-Main.Crop (Cropped, Full or Refused). Before Go only: the recording starts at Go, so its frame size is fixed from there.</orcl:Description>
+              <orcl:Description>The Zapit camera's shown and recorded frame cut to args x,y,w,h (pixels of the camera's frame; w and h even), or the whole frame for full or none; the stills stay whole. Reported on the metric Zapit-Main.Crop: Cropping when taken, then the camera's answer from the first frame cut to it (Cropped, Full Frame or Refused). Before Go only: the recording starts at Go, so its frame size is fixed from there.</orcl:Description>
             </orcl:Command>
           </orcl:Commands>
         </Combinator>
@@ -505,7 +505,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Name>CropRequest</Name>
-        <Description>Zapit-Main.Crop before Go: the shown and recorded frame's crop (x,y,w,h, or the whole frame), reported as Zapit-Main.Crop and sent to the camera on Camera-Zapit.Settings. After Go none is taken: the mp4 starts at Go at the crop then.</Description>
+        <Description>Zapit-Main.Crop before Go: the shown and recorded frame's crop (x,y,w,h, or the whole frame), reported as Zapit-Main.Crop (Cropping, then the camera's answer) and sent to the camera on Camera-Zapit.Settings. After Go none is taken: the mp4 starts at Go at the crop then.</Description>
         <Combinator xsi:type="zap:ZapitCropRequest" />
       </Expression>
       <Expression xsi:type="Combinator">

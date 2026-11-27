@@ -353,7 +353,7 @@ namespace OpenRigs.Zapit
     /// <summary>
     /// Zapit-Main.Crop's args as the Zapit camera's crop (the window and the mp4 cut to the brain, the
     /// agent's crop round the grid area): "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
-    /// h even and from 16) is Stage Cropped with that crop on Camera; "" or "full" is Stage Full (Detail "Frame") with the
+    /// h even and from 16) is Stage Cropping with that crop on Camera; "" or "full" is Stage Cropping (Detail "Full Frame") with the
     /// whole frame; anything else is Refused, saying why, with no Camera. Reported as the metric Zapit-Main.Crop. A taken
     /// request is only Cropping (Detail x,y,w,h, or Full Frame), not yet answered: the frame's size is known only to the
     /// camera, which answers from the first frame cut to the crop, Cropped, Full Frame or Refused (a crop outside the

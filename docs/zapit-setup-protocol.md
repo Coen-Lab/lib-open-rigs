@@ -83,6 +83,8 @@ The answer is on its own metric, `status.metrics["Zapit-Main.Crop"]`. Only the c
 
 A request is refused at once when it is not four whole numbers, x or y is below 0, or w or h is odd or below 16. A crop that runs off the frame (x+w above the width, y+h above the height) is answered `Cropping` and then `Refused <reason>` from the first frame; the camera drops it and shows the whole frame, never a clamped crop. The agent polls the metric until it reads `Cropped`, `Full Frame` or `Refused`, and sends Go only then, since `Cropping` can still turn into `Refused`.
 
+`Cropping` can stay pending if the camera is not running or restarts, so the agent times out and resends the crop. The metric carries no request ID, so the agent sends one crop at a time and waits for its final answer before sending another.
+
 ## Hand aiming
 
 Between a passed scanner fit and Go, the agent can point the beam by hand (its Point and Cat & Mouse). It sends `Zapit-Main.Aim <xVolts>,<yVolts>,<laserVolts>`: the galvo volts come from the sample mm through the scanner fit, and the laser volts from the scanner grid's power (2 mW by default, never above `ceilingMw`) through the laser curve, as `calibration_plan` makes them. The workflow points the galvos with the laser on (ZapitDaq `Point`) and reports `Aiming`. The beam stays there until the next aim, `Zapit-Main.LaserOff`, a grid run or a still. An aim or grid above the ceiling as volts (the launch property `LaserCeilingVolts`: `ceilingMw` through the laser curve) is refused, and ZapitDaq refuses any laser sample above it. Go ends a grid run or still still in progress (`Refused`, the lines zeroed), and once a trial is armed ZapitDaq answers any `Point` with `Refused`.
