@@ -191,8 +191,8 @@ namespace OpenRigs.Devices.Tests
         /// <summary>The whole frame Zapit's setup saves (ZapitFrame.Still).</summary>
         public OpenCV.Net.IplImage Still { get; set; }
 
-        /// <summary>The camera's answer to a crop (ZapitFrame.CropReport).</summary>
-        public OpenRigs.Zapit.ZapitSetupStep CropReport { get; set; }
+        /// <summary>The camera's answer to a crop (ZapitFrame.CropReports).</summary>
+        public OpenRigs.Zapit.ZapitSetupStep[] CropReports { get; set; }
 
         /// <summary>The grab's ID.</summary>
         public long FrameID { get; set; }

@@ -72,11 +72,11 @@ namespace OpenRigs.Zapit
         /// <summary>The camera's timestamp of the grab (GrabResult.Timestamp).</summary>
         public long Timestamp { get; set; }
 
-        /// <summary>The camera's answer to a Zapit-Main.Crop #n, on the first frame cut to it (null on every other frame):
+        /// <summary>The camera's answers to Zapit-Main.Crop requests, in order, on the first frame cut to them (null on every other frame):
         /// Cropped #n x,y,w,h, Full Frame #n, or Refused #n with the reason when the crop does not fit this frame (the camera's
         /// size is known only from a frame). A refused crop is dropped, the whole frame shown, never a clamped one;
-        /// ZapitCropReport sends it to the metric Zapit-Main.Crop.</summary>
-        public ZapitSetupStep? CropReport { get; set; }
+        /// ZapitCropReport sends them in order to the metric Zapit-Main.Crop.</summary>
+        public ZapitSetupStep[]? CropReports { get; set; }
     }
 
     /// <summary>The camera features a grid run sets, by GenICam name: a Basler camera's, or a test's.</summary>
@@ -200,7 +200,7 @@ namespace OpenRigs.Zapit
                 {
                     var cut = crop.Current;
                     Split(frame.Image, gridApplied, cut, out var shown, out var still, out var refusal);
-                    return new ZapitFrame { Image = shown, Still = still, CropReport = crop.Finish(cut, refusal), FrameID = frame.GrabResult?.ID ?? 0, Timestamp = frame.GrabResult?.Timestamp ?? 0 };
+                    return new ZapitFrame { Image = shown, Still = still, CropReports = crop.Finish(cut, refusal), FrameID = frame.GrabResult?.ID ?? 0, Timestamp = frame.GrabResult?.Timestamp ?? 0 };
                 }).Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; } crop.Reset(); }).Subscribe(observer),
                 settings.Subscribe(s =>
                 {

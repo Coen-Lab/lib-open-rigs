@@ -506,28 +506,49 @@ namespace OpenRigs.Zapit.Tests
             Assert.IsNull(state.Finish(state.Current, null));   // no request, no answer
             var fits = new Rect(16, 8, 32, 24);
             state.Set(fits, 1);
-            Assert.AreEqual("Cropped #1 16,8,32,24", state.Finish(fits, ZapitFrameDepth.Refusal(frame.Size, fits)).ToString());
+            Assert.AreEqual("Cropped #1 16,8,32,24", Say(state.Finish(fits, ZapitFrameDepth.Refusal(frame.Size, fits))));
             Assert.IsNull(state.Finish(fits, null));   // once
             state.Set(default, 2);
-            Assert.AreEqual("Full Frame #2", state.Finish(default, null).ToString());
+            Assert.AreEqual("Full Frame #2", Say(state.Finish(default, null)));
             var off = new Rect(3000, 2000, 800, 600);
             state.Set(off, 3);
-            var step = state.Finish(off, ZapitFrameDepth.Refusal(frame.Size, off));
-            StringAssert.StartsWith(step!.ToString(), "Refused #3 the crop 3000,2000,800,600 does not fit");
-            StringAssert.EndsWith(step.ToString(), "; Now Full Frame");
+            var step = Say(state.Finish(off, ZapitFrameDepth.Refusal(frame.Size, off)));
+            StringAssert.StartsWith(step, "Refused #3 the crop 3000,2000,800,600 does not fit");
+            StringAssert.EndsWith(step, "; Now Full Frame");
             Assert.AreEqual(default(Rect), state.Current);   // reset once, to the whole frame
             Assert.IsNull(state.Finish(default, null));
             // A request that was no crop keeps the crop in force and says so, under its own number.
             state.Set(fits, 4);
             state.Finish(fits, null);
             state.Reject("a crop is x,y,w,h", 5);
-            Assert.AreEqual("Refused #5 a crop is x,y,w,h; Now Cropped 16,8,32,24", state.Finish(fits, null).ToString());
+            Assert.AreEqual("Refused #5 a crop is x,y,w,h; Now Cropped 16,8,32,24", Say(state.Finish(fits, null)));
             Assert.AreEqual(fits, state.Current);
             Assert.IsNull(state.Finish(fits, null));   // once
             state.Set(default, 6);
             state.Finish(default, null);
             state.Reject("a crop request is #<n> x,y,w,h", 0);
-            Assert.AreEqual("Refused #0 a crop request is #<n> x,y,w,h; Now Full Frame", state.Finish(default, null).ToString());
+            Assert.AreEqual("Refused #0 a crop request is #<n> x,y,w,h; Now Full Frame", Say(state.Finish(default, null)));
+        }
+
+        // The answers as one text, in order, for a frame's reports.
+        static string? Say(ZapitSetupStep[]? steps) => steps == null ? null : string.Join(" | ", steps.Select(step => step.ToString()));
+
+        // A request refused before any frame has answered the crop set before it: the frame answers both, the crop first.
+        [TestMethod]
+        public void ARejectedRequestIsAnsweredAfterTheCropBeforeIt()
+        {
+            var state = new ZapitCropState();
+            var a = new Rect(16, 8, 32, 24);
+            state.Set(a, 1);
+            state.Reject("a crop is x,y,w,h", 2);
+            Assert.AreEqual("Cropped #1 16,8,32,24 | Refused #2 a crop is x,y,w,h; Now Cropped 16,8,32,24", Say(state.Finish(a, null)));
+            Assert.IsNull(state.Finish(a, null));
+            // A first crop outside the frame is dropped before the rejection is answered: that one is Now Full Frame.
+            var off = new Rect(3000, 2000, 800, 600);
+            state.Set(off, 3);
+            state.Reject("a crop is x,y,w,h", 4);
+            var both = Say(state.Finish(off, "does not fit"));
+            Assert.AreEqual("Refused #3 does not fit; Now Full Frame | Refused #4 a crop is x,y,w,h; Now Full Frame", both);
         }
 
         // A crop sent after a rejected request, before a frame, is the one answered: Cropped, not the older Refused.
@@ -538,7 +559,7 @@ namespace OpenRigs.Zapit.Tests
             var b = new Rect(16, 8, 32, 24);
             state.Reject("a crop is x,y,w,h", 1);
             state.Set(b, 2);
-            Assert.AreEqual("Cropped #2 16,8,32,24", state.Finish(b, null).ToString());
+            Assert.AreEqual("Cropped #2 16,8,32,24", Say(state.Finish(b, null)));
             Assert.IsNull(state.Finish(b, null));
         }
 
@@ -554,7 +575,7 @@ namespace OpenRigs.Zapit.Tests
             state.Set(newer, 2);   // arrives while the frame cut to the old crop is in flight
             Assert.IsNull(state.Finish(taken, "does not fit"));
             Assert.AreEqual(newer, state.Current);
-            Assert.AreEqual("Cropped #2 16,8,32,24", state.Finish(newer, null).ToString());
+            Assert.AreEqual("Cropped #2 16,8,32,24", Say(state.Finish(newer, null)));
             state.Reset();
             Assert.AreEqual(default(Rect), state.Current);
             Assert.IsNull(state.Finish(default, null));

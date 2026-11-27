@@ -95,8 +95,9 @@ namespace OpenRigs.Zapit
         /// <summary>A new crop (an empty one is the whole frame), to be answered by the next frame.</summary>
         public void Set(Rect request, int requestNumber) { lock (gate) { crop = request; number = requestNumber; pending = true; rejection = null; } }
 
-        /// <summary>A request that was no crop: the crop in force stays, and the next frame answers Refused with it.</summary>
-        public void Reject(string reason, int requestNumber) { lock (gate) { rejection = reason; rejectionNumber = requestNumber; pending = false; } }
+        /// <summary>A request that was no crop: the crop in force stays, and the next frame answers Refused with it, after the
+        /// answer to a crop set before it that no frame has answered yet.</summary>
+        public void Reject(string reason, int requestNumber) { lock (gate) { rejection = reason; rejectionNumber = requestNumber; } }
 
         /// <summary>No crop and nothing to answer (the camera closed).</summary>
         public void Reset() { lock (gate) { crop = default; number = 0; pending = false; rejection = null; } }
@@ -109,25 +110,36 @@ namespace OpenRigs.Zapit
         /// <paramref name="refusal"/> or none: Refused (a crop outside the frame is dropped, once; a request that was no crop
         /// is Rejected), each saying which crop is now in force (Now Full Frame, or Now Cropped x,y,w,h); Cropped or Full
         /// Frame for the first frame cut to a new crop, else null. Null too when the crop changed since: the newer request is answered by its own frame.</summary>
-        public ZapitSetupStep? Finish(Rect cut, string? refusal)
+        public ZapitSetupStep[]? Finish(Rect cut, string? refusal)
         {
             lock (gate)
             {
                 if (!crop.Equals(cut)) return null;
-                if (refusal != null || rejection != null)
+                var answers = new System.Collections.Generic.List<ZapitSetupStep>();
+                if (pending || refusal != null)   // the crop set, answered first
                 {
-                    var why = refusal ?? rejection;
-                    var asked = refusal != null ? number : rejectionNumber;
-                    if (refusal != null) crop = default;   // never a clamped crop: the whole frame
                     pending = false;
-                    rejection = null;
-                    return new ZapitSetupStep { Stage = "Refused", Detail = $"#{asked} {why}; Now " + (crop.Width <= 0 ? "Full Frame" : $"Cropped {crop.X},{crop.Y},{crop.Width},{crop.Height}") };
+                    if (refusal != null)
+                    {
+                        crop = default;   // never a clamped crop: the whole frame
+                        answers.Add(Refused(number, refusal));
+                    }
+                    else answers.Add(cut.Width <= 0 ? new ZapitSetupStep { Stage = "Full", Detail = $"Frame #{number}" }
+                        : new ZapitSetupStep { Stage = "Cropped", Detail = $"#{number} {cut.X},{cut.Y},{cut.Width},{cut.Height}" });
                 }
-                if (!pending) return null;
-                pending = false;
-                return cut.Width <= 0 ? new ZapitSetupStep { Stage = "Full", Detail = $"Frame #{number}" }
-                    : new ZapitSetupStep { Stage = "Cropped", Detail = $"#{number} {cut.X},{cut.Y},{cut.Width},{cut.Height}" };
+                if (rejection != null)   // then the request that was no crop, with the crop in force after the first
+                {
+                    answers.Add(Refused(rejectionNumber, rejection));
+                    rejection = null;
+                }
+                return answers.Count == 0 ? null : answers.ToArray();
             }
         }
+
+        ZapitSetupStep Refused(int asked, string why) => new ZapitSetupStep
+        {
+            Stage = "Refused",
+            Detail = $"#{asked} {why}; Now " + (crop.Width <= 0 ? "Full Frame" : $"Cropped {crop.X},{crop.Y},{crop.Width},{crop.Height}"),
+        };
     }
 }

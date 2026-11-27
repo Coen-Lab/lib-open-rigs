@@ -147,7 +147,7 @@ namespace OpenRigs.Devices.Tests
 
     /// <summary>
     /// The Zapit camera's crop handling on 64 x 48 frames sent by the test (SendFrame), as ZapitPylonCapture does it: each
-    /// Camera-Zapit.Settings crop is kept (ZapitCropState), and a frame is cut to it, answering from that frame (ZapitFrame.CropReport).
+    /// Camera-Zapit.Settings crop is kept (ZapitCropState), and a frame is cut to it, answering from that frame (ZapitFrame.CropReports).
     /// </summary>
     public class SimulatedZapitCamera : Combinator<OpenRigs.Zapit.ZapitCameraSettings, ZapitCameraFrame>
     {
@@ -172,7 +172,7 @@ namespace OpenRigs.Devices.Tests
                     var whole = new OpenCV.Net.IplImage(new OpenCV.Net.Size(64, 48), OpenCV.Net.IplDepth.U8, 1);
                     var cut = state.Current;
                     var shown = OpenRigs.Zapit.ZapitFrameDepth.Crop(whole, cut, out var refusal);
-                    observer.OnNext(new ZapitCameraFrame { Value = new StandInGrab { Image = shown, Still = whole, CropReport = state.Finish(cut, refusal) } });
+                    observer.OnNext(new ZapitCameraFrame { Value = new StandInGrab { Image = shown, Still = whole, CropReports = state.Finish(cut, refusal) } });
                 });
                 return new System.Reactive.Disposables.CompositeDisposable(settings, frames);
             });

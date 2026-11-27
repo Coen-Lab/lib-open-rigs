@@ -541,7 +541,7 @@
         <Name>Camera-Zapit.Data</Name>
       </Expression>
       <Expression xsi:type="MemberSelector">
-        <Selector>Value.CropReport</Selector>
+        <Selector>Value.CropReports</Selector>
       </Expression>
       <Expression xsi:type="Combinator">
         <Name>CropReport</Name>
