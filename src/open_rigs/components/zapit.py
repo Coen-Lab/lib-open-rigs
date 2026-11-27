@@ -41,13 +41,21 @@ def ramp_down_from(context) -> float:
 def max_ramp_down_seconds(path: str | Path) -> float:
     """A Zapit conditions file's highest offRampDownDuration_ms over its stimLocationsNN conditions, in seconds
     (ZapitConditions.Check's MaxRampDownSeconds; the file's other checks are the workflow's, at Go). ValueError for a
-    condition with none."""
+    condition with none. A condition gives it in its Attributes, as Zapit writes it (stim_config), or at its top level, as
+    ZapitConditions' pattern finds it anywhere in the condition."""
     doc = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     conditions = {k: v for k, v in doc.items() if re.fullmatch(r"stimLocations\d+", str(k))}
-    missing = [k for k, v in conditions.items() if not isinstance(v, dict) or "offRampDownDuration_ms" not in v]
+
+    def ramp(v):
+        if not isinstance(v, dict):
+            return None
+        attributes = v.get("Attributes") if isinstance(v.get("Attributes"), dict) else {}
+        return v.get("offRampDownDuration_ms", attributes.get("offRampDownDuration_ms"))
+
+    missing = [k for k, v in conditions.items() if ramp(v) is None]
     if not conditions or missing:
         raise ValueError(f"the Zapit conditions file {path} has {'no conditions' if not conditions else ', '.join(missing) + ' with no offRampDownDuration_ms'}")
-    return max(float(v["offRampDownDuration_ms"]) for v in conditions.values()) / 1000
+    return max(float(ramp(v)) for v in conditions.values()) / 1000
 
 
 def bank_ramp_down_seconds(bank: str | Path) -> float:

@@ -59,6 +59,11 @@ def test_the_zapit_file_s_largest_ramp_down_is_the_context_where_the_file_is(tmp
     assert check_task.context(on) == {"zapit_ramp_down_seconds": 0.4}
     assert check_task.context({"optogenetics": {**on["optogenetics"], "enabled": False}}) == {}
     assert check_task.context({"optogenetics": {"enabled": True, "zapitConditionsPath": str(tmp_path / "gone.yml")}}) == {}
+    # As Zapit writes a file (the share's): in each condition's Attributes, which ZapitConditions' pattern finds too
+    path.write_text("stimLocations01:\n  ML: [1.5, -1.5]\n  AP: [-0.7, -0.7]\n"
+                    "  Attributes: {laserPowerInMW: 3.0, offRampDownDuration_ms: 250.0}\n"
+                    "stimLocations02:\n  Attributes: {laserPowerInMW: 3.0, offRampDownDuration_ms: 300.0}\n", encoding="utf-8")
+    assert check_task.context(on) == {"zapit_ramp_down_seconds": 0.3}
     path.write_text("stimLocations01:\n  laserPowerInMW: 2\n", encoding="utf-8")  # the workflow refuses it at Go
     assert check_task.context(on) == {}
 
