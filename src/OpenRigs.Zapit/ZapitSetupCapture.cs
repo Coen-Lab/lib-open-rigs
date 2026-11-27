@@ -352,7 +352,8 @@ namespace OpenRigs.Zapit
 
     /// <summary>
     /// Zapit-Main.Crop's args as the Zapit camera's crop (the window and the mp4 cut to the brain, the
-    /// agent's crop round the grid area): "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
+    /// agent's crop round the grid area), each with its request number, "#n x,y,w,h" or "#n full" (n a whole number from 1),
+    /// echoed in every answer so the agent matches answers to requests: "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
     /// h even and from 16) is Stage Cropping with that crop on Camera; "" or "full" is Stage Cropping (Detail "Full Frame") with the
     /// whole frame; anything else is a request with no crop (Camera.RejectReason). Reported as the metric Zapit-Main.Crop.
     /// A taken request is only Cropping (Detail x,y,w,h, Full Frame, or the request's text), not yet answered: the camera
@@ -362,37 +363,52 @@ namespace OpenRigs.Zapit
     /// starts at Go, so its frame size never changes.
     /// </summary>
     [Combinator]
-    [Description("Zapit-Main.Crop's args (x,y,w,h in pixels of the camera's frame, or \"\" / full for the whole frame) as the Zapit camera's crop for the shown and recorded frame: Cropping (the crop, or why it is none, on Camera; the camera answers).")]
+    [Description("Zapit-Main.Crop's args (#n x,y,w,h in pixels of the camera's frame, or #n full for the whole frame; n a whole number from 1) as the Zapit camera's crop for the shown and recorded frame: Cropping (the crop, or why it is none, on Camera; the camera answers).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitCropRequest
     {
         /// <summary>The smallest crop side, in pixels.</summary>
         public const int LeastSide = 16;
 
-        /// <summary>Each request as a Cropping step for the camera to answer.</summary>
+        /// <summary>Each request as a Cropping #n step for the camera to answer.</summary>
         public IObservable<ZapitSetupStep> Process(IObservable<string> source) => source.Select(Parse);
 
         /// <summary>A request that is no crop, as a step the camera answers (it alone knows the crop in force).</summary>
-        static ZapitSetupStep Rejected(string request, string reason) =>
-            new ZapitSetupStep { Stage = "Cropping", Detail = request, Camera = new ZapitCameraSettings { SetCrop = true, RejectReason = reason } };
+        static ZapitSetupStep Rejected(int number, string echo, string reason) =>
+            new ZapitSetupStep { Stage = "Cropping", Detail = $"#{number} {echo}", Camera = new ZapitCameraSettings { SetCrop = true, CropRequest = number, RejectReason = reason } };
 
-        /// <summary>One request as a setup step (Process).</summary>
+        /// <summary>One request as a setup step (Process): "#n x,y,w,h" or "#n full", n a whole number from 1. A request
+        /// without a valid number is number 0.</summary>
         public static ZapitSetupStep Parse(string request)
         {
             var text = (request ?? "").Trim().Trim('"').Trim();
-            if (text.Length == 0 || text.Equals("full", StringComparison.OrdinalIgnoreCase))
-                return new ZapitSetupStep { Stage = "Cropping", Detail = "Full Frame", Camera = new ZapitCameraSettings { SetCrop = true } };
-            var parts = text.Split(',');
+            var number = 0;
+            var rest = text;
+            if (text.StartsWith("#", StringComparison.Ordinal))
+            {
+                var space = text.IndexOfAny(new[] { ' ', '\t' });
+                var head = space < 0 ? text.Substring(1) : text.Substring(1, space - 1);
+                if (head.Length > 0 && head.All(char.IsDigit) && int.TryParse(head, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n > 0)
+                {
+                    number = n;
+                    rest = space < 0 ? "" : text.Substring(space).Trim();
+                }
+            }
+            if (number == 0)
+                return Rejected(0, text, "a crop request is #<n> x,y,w,h or #<n> full, n a whole number from 1: " + request);
+            if (rest.Equals("full", StringComparison.OrdinalIgnoreCase))
+                return new ZapitSetupStep { Stage = "Cropping", Detail = $"#{number} Full Frame", Camera = new ZapitCameraSettings { SetCrop = true, CropRequest = number } };
+            var parts = rest.Split(',');
             var v = new int[4];
             if (parts.Length != 4 || Enumerable.Range(0, 4).Any(i => !int.TryParse(parts[i].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out v[i])))
-                return Rejected(text, "a crop is x,y,w,h in whole pixels, or full: " + request);
+                return Rejected(number, rest, "a crop is x,y,w,h in whole pixels, or full: " + request);
             if (v[0] < 0 || v[1] < 0 || v[2] < LeastSide || v[3] < LeastSide || v[2] % 2 != 0 || v[3] % 2 != 0)
-                return Rejected(text, $"a crop's x and y are from 0, its w and h even and from {LeastSide}: " + request);
+                return Rejected(number, rest, $"a crop's x and y are from 0, its w and h even and from {LeastSide}: " + request);
             var detail = string.Join(",", v.Select(n => n.ToString(CultureInfo.InvariantCulture)));
             return new ZapitSetupStep
             {
-                Stage = "Cropping", Detail = detail,
-                Camera = new ZapitCameraSettings { SetCrop = true, CropX = v[0], CropY = v[1], CropWidth = v[2], CropHeight = v[3] },
+                Stage = "Cropping", Detail = $"#{number} {detail}",
+                Camera = new ZapitCameraSettings { SetCrop = true, CropRequest = number, CropX = v[0], CropY = v[1], CropWidth = v[2], CropHeight = v[3] },
             };
         }
     }

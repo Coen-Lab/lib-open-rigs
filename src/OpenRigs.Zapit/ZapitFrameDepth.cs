@@ -89,20 +89,23 @@ namespace OpenRigs.Zapit
         Rect crop;
         bool pending;
         string? rejection;
+        int number;            // the request number of the crop set
+        int rejectionNumber;   // and of the rejected request
 
         /// <summary>A new crop (an empty one is the whole frame), to be answered by the next frame.</summary>
-        public void Set(Rect request) { lock (gate) { crop = request; pending = true; rejection = null; } }
+        public void Set(Rect request, int requestNumber) { lock (gate) { crop = request; number = requestNumber; pending = true; rejection = null; } }
 
         /// <summary>A request that was no crop: the crop in force stays, and the next frame answers Refused with it.</summary>
-        public void Reject(string reason) { lock (gate) { rejection = reason; pending = false; } }
+        public void Reject(string reason, int requestNumber) { lock (gate) { rejection = reason; rejectionNumber = requestNumber; pending = false; } }
 
         /// <summary>No crop and nothing to answer (the camera closed).</summary>
-        public void Reset() { lock (gate) { crop = default; pending = false; rejection = null; } }
+        public void Reset() { lock (gate) { crop = default; number = 0; pending = false; rejection = null; } }
 
         /// <summary>The crop to cut the next frame to.</summary>
         public Rect Current { get { lock (gate) return crop; } }
 
-        /// <summary>The answer for a frame cut to <paramref name="cut"/> (Current when it was taken), with its
+        /// <summary>Every answer carries the number of the request it answers: the crop the frame was cut to, or the rejected request.
+        /// The answer for a frame cut to <paramref name="cut"/> (Current when it was taken), with its
         /// <paramref name="refusal"/> or none: Refused (a crop outside the frame is dropped, once; a request that was no crop
         /// is Rejected), each saying which crop is now in force (Now Full Frame, or Now Cropped x,y,w,h); Cropped or Full
         /// Frame for the first frame cut to a new crop, else null. Null too when the crop changed since: the newer request is answered by its own frame.</summary>
@@ -114,15 +117,16 @@ namespace OpenRigs.Zapit
                 if (refusal != null || rejection != null)
                 {
                     var why = refusal ?? rejection;
+                    var asked = refusal != null ? number : rejectionNumber;
                     if (refusal != null) crop = default;   // never a clamped crop: the whole frame
                     pending = false;
                     rejection = null;
-                    return new ZapitSetupStep { Stage = "Refused", Detail = why + "; Now " + (crop.Width <= 0 ? "Full Frame" : $"Cropped {crop.X},{crop.Y},{crop.Width},{crop.Height}") };
+                    return new ZapitSetupStep { Stage = "Refused", Detail = $"#{asked} {why}; Now " + (crop.Width <= 0 ? "Full Frame" : $"Cropped {crop.X},{crop.Y},{crop.Width},{crop.Height}") };
                 }
                 if (!pending) return null;
                 pending = false;
-                return cut.Width <= 0 ? new ZapitSetupStep { Stage = "Full", Detail = "Frame" }
-                    : new ZapitSetupStep { Stage = "Cropped", Detail = $"{cut.X},{cut.Y},{cut.Width},{cut.Height}" };
+                return cut.Width <= 0 ? new ZapitSetupStep { Stage = "Full", Detail = $"Frame #{number}" }
+                    : new ZapitSetupStep { Stage = "Cropped", Detail = $"#{number} {cut.X},{cut.Y},{cut.Width},{cut.Height}" };
             }
         }
     }

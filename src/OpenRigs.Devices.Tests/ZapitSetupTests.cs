@@ -75,34 +75,40 @@ namespace OpenRigs.Devices.Tests
                     StringAssert.StartsWith(Command(socket, "Zapit-Main.Aim", "1,-2,6", "Zapit-Main.Aim", "Refused "), "Refused the laser volts must be 0 to 5 V");
                     Assert.AreEqual("BankLoaded " + bank, (string)Ask(socket, new { cmd = "status" })["metrics"]["Zapit-Main.Setup"]);
 
-                    // The shown frame's crop on its own metric too: Cropping when taken, then the camera's answer from the first
-                    // frame cut to it (a 64 x 48 simulated frame): Cropped, Full Frame, or Refused for one outside the frame; a
-                    // request that is not a crop is refused at once (the workflow runs on).
-                    Assert.AreEqual("Cropping 16,16,32,16", Command(socket, "Zapit-Main.Crop", "16,16,32,16", "Zapit-Main.Crop", "Cropping"));
+                    // The shown frame's crop on its own metric too, each request numbered and the number echoed: Cropping #n when
+                    // taken, then the camera's answer from its next frame (a 64 x 48 simulated frame): Cropped, Full Frame, or
+                    // Refused for one outside the frame or no crop, saying which crop is now in force (the workflow runs on).
+                    Assert.AreEqual("Cropping #1 16,16,32,16", Command(socket, "Zapit-Main.Crop", "#1 16,16,32,16", "Zapit-Main.Crop", "Cropping"));
                     Thread.Sleep(500);
-                    Assert.AreEqual("Cropping 16,16,32,16", (string)Ask(socket, new { cmd = "status" })["metrics"]["Zapit-Main.Crop"], "Cropped before any frame");
+                    Assert.AreEqual("Cropping #1 16,16,32,16", (string)Ask(socket, new { cmd = "status" })["metrics"]["Zapit-Main.Crop"], "Cropped before any frame");
                     SimulatedZapitCamera.SendFrame();
-                    Assert.AreEqual("Cropped 16,16,32,16", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Cropped"));
-                    Assert.AreEqual("Cropping 3000,2000,800,600", Command(socket, "Zapit-Main.Crop", "3000,2000,800,600", "Zapit-Main.Crop", "Cropping"));
+                    Assert.AreEqual("Cropped #1 16,16,32,16", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Cropped"));
+                    Assert.AreEqual("Cropping #2 3000,2000,800,600", Command(socket, "Zapit-Main.Crop", "#2 3000,2000,800,600", "Zapit-Main.Crop", "Cropping"));
                     SimulatedZapitCamera.SendFrame();
-                    Assert.AreEqual("Refused the crop 3000,2000,800,600 does not fit the camera's 64 x 48 frame; Now Full Frame", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Refused "));
-                    Assert.AreEqual("Cropping Full Frame", Command(socket, "Zapit-Main.Crop", "full", "Zapit-Main.Crop", "Cropping"));
+                    Assert.AreEqual("Refused #2 the crop 3000,2000,800,600 does not fit the camera's 64 x 48 frame; Now Full Frame", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Refused "));
+                    Assert.AreEqual("Cropping #3 Full Frame", Command(socket, "Zapit-Main.Crop", "#3 full", "Zapit-Main.Crop", "Cropping"));
                     SimulatedZapitCamera.SendFrame();
-                    Assert.AreEqual("Full Frame", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Full"));
-                    // A request that is no crop is answered by the camera too, keeping the crop in force.
-                    Assert.AreEqual("Cropping 1,2", Command(socket, "Zapit-Main.Crop", "1,2", "Zapit-Main.Crop", "Cropping"));
+                    Assert.AreEqual("Full Frame #3", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Full"));
+                    // A request that is no crop is answered by the camera too, under its number, keeping the crop in force.
+                    Assert.AreEqual("Cropping #4 1,2", Command(socket, "Zapit-Main.Crop", "#4 1,2", "Zapit-Main.Crop", "Cropping"));
                     SimulatedZapitCamera.SendFrame();
                     var whole = Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Refused ");
-                    StringAssert.StartsWith(whole, "Refused a crop is x,y,w,h");
+                    StringAssert.StartsWith(whole, "Refused #4 a crop is x,y,w,h");
                     StringAssert.EndsWith(whole, "; Now Full Frame");
-                    Command(socket, "Zapit-Main.Crop", "16,16,32,16", "Zapit-Main.Crop", "Cropping");
+                    Command(socket, "Zapit-Main.Crop", "#5 16,16,32,16", "Zapit-Main.Crop", "Cropping");
                     SimulatedZapitCamera.SendFrame();
-                    Assert.AreEqual("Cropped 16,16,32,16", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Cropped"));
-                    Command(socket, "Zapit-Main.Crop", "0,0,63,48", "Zapit-Main.Crop", "Cropping");
+                    Assert.AreEqual("Cropped #5 16,16,32,16", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Cropped"));
+                    Command(socket, "Zapit-Main.Crop", "#6 0,0,63,48", "Zapit-Main.Crop", "Cropping");
                     SimulatedZapitCamera.SendFrame();
                     var kept = Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Refused ");
-                    StringAssert.StartsWith(kept, "Refused a crop's x and y are from 0");
+                    StringAssert.StartsWith(kept, "Refused #6 a crop's x and y are from 0");
                     StringAssert.EndsWith(kept, "; Now Cropped 16,16,32,16");
+                    // No valid number: #0, the crop in force kept.
+                    Assert.AreEqual("Cropping #0 16,16,32,16", Command(socket, "Zapit-Main.Crop", "16,16,32,16", "Zapit-Main.Crop", "Cropping"));
+                    SimulatedZapitCamera.SendFrame();
+                    var unnumbered = Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Refused ");
+                    StringAssert.StartsWith(unnumbered, "Refused #0 a crop request is #<n> x,y,w,h");
+                    StringAssert.EndsWith(unnumbered, "; Now Cropped 16,16,32,16");
                 }
             }
             finally
@@ -158,8 +164,8 @@ namespace OpenRigs.Devices.Tests
                 var state = new OpenRigs.Zapit.ZapitCropState();
                 var settings = source.Subscribe(s =>
                 {
-                    if (s.SetCrop && s.RejectReason != null) state.Reject(s.RejectReason);
-                    else if (s.SetCrop) state.Set(s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default(OpenCV.Net.Rect));
+                    if (s.SetCrop && s.RejectReason != null) state.Reject(s.RejectReason, s.CropRequest);
+                    else if (s.SetCrop) state.Set(s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default(OpenCV.Net.Rect), s.CropRequest);
                 });
                 var frames = Frames.Subscribe(_ =>
                 {

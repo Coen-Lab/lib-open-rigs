@@ -72,18 +72,18 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
 ## Crop
 
-`Zapit-Main.Crop <x,y,w,h>` cuts the Zapit camera's shown and recorded frame (the live window and the mp4) to a rectangle in camera pixels; `Zapit-Main.Crop full` (or an empty argument) puts the whole frame back. The stills and a grid run's frames stay whole, so every fit stays in the whole frame's pixels. The crop is accepted only before Go: the recording starts at Go, so its frame size never changes, and the command is ignored after it.
+`Zapit-Main.Crop #<n> <x,y,w,h>` cuts the Zapit camera's shown and recorded frame (the live window and the mp4) to a rectangle in camera pixels; `Zapit-Main.Crop #<n> full` puts the whole frame back. `<n>` is the request number, a positive whole number the agent chooses (a new one for each request), and every answer echoes it, so the agent matches answers to requests without timing. A command without a valid `#<n>` is answered `Refused #0 <reason>; Now …`. The stills and a grid run's frames stay whole, so every fit stays in the whole frame's pixels. The crop is accepted only before Go: the recording starts at Go, so its frame size never changes, and the command is ignored after it.
 
-The answer is on its own metric, `status.metrics["Zapit-Main.Crop"]`. Only the camera knows its frame's size, so the metric answers from the camera, never from the command:
+The answer is on its own metric, `status.metrics["Zapit-Main.Crop"]`. Only the camera knows its frame's size and the crop in force, so the metric answers from the camera, never from the command. The grammar, with `<n>` the number echoed:
 
-- `Cropping <x,y,w,h>`, `Cropping Full Frame`, or `Cropping <request text>` (a malformed request, echoed as sent): the command was taken and the camera has not cut a frame to it yet. This state is not terminal: the stream may still be whole.
-- `Cropped <x,y,w,h>`: the camera has cut a frame to this crop.
-- `Full Frame`: the camera has put the whole frame back.
-- `Refused <reason>; Now Full Frame` or `Refused <reason>; Now Cropped <x,y,w,h>`: terminal. The command was not a crop, or the camera's frame does not hold it. The last part says which crop the stream shows now: a crop outside the frame is dropped (`Now Full Frame`), a malformed command leaves the crop in force (`Now Cropped <x,y,w,h>`, or `Now Full Frame` when none). The reason can echo the request, so the agent reads the crop in force from the last `; Now `.
+- `Cropping #<n> <x,y,w,h>`, `Cropping #<n> Full Frame`, or `Cropping #<n> <request text>` (a refused request, echoed as sent): the command was taken and the camera has not answered yet. Not terminal: the stream may still be whole.
+- `Cropped #<n> <x,y,w,h>`: the camera has cut a frame to this crop.
+- `Full Frame #<n>`: the camera has put the whole frame back.
+- `Refused #<n> <reason>; Now Full Frame` or `Refused #<n> <reason>; Now Cropped <x,y,w,h>`: terminal. The command was not a crop (`#0` when it had no valid number), or the camera's frame does not hold it. The last part says which crop the stream shows now: a crop outside the frame is dropped (`Now Full Frame`), a malformed command leaves the crop in force (`Now Cropped <x,y,w,h>`, or `Now Full Frame` when none). The reason can echo the request, so the agent reads the crop in force from the last `; Now `.
 
-Every refusal comes from the camera, which alone knows its frame size and the crop in force: the command is first answered `Cropping`, then `Refused <reason>; Now ...` from the next frame. A command is refused when it is not four whole numbers, x or y is below 0, or w or h is odd or below 16 (the crop in force stays), or when the crop runs off the frame (x+w above the width, y+h above the height; the camera drops it and shows the whole frame, never a clamped crop). The agent polls the metric until it reads `Cropped`, `Full Frame` or `Refused`, and sends Go only then, since `Cropping` can still turn into `Refused`.
+Every refusal comes from the camera, so it follows `Cropping #<n> …` (the next frame): a command is refused when it has no valid number, is not four whole numbers, x or y is below 0, or w or h is odd or below 16 (the crop in force stays), or when the crop runs off the frame (x+w above the width, y+h above the height; the camera drops it and shows the whole frame, never a clamped crop). The agent polls the metric until it reads `Cropped`, `Full Frame` or `Refused` with its number, and sends Go only then, since `Cropping` can still turn into `Refused`. An answer carrying another number is an older request's and is skipped.
 
-`Cropping` can stay pending if the camera is not running or restarts, so the agent times out and resends the crop. The metric carries no request ID, so the agent sends one crop at a time and waits for its final answer before sending another.
+`Cropping` can stay pending if the camera is not running or restarts, so the agent times out and resends the crop under a new number. The agent still sends one crop at a time: the metric keeps only the latest answer, so a second request can overwrite the first's.
 
 ## Hand aiming
 

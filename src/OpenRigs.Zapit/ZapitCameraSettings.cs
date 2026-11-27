@@ -30,6 +30,9 @@ namespace OpenRigs.Zapit
         /// from its next frame, saying which crop is in force. Null for a crop.</summary>
         public string? RejectReason { get; set; }
 
+        /// <summary>With SetCrop, the request's number (Zapit-Main.Crop #n), echoed in every answer; 0 for a request with no valid number.</summary>
+        public int CropRequest { get; set; }
+
         /// <summary>The crop's left edge, in pixels of the camera's frame.</summary>
         public int CropX { get; set; }
 
@@ -69,8 +72,8 @@ namespace OpenRigs.Zapit
         /// <summary>The camera's timestamp of the grab (GrabResult.Timestamp).</summary>
         public long Timestamp { get; set; }
 
-        /// <summary>The camera's answer to a Zapit-Main.Crop, on the first frame cut to it (null on every other frame):
-        /// Cropped x,y,w,h, Full Frame, or Refused with the reason when the crop does not fit this frame (the camera's
+        /// <summary>The camera's answer to a Zapit-Main.Crop #n, on the first frame cut to it (null on every other frame):
+        /// Cropped #n x,y,w,h, Full Frame #n, or Refused #n with the reason when the crop does not fit this frame (the camera's
         /// size is known only from a frame). A refused crop is dropped, the whole frame shown, never a clamped one;
         /// ZapitCropReport sends it to the metric Zapit-Main.Crop.</summary>
         public ZapitSetupStep? CropReport { get; set; }
@@ -207,8 +210,8 @@ namespace OpenRigs.Zapit
                         {
                             if (s.SetCrop)   // the shown frame only: from the next frame, whatever the camera does
                             {
-                                if (s.RejectReason != null) { crop.Reject(s.RejectReason); return; }
-                                crop.Set(s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default);
+                                if (s.RejectReason != null) { crop.Reject(s.RejectReason, s.CropRequest); return; }
+                                crop.Set(s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default, s.CropRequest);
                                 return;
                             }
                             if (exposure == null) throw new InvalidOperationException("The Zapit camera is not open, so the grid's exposure cannot be set.");

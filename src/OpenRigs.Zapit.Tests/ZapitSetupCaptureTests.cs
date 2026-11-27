@@ -505,29 +505,29 @@ namespace OpenRigs.Zapit.Tests
             var frame = new IplImage(new Size(64, 48), IplDepth.U8, 1);
             Assert.IsNull(state.Finish(state.Current, null));   // no request, no answer
             var fits = new Rect(16, 8, 32, 24);
-            state.Set(fits);
-            Assert.AreEqual("Cropped 16,8,32,24", state.Finish(fits, ZapitFrameDepth.Refusal(frame.Size, fits)).ToString());
+            state.Set(fits, 1);
+            Assert.AreEqual("Cropped #1 16,8,32,24", state.Finish(fits, ZapitFrameDepth.Refusal(frame.Size, fits)).ToString());
             Assert.IsNull(state.Finish(fits, null));   // once
-            state.Set(default);
-            Assert.AreEqual("Full Frame", state.Finish(default, null).ToString());
+            state.Set(default, 2);
+            Assert.AreEqual("Full Frame #2", state.Finish(default, null).ToString());
             var off = new Rect(3000, 2000, 800, 600);
-            state.Set(off);
+            state.Set(off, 3);
             var step = state.Finish(off, ZapitFrameDepth.Refusal(frame.Size, off));
-            StringAssert.StartsWith(step!.ToString(), "Refused the crop 3000,2000,800,600 does not fit");
+            StringAssert.StartsWith(step!.ToString(), "Refused #3 the crop 3000,2000,800,600 does not fit");
             StringAssert.EndsWith(step.ToString(), "; Now Full Frame");
             Assert.AreEqual(default(Rect), state.Current);   // reset once, to the whole frame
             Assert.IsNull(state.Finish(default, null));
-            // A request that was no crop keeps the crop in force and says so.
-            state.Set(fits);
+            // A request that was no crop keeps the crop in force and says so, under its own number.
+            state.Set(fits, 4);
             state.Finish(fits, null);
-            state.Reject("a crop is x,y,w,h");
-            Assert.AreEqual("Refused a crop is x,y,w,h; Now Cropped 16,8,32,24", state.Finish(fits, null).ToString());
+            state.Reject("a crop is x,y,w,h", 5);
+            Assert.AreEqual("Refused #5 a crop is x,y,w,h; Now Cropped 16,8,32,24", state.Finish(fits, null).ToString());
             Assert.AreEqual(fits, state.Current);
             Assert.IsNull(state.Finish(fits, null));   // once
-            state.Set(default);
+            state.Set(default, 6);
             state.Finish(default, null);
-            state.Reject("a crop is x,y,w,h");
-            Assert.AreEqual("Refused a crop is x,y,w,h; Now Full Frame", state.Finish(default, null).ToString());
+            state.Reject("a crop request is #<n> x,y,w,h", 0);
+            Assert.AreEqual("Refused #0 a crop request is #<n> x,y,w,h; Now Full Frame", state.Finish(default, null).ToString());
         }
 
         // A crop sent after a rejected request, before a frame, is the one answered: Cropped, not the older Refused.
@@ -536,9 +536,9 @@ namespace OpenRigs.Zapit.Tests
         {
             var state = new ZapitCropState();
             var b = new Rect(16, 8, 32, 24);
-            state.Reject("a crop is x,y,w,h");
-            state.Set(b);
-            Assert.AreEqual("Cropped 16,8,32,24", state.Finish(b, null).ToString());
+            state.Reject("a crop is x,y,w,h", 1);
+            state.Set(b, 2);
+            Assert.AreEqual("Cropped #2 16,8,32,24", state.Finish(b, null).ToString());
             Assert.IsNull(state.Finish(b, null));
         }
 
@@ -548,40 +548,51 @@ namespace OpenRigs.Zapit.Tests
         {
             var state = new ZapitCropState();
             var old = new Rect(3000, 2000, 800, 600);
-            state.Set(old);
+            state.Set(old, 1);
             var taken = state.Current;
             var newer = new Rect(16, 8, 32, 24);
-            state.Set(newer);   // arrives while the frame cut to the old crop is in flight
+            state.Set(newer, 2);   // arrives while the frame cut to the old crop is in flight
             Assert.IsNull(state.Finish(taken, "does not fit"));
             Assert.AreEqual(newer, state.Current);
-            Assert.AreEqual("Cropped 16,8,32,24", state.Finish(newer, null).ToString());
+            Assert.AreEqual("Cropped #2 16,8,32,24", state.Finish(newer, null).ToString());
             state.Reset();
             Assert.AreEqual(default(Rect), state.Current);
             Assert.IsNull(state.Finish(default, null));
         }
 
-        // Zapit-Main.Crop's args: x,y,w,h in pixels, or "" / full for the whole frame; anything else refused, not fatal.
+        // Zapit-Main.Crop's args: #n x,y,w,h in pixels, or #n full for the whole frame; anything else is a request the camera
+        // refuses (not fatal), numbered #0 without a valid number.
         [TestMethod]
-        public void ACropRequestIsPixelsOrFullElseRefused()
+        public void ACropRequestIsNumberedPixelsOrFullElseRefused()
         {
-            var cropped = ZapitCropRequest.Parse("392,232,1152,864");
-            Assert.AreEqual("Cropping 392,232,1152,864", cropped.ToString());
+            var cropped = ZapitCropRequest.Parse("#7 392,232,1152,864");
+            Assert.AreEqual("Cropping #7 392,232,1152,864", cropped.ToString());
             Assert.IsTrue(cropped.Camera!.SetCrop);
+            Assert.AreEqual(7, cropped.Camera.CropRequest);
             Assert.AreEqual(1152, cropped.Camera.CropWidth);
             Assert.AreEqual("crop 392,232,1152,864", cropped.Camera.ToString());
-            foreach (var full in new[] { "", "full", " \"Full\" " })
+            foreach (var full in new[] { "#3 full", " \"#3 Full\" " })
             {
                 var step = ZapitCropRequest.Parse(full);
-                Assert.AreEqual("Cropping Full Frame", step.ToString());
+                Assert.AreEqual("Cropping #3 Full Frame", step.ToString());
                 Assert.IsTrue(step.Camera!.SetCrop);
+                Assert.AreEqual(3, step.Camera.CropRequest);
                 Assert.AreEqual(0, step.Camera.CropWidth);
             }
-            foreach (var bad in new[] { "1,2,3", "a,b,c,d", "-2,0,64,48", "0,0,63,48", "0,0,8,8" })
+            foreach (var bad in new[] { "#2 1,2,3", "#2 a,b,c,d", "#2 -2,0,64,48", "#2 0,0,63,48", "#2 0,0,8,8", "#2", "#2 " })
             {
                 var step = ZapitCropRequest.Parse(bad);
                 Assert.AreEqual("Cropping", step.Stage, bad);   // the camera alone knows the crop in force, and answers Refused
                 Assert.IsTrue(step.Camera!.SetCrop, bad);
+                Assert.AreEqual(2, step.Camera.CropRequest, bad);
                 Assert.IsNotNull(step.Camera.RejectReason, bad);
+            }
+            foreach (var unnumbered in new[] { "", "full", "392,232,1152,864", "#0 full", "#-1 full", "#a full", "# full", "#1.5 full", "#99999999999 full" })
+            {
+                var step = ZapitCropRequest.Parse(unnumbered);
+                Assert.IsTrue(step.ToString().StartsWith("Cropping #0 "), unnumbered + " -> " + step);
+                Assert.AreEqual(0, step.Camera!.CropRequest, unnumbered);
+                StringAssert.Contains(step.Camera.RejectReason, "#<n>", unnumbered);
             }
         }
 
