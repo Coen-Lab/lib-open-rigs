@@ -21,8 +21,8 @@ _REQUIRED = ("device", "galvoXChannel", "galvoYChannel", "laserChannel", "ledCha
              "micronsPerPixel", "voltsPerPixel", "camera")
 # maxTrialSeconds is retired (Pip, 27 Nov 2026: "It should just be calculated by the time available from laser onset
 # until the next laser onset in the shortest possible trial"): a ZapitDaq trial's buffer comes from the task's timing
-# (open_rigs.components.zapit zapit_trial_seconds). An older rig.yml's is still read, and still caps the buffer of a
-# workflow that sizes ZapitDaq from rig.yml.
+# (open_rigs.core.task zapit_trial_seconds), which the launcher gives ZapitDaq for each launch. An older rig.yml's is
+# still read, so the file loads, but is not the buffer.
 _OPTIONAL = ("invertXScanner", "invertYScanner", "blankingTimesMs", "maxTrialSeconds")
 _LEGACY = ("host", "port", "hardwareTriggered")
 MATLAB_BLANKING_MS = (0.3, -0.12, 0.25)

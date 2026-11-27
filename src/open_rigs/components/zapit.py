@@ -32,16 +32,6 @@ ZAPIT_MAX_RAMP_DOWN_SECONDS = 0.5
 RAMP_DOWN_CONTEXT = "zapit_ramp_down_seconds"
 
 
-def zapit_trial_seconds(trigger_gap_seconds: float) -> float:
-    """ZapitDaq's per-trial buffer, in seconds (its MaxTrialSeconds: the laser in whole scan cycles and its ramp), from the
-    task's shortest time from one laser trigger to the next (a task's trigger_gap_seconds, open_rigs.rigs.conditioned_task):
-    that gap less ZAPIT_FREE_MARGIN_SECONDS, after which the loop frees ZapitDaq, and ZAPIT_ARM_SECONDS, which the next
-    trial's Arm may take before its trigger, so a trial that fills its buffer is over before the next is armed. 0 when
-    nothing fits. Not a rig.yml setting (Pip, 27 Nov 2026: "It should just be calculated by the time available from
-    laser onset until the next laser onset in the shortest possible trial")."""
-    return max(float(trigger_gap_seconds) - ZAPIT_FREE_MARGIN_SECONDS - ZAPIT_ARM_SECONDS, 0.0)
-
-
 def ramp_down_from(context) -> float:
     """The conditions file's largest ramp-down from a validation's context (a pydantic ValidationInfo, a context dict or
     None), in seconds; 0 without it, the workflow then checking the file at Go."""
@@ -121,8 +111,8 @@ class Zapit(BaseSchema):
     laser_min_max_control_volts: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's control volts at its lowest and highest power.")
     ceiling_mw: Optional[float] = Field(default=None, ge=0, description="This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): open_rigs.zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
     max_trial_seconds: Optional[float] = Field(default=None, gt=0, description="The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.")
-    # max_trial_seconds is retiring (zapit_trial_seconds: from the task's timing) and is no longer one of ZAPIT_DAQ_REQUIRED. Its
-    # description changes with the C# that takes the task's number (`uv run regenerate-lab-rig` then rewrites lab_rig.json and LabRig).
+    # max_trial_seconds is no longer one of ZAPIT_DAQ_REQUIRED: ZapitDaq's buffer comes from the task's timing (open_rigs.core.task
+    # zapit_trial_seconds), which the launcher gives ZapitDaq for each launch; a value a person wrote here is not used.
     microns_per_pixel: Optional[float] = Field(default=None, gt=0, description="The Zapit camera's scale at the sample, in microns a pixel.")
     volts_per_pixel: Optional[float] = Field(default=None, gt=0, description="The galvos' volts a camera pixel, the scanner calibration's starting guess.")
     invert_x_scanner: bool = Field(default=False, description="Whether the X galvo moves against the camera's X.")

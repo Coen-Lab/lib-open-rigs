@@ -5,7 +5,7 @@ from pydantic import ConfigDict, Field, WithJsonSchema, model_validator
 
 from swc.aeon.schema import BaseSchema
 
-from open_rigs.components.zapit import ZAPIT_REPLY_MARGIN_SECONDS
+from open_rigs.components.zapit import ZAPIT_ARM_SECONDS, ZAPIT_REPLY_MARGIN_SECONDS
 from open_rigs.core.base import Double
 
 # The most one reward may ask for, in ul (OpenRigs.Core LoadRewardLine.DefaultMaxRewardUl, a RewardValve piece's MaxRewardUl).
@@ -308,6 +308,54 @@ class Optogenetics(TaskBlock):
                 f"(trial_structure.iti_min_seconds - optogenetics.laser_to_stimulus_seconds - Zapit's {margin} s reply margin): "
                 "the trigger line is held that long past the outcome and the next trial is armed once it falls"
             )
+
+
+def zapit_trial_seconds(combinations, ramp_down_seconds: float) -> tuple[float, str]:
+    """ZapitDaq's per-trial buffer (its MaxTrialSeconds), in seconds, for a session on Zapit-Bonsai that may draw any of
+    `combinations`, and why the session cannot run ("" when it can). Each combination is a whole taskParameters, by alias
+    as JSON (a trainingStages row or a trial condition over the task's own): every task runs the same trial loop and the
+    standard task blocks, so the buffer comes from trialStructure.itiMinSeconds,
+    stimulusToResponseWindowSeconds and responseWindowSeconds, and optogenetics.laserToStimulusSeconds alone:
+
+    - a trial's end (OpenRigs.Trials TrialEndSeconds): stimulusToResponseWindowSeconds + responseWindowSeconds (0 without),
+      the response window always running in full;
+    - the shortest laser trigger to the next trigger: the shortest lead plus trial end, plus the shortest interval less
+      the lead, each over the combinations (any may follow any);
+    - less OpenRigs.Trials OptoLimits.OverheadSeconds: BusyAfterEndSeconds, the conditions file's largest ramp-down
+      (`ramp_down_seconds`), plus ArmLeadSeconds, Zapit's ZAPIT_ARM_SECONDS arm time.
+
+    The same rule as a task model's _between_trials laserDurationSeconds limit. Why not:
+    OptoLimits.LeadProblem's words (a combination's lead plus the arm time must fit its own interval), a combination
+    lacking a timing field, or no buffer left (0)."""
+    leads, ends, itis = [], [], []
+    for combination in combinations:
+        structure = (combination or {}).get("trialStructure") or {}
+        opto = (combination or {}).get("optogenetics") or {}
+        values = {"trialStructure.itiMinSeconds": structure.get("itiMinSeconds"),
+                  "trialStructure.stimulusToResponseWindowSeconds": structure.get("stimulusToResponseWindowSeconds"),
+                  "optogenetics.laserToStimulusSeconds": opto.get("laserToStimulusSeconds")}
+        for name, value in values.items():
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                return 0.0, f"{name} is {value!r}, so ZapitDaq's trial buffer cannot be worked out"
+        window = structure.get("responseWindowSeconds") or 0.0
+        if isinstance(window, bool) or not isinstance(window, (int, float)) or not math.isfinite(window):
+            return 0.0, f"trialStructure.responseWindowSeconds is {window!r}, so ZapitDaq's trial buffer cannot be worked out"
+        lead, iti = float(values["optogenetics.laserToStimulusSeconds"]), float(values["trialStructure.itiMinSeconds"])
+        if lead + ZAPIT_ARM_SECONDS > iti + 1e-9:  # OptoLimits.LeadProblem
+            return 0.0, (f"optogenetics.laserToStimulusSeconds ({lead:g} s) plus Zapit's {ZAPIT_ARM_SECONDS:g} s arm time must be at "
+                         f"most trialStructure.itiMinSeconds ({iti:g} s), the shortest interval")
+        leads.append(lead)
+        ends.append(float(values["trialStructure.stimulusToResponseWindowSeconds"]) + float(window))
+        itis.append(iti)
+    if not leads:
+        return 0.0, "the task has no trial combination, so ZapitDaq's trial buffer cannot be worked out"
+    gap = min(lead + end for lead, end in zip(leads, ends)) + min(iti - lead for lead, iti in zip(leads, itis))
+    overhead = float(ramp_down_seconds) + ZAPIT_ARM_SECONDS  # OptoLimits.OverheadSeconds
+    seconds = max(gap - overhead, 0.0)
+    if seconds <= 1e-9:
+        return 0.0, (f"the shortest laser trigger to the next ({gap:g} s) leaves no ZapitDaq trial buffer after the Zapit "
+                     f"conditions file's {float(ramp_down_seconds):g} s ramp-down and Zapit's {ZAPIT_ARM_SECONDS:g} s arm time")
+    return seconds, ""
 
 
 # The lab's sound levels, in dBFS RMS: the RMS of a sound over its samples outside silent stretches (a silent stretch a

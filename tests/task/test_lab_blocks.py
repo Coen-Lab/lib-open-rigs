@@ -307,3 +307,45 @@ def test_an_always_full_window_is_on_by_default_in_a_task_with_the_block_and_nee
         AlwaysFullRow.model_validate(row)
     with pytest.raises(ValidationError, match="response_window_always_full needs a response_window_seconds"):
         AlwaysFullRow.model_validate({**row, "responseWindowAlwaysFull": True})
+
+
+def _combination(iti=2.5, to_window=0.5, window=2.0, lead=0.1):
+    return {"trialStructure": {"itiMinSeconds": iti, "stimulusToResponseWindowSeconds": to_window, "responseWindowSeconds": window},
+            "optogenetics": {"laserToStimulusSeconds": lead, "laserDurationSeconds": 2.5}}
+
+
+def test_zapit_trial_seconds_is_the_shortest_trigger_to_trigger_less_the_ramp_down_and_arm_time():
+    # Pip, 27 Nov 2026: ZapitDaq's buffer from the standard blocks, OptoLimits' rule (decision-making's _between_trials).
+    from open_rigs.core.task import zapit_trial_seconds
+    # decision-making's own file: 0.1 + 2.5 + (2.5 - 0.1) = 5 s trigger to trigger, less 0.25 s ramp-down and 0.2 s arm time
+    assert zapit_trial_seconds([_combination()], 0.25) == (pytest.approx(4.55), "")
+    # Boundary: a 2.5 s laser and its 0.25 s ramp fill a 2.75 s buffer exactly (0.1 + 1.2 + 1.9 = 3.2 s trigger to trigger)
+    assert zapit_trial_seconds([_combination(iti=2.0, to_window=0.2, window=1.0)], 0.25) == (pytest.approx(2.75), "")
+    # No responseWindowSeconds: the trial ends at the window's opening (TrialEndSeconds)
+    assert zapit_trial_seconds([_combination(window=None)], 0.0)[0] == pytest.approx(0.1 + 0.5 + 2.4 - 0.2)
+
+
+def test_zapit_trial_seconds_takes_the_shortest_of_every_combination_a_session_may_draw():
+    from open_rigs.core.task import zapit_trial_seconds
+    # A stage row with a shorter interval sets the buffer for the session, whichever stage it starts on
+    rows = [_combination(), _combination(iti=1.5)]
+    assert zapit_trial_seconds(rows, 0.25)[0] == pytest.approx(0.1 + 2.5 + 1.4 - 0.45)
+    assert zapit_trial_seconds(list(reversed(rows)), 0.25)[0] == pytest.approx(3.55)
+    # A negative lead (the trigger after the stimulus onset): the shortest lead plus trial end, plus the shortest
+    # interval less the lead, each over the combinations
+    assert zapit_trial_seconds([_combination(lead=-0.3)], 0.25)[0] == pytest.approx(-0.3 + 2.5 + 2.8 - 0.45)
+    mixed = [_combination(lead=0.1), _combination(lead=-0.3)]
+    assert zapit_trial_seconds(mixed, 0.25)[0] == pytest.approx(min(2.6, 2.2) + min(2.4, 2.8) - 0.45)
+
+
+def test_zapit_trial_seconds_says_why_a_session_cannot_run():
+    from open_rigs.core.task import zapit_trial_seconds
+    # OptoLimits.LeadProblem: the lead plus the 0.2 s arm time within the combination's own interval
+    seconds, why = zapit_trial_seconds([_combination(), _combination(iti=1.5, lead=1.4)], 0.25)
+    assert seconds == 0.0 and why == ("optogenetics.laserToStimulusSeconds (1.4 s) plus Zapit's 0.2 s arm time must be at most "
+                                      "trialStructure.itiMinSeconds (1.5 s), the shortest interval")
+    assert zapit_trial_seconds([_combination(iti=1.5, lead=1.3)], 0.25)[1] == ""  # exactly fits
+    assert "no ZapitDaq trial buffer" in zapit_trial_seconds([_combination(iti=0.3, to_window=0.1, window=0.0, lead=0.1)], 0.5)[1]
+    assert "trialStructure.itiMinSeconds is None" in zapit_trial_seconds([_combination(iti=None)], 0.25)[1]
+    assert "laserToStimulusSeconds is True" in zapit_trial_seconds([_combination(lead=True)], 0.25)[1]
+    assert "no trial combination" in zapit_trial_seconds([], 0.25)[1]
