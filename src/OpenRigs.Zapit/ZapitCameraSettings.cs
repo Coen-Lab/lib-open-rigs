@@ -48,6 +48,9 @@ namespace OpenRigs.Zapit
 
         public CameraExposure(ICameraFeatures camera) => this.camera = camera;
 
+        /// <summary>True while a grid run's exposure and gain are on the camera (applied, not yet put back).</summary>
+        public bool GridApplied => saved != null;
+
         /// <summary>The first of the names the camera has, writable or not: an auto mode left on makes the feature read-only
         /// (USB3 cameras name it ExposureTime, older GigE ones ExposureTimeAbs).</summary>
         string Feature(params string[] names)
@@ -94,12 +97,15 @@ namespace OpenRigs.Zapit
     /// The Zapit camera: Bonsai.Pylon's PylonCapture (its serial number and session .pfs), whose exposure and gain the
     /// setup phase sets for a grid run's frames while it grabs, and puts back after. PylonCapture loads its .pfs only as
     /// the camera opens and has no exposure or gain property; its Configure hands over the opened camera, kept here.
+    /// Every frame is 8-bit (ZapitFrameDepth): a Mono12 .pfs's frames are its raw counts saturating at 255, a grid run's
+    /// over 16 as Mono8; a Mono8 .pfs's frames pass through.
     /// </summary>
-    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), or the camera's own put back (Restore).")]
+    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs), each frame 8-bit (Mono12: raw counts saturating at 255, a grid run's over 16; Mono8 as it comes). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), or the camera's own put back (Restore).")]
     public class ZapitPylonCapture : PylonCapture
     {
         readonly object cameraLock = new object();
         CameraExposure? exposure;
+        volatile bool gridApplied;   // a grid run's exposure is on the camera: Mono12 frames go to Mono8's scale
 
         /// <summary>Loads the .pfs as PylonCapture does and keeps the opened camera for the settings.</summary>
         protected override void Configure(Camera camera)
@@ -108,10 +114,15 @@ namespace OpenRigs.Zapit
             lock (cameraLock) exposure = new CameraExposure(new BaslerFeatures(camera.Parameters));
         }
 
+        /// <summary>The camera's frames as PylonCapture grabs them, each made 8-bit (ZapitFrameDepth).</summary>
+        public override IObservable<PylonDataFrame> Generate() => base.Generate().Select(frame =>
+            frame.Image == null || frame.Image.Depth == OpenCV.Net.IplDepth.U8 ? frame
+                : new PylonDataFrame(ZapitFrameDepth.ToEightBit(frame.Image, gridApplied), frame.GrabResult));
+
         /// <summary>The camera's frames, with each of <paramref name="settings"/> applied to it while it grabs.</summary>
         public IObservable<PylonDataFrame> Generate(IObservable<ZapitCameraSettings> settings) => Observable.Create<PylonDataFrame>(observer =>
             new CompositeDisposable(
-                Generate().Finally(() => { lock (cameraLock) exposure = null; }).Subscribe(observer),
+                Generate().Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; } }).Subscribe(observer),
                 settings.Subscribe(s =>
                 {
                     lock (cameraLock)
@@ -120,6 +131,7 @@ namespace OpenRigs.Zapit
                         {
                             if (exposure == null) throw new InvalidOperationException("The Zapit camera is not open, so the grid's exposure cannot be set.");
                             exposure.Apply(s);
+                            gridApplied = exposure.GridApplied;
                         }
                         catch (Exception error) { observer.OnError(error); }   // stops the workflow naming it
                     }

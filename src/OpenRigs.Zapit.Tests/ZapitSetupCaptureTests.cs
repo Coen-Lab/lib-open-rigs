@@ -383,6 +383,61 @@ namespace OpenRigs.Zapit.Tests
             StringAssert.Contains(error.Message, "ExposureTime, ExposureTimeAbs");
         }
 
+        // GridApplied (which picks the Mono12 frames' Mono8 scale) holds from a grid's settings until they are put back.
+        [TestMethod]
+        public void CameraExposureIsGridAppliedFromTheGridsSettingsUntilRestore()
+        {
+            var exposure = new CameraExposure(new Features(new Dictionary<string, object> { ["ExposureTime"] = 3000.0, ["Gain"] = 0.0 }));
+            Assert.IsFalse(exposure.GridApplied);
+            exposure.Apply(new ZapitCameraSettings { ExposureUs = 2000, GainDb = 0 });
+            Assert.IsTrue(exposure.GridApplied);
+            exposure.Apply(new ZapitCameraSettings { Restore = true });
+            Assert.IsFalse(exposure.GridApplied);
+        }
+
+        static IplImage Row(IplDepth depth, params int[] values)
+        {
+            var image = new IplImage(new Size(values.Length, 1), depth, 1);
+            for (int i = 0; i < values.Length; i++) image[0, i] = new Scalar(values[i]);
+            return image;
+        }
+
+        static int[] Values(IplImage image) => Enumerable.Range(0, image.Width).Select(i => (int)image[0, i].Val0).ToArray();
+
+        // Mono12 as Bonsai.Pylon gives it (16-bit, raw 0-4095 counts): session frames keep every count up to 255 and
+        // saturate there (B2's dim view peaks near 46); a grid run's frames are Mono8's scale, counts over 16.
+        [TestMethod]
+        public void Mono12FramesAreRawCountsSaturatingAt255AndAGridRunsOver16()
+        {
+            var mono12 = Row(IplDepth.U16, 0, 1, 2, 45, 46, 255, 256, 4095);
+            var session = ZapitFrameDepth.ToEightBit(mono12, mono8Scale: false);
+            Assert.AreEqual(IplDepth.U8, session.Depth);
+            Assert.AreEqual(1, session.Channels);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 45, 46, 255, 255, 255 }, Values(session));
+            var grid = ZapitFrameDepth.ToEightBit(mono12, mono8Scale: true);
+            Assert.AreEqual(IplDepth.U8, grid.Depth);
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 3, 3, 16, 16, 255 }, Values(grid));
+        }
+
+        // A Mono8 .pfs (every other rig): the frame itself, untouched, in a grid run or not.
+        [TestMethod]
+        public void Mono8FramesPassThroughUnchanged()
+        {
+            var mono8 = Row(IplDepth.U8, 0, 3, 200, 255);
+            Assert.AreSame(mono8, ZapitFrameDepth.ToEightBit(mono8, mono8Scale: false));
+            Assert.AreSame(mono8, ZapitFrameDepth.ToEightBit(mono8, mono8Scale: true));
+            CollectionAssert.AreEqual(new[] { 0, 3, 200, 255 }, Values(mono8));
+        }
+
+        // A colour or other depth (a .pfs set to RGB8 or Mono16 packed oddly) stops the workflow naming PixelFormat.
+        [TestMethod]
+        public void AFrameNeitherMono8NorMono12IsRefusedNamingPixelFormat()
+        {
+            var colour = new IplImage(new Size(2, 1), IplDepth.U16, 3);
+            var error = Assert.ThrowsException<InvalidOperationException>(() => ZapitFrameDepth.ToEightBit(colour, false));
+            StringAssert.Contains(error.Message, "PixelFormat");
+        }
+
         // Hand aiming: each aim points the beam; bad volts, a busy setup step and a disabled laser are refused, not fatal;
         // Go (the aims ending) with the beam on zeroes the lines.
         [TestMethod]
