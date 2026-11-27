@@ -496,21 +496,44 @@ namespace OpenRigs.Zapit.Tests
             }
         }
 
-        // The camera learns the frame's size from its first frame: a crop outside it comes back on that frame as a
-        // CropRefusal, and ZapitCropRefusal reports it as Refused for the metric Zapit-Main.Crop.
+        // The camera answers a crop only from a frame cut to it: Cropped for the first frame at a new crop, Full Frame
+        // for the whole frame put back, Refused (the crop dropped, once) for one outside the frame, nothing otherwise.
         [TestMethod]
-        public void ACropOutsideTheFrameIsReportedRefused()
+        public void TheCropIsAnsweredFromTheFirstFrameCutToIt()
         {
+            var state = new ZapitCropState();
             var frame = new IplImage(new Size(64, 48), IplDepth.U8, 1);
-            var shown = ZapitFrameDepth.Crop(frame, new Rect(3000, 2000, 800, 600), out var refusal);
-            Assert.AreSame(frame, shown);
-            Assert.IsNotNull(refusal);
-            var steps = new System.Collections.Generic.List<ZapitSetupStep>();
-            new ZapitCropRefusal().Process(System.Reactive.Linq.Observable.Return(refusal!)).Subscribe(steps.Add);
-            Assert.AreEqual(1, steps.Count);
-            Assert.IsTrue(steps[0].ToString().StartsWith("Refused "), steps[0].ToString());
-            new ZapitCropRefusal().Process(System.Reactive.Linq.Observable.Return<string>(null!)).Subscribe(steps.Add);
-            Assert.AreEqual(1, steps.Count);
+            Assert.IsNull(state.Finish(state.Current, null));   // no request, no answer
+            var fits = new Rect(16, 8, 32, 24);
+            state.Set(fits);
+            Assert.AreEqual("Cropped 16,8,32,24", state.Finish(fits, ZapitFrameDepth.Refusal(frame.Size, fits)).ToString());
+            Assert.IsNull(state.Finish(fits, null));   // once
+            state.Set(default);
+            Assert.AreEqual("Full Frame", state.Finish(default, null).ToString());
+            var off = new Rect(3000, 2000, 800, 600);
+            state.Set(off);
+            var step = state.Finish(off, ZapitFrameDepth.Refusal(frame.Size, off));
+            Assert.IsTrue(step!.ToString().StartsWith("Refused "), step.ToString());
+            Assert.AreEqual(default(Rect), state.Current);   // reset once, to the whole frame
+            Assert.IsNull(state.Finish(default, null));
+        }
+
+        // A frame cut to a crop that has changed since is not that crop's answer, and does not reset the newer crop.
+        [TestMethod]
+        public void AnAnswerForAnOlderCropNeitherReportsNorResetsTheNewerOne()
+        {
+            var state = new ZapitCropState();
+            var old = new Rect(3000, 2000, 800, 600);
+            state.Set(old);
+            var taken = state.Current;
+            var newer = new Rect(16, 8, 32, 24);
+            state.Set(newer);   // arrives while the frame cut to the old crop is in flight
+            Assert.IsNull(state.Finish(taken, "does not fit"));
+            Assert.AreEqual(newer, state.Current);
+            Assert.AreEqual("Cropped 16,8,32,24", state.Finish(newer, null).ToString());
+            state.Reset();
+            Assert.AreEqual(default(Rect), state.Current);
+            Assert.IsNull(state.Finish(default, null));
         }
 
         // Zapit-Main.Crop's args: x,y,w,h in pixels, or "" / full for the whole frame; anything else refused, not fatal.
@@ -518,14 +541,14 @@ namespace OpenRigs.Zapit.Tests
         public void ACropRequestIsPixelsOrFullElseRefused()
         {
             var cropped = ZapitCropRequest.Parse("392,232,1152,864");
-            Assert.AreEqual("Cropped 392,232,1152,864", cropped.ToString());
+            Assert.AreEqual("Cropping 392,232,1152,864", cropped.ToString());
             Assert.IsTrue(cropped.Camera!.SetCrop);
             Assert.AreEqual(1152, cropped.Camera.CropWidth);
             Assert.AreEqual("crop 392,232,1152,864", cropped.Camera.ToString());
             foreach (var full in new[] { "", "full", " \"Full\" " })
             {
                 var step = ZapitCropRequest.Parse(full);
-                Assert.AreEqual("Full Frame", step.ToString());
+                Assert.AreEqual("Cropping Full Frame", step.ToString());
                 Assert.IsTrue(step.Camera!.SetCrop);
                 Assert.AreEqual(0, step.Camera.CropWidth);
             }

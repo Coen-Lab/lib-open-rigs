@@ -65,10 +65,11 @@ namespace OpenRigs.Zapit
         /// <summary>The camera's timestamp of the grab (GrabResult.Timestamp).</summary>
         public long Timestamp { get; set; }
 
-        /// <summary>Why the crop does not fit this frame (null when it does): set on the first frame after a crop that
-        /// does not fit the camera's frame size, which is not known until a frame comes. That crop is dropped, the whole
-        /// frame shown, never a clamped one; ZapitCropRefusal reports it.</summary>
-        public string? CropRefusal { get; set; }
+        /// <summary>The camera's answer to a Zapit-Main.Crop, on the first frame cut to it (null on every other frame):
+        /// Cropped x,y,w,h, Full Frame, or Refused with the reason when the crop does not fit this frame (the camera's
+        /// size is known only from a frame). A refused crop is dropped, the whole frame shown, never a clamped one;
+        /// ZapitCropReport sends it to the metric Zapit-Main.Crop.</summary>
+        public ZapitSetupStep? CropReport { get; set; }
     }
 
     /// <summary>The camera features a grid run sets, by GenICam name: a Basler camera's, or a test's.</summary>
@@ -153,7 +154,7 @@ namespace OpenRigs.Zapit
         readonly object cameraLock = new object();
         CameraExposure? exposure;
         volatile bool gridApplied;   // a grid run's exposure is on the camera: Mono12 stills go to Mono8's scale
-        OpenCV.Net.Rect crop;        // the shown frame's crop; empty for the whole frame (under cameraLock)
+        readonly ZapitCropState crop = new ZapitCropState();   // the shown frame's crop (empty: the whole frame) and its pending answer
 
         /// <summary>Loads the .pfs as PylonCapture does and keeps the opened camera for the settings.</summary>
         protected override void Configure(Camera camera)
@@ -190,12 +191,10 @@ namespace OpenRigs.Zapit
             new CompositeDisposable(
                 base.Generate().Select(frame =>
                 {
-                    OpenCV.Net.Rect cut;
-                    lock (cameraLock) cut = crop;
+                    var cut = crop.Current;
                     Split(frame.Image, gridApplied, cut, out var shown, out var still, out var refusal);
-                    if (refusal != null) lock (cameraLock) if (crop.Equals(cut)) crop = default;   // reported once, then the whole frame
-                    return new ZapitFrame { Image = shown, Still = still, CropRefusal = refusal, FrameID = frame.GrabResult?.ID ?? 0, Timestamp = frame.GrabResult?.Timestamp ?? 0 };
-                }).Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; crop = default; } }).Subscribe(observer),
+                    return new ZapitFrame { Image = shown, Still = still, CropReport = crop.Finish(cut, refusal), FrameID = frame.GrabResult?.ID ?? 0, Timestamp = frame.GrabResult?.Timestamp ?? 0 };
+                }).Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; } crop.Reset(); }).Subscribe(observer),
                 settings.Subscribe(s =>
                 {
                     lock (cameraLock)
@@ -204,7 +203,7 @@ namespace OpenRigs.Zapit
                         {
                             if (s.SetCrop)   // the shown frame only: from the next frame, whatever the camera does
                             {
-                                crop = s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default;
+                                crop.Set(s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default);
                                 return;
                             }
                             if (exposure == null) throw new InvalidOperationException("The Zapit camera is not open, so the grid's exposure cannot be set.");

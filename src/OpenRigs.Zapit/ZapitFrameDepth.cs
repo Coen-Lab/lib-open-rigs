@@ -80,4 +80,38 @@ namespace OpenRigs.Zapit
             return cut;
         }
     }
+
+    /// <summary>The Zapit camera's crop and what it has answered: set by a Zapit-Main.Crop command, reported only from a frame
+    /// cut to it (Finish), so the metric never says Cropped while the stream is whole.</summary>
+    internal sealed class ZapitCropState
+    {
+        readonly object gate = new object();
+        Rect crop;
+        bool pending;
+
+        /// <summary>A new crop (an empty one is the whole frame), to be answered by the next frame.</summary>
+        public void Set(Rect request) { lock (gate) { crop = request; pending = true; } }
+
+        /// <summary>No crop and nothing to answer (the camera closed).</summary>
+        public void Reset() { lock (gate) { crop = default; pending = false; } }
+
+        /// <summary>The crop to cut the next frame to.</summary>
+        public Rect Current { get { lock (gate) return crop; } }
+
+        /// <summary>The answer for a frame cut to <paramref name="cut"/> (Current when it was taken), with its
+        /// <paramref name="refusal"/> or none: Refused (the crop dropped, once), Cropped or Full Frame for the first frame cut
+        /// to a new crop, else null. Null too when the crop changed since: the newer request is answered by its own frame.</summary>
+        public ZapitSetupStep? Finish(Rect cut, string? refusal)
+        {
+            lock (gate)
+            {
+                if (!crop.Equals(cut)) return null;
+                if (refusal != null) { crop = default; pending = false; return new ZapitSetupStep { Stage = "Refused", Detail = refusal }; }
+                if (!pending) return null;
+                pending = false;
+                return cut.Width <= 0 ? new ZapitSetupStep { Stage = "Full", Detail = "Frame" }
+                    : new ZapitSetupStep { Stage = "Cropped", Detail = $"{cut.X},{cut.Y},{cut.Width},{cut.Height}" };
+            }
+        }
+    }
 }

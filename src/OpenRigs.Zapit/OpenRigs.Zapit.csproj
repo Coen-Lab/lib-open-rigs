@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="OpenRigs.Zapit.Tests" />
+    <InternalsVisibleTo Include="OpenRigs.Devices.Tests" />
     <InternalsVisibleTo Include="OpenRigs.Trials.Tests" />
   </ItemGroup>
 

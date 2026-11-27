@@ -354,20 +354,21 @@ namespace OpenRigs.Zapit
     /// Zapit-Main.Crop's args as the Zapit camera's crop (the window and the mp4 cut to the brain, the
     /// agent's crop round the grid area): "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
     /// h even and from 16) is Stage Cropped with that crop on Camera; "" or "full" is Stage Full (Detail "Frame") with the
-    /// whole frame; anything else is Refused, saying why, with no Camera. Reported as the metric Zapit-Main.Crop. The
-    /// frame's size is not known here: the camera checks the crop against its first frame (ZapitFrameDepth.Crop) and a
-    /// crop outside it is dropped and reported then (ZapitCropRefusal), never clamped. Taken until Go only (ZapitSetup): the mp4
+    /// whole frame; anything else is Refused, saying why, with no Camera. Reported as the metric Zapit-Main.Crop. A taken
+    /// request is only Cropping (Detail x,y,w,h, or Full Frame), not yet answered: the frame's size is known only to the
+    /// camera, which answers from the first frame cut to the crop, Cropped, Full Frame or Refused (a crop outside the
+    /// frame is dropped, never clamped), through ZapitCropReport. Taken until Go only (ZapitSetup): the mp4
     /// starts at Go, so its frame size never changes.
     /// </summary>
     [Combinator]
-    [Description("Zapit-Main.Crop's args (x,y,w,h in pixels of the camera's frame, or \"\" / full for the whole frame) as the Zapit camera's crop for the shown and recorded frame: Cropped, Full or Refused, the crop on Camera.")]
+    [Description("Zapit-Main.Crop's args (x,y,w,h in pixels of the camera's frame, or \"\" / full for the whole frame) as the Zapit camera's crop for the shown and recorded frame: Cropping (the crop on Camera; the camera answers) or Refused.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitCropRequest
     {
         /// <summary>The smallest crop side, in pixels.</summary>
         public const int LeastSide = 16;
 
-        /// <summary>Each request as a setup step: Cropped, Full or Refused.</summary>
+        /// <summary>Each request as a setup step: Cropping or Refused.</summary>
         public IObservable<ZapitSetupStep> Process(IObservable<string> source) => source.Select(Parse);
 
         /// <summary>One request as a setup step (Process).</summary>
@@ -375,7 +376,7 @@ namespace OpenRigs.Zapit
         {
             var text = (request ?? "").Trim().Trim('"').Trim();
             if (text.Length == 0 || text.Equals("full", StringComparison.OrdinalIgnoreCase))
-                return new ZapitSetupStep { Stage = "Full", Detail = "Frame", Camera = new ZapitCameraSettings { SetCrop = true } };
+                return new ZapitSetupStep { Stage = "Cropping", Detail = "Full Frame", Camera = new ZapitCameraSettings { SetCrop = true } };
             var parts = text.Split(',');
             var v = new int[4];
             if (parts.Length != 4 || Enumerable.Range(0, 4).Any(i => !int.TryParse(parts[i].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out v[i])))
@@ -385,22 +386,21 @@ namespace OpenRigs.Zapit
             var detail = string.Join(",", v.Select(n => n.ToString(CultureInfo.InvariantCulture)));
             return new ZapitSetupStep
             {
-                Stage = "Cropped", Detail = detail,
+                Stage = "Cropping", Detail = detail,
                 Camera = new ZapitCameraSettings { SetCrop = true, CropX = v[0], CropY = v[1], CropWidth = v[2], CropHeight = v[3] },
             };
         }
     }
 
-    /// <summary>The Zapit camera's report of a crop that does not fit its frame (ZapitFrame.CropRefusal), as the setup step Refused,
-    /// for the metric Zapit-Main.Crop.</summary>
+    /// <summary>The Zapit camera's answer to a crop (ZapitFrame.CropReport: Cropped, Full Frame or Refused), for the metric
+    /// Zapit-Main.Crop; the frames that carry none are passed over.</summary>
     [Combinator]
-    [Description("Camera-Zapit.Data's frames whose crop did not fit the camera's frame, as a Refused step for the metric Zapit-Main.Crop. Input: each frame's CropRefusal.")]
+    [Description("The Zapit camera's answer to a crop (Cropped, Full Frame or Refused), for the metric Zapit-Main.Crop. Input: each frame's CropReport (null is passed over).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
-    public class ZapitCropRefusal
+    public class ZapitCropReport
     {
-        /// <summary>A Refused step for each non-empty reason.</summary>
-        public IObservable<ZapitSetupStep> Process(IObservable<string> source) =>
-            source.Where(reason => !string.IsNullOrEmpty(reason)).Select(reason => new ZapitSetupStep { Stage = "Refused", Detail = reason });
+        /// <summary>Each answer; a frame without one is passed over.</summary>
+        public IObservable<ZapitSetupStep> Process(IObservable<ZapitSetupStep> source) => source.Where(step => step != null);
     }
 
     /// <summary>The loaded bank, checked at Go against the task's conditions file and the trials' rules.</summary>
