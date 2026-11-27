@@ -91,7 +91,7 @@ namespace OpenRigs.Zapit
         string? rejection;
 
         /// <summary>A new crop (an empty one is the whole frame), to be answered by the next frame.</summary>
-        public void Set(Rect request) { lock (gate) { crop = request; pending = true; } }
+        public void Set(Rect request) { lock (gate) { crop = request; pending = true; rejection = null; } }
 
         /// <summary>A request that was no crop: the crop in force stays, and the next frame answers Refused with it.</summary>
         public void Reject(string reason) { lock (gate) { rejection = reason; pending = false; } }

@@ -530,6 +530,18 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual("Refused a crop is x,y,w,h; Now Full Frame", state.Finish(default, null).ToString());
         }
 
+        // A crop sent after a rejected request, before a frame, is the one answered: Cropped, not the older Refused.
+        [TestMethod]
+        public void ACropAfterARejectedRequestIsAnsweredCropped()
+        {
+            var state = new ZapitCropState();
+            var b = new Rect(16, 8, 32, 24);
+            state.Reject("a crop is x,y,w,h");
+            state.Set(b);
+            Assert.AreEqual("Cropped 16,8,32,24", state.Finish(b, null).ToString());
+            Assert.IsNull(state.Finish(b, null));
+        }
+
         // A frame cut to a crop that has changed since is not that crop's answer, and does not reset the newer crop.
         [TestMethod]
         public void AnAnswerForAnOlderCropNeitherReportsNorResetsTheNewerOne()

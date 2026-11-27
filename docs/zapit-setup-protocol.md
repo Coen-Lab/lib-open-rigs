@@ -76,10 +76,10 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
 The answer is on its own metric, `status.metrics["Zapit-Main.Crop"]`. Only the camera knows its frame's size, so the metric answers from the camera, never from the command:
 
-- `Cropping <x,y,w,h>` or `Cropping Full Frame`: the command was taken and the camera has not cut a frame to it yet. This state is not terminal: the stream may still be whole.
+- `Cropping <x,y,w,h>`, `Cropping Full Frame`, or `Cropping <request text>` (a malformed request, echoed as sent): the command was taken and the camera has not cut a frame to it yet. This state is not terminal: the stream may still be whole.
 - `Cropped <x,y,w,h>`: the camera has cut a frame to this crop.
 - `Full Frame`: the camera has put the whole frame back.
-- `Refused <reason>; Now Full Frame` or `Refused <reason>; Now Cropped <x,y,w,h>`: terminal. The command was not a crop, or the camera's frame does not hold it. The last part says which crop the stream shows now: a crop outside the frame is dropped (`Now Full Frame`), a malformed command leaves the crop in force (`Now Cropped <x,y,w,h>`, or `Now Full Frame` when none).
+- `Refused <reason>; Now Full Frame` or `Refused <reason>; Now Cropped <x,y,w,h>`: terminal. The command was not a crop, or the camera's frame does not hold it. The last part says which crop the stream shows now: a crop outside the frame is dropped (`Now Full Frame`), a malformed command leaves the crop in force (`Now Cropped <x,y,w,h>`, or `Now Full Frame` when none). The reason can echo the request, so the agent reads the crop in force from the last `; Now `.
 
 Every refusal comes from the camera, which alone knows its frame size and the crop in force: the command is first answered `Cropping`, then `Refused <reason>; Now ...` from the next frame. A command is refused when it is not four whole numbers, x or y is below 0, or w or h is odd or below 16 (the crop in force stays), or when the crop runs off the frame (x+w above the width, y+h above the height; the camera drops it and shows the whole frame, never a clamped crop). The agent polls the metric until it reads `Cropped`, `Full Frame` or `Refused`, and sends Go only then, since `Cropping` can still turn into `Refused`.
 
