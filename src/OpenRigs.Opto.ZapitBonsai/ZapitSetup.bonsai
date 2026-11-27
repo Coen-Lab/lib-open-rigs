@@ -7,7 +7,7 @@
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:zdq="clr-namespace:OpenRigs.Opto.ZapitBonsai;assembly=OpenRigs.Opto.ZapitBonsai"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTaskZapitDaq's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the device Zapit-Main's commands (DeclareDeviceControls): Zapit-Main.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit-Main.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit-Main.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json in pending) loads it into ZapitDaq (ZapitSetupCapture checks the path), which publishes it on Zapit.Bank; Zapit-Main.LaserOff zeroes every line at once, before or after Go. Zapit-Main.Aim (args: xVolts,yVolts,laserVolts) points the beam by hand, reported on its own metric Zapit-Main.Aim ("Aiming &lt;volts&gt;", "Off Go" or "Refused &lt;why&gt;") so the Setup metric keeps BankLoaded; refused at rig.yml zapit.ceilingMw 0, above laserMinMaxControlVolts[1] (both from ZapitRig), above the ceiling's volts (Zapit.LaserCeilingVolts, ConnectForTaskZapitDaq's launch property LaserCeilingVolts) or during a grid run or still; a grid's laserVolts is held to the same rules; at Go a beam still aimed is zeroed, and a grid run or still in progress refused with the lines zeroed. A still with no camera frame in 2 s is refused. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit-Main.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "Loading &lt;json&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;", each stage before its command goes to ZapitDaq, whose answer (BankLoaded comes back inside LoadBank) must not be overwritten by it; a refused request leaves the workflow running. A grid.json camera block's exposure and gain go to the Zapit camera with the run's first point, and its session settings back with the run's end, on Camera-Zapit.Settings (ZapitCamera's ZapitPylonCapture). Zapit-Main.Play (args: condition,powerMw,seconds) is Play Condition (ZapitPlay; open_rigs.zapit.play drives the sequence): ZapitDaq's own Arm of that condition from the loaded bank as trial 0, refused (never an error) with no bank, a play already armed, the laser disabled, or a condition, power or duration the bank and maxTrialSeconds cannot play, reported on the metric Zapit-Main.Play (Arming, Armed, Playing, Ended, Off or Refused); Zapit-Main.Trigger (args: on, else off) raises or clears the ZapitTrigger line on BehaviorBoard-Main.Commands (SetZapitTriggerLine; the twin's trigger with on), which starts the armed play on the NI DAQ's trigger terminal as a trial's trigger does; the line is cleared by LaserOff, by the play's end (its own, a stop or a Zero) and at Go with a play still armed (its lines zeroed), and when the workflow stops (the board piece's ClearOutputsOnStop). Play and Trigger are taken until Go and ignored after it. A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, ZapitRig, Zapit.LaserCeilingVolts, Zapit.Commands, Zapit.Events, Zapit.Bank, Camera-Zapit.Settings, Camera-Zapit.Data, ZapitTriggerLine and BehaviorBoard-Main.Commands from the workflow.</Description>
+  <Description>Zapit's setup phase, between launch and Go, inside ConnectForTaskZapitDaq's Zapit group: the protocol is lib-open-rigs' docs/zapit-setup-protocol.md. Declares the device Zapit-Main's commands (DeclareDeviceControls): Zapit-Main.Setup (args: a grid run folder in RigConfigs\&lt;RIG&gt;\pending holding the agent's grid.json) points the galvos at each point, saving point_NNNN.png and background_K.png there (ZapitSetupCapture); Zapit-Main.Still (args: a new .png in pending) saves the next camera frame, laser off; Zapit-Main.LoadBank (args: the bank's Settings_ZapitBank_&lt;DateTime&gt;.json in pending) loads it into ZapitDaq (ZapitSetupCapture checks the path), which publishes it on Zapit.Bank; Zapit-Main.LaserOff zeroes every line at once, before or after Go. Zapit-Main.Aim (args: xVolts,yVolts,laserVolts) points the beam by hand, reported on its own metric Zapit-Main.Aim ("Aiming &lt;volts&gt;", "Off Go" or "Refused &lt;why&gt;") so the Setup metric keeps BankLoaded; refused at rig.yml zapit.ceilingMw 0, above laserMinMaxControlVolts[1] (both from ZapitRig), above the ceiling's volts (Zapit.LaserCeilingVolts, ConnectForTaskZapitDaq's launch property LaserCeilingVolts) or during a grid run or still; a grid's laserVolts is held to the same rules; at Go a beam still aimed is zeroed, and a grid run or still in progress refused with the lines zeroed. A still with no camera frame in 2 s is refused. Setup, Still and LoadBank are taken until Go (ExperimentGo) and ignored after it. Each stage is reported as the metric Zapit-Main.Setup: "Pointing &lt;folder&gt;", "FramesSaved &lt;folder&gt;", "StillSaved &lt;png&gt;", "Loading &lt;json&gt;", "BankLoaded &lt;json&gt;" or "Refused &lt;why&gt;", each stage before its command goes to ZapitDaq, whose answer (BankLoaded comes back inside LoadBank) must not be overwritten by it; a refused request leaves the workflow running. A grid.json camera block's exposure and gain go to the Zapit camera with the run's first point, and its session settings back with the run's end, on Camera-Zapit.Settings (ZapitCamera's ZapitPylonCapture). Zapit-Main.Play (args: condition,powerMw,seconds) is Play Condition (ZapitPlay; open_rigs.zapit.play drives the sequence): ZapitDaq's own Arm of that condition from the loaded bank as trial 0, refused (never an error) with no bank, a play already armed, the laser disabled, or a condition, power or duration the bank and maxTrialSeconds cannot play, reported on the metric Zapit-Main.Play (Arming, Armed, Playing, Ended, Off or Refused); Zapit-Main.Trigger (args: on, else off) raises or clears the ZapitTrigger line on BehaviorBoard-Main.Commands (SetZapitTriggerLine; the twin's trigger with on), which starts the armed play on the NI DAQ's trigger terminal as a trial's trigger does; the line is cleared by LaserOff, by the play's end (its own, a stop or a Zero) and at Go with a play still armed (its lines zeroed), and when the workflow stops (the board piece's ClearOutputsOnStop). Play and Trigger are taken until Go and ignored after it. Zapit-Main.Crop (args: x,y,w,h in pixels of the camera's frame, or full) cuts the Zapit camera's shown and recorded frame (ZapitCropRequest, on Camera-Zapit.Settings to ZapitCamera), reported on the metric Zapit-Main.Crop ("Cropped &lt;x,y,w,h&gt;", "Full Frame" or "Refused &lt;why&gt;"); taken until Go only, so the recording, which starts at Go, keeps one frame size. Stills and grid runs save Camera-Zapit.Data's Still, the whole frame (a grid run's at Mono8's scale), never the cropped Image. A bank ZapitDaq refuses (hash, sample rate, a volt outside +/-10 V) stops the workflow naming it. Needs ControlEvents, ExperimentGo, RigFile, ZapitRig, Zapit.LaserCeilingVolts, Zapit.Commands, Zapit.Events, Zapit.Bank, Camera-Zapit.Settings, Camera-Zapit.Data, ZapitTriggerLine and BehaviorBoard-Main.Commands from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -47,7 +47,7 @@
         <Name>Camera-Zapit.Data</Name>
       </Expression>
       <Expression xsi:type="MemberSelector">
-        <Selector>Value.Image</Selector>
+        <Selector>Value.Still</Selector>
       </Expression>
       <Expression xsi:type="SubscribeSubject">
         <Name>RigFile</Name>
@@ -192,6 +192,10 @@
             <orcl:Command>
               <orcl:Name>Trigger</orcl:Name>
               <orcl:Description>The ZapitTrigger line (and the masking light): args on raises it, starting an armed play; anything else clears it. Cleared too by LaserOff and when the play ends. Before Go only.</orcl:Description>
+            </orcl:Command>
+            <orcl:Command>
+              <orcl:Name>Crop</orcl:Name>
+              <orcl:Description>The Zapit camera's shown and recorded frame cut to args x,y,w,h (pixels of the camera's frame; w and h even), or the whole frame for full or none; the stills stay whole. Reported on the metric Zapit-Main.Crop (Cropped, Full or Refused). Before Go only: the recording starts at Go, so its frame size is fixed from there.</orcl:Description>
             </orcl:Command>
           </orcl:Commands>
         </Combinator>
@@ -484,6 +488,55 @@
         <Set>false</Set>
         <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ControlEvents</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:OnDeviceCommand">
+          <orcl:Name>Zapit-Main</orcl:Name>
+          <orcl:Command>Crop</orcl:Command>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>ExperimentGo</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:TakeUntil" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Name>CropRequest</Name>
+        <Description>Zapit-Main.Crop before Go: the shown and recorded frame's crop (x,y,w,h, or the whole frame), reported as Zapit-Main.Crop and sent to the camera on Camera-Zapit.Settings. After Go none is taken: the mp4 starts at Go at the crop then.</Description>
+        <Combinator xsi:type="zap:ZapitCropRequest" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>Zapit-Main.Crop</orcl:Name>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:Condition">
+        <Name>HasCamera?</Name>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="WorkflowInput">
+              <Name>Source1</Name>
+            </Expression>
+            <Expression xsi:type="scr:ExpressionTransform">
+              <scr:Expression>Camera != null</scr:Expression>
+            </Expression>
+            <Expression xsi:type="WorkflowOutput" />
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Camera</Selector>
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>Camera-Zapit.Settings</Name>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -558,6 +611,14 @@
       <Edge From="24" To="76" Label="Source1" />
       <Edge From="75" To="76" Label="Source2" />
       <Edge From="76" To="77" Label="Source1" />
+      <Edge From="78" To="79" Label="Source1" />
+      <Edge From="79" To="81" Label="Source1" />
+      <Edge From="80" To="81" Label="Source2" />
+      <Edge From="81" To="82" Label="Source1" />
+      <Edge From="82" To="83" Label="Source1" />
+      <Edge From="83" To="84" Label="Source1" />
+      <Edge From="84" To="85" Label="Source1" />
+      <Edge From="85" To="86" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

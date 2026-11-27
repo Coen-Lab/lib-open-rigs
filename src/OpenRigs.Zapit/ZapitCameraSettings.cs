@@ -59,8 +59,11 @@ namespace OpenRigs.Zapit
         /// <summary>The whole frame Zapit's setup saves: stretched, or Mono8's scale during a grid run.</summary>
         public OpenCV.Net.IplImage? Still { get; set; }
 
-        /// <summary>The grab (its ID and camera timestamp), as PylonCapture's frame carries it.</summary>
-        public IGrabResult? GrabResult { get; set; }
+        /// <summary>The grab's ID (PylonCapture's GrabResult.ID), as the recording's frame log keeps it.</summary>
+        public long FrameID { get; set; }
+
+        /// <summary>The camera's timestamp of the grab (GrabResult.Timestamp).</summary>
+        public long Timestamp { get; set; }
     }
 
     /// <summary>The camera features a grid run sets, by GenICam name: a Basler camera's, or a test's.</summary>
@@ -184,7 +187,7 @@ namespace OpenRigs.Zapit
                     OpenCV.Net.Rect cut;
                     lock (cameraLock) cut = crop;
                     Split(frame.Image, gridApplied, cut, out var shown, out var still);
-                    return new ZapitFrame { Image = shown, Still = still, GrabResult = frame.GrabResult };
+                    return new ZapitFrame { Image = shown, Still = still, FrameID = frame.GrabResult?.ID ?? 0, Timestamp = frame.GrabResult?.Timestamp ?? 0 };
                 }).Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; crop = default; } }).Subscribe(observer),
                 settings.Subscribe(s =>
                 {

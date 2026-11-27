@@ -27,6 +27,14 @@ namespace OpenRigs.Devices.Tests
             CollectionAssert.Contains(Streams(ZapitDaq), "Camera-Zapit.video");
         }
 
+        // The window and the mp4 get the shown frame, cropped and stretched (Image), never the whole frame the setup saves
+        // (Still): the live view takes a frame's first image, so Image must come first (Pip, 27 Nov 2026).
+        [TestMethod]
+        public void TheZapitStreamIsTheShownImageNotTheStill()
+        {
+            Assert.AreEqual("Value.Image", StreamImages(ZapitDaq)["Camera-Zapit.video"]);
+        }
+
         // MATLAB Zapit's block alone opens no camera, so the live view shows none.
         [TestMethod]
         public void NoZapitCameraIsStreamedWithoutZapitDaq()
@@ -91,7 +99,10 @@ namespace OpenRigs.Devices.Tests
         }
 
         // The streams StreamDevices plans from a rig.yml whose zapit block is this one.
-        static string[] Streams(string zapit)
+        static string[] Streams(string zapit) => StreamImages(zapit).Keys.ToArray();
+
+        // Each stream StreamDevices plans from a rig.yml whose zapit block is this one, with the member its image is read from.
+        static System.Collections.Generic.Dictionary<string, string> StreamImages(string zapit)
         {
             var root = Path.Combine(Path.GetTempPath(), "ZapitLiveViewTests", Guid.NewGuid().ToString("N"));
             try
@@ -114,7 +125,8 @@ namespace OpenRigs.Devices.Tests
                 builder.Workflow.Build();
                 var liveView = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<OpenRigs.LiveView.StreamDevices>().Single();
                 var generated = liveView.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<GroupWorkflowBuilder>().Single();
-                return generated.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<GroupWorkflowBuilder>().Select(g => g.Name).ToArray();
+                return generated.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<GroupWorkflowBuilder>().ToDictionary(g => g.Name,
+                    g => g.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<MemberSelectorBuilder>().Select(m => m.Selector).FirstOrDefault());
             }
             finally
             {
@@ -170,23 +182,19 @@ namespace OpenRigs.Devices.Tests
         }
     }
 
-    /// <summary>A grab's members ZapitCamera reads, as Bonsai.Pylon's frame has them.</summary>
+    /// <summary>A frame's members ZapitCamera reads, as OpenRigs.Zapit's ZapitFrame has them.</summary>
     public class StandInGrab
     {
-        /// <summary>The image.</summary>
+        /// <summary>The shown image, streamed and recorded (ZapitFrame.Image).</summary>
         public OpenCV.Net.IplImage Image { get; set; }
 
-        /// <summary>The grab's ID and camera timestamp.</summary>
-        public StandInGrabResult GrabResult { get; set; }
-    }
+        /// <summary>The whole frame Zapit's setup saves (ZapitFrame.Still).</summary>
+        public OpenCV.Net.IplImage Still { get; set; }
 
-    /// <summary>A grab result's ID and camera timestamp.</summary>
-    public class StandInGrabResult
-    {
         /// <summary>The grab's ID.</summary>
-        public long ID { get; set; }
+        public long FrameID { get; set; }
 
-        /// <summary>The camera's timestamp.</summary>
+        /// <summary>The camera's timestamp of the grab.</summary>
         public long Timestamp { get; set; }
     }
 

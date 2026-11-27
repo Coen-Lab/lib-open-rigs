@@ -34,7 +34,7 @@ namespace OpenRigs.Devices.Tests
             var pending = Path.Combine(root, Environment.MachineName, "pending");
             Directory.CreateDirectory(pending);
             File.WriteAllText(Path.Combine(root, Environment.MachineName, "rig.yml"), "rootPath: C:\\nowhere\nrigId: D1\nbehaviorBoard:\n  main:\n    portName: COM97\n" +
-                "zapit:\n  device: Dev1\n  ceilingMw: 30\n  laserMinMaxControlVolts: [0.0, 5.0]\n");
+                "zapit:\n  device: Dev1\n  ceilingMw: 30\n  maxTrialSeconds: 6\n  laserMinMaxControlVolts: [0.0, 5.0]\n");
             var bank = Path.Combine(pending, "Settings_ZapitBank_T.json");
             File.Copy(Path.Combine(Folder, "Settings_ZapitBank_T.json"), bank);
             using (var input = new GZipStream(File.OpenRead(Path.Combine(Folder, "Settings_ZapitBank_T.bin.gz")), CompressionMode.Decompress))
@@ -74,6 +74,11 @@ namespace OpenRigs.Devices.Tests
                     Assert.AreEqual("Aiming 1,-2,0.5", Command(socket, "Zapit-Main.Aim", "1,-2,0.5", "Zapit-Main.Aim", "Aiming 1,-2"));
                     StringAssert.StartsWith(Command(socket, "Zapit-Main.Aim", "1,-2,6", "Zapit-Main.Aim", "Refused "), "Refused the laser volts must be 0 to 5 V");
                     Assert.AreEqual("BankLoaded " + bank, (string)Ask(socket, new { cmd = "status" })["metrics"]["Zapit-Main.Setup"]);
+
+                    // The shown frame's crop on its own metric too: pixels, the whole frame, or refused (the workflow runs on).
+                    Assert.AreEqual("Cropped 392,232,1152,864", Command(socket, "Zapit-Main.Crop", "392,232,1152,864", "Zapit-Main.Crop", "Cropped"));
+                    Assert.AreEqual("Full Frame", Command(socket, "Zapit-Main.Crop", "full", "Zapit-Main.Crop", "Full"));
+                    StringAssert.StartsWith(Command(socket, "Zapit-Main.Crop", "1,2", "Zapit-Main.Crop", "Refused "), "Refused a crop is x,y,w,h");
                 }
             }
             finally
