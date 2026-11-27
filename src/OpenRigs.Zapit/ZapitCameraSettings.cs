@@ -45,7 +45,7 @@ namespace OpenRigs.Zapit
     }
 
     /// <summary>
-    /// One Zapit camera frame, two ways (Pip, 27 Nov 2026: a grid run's frames were nearly black in the window): Image, what
+    /// One Zapit camera frame, two ways (a grid run's frames were nearly black in the window, 27 Nov 2026): Image, what
     /// the window streams and the mp4 records, always the session's stretched picture, cut to the crop (ZapitFrameDepth.Crop);
     /// Still, what Zapit's setup saves (stills, a grid run's point and background frames), the whole frame, the stretched
     /// picture too except during a grid run, when it is Mono8's scale (counts / 16), which the spot detection's 90 %-of-peak
@@ -64,6 +64,11 @@ namespace OpenRigs.Zapit
 
         /// <summary>The camera's timestamp of the grab (GrabResult.Timestamp).</summary>
         public long Timestamp { get; set; }
+
+        /// <summary>Why the crop does not fit this frame (null when it does): set on the first frame after a crop that
+        /// does not fit the camera's frame size, which is not known until a frame comes. That crop is dropped, the whole
+        /// frame shown, never a clamped one; ZapitCropRefusal reports it.</summary>
+        public string? CropRefusal { get; set; }
     }
 
     /// <summary>The camera features a grid run sets, by GenICam name: a Basler camera's, or a test's.</summary>
@@ -166,16 +171,17 @@ namespace OpenRigs.Zapit
 
         /// <summary>A grabbed frame as the shown image (stretched, cropped) and the still Zapit's setup saves (whole; Mono8's
         /// scale in a grid run), each null for a null frame.</summary>
-        internal static void Split(OpenCV.Net.IplImage? image, bool grid, OpenCV.Net.Rect crop, out OpenCV.Net.IplImage? shown, out OpenCV.Net.IplImage? still)
+        internal static void Split(OpenCV.Net.IplImage? image, bool grid, OpenCV.Net.Rect crop, out OpenCV.Net.IplImage? shown, out OpenCV.Net.IplImage? still, out string? cropRefusal)
         {
             shown = still = image;
+            cropRefusal = null;
             if (image == null) return;
             if (image.Depth != OpenCV.Net.IplDepth.U8)
             {
                 shown = ZapitFrameDepth.ToEightBit(image, false, ZapitFrameDepth.StretchTop(image));
                 still = grid ? ZapitFrameDepth.ToEightBit(image, true, 0) : shown;
             }
-            shown = ZapitFrameDepth.Crop(shown!, crop);
+            shown = ZapitFrameDepth.Crop(shown!, crop, out cropRefusal);
         }
 
         /// <summary>The camera's frames, with each of <paramref name="settings"/> applied to it while it grabs: each frame
@@ -186,8 +192,9 @@ namespace OpenRigs.Zapit
                 {
                     OpenCV.Net.Rect cut;
                     lock (cameraLock) cut = crop;
-                    Split(frame.Image, gridApplied, cut, out var shown, out var still);
-                    return new ZapitFrame { Image = shown, Still = still, FrameID = frame.GrabResult?.ID ?? 0, Timestamp = frame.GrabResult?.Timestamp ?? 0 };
+                    Split(frame.Image, gridApplied, cut, out var shown, out var still, out var refusal);
+                    if (refusal != null) lock (cameraLock) if (crop.Equals(cut)) crop = default;   // reported once, then the whole frame
+                    return new ZapitFrame { Image = shown, Still = still, CropRefusal = refusal, FrameID = frame.GrabResult?.ID ?? 0, Timestamp = frame.GrabResult?.Timestamp ?? 0 };
                 }).Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; crop = default; } }).Subscribe(observer),
                 settings.Subscribe(s =>
                 {

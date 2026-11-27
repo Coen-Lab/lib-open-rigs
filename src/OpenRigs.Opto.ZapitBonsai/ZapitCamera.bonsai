@@ -62,7 +62,7 @@
               </Combinator>
             </Expression>
             <Expression xsi:type="scr:ExpressionTransform">
-              <scr:Expression>new(Image as Image, Still as Still, new(FrameID as FrameID, Timestamp as Timestamp) as ChunkData)</scr:Expression>
+              <scr:Expression>new(Image as Image, Still as Still, CropRefusal as CropRefusal, new(FrameID as FrameID, Timestamp as Timestamp) as ChunkData)</scr:Expression>
             </Expression>
             <Expression xsi:type="IncludeWorkflow" Path="Bonsai.Harp:WithLatestTimestamp.bonsai">
               <Name>Timestamp</Name>

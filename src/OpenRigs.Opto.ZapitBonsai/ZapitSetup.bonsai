@@ -537,6 +537,22 @@
       <Expression xsi:type="MulticastSubject">
         <Name>Camera-Zapit.Settings</Name>
       </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Camera-Zapit.Data</Name>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Value.CropRefusal</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Name>CropRefusal</Name>
+        <Description>A crop that did not fit the camera's frame (known from its first frame), reported as Zapit-Main.Crop Refused; the camera drops it and shows the whole frame.</Description>
+        <Combinator xsi:type="zap:ZapitCropRefusal" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="orcl:ReportMetric">
+          <orcl:Name>Zapit-Main.Crop</orcl:Name>
+        </Combinator>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
@@ -619,6 +635,9 @@
       <Edge From="83" To="84" Label="Source1" />
       <Edge From="84" To="85" Label="Source1" />
       <Edge From="85" To="86" Label="Source1" />
+      <Edge From="87" To="88" Label="Source1" />
+      <Edge From="88" To="89" Label="Source1" />
+      <Edge From="89" To="90" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

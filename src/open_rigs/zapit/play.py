@@ -1,6 +1,6 @@
 """Play Condition: a condition's real trial before Go, from the loaded bank, as the task's own trials play it.
 
-The sequence is Pip's (27 Nov 2026): no new ZapitDaq command. The condition is armed with ZapitDaq's own Arm (the
+The sequence is the user's (27 Nov 2026): no new ZapitDaq command. The condition is armed with ZapitDaq's own Arm (the
 workflow's Zapit-Main.Play, lib-open-rigs ZapitPlay, trial 0), the ZapitTrigger line is raised to start it (Zapit-Main.Trigger
 on, as a trial's trigger raises it; the masking light with it) and cleared once the trial with its ramp has played, then
 every output zeroed (Zapit-Main.LaserOff). A stop (Laser Off, Stop, Go) clears the line and zeroes the outputs at once.
@@ -8,7 +8,7 @@ every output zeroed (Zapit-Main.LaserOff). A stop (Laser Off, Stop, Go) clears t
 ``plan_play`` chooses what plays: the condition at the bank's laser-on power (the task's ``laserPowerMw``, held under
 ``ceilingMw`` when the bank was built, and refused here above it), for the task's laser duration, else
 ``PLAY_DEFAULT_S``, never longer than ZapitDaq's trial buffer takes with the ramp (as lib-open-rigs ZapitBank.Cycles judges
-it). ``ConditionPlay`` runs the sequence on its own thread with the device actions given to it, so a caller (app-rig-control's
+it). ``ConditionPlay`` runs the sequence on its own thread with the device actions given to it, so a caller (the rig app's
 agent) only relays the request and shows the state. Its laser is never "off" while it may be on: from the Arm until the clear
 and the zero are delivered it reads "play", and a clear or zero not delivered reads "unknown" until ``retry`` delivers one.
 Free of hardware, Qt and sockets: the actions are the caller's.

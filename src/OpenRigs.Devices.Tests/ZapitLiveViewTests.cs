@@ -28,7 +28,7 @@ namespace OpenRigs.Devices.Tests
         }
 
         // The window and the mp4 get the shown frame, cropped and stretched (Image), never the whole frame the setup saves
-        // (Still): the live view takes a frame's first image, so Image must come first (Pip, 27 Nov 2026).
+        // (Still): the live view takes a frame's first image, so Image must come first (27 Nov 2026).
         [TestMethod]
         public void TheZapitStreamIsTheShownImageNotTheStill()
         {
@@ -190,6 +190,7 @@ namespace OpenRigs.Devices.Tests
 
         /// <summary>The whole frame Zapit's setup saves (ZapitFrame.Still).</summary>
         public OpenCV.Net.IplImage Still { get; set; }
+        public string CropRefusal { get; set; }
 
         /// <summary>The grab's ID.</summary>
         public long FrameID { get; set; }

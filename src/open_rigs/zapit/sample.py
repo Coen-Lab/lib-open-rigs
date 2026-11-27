@@ -1,11 +1,11 @@
 """The sample: bregma and a second midline point from two clicks, or registration of the mouse's last reference still.
 
 The two points are atlas coordinates [ML, AP] in mm: bregma [0, 0] and the caller's second point [0, ap] on the midline
-(MATLAB Zapit's refAP point, pointer.m refPointsStereotaxic = [0 0; 0 refAP], +AP anterior; app-rig-control gives it,
+(MATLAB Zapit's refAP point, pointer.m refPointsStereotaxic = [0 0; 0 refAP], +AP anterior; the rig app gives it,
 3 mm posterior on 27 Nov 2026). They set the
 conversion from atlas units to the still (position, rotation and scale), so the second point's distance is in atlas mm,
 scaled to each mouse by where it is clicked, not a skull landmark's (lambda is a Paxinos skull landmark the Allen atlas
-does not define; Pip, 27 Nov 2026).
+does not define; 27 Nov 2026).
 
 Registration scales the reference to the new image's micronsPerPixel, masks the skull and head-plate, matches ORB
 features, finds the consistent ones with a RANSAC similarity and refits them as rigid (rotation and shift: the scale

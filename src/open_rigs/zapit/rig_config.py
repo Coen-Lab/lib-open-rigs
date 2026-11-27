@@ -19,7 +19,7 @@ from open_rigs.zapit.laser import LaserCalibration
 _REQUIRED = ("device", "galvoXChannel", "galvoYChannel", "laserChannel", "ledChannel", "photodiodeChannel",
              "triggerChannel", "sampleRate", "laserMinMaxMw", "laserMinMaxControlVolts", "ceilingMw",
              "micronsPerPixel", "voltsPerPixel", "camera")
-# maxTrialSeconds is retired (Pip, 27 Nov 2026: "It should just be calculated by the time available from laser onset
+# maxTrialSeconds is retired (the user, 27 Nov 2026: "It should just be calculated by the time available from laser onset
 # until the next laser onset in the shortest possible trial"): a ZapitDaq trial's buffer comes from the task's timing
 # (open_rigs.core.task zapit_trial_seconds), which the launcher gives ZapitDaq for each launch. An older rig.yml's is
 # still read, so the file loads, but is not the buffer.

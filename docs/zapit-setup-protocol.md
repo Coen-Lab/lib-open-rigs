@@ -4,7 +4,7 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
 
 ## Channels
 
-- **Commands.** The agent sends `{"cmd": "command", "name": <name>, "args": <path>}`. The device `Zapit-Main` declares seven commands, and only on a rig with a `zapit` block:
+- **Commands.** The agent sends `{"cmd": "command", "name": <name>, "args": <path>}`. The device `Zapit-Main` declares eight commands, and only on a rig with a `zapit` block:
   - `Zapit-Main.Setup`
   - `Zapit-Main.Still`
   - `Zapit-Main.LoadBank`
@@ -12,6 +12,7 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
   - `Zapit-Main.Aim`
   - `Zapit-Main.Play`
   - `Zapit-Main.Trigger`
+  - `Zapit-Main.Crop`
 
   A rig without the block declares none of them, so the agent finds out whether the rig has Zapit from `status.commands`.
 - **State.** `status.metrics["Zapit-Main.Setup"]` holds the latest stage as `<Stage> <detail>`. The stages are:
@@ -68,6 +69,18 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
    With `ceilingMw` 0 there is no `ZapitScanner\`, no accuracy file and no laser curve. ExperimentManifest expects those three under `OptogeneticsLaserEnabled`, the rest of Zapit's files under `Optogenetics`.
 
    ZapitDaq holds the bank in memory, so moving the files does not affect trials.
+
+## Crop
+
+`Zapit-Main.Crop <x,y,w,h>` cuts the Zapit camera's shown and recorded frame (the live window and the mp4) to a rectangle in camera pixels; `Zapit-Main.Crop full` (or an empty argument) puts the whole frame back. The stills and a grid run's frames stay whole, so every fit stays in the whole frame's pixels. The crop is accepted only before Go: the recording starts at Go, so its frame size never changes, and the command is ignored after it.
+
+The answer is on its own metric, `status.metrics["Zapit-Main.Crop"]`:
+
+- `Cropped <x,y,w,h>`
+- `Full Frame`
+- `Refused <reason>`
+
+A crop is refused when it is not four whole numbers, x or y is below 0, w or h is odd or below 16, or it does not fit inside the frame (x+w above the width, y+h above the height). The frame's size is known only from the camera's first frame, so a crop that runs off the frame is first answered `Cropped`, then `Refused <reason>` once a frame comes; the camera shows the whole frame, never a clamped crop. The agent polls the metric until it reads a crop's terminal answer.
 
 ## Hand aiming
 

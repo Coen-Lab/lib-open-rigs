@@ -351,11 +351,12 @@ namespace OpenRigs.Zapit
     }
 
     /// <summary>
-    /// Zapit-Main.Crop's args as the Zapit camera's crop (Pip, 27 Nov 2026: the window and the mp4 cut to the brain, the
+    /// Zapit-Main.Crop's args as the Zapit camera's crop (the window and the mp4 cut to the brain, the
     /// agent's crop round the grid area): "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
     /// h even and from 16) is Stage Cropped with that crop on Camera; "" or "full" is Stage Full (Detail "Frame") with the
     /// whole frame; anything else is Refused, saying why, with no Camera. Reported as the metric Zapit-Main.Crop. The
-    /// frame's own size is the camera's to keep to (ZapitFrameDepth.Crop). Taken until Go only (ZapitSetup): the mp4
+    /// frame's size is not known here: the camera checks the crop against its first frame (ZapitFrameDepth.Crop) and a
+    /// crop outside it is dropped and reported then (ZapitCropRefusal), never clamped. Taken until Go only (ZapitSetup): the mp4
     /// starts at Go, so its frame size never changes.
     /// </summary>
     [Combinator]
@@ -388,6 +389,18 @@ namespace OpenRigs.Zapit
                 Camera = new ZapitCameraSettings { SetCrop = true, CropX = v[0], CropY = v[1], CropWidth = v[2], CropHeight = v[3] },
             };
         }
+    }
+
+    /// <summary>The Zapit camera's report of a crop that does not fit its frame (ZapitFrame.CropRefusal), as the setup step Refused,
+    /// for the metric Zapit-Main.Crop.</summary>
+    [Combinator]
+    [Description("Camera-Zapit.Data's frames whose crop did not fit the camera's frame, as a Refused step for the metric Zapit-Main.Crop. Input: each frame's CropRefusal.")]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    public class ZapitCropRefusal
+    {
+        /// <summary>A Refused step for each non-empty reason.</summary>
+        public IObservable<ZapitSetupStep> Process(IObservable<string> source) =>
+            source.Where(reason => !string.IsNullOrEmpty(reason)).Select(reason => new ZapitSetupStep { Stage = "Refused", Detail = reason });
     }
 
     /// <summary>The loaded bank, checked at Go against the task's conditions file and the trials' rules.</summary>

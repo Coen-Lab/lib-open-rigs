@@ -10,7 +10,7 @@ from open_rigs.zapit.bank import sample_hash
 from open_rigs.zapit.scanner import ScannerSettings
 
 SETTINGS = ScannerSettings(microns_per_pixel=12.0, volts_per_pixel=0.0015, image_size=(800, 600))
-AP = -3.0  # the second point's atlas AP, 3 mm posterior, as app-rig-control's SECOND_POINT_AP_MM gives it (MATLAB's refAP)
+AP = -3.0  # the second point's atlas AP, 3 mm posterior, as the rig app's SECOND_POINT_AP_MM gives it (MATLAB's refAP)
 
 
 def skull(seed=0, size=(800, 600)):
@@ -54,7 +54,7 @@ def test_clicks_give_the_reference_points():
 
 
 def test_the_second_point_has_no_default_and_no_lambda():
-    """Pip, 27 Nov 2026: the second point is MATLAB Zapit's refAP midline point, given by the caller; lambda is gone."""
+    """27 Nov 2026: the second point is MATLAB Zapit's refAP midline point, given by the caller; lambda is gone."""
     assert not hasattr(sm, "LAMBDA_AP_MM")
     with pytest.raises(TypeError):
         sm.sample_from_clicks([400, 300], [400, 180], SETTINGS)  # type: ignore[call-arg]

@@ -66,7 +66,7 @@ def test_bad_new_keys_are_refused(change):
 
 
 def test_max_trial_seconds_is_retired_but_an_older_rig_yml_s_still_reads():
-    # Pip, 27 Nov 2026: ZapitDaq's trial buffer comes from the task's timing (open_rigs.core.task zapit_trial_seconds).
+    # 27 Nov 2026: ZapitDaq's trial buffer comes from the task's timing (open_rigs.core.task zapit_trial_seconds).
     assert ZapitRig.from_dict({k: v for k, v in BLOCK.items() if k != "maxTrialSeconds"}).max_trial_seconds is None
     assert ZapitRig.from_dict(BLOCK).max_trial_seconds == 3.0
     with pytest.raises(ZapitConfigError, match="maxTrialSeconds"):

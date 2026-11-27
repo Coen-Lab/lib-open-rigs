@@ -404,25 +404,25 @@ namespace OpenRigs.Zapit.Tests
 
         static int[] Values(IplImage image) => Enumerable.Range(0, image.Width).Select(i => (int)image[0, i].Val0).ToArray();
 
-        // Mono12 as Bonsai.Pylon gives it (16-bit, raw 0-4095 counts): session frames stretched darkest to 0, brightest to
-        // 255 (MATLAB's mat2gray; B2's dim view peaks near 46); a grid run's frames are Mono8's scale, counts over 16.
+        // Mono12 as Bonsai.Pylon gives it (16-bit, raw 0-4095 counts): session frames stretched 0 to the top to 255
+        // (B2's dim view peaks near 46); a grid run's frames are Mono8's scale, counts over 16.
         [TestMethod]
         public void Mono12FramesAreStretchedMinToMaxAndAGridRunsOver16()
         {
             var dim = Row(IplDepth.U16, 10, 11, 28, 46);
-            var session = ZapitFrameDepth.ToEightBit(dim, mono8Scale: false);
+            var session = ZapitFrameDepth.ToEightBit(dim, mono8Scale: false, top: 46);
             Assert.AreEqual(IplDepth.U8, session.Depth);
             Assert.AreEqual(1, session.Channels);
-            CollectionAssert.AreEqual(new[] { 0, 7, 128, 255 }, Values(session));
-            CollectionAssert.AreEqual(new[] { 7, 7 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 7, 7), false)));
+            CollectionAssert.AreEqual(new[] { 55, 61, 155, 255 }, Values(session));
+            CollectionAssert.AreEqual(new[] { 7, 7 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 7, 7), false, 0)));
             var mono12 = Row(IplDepth.U16, 0, 1, 2, 45, 46, 255, 256, 4095);
-            var grid = ZapitFrameDepth.ToEightBit(mono12, mono8Scale: true);
+            var grid = ZapitFrameDepth.ToEightBit(mono12, mono8Scale: true, top: 0);
             Assert.AreEqual(IplDepth.U8, grid.Depth);
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 3, 3, 16, 16, 255 }, Values(grid));
         }
 
         // The stretch's top is the frame averaged 8 x 8 at its WhitePercentile: one hot pixel (4000 in a field of 40) is
-        // above it and leaves it at 40 (Pip, 27 Nov 2026: the view brightened and dimmed with single pixels).
+        // above it and leaves it at 40 (27 Nov 2026: the view brightened and dimmed with single pixels).
         [TestMethod]
         public void StretchTopIsAPercentileOfTheFrameAveragedEightByEight()
         {
@@ -435,7 +435,17 @@ namespace OpenRigs.Zapit.Tests
             CollectionAssert.AreEqual(new[] { 255 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 4000), false, top)));
         }
 
-        // The display and the measurement split (Pip, 27 Nov 2026): a grid run's shown frame is the stretched picture, cut to
+        // A near-dark frame (lights off, 1 to 5 counts) has its top held at MinTop, so it is not stretched to noise.
+        [TestMethod]
+        public void StretchTopHasAFloorSoADarkFrameIsNotAmplified()
+        {
+            var frame = new IplImage(new Size(64, 64), IplDepth.U16, 1);
+            frame.Set(new Scalar(3));
+            Assert.AreEqual(ZapitFrameDepth.MinTop, ZapitFrameDepth.StretchTop(frame), 0.01);
+            CollectionAssert.AreEqual(new[] { 48 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 3), false, ZapitFrameDepth.StretchTop(frame))));   // 3 of 16, not 255
+        }
+
+        // The display and the measurement split (27 Nov 2026): a grid run's shown frame is the stretched picture, cut to
         // the crop, while its still stays whole at Mono8's scale for the spot detection; outside a grid run the still is
         // the stretched picture, whole.
         [TestMethod]
@@ -445,36 +455,62 @@ namespace OpenRigs.Zapit.Tests
             frame.Set(new Scalar(48));
             frame[20, 30] = new Scalar(1600);   // the beam
             var crop = new Rect(16, 8, 32, 24);
-            ZapitPylonCapture.Split(frame, true, crop, out var shown, out var still);
+            ZapitPylonCapture.Split(frame, true, crop, out var shown, out var still, out _);
             Assert.AreEqual(new Size(32, 24), shown!.Size);
             Assert.AreEqual(255, (int)shown[20 - 8, 30 - 16].Val0);   // stretched: the beam white
             Assert.AreEqual(255, (int)shown[0, 0].Val0);               // and the skull's 48 at the stretch's top
             Assert.AreEqual(new Size(64, 48), still!.Size);
             Assert.AreEqual(100, (int)still[20, 30].Val0);             // counts over 16
             Assert.AreEqual(3, (int)still[0, 0].Val0);
-            ZapitPylonCapture.Split(frame, false, default, out shown, out still);
+            ZapitPylonCapture.Split(frame, false, default, out shown, out still, out _);
             Assert.AreEqual(new Size(64, 48), shown!.Size);
             Assert.AreSame(shown, still);
             var mono8 = new IplImage(new Size(64, 48), IplDepth.U8, 1);
-            ZapitPylonCapture.Split(mono8, true, crop, out shown, out still);
+            ZapitPylonCapture.Split(mono8, true, crop, out shown, out still, out _);
             Assert.AreSame(mono8, still);
             Assert.AreEqual(new Size(32, 24), shown!.Size);
         }
 
-        // A crop is kept inside the frame with an even size (an mp4's frame must be); none, or one leaving nothing, is the
-        // frame itself.
+        // A crop is cut exactly as asked; none, or the whole frame, is the frame itself; one that does not fit the frame
+        // is refused with its reason and the frame returned whole, never clamped.
         [TestMethod]
-        public void ACropStaysInsideTheFrameEven()
+        public void ACropFitsInsideTheFrameElseIsRefused()
         {
             var frame = new IplImage(new Size(100, 60), IplDepth.U8, 1);
             frame.Set(new Scalar(0));
             frame[30, 50] = new Scalar(9);
-            Assert.AreSame(frame, ZapitFrameDepth.Crop(frame, default));
-            Assert.AreSame(frame, ZapitFrameDepth.Crop(frame, new Rect(0, 0, 100, 60)));
-            var cut = ZapitFrameDepth.Crop(frame, new Rect(40, 20, 21, 17));
+            Assert.AreSame(frame, ZapitFrameDepth.Crop(frame, default, out var refusal));
+            Assert.IsNull(refusal);
+            Assert.AreSame(frame, ZapitFrameDepth.Crop(frame, new Rect(0, 0, 100, 60), out refusal));
+            Assert.IsNull(refusal);
+            var cut = ZapitFrameDepth.Crop(frame, new Rect(40, 20, 20, 16), out refusal);
+            Assert.IsNull(refusal);
             Assert.AreEqual(new Size(20, 16), cut.Size);
             Assert.AreEqual(9, (int)cut[10, 10].Val0);
-            Assert.AreEqual(new Size(30, 20), ZapitFrameDepth.Crop(frame, new Rect(70, 40, 64, 48)).Size);   // the frame's edge
+            Assert.AreEqual(new Size(30, 20), ZapitFrameDepth.Crop(frame, new Rect(70, 40, 30, 20), out refusal).Size);   // to the frame's edge
+            Assert.IsNull(refusal);
+            foreach (var bad in new[] { new Rect(3000, 2000, 800, 600), new Rect(70, 40, 64, 48), new Rect(-2, 0, 20, 20), new Rect(0, 0, 102, 60), new Rect(0, 0, 100, 62) })
+            {
+                Assert.AreSame(frame, ZapitFrameDepth.Crop(frame, bad, out refusal), bad.ToString());
+                StringAssert.Contains(refusal, "100 x 60");
+            }
+        }
+
+        // The camera learns the frame's size from its first frame: a crop outside it comes back on that frame as a
+        // CropRefusal, and ZapitCropRefusal reports it as Refused for the metric Zapit-Main.Crop.
+        [TestMethod]
+        public void ACropOutsideTheFrameIsReportedRefused()
+        {
+            var frame = new IplImage(new Size(64, 48), IplDepth.U8, 1);
+            var shown = ZapitFrameDepth.Crop(frame, new Rect(3000, 2000, 800, 600), out var refusal);
+            Assert.AreSame(frame, shown);
+            Assert.IsNotNull(refusal);
+            var steps = new System.Collections.Generic.List<ZapitSetupStep>();
+            new ZapitCropRefusal().Process(System.Reactive.Linq.Observable.Return(refusal!)).Subscribe(steps.Add);
+            Assert.AreEqual(1, steps.Count);
+            Assert.IsTrue(steps[0].ToString().StartsWith("Refused "), steps[0].ToString());
+            new ZapitCropRefusal().Process(System.Reactive.Linq.Observable.Return<string>(null!)).Subscribe(steps.Add);
+            Assert.AreEqual(1, steps.Count);
         }
 
         // Zapit-Main.Crop's args: x,y,w,h in pixels, or "" / full for the whole frame; anything else refused, not fatal.
@@ -506,8 +542,8 @@ namespace OpenRigs.Zapit.Tests
         public void Mono8FramesPassThroughUnchanged()
         {
             var mono8 = Row(IplDepth.U8, 0, 3, 200, 255);
-            Assert.AreSame(mono8, ZapitFrameDepth.ToEightBit(mono8, mono8Scale: false));
-            Assert.AreSame(mono8, ZapitFrameDepth.ToEightBit(mono8, mono8Scale: true));
+            Assert.AreSame(mono8, ZapitFrameDepth.ToEightBit(mono8, mono8Scale: false, top: 0));
+            Assert.AreSame(mono8, ZapitFrameDepth.ToEightBit(mono8, mono8Scale: true, top: 0));
             CollectionAssert.AreEqual(new[] { 0, 3, 200, 255 }, Values(mono8));
         }
 
@@ -516,7 +552,7 @@ namespace OpenRigs.Zapit.Tests
         public void AFrameNeitherMono8NorMono12IsRefusedNamingPixelFormat()
         {
             var colour = new IplImage(new Size(2, 1), IplDepth.U16, 3);
-            var error = Assert.ThrowsException<InvalidOperationException>(() => ZapitFrameDepth.ToEightBit(colour, false));
+            var error = Assert.ThrowsException<InvalidOperationException>(() => ZapitFrameDepth.ToEightBit(colour, false, 0));
             StringAssert.Contains(error.Message, "PixelFormat");
         }
 

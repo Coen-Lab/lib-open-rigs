@@ -315,7 +315,7 @@ def _combination(iti=2.5, to_window=0.5, window=2.0, lead=0.1):
 
 
 def test_zapit_trial_seconds_is_the_shortest_trigger_to_trigger_less_the_ramp_down_and_arm_time():
-    # Pip, 27 Nov 2026: ZapitDaq's buffer from the standard blocks, OptoLimits' rule (decision-making's _between_trials).
+    # 27 Nov 2026: ZapitDaq's buffer from the standard blocks, OptoLimits' rule (decision-making's _between_trials).
     from open_rigs.core.task import zapit_trial_seconds
     # decision-making's own file: 0.1 + 2.5 + (2.5 - 0.1) = 5 s trigger to trigger, less 0.25 s ramp-down and 0.2 s arm time
     assert zapit_trial_seconds([_combination()], 0.25) == (pytest.approx(4.55), "")
@@ -352,7 +352,7 @@ def test_zapit_trial_seconds_says_why_a_session_cannot_run():
 
 
 def test_zapit_does_not_allow_a_laser_that_runs_until_stopped():
-    # Pip, 27 Nov 2026: no laserDurationSeconds and no laserCapSeconds (null, absent or 0) is refused, naming the stage row.
+    # 27 Nov 2026: no laserDurationSeconds and no laserCapSeconds (null, absent or 0) is refused, naming the stage row.
     from open_rigs.core.task import zapit_open_ended_laser
     assert zapit_open_ended_laser([_combination()]) == ""
     assert zapit_open_ended_laser([{"optogenetics": {"laserDurationSeconds": 0, "laserCapSeconds": 2.0}}]) == ""  # a cap bounds it
