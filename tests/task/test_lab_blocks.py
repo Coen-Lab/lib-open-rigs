@@ -349,3 +349,15 @@ def test_zapit_trial_seconds_says_why_a_session_cannot_run():
     assert "trialStructure.itiMinSeconds is None" in zapit_trial_seconds([_combination(iti=None)], 0.25)[1]
     assert "laserToStimulusSeconds is True" in zapit_trial_seconds([_combination(lead=True)], 0.25)[1]
     assert "no trial combination" in zapit_trial_seconds([], 0.25)[1]
+
+
+def test_zapit_does_not_allow_a_laser_that_runs_until_stopped():
+    # Pip, 27 Nov 2026: no laserDurationSeconds and no laserCapSeconds (null, absent or 0) is refused, naming the stage row.
+    from open_rigs.core.task import zapit_open_ended_laser
+    assert zapit_open_ended_laser([_combination()]) == ""
+    assert zapit_open_ended_laser([{"optogenetics": {"laserDurationSeconds": 0, "laserCapSeconds": 2.0}}]) == ""  # a cap bounds it
+    for blank in ({}, {"laserDurationSeconds": None}, {"laserDurationSeconds": 0, "laserCapSeconds": 0}):
+        assert zapit_open_ended_laser([_combination(), {"label": "S2", "optogenetics": blank}]) == (
+            "Zapit Needs a Laser Duration: optogenetics.laserDurationSeconds Is Not Set in Stage S2")
+    assert zapit_open_ended_laser([{"optogenetics": {}}]).endswith("in the Task's Own Parameters")
+    assert zapit_open_ended_laser([{"optogenetics": {"enabled": False}}]) == ""  # optogenetics off asks nothing

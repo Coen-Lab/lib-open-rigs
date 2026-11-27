@@ -358,6 +358,24 @@ def zapit_trial_seconds(combinations, ramp_down_seconds: float) -> tuple[float, 
     return seconds, ""
 
 
+def zapit_open_ended_laser(combinations) -> str:
+    """Why Zapit cannot run a session that may draw any of `combinations` (as zapit_trial_seconds takes them), "" when it
+    can: a combination whose laser runs until stopped, with no laserDurationSeconds and no laserCapSeconds above 0 (null,
+    absent or 0 mean none: OpenRigs.Trials TrialRules, "0 with no cap (until stopped, at most maxTrialSeconds)"), which
+    Zapit does not allow. A combination with optogenetics off is not asked. Names the field and the stage row
+    (its `label`; the task's own without one)."""
+    for combination in combinations:
+        opto = (combination or {}).get("optogenetics") or {}
+        if opto.get("enabled") is False:
+            continue
+        values = (opto.get("laserDurationSeconds"), opto.get("laserCapSeconds"))
+        if not any(isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 for v in values):
+            label = (combination or {}).get("label")
+            where = f" in Stage {label}" if label else " in the Task's Own Parameters"
+            return f"Zapit Needs a Laser Duration: optogenetics.laserDurationSeconds Is Not Set{where}"
+    return ""
+
+
 # The lab's sound levels, in dBFS RMS: the RMS of a sound over its samples outside silent stretches (a silent stretch a
 # run of exactly-zero samples at least 1 ms long), as the task gives it (before the speaker's equalisation), against full
 # scale (OpenRigs.Audio SoundLevel, the same numbers and rule). Defaults only: each task file states its own; they become
