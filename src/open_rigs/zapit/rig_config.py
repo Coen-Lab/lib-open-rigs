@@ -18,8 +18,12 @@ from open_rigs.zapit.laser import LaserCalibration
 
 _REQUIRED = ("device", "galvoXChannel", "galvoYChannel", "laserChannel", "ledChannel", "photodiodeChannel",
              "triggerChannel", "sampleRate", "laserMinMaxMw", "laserMinMaxControlVolts", "ceilingMw",
-             "maxTrialSeconds", "micronsPerPixel", "voltsPerPixel", "camera")
-_OPTIONAL = ("invertXScanner", "invertYScanner", "blankingTimesMs")
+             "micronsPerPixel", "voltsPerPixel", "camera")
+# maxTrialSeconds is retired (Pip, 27 Nov 2026: "It should just be calculated by the time available from laser onset
+# until the next laser onset in the shortest possible trial"): a ZapitDaq trial's buffer comes from the task's timing
+# (open_rigs.components.zapit zapit_trial_seconds). An older rig.yml's is still read, and still caps the buffer of a
+# workflow that sizes ZapitDaq from rig.yml.
+_OPTIONAL = ("invertXScanner", "invertYScanner", "blankingTimesMs", "maxTrialSeconds")
 _LEGACY = ("host", "port", "hardwareTriggered")
 MATLAB_BLANKING_MS = (0.3, -0.12, 0.25)
 _CAMERA = ("serialNumber", "sessionPfsPath", "calibrationPfsPath")
@@ -49,7 +53,7 @@ class ZapitRig:
     laser_min_max_mw: tuple[float, float]
     laser_min_max_control_volts: tuple[float, float]
     ceiling_mw: float               # caps every volts value handed out (not the laser-curve staircase); 0 = laser disabled
-    max_trial_seconds: float        # a task's LaserCapSeconds above this is refused at Go
+    max_trial_seconds: float | None  # retired (_OPTIONAL): an older rig.yml's buffer cap, None without one
     microns_per_pixel: float
     volts_per_pixel: float
     camera: ZapitCamera
@@ -110,7 +114,8 @@ class ZapitRig:
         mw, cv = pair("laserMinMaxMw"), pair("laserMinMaxControlVolts")
         rig = cls(text("device"), text("galvoXChannel"), text("galvoYChannel"), text("laserChannel"),
                   text("ledChannel"), text("photodiodeChannel"), text("triggerChannel"), num("sampleRate"), mw, cv,
-                  num("ceilingMw", positive=False), num("maxTrialSeconds"),
+                  num("ceilingMw", positive=False),
+                  num("maxTrialSeconds") if b.get("maxTrialSeconds") is not None else None,
                   num("micronsPerPixel"), num("voltsPerPixel"), camera, flag("invertXScanner"),
                   flag("invertYScanner"), blanking)
         return rig

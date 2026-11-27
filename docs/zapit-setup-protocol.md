@@ -50,7 +50,7 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 4. **Accuracy.** The same steps, in an `Accuracy_<DT>` folder (`measure_accuracy_run`).
 
    With `ceilingMw` 0 (laser disabled) there is no beam: the agent sends no grid, takes the nominal scanner mapping as the fit and has no accuracy.
-5. **Sample.** The agent registers the still against the mouse's last reference, or asks for bregma and lambda clicks.
+5. **Sample.** The agent registers the still against the mouse's last reference, or asks for two clicks: bregma, then the midline point the agent names (atlas AP -3 mm, MATLAB Zapit's refAP point; they set the atlas-to-still conversion, so the 3 mm is atlas mm scaled to the mouse).
 6. **Bank.** The agent builds the bank into `pending\` and checks it with open_rigs.zapit's `read_bank`. It then sends `Zapit-Main.LoadBank <json>`, and the workflow reports `Loading <json>`. ZapitDaq reads the bank and checks the `.bin` hash, the sample rate and the ±10 V range, then reports `BankLoaded <json>`. The loaded bank is also published on `Zapit.Bank`.
 7. **Go.** Readiness requires all of the following:
    - the metric reads `BankLoaded` with the bank the agent built;

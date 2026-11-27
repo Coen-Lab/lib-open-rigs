@@ -178,3 +178,49 @@ def test_the_validation_s_context_reaches_each_combination_and_between_trials():
     Timed.model_validate(task(set={"contrasts": [0.5, 1.0]}), context={"ramp": 0.4})
     assert set(seen[:-1]) == {0.4} and seen[-1] == ("between", {"ramp": 0.4})
     Params.model_validate(task(), context={})  # a hook with no context argument, validated with none
+
+
+class ZapitBonsaiOpto(Opto):
+    zapit_bonsai: bool = False
+
+
+class Gapped(Params):
+    """A task whose trigger to next trigger is its delaySeconds plus 3 s (decision-making's is its lead plus the trial's
+    end plus the interval less the lead)."""
+
+    optogenetics: ZapitBonsaiOpto = ZapitBonsaiOpto()
+
+    @classmethod
+    def trigger_gap_seconds(cls, tasks):
+        return min(t["delaySeconds"] for t in tasks) + 3.0
+
+
+def gapped(zapit_bonsai=True, **top):
+    return {**top, "optogenetics": {"zapitBonsai": zapit_bonsai},
+            "trialConditions": [{"weight": 1, "set": {"delaySeconds": 2.0}}, {"weight": 1, "set": {"delaySeconds": 1.5}},
+                                {"weight": 0, "set": {"delaySeconds": 0.1}}]}
+
+
+def test_check_task_answers_zapitdaq_s_trial_buffer_from_the_task_s_shortest_trigger_gap():
+    # Pip, 27 Nov 2026: maxTrialSeconds is "calculated by the time available from laser onset until the next laser
+    # onset in the shortest possible trial", not set by hand in rig.yml: the shortest weighted combination's gap (1.5 + 3 s;
+    # the weight-0 condition never runs) less the 0.05 s free margin and the 0.2 s arm time.
+    from open_rigs.components.zapit import ZAPIT_ARM_SECONDS, ZAPIT_FREE_MARGIN_SECONDS, zapit_trial_seconds
+    from open_rigs.rigs import check_task
+
+    said = check_task.answer(Gapped, gapped())
+    assert said == {"problems": [], check_task.TRIAL_SECONDS: pytest.approx(4.5 - ZAPIT_FREE_MARGIN_SECONDS - ZAPIT_ARM_SECONDS)}
+    assert said[check_task.TRIAL_SECONDS] == pytest.approx(4.25)
+    assert zapit_trial_seconds(0.1) == 0.0  # nothing fits
+    # None without Zapit-Bonsai (no ZapitDaq; MATLAB Zapit's buffer is its own), from a task that gives no gap (the
+    # hook's default), or for values the model refuses: the launcher keeps rig.yml's maxTrialSeconds then.
+    assert check_task.answer(Gapped, gapped(zapit_bonsai=False)) == {"problems": []}
+    plain = {k: v for k, v in gapped().items() if k != "optogenetics"}
+    assert check_task.answer(Params, plain) == {"problems": []}
+    refused = check_task.answer(Gapped, {**gapped(), "trialConditions": [{"weight": 1, "set": {"delaySeconds": 9}}]})
+    assert refused["problems"] and TRIAL not in refused  # between_trials: delay too long
+    # A check without `drawn` asks for nothing more (the older callers).
+    assert check_task.problems(Gapped, gapped()) == []
+
+
+TRIAL = "zapitTrialSeconds"

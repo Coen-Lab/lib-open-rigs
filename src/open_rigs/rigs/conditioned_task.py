@@ -37,6 +37,9 @@ SoundAzimuth = Annotated[Double | Literal["all"], WithJsonSchema({"oneOf": [{"ty
 SIDELESS = [0, ALL_SPEAKERS]  # sound azimuths with no side
 MAX_WEIGHT = 1_000_000  # the most one condition's weight may be (OpenRigs.Trials TrialConditions.MaxWeight)
 MAX_WEIGHT_SUM = 2147483647  # the most the weights may add to: the draw sums them as an int (int.MaxValue)
+# The validation context key under which a caller hands an empty list for the weighted combinations, which _conditions_run
+# fills once they pass (open_rigs.rigs.check_task reads trigger_gap_seconds from them).
+DRAWN_CONTEXT = "drawn_combinations"
 
 # The session fields every conditioned task has (x-session-fields; a task adds its own): only what really cannot change per
 # trial, so a condition may not set it (the path or any path under it). Everything else is condition-level, logged per trial
@@ -210,6 +213,14 @@ class ConditionedTask(TaskBlock):
         ValueError on a break. None by default. `context`, the validation's (a Zapit file's ramp-down, RAMP_DOWN_CONTEXT;
         ramp_down_from reads it), is always passed, None without one."""
 
+    @classmethod
+    def trigger_gap_seconds(cls, tasks: list[dict]) -> float | None:
+        """The shortest time from one trial's laser trigger to the next's across the weighted combinations' values (by alias,
+        as JSON), in seconds: the task's own timing, the one its between_trials checks the laser against. ZapitDaq's trial
+        buffer is it less the free margin and the arm time (open_rigs.components.zapit zapit_trial_seconds). None by
+        default: a task that does not give it keeps rig.yml's older maxTrialSeconds."""
+        return None
+
     def derive_trial_type(self, condition: TrialCondition) -> str:
         """A condition's trialType from its settings (its set over the task's), by TRIAL_TYPES (x-trial-types)."""
         return conditions.derive_trial_type(list(self.TRIAL_TYPES), self.model_dump(by_alias=True, mode="json"), condition.set, condition.pairs)  # type: ignore[attr-defined]
@@ -260,6 +271,8 @@ class ConditionedTask(TaskBlock):
         if problems := conditions.required_problems(list(self.REQUIRED_CONDITIONS), base, drawn):
             raise ValueError("; ".join(f"{problem} (x-required-conditions)" for problem in problems))
         self.between_trials(drawn, context=info.context)
+        if isinstance(found := (info.context or {}).get(DRAWN_CONTEXT), list):
+            found[:] = drawn
         return self
 
     def _combinations(self, base: dict, condition: TrialCondition, where: str, context: dict) -> list[dict]:

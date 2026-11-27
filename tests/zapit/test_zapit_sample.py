@@ -10,6 +10,7 @@ from open_rigs.zapit.bank import sample_hash
 from open_rigs.zapit.scanner import ScannerSettings
 
 SETTINGS = ScannerSettings(microns_per_pixel=12.0, volts_per_pixel=0.0015, image_size=(800, 600))
+AP = -3.0  # the second point's atlas AP, 3 mm posterior, as app-rig-control's SECOND_POINT_AP_MM gives it (MATLAB's refAP)
 
 
 def skull(seed=0, size=(800, 600)):
@@ -38,18 +39,28 @@ def move(img, angle_deg, shift, scale=1.0):
 
 @pytest.fixture(scope="module")
 def reference():
-    return skull(), sm.sample_from_clicks([400, 300], [400, 180], SETTINGS)
+    return skull(), sm.sample_from_clicks([400, 300], [400, 180], SETTINGS, AP)
 
 
 def test_clicks_give_the_reference_points():
-    s = sm.sample_from_clicks([400, 300], [400, 180], SETTINGS)
+    s = sm.sample_from_clicks([400, 300], [400, 180], SETTINGS, AP)
     np.testing.assert_allclose(s.ref_sample_mm[0], [0, 0], atol=1e-9)    # bregma at the image centre
     np.testing.assert_allclose(s.ref_sample_mm[1], [0, -120 * 0.012], atol=1e-9)
-    assert s.ref_stereotaxic[1, 1] == sm.LAMBDA_AP_MM
+    np.testing.assert_array_equal(s.ref_stereotaxic, [[0, 0], [0, AP]])   # the caller's point, not lambda's -4.2
     assert len(sample_hash(s.ref_stereotaxic, s.ref_sample_mm)) == 64
     assert sm.Sample.from_dict(s.to_dict()).method == "clicks"
     with pytest.raises(ValueError):
-        sm.sample_from_clicks([5, 5], [5, 5], SETTINGS)
+        sm.sample_from_clicks([5, 5], [5, 5], SETTINGS, AP)
+
+
+def test_the_second_point_has_no_default_and_no_lambda():
+    """Pip, 27 Nov 2026: the second point is MATLAB Zapit's refAP midline point, given by the caller; lambda is gone."""
+    assert not hasattr(sm, "LAMBDA_AP_MM")
+    with pytest.raises(TypeError):
+        sm.sample_from_clicks([400, 300], [400, 180], SETTINGS)  # type: ignore[call-arg]
+    for bad in (0.0, float("nan")):
+        with pytest.raises(ValueError, match="second point's AP"):
+            sm.sample_from_clicks([400, 300], [400, 180], SETTINGS, bad)
 
 
 def test_the_mask_covers_the_head_not_the_background():
@@ -119,7 +130,7 @@ def test_a_real_dim_skull_registers_to_a_later_dimmer_rotated_still_of_itself():
     """Audit 24 Nov 2026: B2's still (mean grey 28) gave ORB 20 corners and never registered, even to itself; the
     contrast-equalised still registers a 4 degree turn, a shift, 15 % less light and noise."""
     ref = b2_still("still_skull_B2.png")
-    ref_sample = sm.sample_from_clicks((560, 300), (560, 720), B2)
+    ref_sample = sm.sample_from_clicks((560, 300), (560, 720), B2, AP)
     h, w = ref.shape
     m = cv2.getRotationMatrix2D((w / 2, h / 2), 4, 1.0)
     m[:, 2] += (25, -15)
@@ -133,14 +144,14 @@ def test_a_real_dim_skull_registers_to_a_later_dimmer_rotated_still_of_itself():
 
 
 def test_the_same_skull_off_centre_registers_as_a_shift():
-    reg = sm.register_sample(b2_still("still_skull_B2.png"), sm.sample_from_clicks((560, 300), (560, 720), B2),
+    reg = sm.register_sample(b2_still("still_skull_B2.png"), sm.sample_from_clicks((560, 300), (560, 720), B2, AP),
                              b2_still("still_skull_offcentre_B2.png"), B2)
     assert reg.passed, reg.reason
     assert reg.transform is not None
     assert abs(reg.scale - 1) < 0.02 and abs(reg.transform[1, 0]) < 0.01
 
 
-B2_CLICKS = ((560, 300), (560, 720))   # bregma, and lambda 420 px (8.1 mm) below it
+B2_CLICKS = ((560, 300), (560, 720))   # bregma, and a second point 420 px (8.1 mm) below it
 
 
 @pytest.mark.skipif(
@@ -150,9 +161,9 @@ B2_CLICKS = ((560, 300), (560, 720))   # bregma, and lambda 420 px (8.1 mm) belo
     "'Sample registration margin'.",
 )
 def test_the_real_pair_registers_both_ways_and_the_round_trip_lands_within_25_um():
-    """Audit E F3: the free similarity scale (1.019) put lambda 101 um off on the round trip; the rigid refit 19/14."""
+    """Audit E F3: the free similarity scale (1.019) put the second point 101 um off on the round trip; the rigid refit 19/14."""
     a, b = b2_still("still_skull_B2.png"), b2_still("still_skull_offcentre_B2.png")
-    clicks = sm.sample_from_clicks(*B2_CLICKS, B2)
+    clicks = sm.sample_from_clicks(*B2_CLICKS, B2, AP)
     ab, ba = sm.register_sample(a, clicks, b, B2), sm.register_sample(b, clicks, a, B2)
     assert ab.passed and ba.passed, (ab.reason, ba.reason)
     assert min(ab.correlation, ba.correlation) >= 0.85
@@ -192,7 +203,7 @@ def test_wrong_pairs_fail_both_ways(name):
     """Audit E's false positives: the skull turned 180 deg inside an unmoved plate passed with 362 inliers before
     the rotation limit."""
     ref, other = b2_still("still_skull_B2.png"), WRONG[name]()
-    clicks = sm.sample_from_clicks(*B2_CLICKS, B2)
+    clicks = sm.sample_from_clicks(*B2_CLICKS, B2, AP)
     for a, b in ((ref, other), (other, ref)):
         reg = sm.register_sample(a, clicks, b, B2)
         assert not reg.passed and reg.sample is None and reg.reason

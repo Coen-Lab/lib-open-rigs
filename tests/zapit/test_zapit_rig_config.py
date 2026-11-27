@@ -18,7 +18,7 @@ def test_a_full_block_reads():
     assert r.camera.serial_number == "40123456" and r.camera.session_pfs_path == "calibration/Zapit-Session.pfs"
 
 
-@pytest.mark.parametrize("key", [k for k in BLOCK if k not in ("invertXScanner",)])
+@pytest.mark.parametrize("key", [k for k in BLOCK if k not in ("invertXScanner", "maxTrialSeconds")])
 def test_a_missing_required_field_is_refused_by_name(key):
     b = {k: v for k, v in BLOCK.items() if k != key}
     with pytest.raises(ZapitConfigError, match=key):
@@ -63,3 +63,18 @@ def test_legacy_keys_are_ignored_and_new_keys_read():
 def test_bad_new_keys_are_refused(change):
     with pytest.raises(ZapitConfigError):
         ZapitRig.from_dict({**BLOCK, **change})
+
+
+def test_max_trial_seconds_is_retired_but_an_older_rig_yml_s_still_reads():
+    # Pip, 27 Nov 2026: ZapitDaq's trial buffer comes from the task's timing (zapit_trial_seconds), not rig.yml.
+    assert ZapitRig.from_dict({k: v for k, v in BLOCK.items() if k != "maxTrialSeconds"}).max_trial_seconds is None
+    assert ZapitRig.from_dict(BLOCK).max_trial_seconds == 3.0
+    with pytest.raises(ZapitConfigError, match="maxTrialSeconds"):
+        ZapitRig.from_dict({**BLOCK, "maxTrialSeconds": 0})
+
+
+def test_the_lab_rig_model_no_longer_needs_max_trial_seconds_with_the_daq_fields():
+    from open_rigs.components.zapit import Zapit
+    daq = {k: v for k, v in BLOCK.items() if k not in ("maxTrialSeconds", "invertXScanner")}
+    assert Zapit.model_validate(daq).max_trial_seconds is None
+    assert Zapit.model_validate(BLOCK).max_trial_seconds == 3.0
