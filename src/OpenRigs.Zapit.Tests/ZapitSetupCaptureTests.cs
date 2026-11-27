@@ -421,17 +421,17 @@ namespace OpenRigs.Zapit.Tests
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 3, 3, 16, 16, 255 }, Values(grid));
         }
 
-        // The stretch's top is the brightest of the frame averaged 8 x 8: one hot pixel (4000 in a field of 40) moves it
-        // by its 1/64 share, not to 4000 (Pip, 27 Nov 2026: the view brightened and dimmed with single pixels).
+        // The stretch's top is the frame averaged 8 x 8 at its WhitePercentile: one hot pixel (4000 in a field of 40) is
+        // above it and leaves it at 40 (Pip, 27 Nov 2026: the view brightened and dimmed with single pixels).
         [TestMethod]
-        public void StretchTopIsTheBrightestOfTheFrameAveragedEightByEight()
+        public void StretchTopIsAPercentileOfTheFrameAveragedEightByEight()
         {
             var frame = new IplImage(new Size(64, 64), IplDepth.U16, 1);
 
             frame.Set(new Scalar(40));
             frame[10, 10] = new Scalar(4000);
             var top = ZapitFrameDepth.StretchTop(frame);
-            Assert.AreEqual(40 + (4000 - 40) / 64.0, top, 0.01);
+            Assert.AreEqual(40, top, 0.01);   // the hot pixel's 8 x 8 cell is above the WhitePercentile
             CollectionAssert.AreEqual(new[] { 255 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 4000), false, top)));
         }
 

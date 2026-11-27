@@ -19,19 +19,25 @@ namespace OpenRigs.Zapit
         /// <summary>The 16-bit count that is Mono8's 1: a 12-bit count over 16.</summary>
         public const double Mono12PerMono8 = 16;
 
-        /// <summary>The 16-bit count a session frame's stretch puts at 255: the brightest of the frame averaged over 8 x 8
-        /// pixels, about what the live view shows, so one glint or noisy pixel no longer sets it (Pip, 27 Nov 2026: stretched
-        /// to each frame's single brightest pixel, B2's view brightened and dimmed frame to frame).</summary>
+        /// <summary>The share of the frame, averaged 8 x 8, at or below the stretch's white: the brightest 2.7 % (the head
+        /// bars, ring and glints) go white, so the skull sits near 80 of 255 (Pip, 27 Nov 2026, B2 at 30 ms; the brightest
+        /// 8 x 8 average put it near 24).</summary>
+        public const double WhitePercentile = 97.3;
+
+        /// <summary>The 16-bit count a session frame's stretch puts at 255: the frame averaged over 8 x 8 pixels, about what
+        /// the live view shows, at its WhitePercentile, so no glint or noisy pixel sets it (Pip, 27 Nov 2026: stretched to
+        /// each frame's single brightest pixel, B2's view brightened and dimmed frame to frame).</summary>
         public static double StretchTop(IplImage image)
         {
             var small = new IplImage(new Size(Math.Max(1, image.Width / 8), Math.Max(1, image.Height / 8)), IplDepth.F32, 1);
             var wide = new IplImage(image.Size, IplDepth.F32, 1);
             CV.Convert(image, wide);
             CV.Resize(wide, small, SubPixelInterpolation.Area);
-            double min, max;
-            Point minAt, maxAt;
-            CV.MinMaxLoc(small, out min, out max, out minAt, out maxAt);
-            return max;
+            var values = new float[small.Width * small.Height];
+            for (int y = 0; y < small.Height; y++)   // a row at a time: the indexer per pixel is too slow at 30 frames/s
+                System.Runtime.InteropServices.Marshal.Copy(small.ImageData + y * small.WidthStep, values, y * small.Width, small.Width);
+            Array.Sort(values);
+            return values[(int)Math.Round((values.Length - 1) * WhitePercentile / 100.0)];
         }
 
         /// <summary><paramref name="image"/> itself when it is already 8-bit; else (16-bit, one channel) a new 8-bit image:
