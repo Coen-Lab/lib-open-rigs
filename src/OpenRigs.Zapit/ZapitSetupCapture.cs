@@ -354,22 +354,27 @@ namespace OpenRigs.Zapit
     /// Zapit-Main.Crop's args as the Zapit camera's crop (the window and the mp4 cut to the brain, the
     /// agent's crop round the grid area): "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
     /// h even and from 16) is Stage Cropping with that crop on Camera; "" or "full" is Stage Cropping (Detail "Full Frame") with the
-    /// whole frame; anything else is Refused, saying why, with no Camera. Reported as the metric Zapit-Main.Crop. A taken
-    /// request is only Cropping (Detail x,y,w,h, or Full Frame), not yet answered: the frame's size is known only to the
-    /// camera, which answers from the first frame cut to the crop, Cropped, Full Frame or Refused (a crop outside the
-    /// frame is dropped, never clamped), through ZapitCropReport. Taken until Go only (ZapitSetup): the mp4
+    /// whole frame; anything else is a request with no crop (Camera.RejectReason). Reported as the metric Zapit-Main.Crop.
+    /// A taken request is only Cropping (Detail x,y,w,h, Full Frame, or the request's text), not yet answered: the camera
+    /// alone knows its frame's size and the crop in force, and answers from its next frame, Cropped, Full Frame or Refused
+    /// (a crop outside the frame is dropped, never clamped), each Refused saying which crop is now in force ("; Now Full
+    /// Frame" or "; Now Cropped x,y,w,h"), through ZapitCropReport. Taken until Go only (ZapitSetup): the mp4
     /// starts at Go, so its frame size never changes.
     /// </summary>
     [Combinator]
-    [Description("Zapit-Main.Crop's args (x,y,w,h in pixels of the camera's frame, or \"\" / full for the whole frame) as the Zapit camera's crop for the shown and recorded frame: Cropping (the crop on Camera; the camera answers) or Refused.")]
+    [Description("Zapit-Main.Crop's args (x,y,w,h in pixels of the camera's frame, or \"\" / full for the whole frame) as the Zapit camera's crop for the shown and recorded frame: Cropping (the crop, or why it is none, on Camera; the camera answers).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitCropRequest
     {
         /// <summary>The smallest crop side, in pixels.</summary>
         public const int LeastSide = 16;
 
-        /// <summary>Each request as a setup step: Cropping or Refused.</summary>
+        /// <summary>Each request as a Cropping step for the camera to answer.</summary>
         public IObservable<ZapitSetupStep> Process(IObservable<string> source) => source.Select(Parse);
+
+        /// <summary>A request that is no crop, as a step the camera answers (it alone knows the crop in force).</summary>
+        static ZapitSetupStep Rejected(string request, string reason) =>
+            new ZapitSetupStep { Stage = "Cropping", Detail = request, Camera = new ZapitCameraSettings { SetCrop = true, RejectReason = reason } };
 
         /// <summary>One request as a setup step (Process).</summary>
         public static ZapitSetupStep Parse(string request)
@@ -380,9 +385,9 @@ namespace OpenRigs.Zapit
             var parts = text.Split(',');
             var v = new int[4];
             if (parts.Length != 4 || Enumerable.Range(0, 4).Any(i => !int.TryParse(parts[i].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out v[i])))
-                return new ZapitSetupStep { Stage = "Refused", Detail = "a crop is x,y,w,h in whole pixels, or full: " + request };
+                return Rejected(text, "a crop is x,y,w,h in whole pixels, or full: " + request);
             if (v[0] < 0 || v[1] < 0 || v[2] < LeastSide || v[3] < LeastSide || v[2] % 2 != 0 || v[3] % 2 != 0)
-                return new ZapitSetupStep { Stage = "Refused", Detail = $"a crop's x and y are from 0, its w and h even and from {LeastSide}: " + request };
+                return Rejected(text, $"a crop's x and y are from 0, its w and h even and from {LeastSide}: " + request);
             var detail = string.Join(",", v.Select(n => n.ToString(CultureInfo.InvariantCulture)));
             return new ZapitSetupStep
             {

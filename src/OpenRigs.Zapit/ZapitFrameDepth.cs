@@ -88,25 +88,37 @@ namespace OpenRigs.Zapit
         readonly object gate = new object();
         Rect crop;
         bool pending;
+        string? rejection;
 
         /// <summary>A new crop (an empty one is the whole frame), to be answered by the next frame.</summary>
         public void Set(Rect request) { lock (gate) { crop = request; pending = true; } }
 
+        /// <summary>A request that was no crop: the crop in force stays, and the next frame answers Refused with it.</summary>
+        public void Reject(string reason) { lock (gate) { rejection = reason; pending = false; } }
+
         /// <summary>No crop and nothing to answer (the camera closed).</summary>
-        public void Reset() { lock (gate) { crop = default; pending = false; } }
+        public void Reset() { lock (gate) { crop = default; pending = false; rejection = null; } }
 
         /// <summary>The crop to cut the next frame to.</summary>
         public Rect Current { get { lock (gate) return crop; } }
 
         /// <summary>The answer for a frame cut to <paramref name="cut"/> (Current when it was taken), with its
-        /// <paramref name="refusal"/> or none: Refused (the crop dropped, once), Cropped or Full Frame for the first frame cut
-        /// to a new crop, else null. Null too when the crop changed since: the newer request is answered by its own frame.</summary>
+        /// <paramref name="refusal"/> or none: Refused (a crop outside the frame is dropped, once; a request that was no crop
+        /// is Rejected), each saying which crop is now in force (Now Full Frame, or Now Cropped x,y,w,h); Cropped or Full
+        /// Frame for the first frame cut to a new crop, else null. Null too when the crop changed since: the newer request is answered by its own frame.</summary>
         public ZapitSetupStep? Finish(Rect cut, string? refusal)
         {
             lock (gate)
             {
                 if (!crop.Equals(cut)) return null;
-                if (refusal != null) { crop = default; pending = false; return new ZapitSetupStep { Stage = "Refused", Detail = refusal }; }
+                if (refusal != null || rejection != null)
+                {
+                    var why = refusal ?? rejection;
+                    if (refusal != null) crop = default;   // never a clamped crop: the whole frame
+                    pending = false;
+                    rejection = null;
+                    return new ZapitSetupStep { Stage = "Refused", Detail = why + "; Now " + (crop.Width <= 0 ? "Full Frame" : $"Cropped {crop.X},{crop.Y},{crop.Width},{crop.Height}") };
+                }
                 if (!pending) return null;
                 pending = false;
                 return cut.Width <= 0 ? new ZapitSetupStep { Stage = "Full", Detail = "Frame" }

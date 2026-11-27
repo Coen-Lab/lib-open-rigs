@@ -26,6 +26,10 @@ namespace OpenRigs.Zapit
         /// and the mp4's picture only; the camera itself and the stills are left whole. A CropWidth of 0 is the whole frame.</summary>
         public bool SetCrop { get; set; }
 
+        /// <summary>With SetCrop, why the request was no crop (not x,y,w,h or full): the camera keeps its crop and answers Refused
+        /// from its next frame, saying which crop is in force. Null for a crop.</summary>
+        public string? RejectReason { get; set; }
+
         /// <summary>The crop's left edge, in pixels of the camera's frame.</summary>
         public int CropX { get; set; }
 
@@ -40,7 +44,7 @@ namespace OpenRigs.Zapit
 
         /// <summary>The settings as text, for the Zapit-Main.Setup metric's readers.</summary>
         public override string ToString() => SetCrop
-            ? (CropWidth > 0 ? $"crop {CropX},{CropY},{CropWidth},{CropHeight}" : "crop full frame")
+            ? (RejectReason != null ? "crop refused" : CropWidth > 0 ? $"crop {CropX},{CropY},{CropWidth},{CropHeight}" : "crop full frame")
             : Restore ? "restore" : $"exposure {ExposureUs} us, gain {GainDb} dB";
     }
 
@@ -203,6 +207,7 @@ namespace OpenRigs.Zapit
                         {
                             if (s.SetCrop)   // the shown frame only: from the next frame, whatever the camera does
                             {
+                                if (s.RejectReason != null) { crop.Reject(s.RejectReason); return; }
                                 crop.Set(s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default);
                                 return;
                             }

@@ -513,9 +513,21 @@ namespace OpenRigs.Zapit.Tests
             var off = new Rect(3000, 2000, 800, 600);
             state.Set(off);
             var step = state.Finish(off, ZapitFrameDepth.Refusal(frame.Size, off));
-            Assert.IsTrue(step!.ToString().StartsWith("Refused "), step.ToString());
+            StringAssert.StartsWith(step!.ToString(), "Refused the crop 3000,2000,800,600 does not fit");
+            StringAssert.EndsWith(step.ToString(), "; Now Full Frame");
             Assert.AreEqual(default(Rect), state.Current);   // reset once, to the whole frame
             Assert.IsNull(state.Finish(default, null));
+            // A request that was no crop keeps the crop in force and says so.
+            state.Set(fits);
+            state.Finish(fits, null);
+            state.Reject("a crop is x,y,w,h");
+            Assert.AreEqual("Refused a crop is x,y,w,h; Now Cropped 16,8,32,24", state.Finish(fits, null).ToString());
+            Assert.AreEqual(fits, state.Current);
+            Assert.IsNull(state.Finish(fits, null));   // once
+            state.Set(default);
+            state.Finish(default, null);
+            state.Reject("a crop is x,y,w,h");
+            Assert.AreEqual("Refused a crop is x,y,w,h; Now Full Frame", state.Finish(default, null).ToString());
         }
 
         // A frame cut to a crop that has changed since is not that crop's answer, and does not reset the newer crop.
@@ -555,8 +567,9 @@ namespace OpenRigs.Zapit.Tests
             foreach (var bad in new[] { "1,2,3", "a,b,c,d", "-2,0,64,48", "0,0,63,48", "0,0,8,8" })
             {
                 var step = ZapitCropRequest.Parse(bad);
-                Assert.AreEqual("Refused", step.Stage, bad);
-                Assert.IsNull(step.Camera, bad);
+                Assert.AreEqual("Cropping", step.Stage, bad);   // the camera alone knows the crop in force, and answers Refused
+                Assert.IsTrue(step.Camera!.SetCrop, bad);
+                Assert.IsNotNull(step.Camera.RejectReason, bad);
             }
         }
 
