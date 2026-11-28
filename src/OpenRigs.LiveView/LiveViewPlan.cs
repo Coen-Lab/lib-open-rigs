@@ -67,7 +67,9 @@ namespace OpenRigs.LiveView
         /// <summary>
         /// The member path to the first IplImage in the data, breadth first and at most three
         /// members deep (Value.Image for a camera's frame paired with its trigger), "it" if the
-        /// data is the image, or null if it holds none.
+        /// data is the image, or null if it holds none. At each level a member named View comes
+        /// before every other: the Zapit camera's frame streams its cropped View, not its Image
+        /// (recorded whole); any device type with a View member is streamed by it.
         /// </summary>
         public static string ImagePath(Type type)
         {

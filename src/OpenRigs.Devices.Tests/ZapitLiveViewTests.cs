@@ -27,8 +27,8 @@ namespace OpenRigs.Devices.Tests
             CollectionAssert.Contains(Streams(ZapitDaq), "Camera-Zapit.video");
         }
 
-        // The window and the mp4 get the shown frame, cropped and stretched (Image), never the whole frame the setup saves
-        // (Still): the live view takes a frame's first image, so Image must come first.
+        // The window gets the viewed frame, cropped and stretched (View); the mp4 records it whole (Image), never the frame
+        // the setup saves (Still): the live view takes a member named View before any other image.
         [TestMethod]
         public void TheZapitStreamIsTheShownImageNotTheStill()
         {

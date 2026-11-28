@@ -263,7 +263,7 @@ namespace OpenRigs.Zapit
     /// a grid run, when it is Mono8's scale (counts over 16) for the spot detection. A Mono8 .pfs's frames pass through
     /// (View cropped).
     /// </summary>
-    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs), each frame 8-bit (Mono12: stretched to the frame's StretchTop; Mono8 as it comes) as Image, cut to the crop, and whole as Still (a grid run's Mono12 frames at Mono8's scale, counts over 16, there). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), the camera's own put back (Restore), or the shown frame's crop (SetCrop).")]
+    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs), each frame 8-bit (Mono12: stretched to the frame's StretchTop; Mono8 as it comes) as View, cut to the crop (streamed), as Image, whole (recorded), and whole as Still (a grid run's Mono12 frames at Mono8's scale, counts over 16, there). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), the camera's own put back (Restore), or the shown frame's crop (SetCrop).")]
     public class ZapitPylonCapture : PylonCapture
     {
         readonly object cameraLock = new object();
