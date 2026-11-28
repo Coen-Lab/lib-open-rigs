@@ -53,8 +53,9 @@ namespace OpenRigs.Zapit
 
     /// <summary>
     /// One Zapit camera frame, three ways (a grid run's frames at Mono8's scale are nearly black in the window): View, what
-    /// the window streams, the session's stretched picture cut to the crop (ZapitFrameDepth.Crop), which is for viewing only,
-    /// so it can change before or after Go; Image, what the mp4 records, the same picture whole;
+    /// the window streams, the session's stretched picture cut to the crop (ZapitFrameDepth.Crop); Image, what the mp4
+    /// records, the same picture cut to the crop too when the crop is recorded (rig.yml's zapit.camera.recordCrop, the
+    /// default; the crop is then fixed from Go), else whole (the crop for viewing only, changed at any time);
     /// Still, what Zapit's setup saves (stills, a grid run's point and background frames), the whole frame, the stretched
     /// picture too except during a grid run, when it is Mono8's scale (counts / 16), which the spot detection's 90 %-of-peak
     /// threshold and 500 px size limit were tuned on. A Mono8 camera's frame is all three, as it comes (View cropped).
@@ -65,7 +66,7 @@ namespace OpenRigs.Zapit
         /// The live view takes it before Image (LiveViewPlan.ImagePath prefers a member named View).</summary>
         public OpenCV.Net.IplImage? View { get; set; }
 
-        /// <summary>The frame the mp4 records: as View, but whole, never cropped.</summary>
+        /// <summary>The frame the mp4 records: View itself when the crop is recorded (RecordCrop), else the same picture whole.</summary>
         public OpenCV.Net.IplImage? Image { get; set; }
 
         /// <summary>The whole frame Zapit's setup saves: a Mono12 frame stretched, or at Mono8's scale during a grid run; a Mono8 frame as it comes.</summary>
@@ -259,11 +260,11 @@ namespace OpenRigs.Zapit
     /// property; its Configure hands over the opened camera, kept here, and loads the .pfs (ZapitCameraOpening).
     /// Every frame is 8-bit (ZapitFrameDepth), given three ways (ZapitFrame): View, the streamed picture, a Mono12 frame
     /// stretched to its StretchTop always, cut to the crop the setup sent (SetCrop; the whole frame until one comes);
-    /// Image, the recorded picture, the same whole; Still, the whole frame Zapit's setup saves, stretched too except during
+    /// Image, the recorded picture, cut too when RecordCrop, else whole; Still, the whole frame Zapit's setup saves, stretched too except during
     /// a grid run, when it is Mono8's scale (counts over 16) for the spot detection. A Mono8 .pfs's frames pass through
     /// (View cropped).
     /// </summary>
-    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs), each frame 8-bit (Mono12: stretched to the frame's StretchTop; Mono8 as it comes) as View, cut to the crop (streamed), as Image, whole (recorded), and whole as Still (a grid run's Mono12 frames at Mono8's scale, counts over 16, there). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), the camera's own put back (Restore), or the shown frame's crop (SetCrop).")]
+    [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs), each frame 8-bit (Mono12: stretched to the frame's StretchTop; Mono8 as it comes) as View, cut to the crop (streamed), as Image (recorded: cut too when RecordCrop, else whole), and whole as Still (a grid run's Mono12 frames at Mono8's scale, counts over 16, there). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), the camera's own put back (Restore), or the shown frame's crop (SetCrop).")]
     public class ZapitPylonCapture : PylonCapture
     {
         readonly object cameraLock = new object();
@@ -273,6 +274,11 @@ namespace OpenRigs.Zapit
         readonly ZapitCameraOpening opening;
 
         public ZapitPylonCapture() => opening = new ZapitCameraOpening(() => SerialNumber, () => ParameterFile, file => ParameterFile = file);
+
+        /// <summary>Whether the crop cuts the recorded frame (Image) too: rig.yml's zapit.camera.recordCrop, true by default.
+        /// Then Zapit's setup takes crops until Go only, so the mp4 keeps one frame size; false, the crop cuts only View.</summary>
+        [Description("Whether the crop cuts the recorded frame too (rig.yml's zapit.camera.recordCrop; then fixed from Go), or only the live view.")]
+        public bool RecordCrop { get; set; } = true;
 
         /// <summary>Loads the .pfs into the opened camera (the base was handed none: ZapitCameraOpening) and keeps the camera for the settings.</summary>
         protected override void Configure(Camera camera)
@@ -287,7 +293,7 @@ namespace OpenRigs.Zapit
         public IObservable<ZapitFrame> Generate(IObservable<ZapitCameraSettings> settings) => Observable.Create<ZapitFrame>(observer =>
             new CompositeDisposable(
                 opening.Open(() => base.Generate())
-                    .Select(frame => ZapitFrameDepth.Frame(frame.Image, gridApplied, crop, frame.GrabResult?.ID ?? 0, frame.GrabResult?.Timestamp ?? 0))
+                    .Select(frame => ZapitFrameDepth.Frame(frame.Image, gridApplied, crop, frame.GrabResult?.ID ?? 0, frame.GrabResult?.Timestamp ?? 0, RecordCrop))
                     .Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; } crop.Reset(); }).Subscribe(observer),
                 settings.Subscribe(s =>
                 {

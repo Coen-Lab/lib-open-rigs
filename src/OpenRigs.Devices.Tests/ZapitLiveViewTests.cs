@@ -166,6 +166,9 @@ namespace OpenRigs.Devices.Tests
         /// <summary>Mapped from rig.yml's zapit.camera.sessionPfsPath.</summary>
         public string ParameterFile { get; set; }
 
+        /// <summary>Mapped from rig.yml's zapit.camera.recordCrop.</summary>
+        public bool RecordCrop { get; set; }
+
         /// <summary>No frames: the workflow is only built, with the grid's camera settings as its input as ZapitPylonCapture takes them.</summary>
         /// <param name="settings">Camera-Zapit.Settings.</param>
         /// <returns>A sequence that never produces a frame.</returns>

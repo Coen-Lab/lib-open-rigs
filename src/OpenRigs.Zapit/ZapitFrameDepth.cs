@@ -14,7 +14,7 @@ namespace OpenRigs.Zapit
     /// amplification only for a frame below about 0.4 % of full scale (lights off). A grid
     /// run's frames (its exposure and gain set) are scaled to Mono8's range (counts / 16), so the beam keeps the
     /// unsaturated peak the spot detection's 90 %-of-peak threshold and 500 px size limit were tuned on (a beam saturated
-    /// at 255 is a wide flat top). Crop cuts the viewed frame to a crop that fits inside it; the recorded frame stays whole.</para>
+    /// at 255 is a wide flat top). Crop cuts the viewed frame to a crop that fits inside it; the recorded frame too when the crop is recorded.</para>
     /// </summary>
     internal static class ZapitFrameDepth
     {
@@ -79,12 +79,13 @@ namespace OpenRigs.Zapit
 
         /// <summary>The Zapit camera's frame for a grab (ZapitPylonCapture's, or a test's): <paramref name="image"/> split
         /// (<paramref name="grid"/>: a grid run's exposure is on the camera) and cut to <paramref name="crop"/>'s crop, carrying
-        /// the crop's answer when this frame is the first cut to it.</summary>
-        public static ZapitFrame Frame(IplImage? image, bool grid, ZapitCropState crop, long frameId, long timestamp)
+        /// the crop's answer when this frame is the first cut to it. The recorded frame is the cropped one when
+        /// <paramref name="recordCrop"/> (rig.yml's zapit.camera.recordCrop), else whole.</summary>
+        public static ZapitFrame Frame(IplImage? image, bool grid, ZapitCropState crop, long frameId, long timestamp, bool recordCrop = true)
         {
             var cut = crop.Current;
             Split(image, grid, cut, out var shown, out var still, out var refusal, out var recorded);
-            return new ZapitFrame { View = shown, Image = recorded, Still = still, CropReports = crop.Finish(cut, refusal), FrameID = frameId, Timestamp = timestamp };
+            return new ZapitFrame { View = shown, Image = recordCrop ? shown : recorded, Still = still, CropReports = crop.Finish(cut, refusal), FrameID = frameId, Timestamp = timestamp };
         }
 
         /// <summary>Why <paramref name="crop"/> cannot be cut from a frame of <paramref name="frame"/>'s size, or null when it

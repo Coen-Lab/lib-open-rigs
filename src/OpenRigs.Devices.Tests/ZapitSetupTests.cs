@@ -76,12 +76,31 @@ namespace OpenRigs.Devices.Tests
                 var unnumbered = Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Refused ");
                 StringAssert.StartsWith(unnumbered, "Refused #0 a crop request is #<n> x,y,w,h");
                 StringAssert.EndsWith(unnumbered, "; Now Cropped 16,16,32,16");
-                // The crop is for viewing only (the mp4 stays whole), so it is taken after Go too.
-                Assert.IsTrue((bool)Ask(socket, new { cmd = "go" })["ok"], "Go refused");
-                Assert.AreEqual("Cropping #7 Full Frame", Command(socket, "Zapit-Main.Crop", "#7 full", "Zapit-Main.Crop", "Cropping"));
-                SimulatedZapitCamera.SendFrame();
-                Assert.AreEqual("Full Frame #7", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Full"));
             });
+        }
+
+        // rig.yml's zapit.camera.recordCrop: true (the default), the crop cuts the mp4 too, so none is taken after Go;
+        // false, the crop is for the live view only and is taken after Go too.
+        [TestMethod]
+        [Timeout(60000)]
+        public void ARecordedCropIsFixedFromGoAViewOnlyCropIsNot()
+        {
+            foreach (var recorded in new[] { true, false })
+            {
+                RunPiece((socket, bank) =>
+                {
+                    Command(socket, "Zapit-Main.Crop", "#1 16,16,32,16", "Zapit-Main.Crop", "Cropping");
+                    SimulatedZapitCamera.SendFrame();
+                    Assert.AreEqual("Cropped #1 16,16,32,16", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Cropped"));
+                    Assert.IsTrue((bool)Ask(socket, new { cmd = "go" })["ok"], "Go refused");
+                    Assert.IsTrue((bool)Ask(socket, new { cmd = "command", name = "Zapit-Main.Crop", args = "#2 full" })["ok"]);
+                    Thread.Sleep(300);
+                    SimulatedZapitCamera.SendFrame();
+                    Thread.Sleep(500);
+                    var metric = (string)Ask(socket, new { cmd = "status" })["metrics"]["Zapit-Main.Crop"];
+                    Assert.AreEqual(recorded ? "Cropped #1 16,16,32,16" : "Full Frame #2", metric, recorded ? "a recorded crop changed after Go" : "a view-only crop refused after Go");
+                }, "  camera:\n    serialNumber: '40123456'\n" + (recorded ? "" : "    recordCrop: false\n"));
+            }
         }
 
         // Play Condition's lines as ZapitSetup routes them (open_rigs.zapit.play relies on it): Trigger on raises the
@@ -151,11 +170,11 @@ namespace OpenRigs.Devices.Tests
 
         // The piece with CONFIG_ROOT and its controller on a free port, the bank loaded (BankLoaded the Setup metric), then
         // drive. A port found free can be taken before the controller binds it: then a new one, 3 tries.
-        static void RunPiece(Action<RequestSocket, string> drive)
+        static void RunPiece(Action<RequestSocket, string> drive, string camera = "")
         {
             for (var attempt = 1; ; attempt++)
             {
-                var error = RunPiece(TestPorts.Free(), drive);
+                var error = RunPiece(TestPorts.Free(), drive, camera);
                 if (attempt < 3 && TestPorts.Taken(error)) continue;
                 Assert.IsNull(error, error == null ? "" : error.ToString());
                 return;
@@ -163,13 +182,13 @@ namespace OpenRigs.Devices.Tests
         }
 
         // The workflow's error, or null.
-        static Exception RunPiece(int port, Action<RequestSocket, string> drive)
+        static Exception RunPiece(int port, Action<RequestSocket, string> drive, string camera)
         {
             var root = Path.Combine(Path.GetTempPath(), "ZapitSetupTests", Guid.NewGuid().ToString("N"));
             var pending = Path.Combine(root, Environment.MachineName, "pending");
             Directory.CreateDirectory(pending);
             File.WriteAllText(Path.Combine(root, Environment.MachineName, "rig.yml"), "rootPath: C:\\nowhere\nrigId: D1\nbehaviorBoard:\n  main:\n    portName: COM97\n" +
-                "zapit:\n  device: Dev1\n  ceilingMw: 30\n  maxTrialSeconds: 6\n  laserMinMaxControlVolts: [0.0, 5.0]\n");
+                "zapit:\n  device: Dev1\n  ceilingMw: 30\n  maxTrialSeconds: 6\n  laserMinMaxControlVolts: [0.0, 5.0]\n" + camera);
             var bank = Path.Combine(pending, "Settings_ZapitBank_T.json");
             File.Copy(Path.Combine(Folder, "Settings_ZapitBank_T.json"), bank);
             using (var input = new GZipStream(File.OpenRead(Path.Combine(Folder, "Settings_ZapitBank_T.bin.gz")), CompressionMode.Decompress))

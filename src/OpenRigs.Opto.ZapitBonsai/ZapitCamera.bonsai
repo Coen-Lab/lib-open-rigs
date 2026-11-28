@@ -8,7 +8,7 @@
                  xmlns:core="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The Zapit camera, Camera-Zapit, at ConnectForTaskZapitDaq's top level, opened only once ZapitRig (rig.yml's zapit block, on a rig whose zapit block names its NI device) has a value (the SelectMany Camera-Zapit): OpenRigs.Zapit's ZapitPylonCapture (Bonsai.Pylon's PylonCapture) with zapit.camera's serialNumber and its session settings file (sessionPfsPath, relative to rig.yml's folder: ResolveRigFile stops the workflow at start on a full path or no file), taking each Camera-Zapit.Settings from ZapitSetup: a grid run's exposure and gain (auto off) set while it grabs, the session's put back after the run, and the viewed frame's crop (Zapit-Main.Crop, before or after Go). Each frame (View, the stretched picture cut to the crop Camera-Zapit.Settings last set, which StreamDevices streams; Image, the same picture whole, which LogVideoFfmpeg records; Still, the whole frame, at Mono8's scale during a grid run, which ZapitSetup saves; and ChunkData of the grab's ID and camera timestamp, as FfmpegVideoWriter reads it) is stamped with the latest Harp time (WithLatestTimestamp) and published on Camera-Zapit.Data, here at the top level so the including workflow sees it: StreamDevices streams it as the camera Zapit and ZapitSetup saves stills from it. A SelectMany is a subject scope of its own, so a Camera-Zapit.Data published inside one reached no StreamDevices. In an optogenetics experiment, once the experiment folder exists (PathPrefix), the frames are recorded as Camera-Zapit (LogVideoFfmpeg) at the frequency of the board trigger whose wiring line names Camera-Zapit in targets (CameraTriggerLine: the workflow stops at start without exactly one). Needs ZapitRig, RigFile, Camera-Zapit.Settings, ConfigRoot, Timestamp, PathPrefix, Optogenetics, BehaviorBoard-Main and BehaviorBoard-Main.Data from the workflow.</Description>
+  <Description>The Zapit camera, Camera-Zapit, at ConnectForTaskZapitDaq's top level, opened only once ZapitRig (rig.yml's zapit block, on a rig whose zapit block names its NI device) has a value (the SelectMany Camera-Zapit): OpenRigs.Zapit's ZapitPylonCapture (Bonsai.Pylon's PylonCapture) with zapit.camera's serialNumber and its session settings file (sessionPfsPath, relative to rig.yml's folder: ResolveRigFile stops the workflow at start on a full path or no file), taking each Camera-Zapit.Settings from ZapitSetup: a grid run's exposure and gain (auto off) set while it grabs, the session's put back after the run, and the viewed frame's crop (Zapit-Main.Crop). Each frame (View, the stretched picture cut to the crop Camera-Zapit.Settings last set, which StreamDevices streams; Image, which LogVideoFfmpeg records: View itself when rig.yml's zapit.camera.recordCrop is true, the default (ZapitPylonCapture.RecordCrop), else the same picture whole; Still, the whole frame, at Mono8's scale during a grid run, which ZapitSetup saves; and ChunkData of the grab's ID and camera timestamp, as FfmpegVideoWriter reads it) is stamped with the latest Harp time (WithLatestTimestamp) and published on Camera-Zapit.Data, here at the top level so the including workflow sees it: StreamDevices streams it as the camera Zapit and ZapitSetup saves stills from it. A SelectMany is a subject scope of its own, so a Camera-Zapit.Data published inside one reached no StreamDevices. In an optogenetics experiment, once the experiment folder exists (PathPrefix), the frames are recorded as Camera-Zapit (LogVideoFfmpeg) at the frequency of the board trigger whose wiring line names Camera-Zapit in targets (CameraTriggerLine: the workflow stops at start without exactly one). Needs ZapitRig, RigFile, Camera-Zapit.Settings, ConfigRoot, Timestamp, PathPrefix, Optogenetics, BehaviorBoard-Main and BehaviorBoard-Main.Data from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="SubscribeSubject">
@@ -53,6 +53,7 @@
               <PropertyMappings>
                 <Property Name="SerialNumber" Selector="Item1" />
                 <Property Name="ParameterFile" Selector="Item2" />
+                <Property Name="RecordCrop" Selector="Item3" />
               </PropertyMappings>
             </Expression>
             <Expression xsi:type="Combinator">
@@ -127,6 +128,9 @@
             <Expression xsi:type="SubscribeSubject">
               <Name>Camera-Zapit.Settings</Name>
             </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Camera.RecordCrop</Selector>
+            </Expression>
           </Nodes>
           <Edges>
             <Edge From="1" To="2" Label="Source1" />
@@ -153,6 +157,8 @@
             <Edge From="19" To="23" Label="Source1" />
             <Edge From="20" To="23" Label="Source2" />
             <Edge From="22" To="23" Label="Source3" />
+            <Edge From="1" To="26" Label="Source1" />
+            <Edge From="26" To="8" Label="Source3" />
           </Edges>
         </Workflow>
       </Expression>

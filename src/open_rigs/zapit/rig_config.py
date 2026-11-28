@@ -24,6 +24,7 @@ _OPTIONAL = ("invertXScanner", "invertYScanner", "blankingTimesMs")
 _LEGACY = ("host", "port", "hardwareTriggered")
 MATLAB_BLANKING_MS = (0.3, -0.12, 0.25)
 _CAMERA = ("serialNumber", "sessionPfsPath", "calibrationPfsPath")
+_CAMERA_FLAGS = ("recordCrop",)
 
 
 class ZapitConfigError(ValueError):
@@ -35,6 +36,7 @@ class ZapitCamera:
     serial_number: str
     session_pfs_path: str = "calibration/Zapit-Session.pfs"          # relative to rig.yml's folder
     calibration_pfs_path: str = "calibration/Zapit-Calibration.pfs"
+    record_crop: bool = True        # the crop cuts the recording too, so it is fixed from Go; False: the live view only
 
 
 @dataclass(frozen=True)
@@ -103,12 +105,15 @@ class ZapitRig:
                 raise ZapitConfigError("zapit.blankingTimesMs must be three finite numbers, the first positive")
             blanking = (float(v[0]), float(v[1]), float(v[2]))
         c = b["camera"]
-        if not isinstance(c, dict) or set(c) - set(_CAMERA) or any(
+        if not isinstance(c, dict) or set(c) - set(_CAMERA + _CAMERA_FLAGS) or any(
                 not isinstance(c.get(k, "x"), str) or not c.get(k, "x").strip() for k in _CAMERA):
-            raise ZapitConfigError(f"zapit.camera must be a mapping of {', '.join(_CAMERA)} (non-empty text)")
+            raise ZapitConfigError(f"zapit.camera must be a mapping of {', '.join(_CAMERA)} (non-empty text) and recordCrop (true or false)")
+        if not isinstance(c.get("recordCrop", True), bool):
+            raise ZapitConfigError(f"zapit.camera.recordCrop must be true or false, not {c['recordCrop']!r}")
         if "serialNumber" not in c:
             raise ZapitConfigError("zapit.camera.serialNumber is missing")
-        camera = ZapitCamera(c["serialNumber"].strip(), *(c[k].strip() for k in _CAMERA[1:] if k in c))
+        camera = ZapitCamera(c["serialNumber"].strip(), *(c[k].strip() for k in _CAMERA[1:] if k in c),
+                             record_crop=c.get("recordCrop", True))
         mw, cv = pair("laserMinMaxMw"), pair("laserMinMaxControlVolts")
         rig = cls(text("device"), text("galvoXChannel"), text("galvoYChannel"), text("laserChannel"),
                   text("ledChannel"), text("photodiodeChannel"), text("triggerChannel"), num("sampleRate"), mw, cv,

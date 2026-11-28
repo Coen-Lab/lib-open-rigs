@@ -434,7 +434,7 @@ namespace OpenRigs.Zapit
     }
 
     /// <summary>
-    /// Zapit-Main.Crop's args as the Zapit camera's crop (the window, for viewing only, cut to the brain, the
+    /// Zapit-Main.Crop's args as the Zapit camera's crop (the window, and the mp4 when the crop is recorded, cut to the brain, the
     /// agent's crop round the grid area), each with its request number, "#n x,y,w,h" or "#n full" (n a whole number from 1),
     /// echoed in every answer so the agent matches answers to requests: "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
     /// h even and from 16) is Stage Cropping with that crop on Camera; "#n full" is Stage Cropping (Detail "#n Full Frame") with the
@@ -442,11 +442,11 @@ namespace OpenRigs.Zapit
     /// A taken request is only Cropping (Detail x,y,w,h, Full Frame, or the request's text), not yet answered: the camera
     /// alone knows its frame's size and the crop in force, and answers from its next frame, Cropped, Full Frame or Refused
     /// (a crop outside the frame is dropped, never clamped), each Refused saying which crop is now in force ("; Now Full
-    /// Frame" or "; Now Cropped x,y,w,h"), through ZapitCropReport. Taken before and after Go: it cuts only the
-    /// live view (ZapitFrame.View), never the mp4 (Image, whole), so the mp4's frame size never changes.
+    /// Frame" or "; Now Cropped x,y,w,h"), through ZapitCropReport. A recorded crop (rig.yml's zapit.camera.recordCrop,
+    /// the default) is taken until Go only (ZapitSetup), so the mp4's frame size never changes; a view-only one at any time.
     /// </summary>
     [Combinator]
-    [Description("Zapit-Main.Crop's args (#n x,y,w,h in pixels of the camera's frame, or #n full for the whole frame; n a whole number from 1) as the Zapit camera's crop for the viewed frame (the mp4 stays whole): Cropping (the crop, or why it is none, on Camera; the camera answers).")]
+    [Description("Zapit-Main.Crop's args (#n x,y,w,h in pixels of the camera's frame, or #n full for the whole frame; n a whole number from 1) as the Zapit camera's crop for the viewed frame (and the mp4's when recordCrop): Cropping (the crop, or why it is none, on Camera; the camera answers).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitCropRequest
     {

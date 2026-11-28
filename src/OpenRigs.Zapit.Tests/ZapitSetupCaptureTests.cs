@@ -590,6 +590,21 @@ namespace OpenRigs.Zapit.Tests
             CollectionAssert.AreEqual(new[] { 48 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 3), false, ZapitFrameDepth.StretchTop(frame))));   // 3 of 16, not 255
         }
 
+        // rig.yml's zapit.camera.recordCrop: the mp4's frame (Image) is the cropped View when the crop is recorded, else whole.
+        [TestMethod]
+        public void TheRecordedFrameIsCutOnlyWhenTheCropIsRecorded()
+        {
+            var frame = new IplImage(new Size(64, 48), IplDepth.U8, 1);
+            var state = new ZapitCropState();
+            state.Set(new Rect(16, 8, 32, 24), 1);
+            var recorded = ZapitFrameDepth.Frame(frame, false, state, 0, 0, recordCrop: true);
+            Assert.AreEqual(new Size(32, 24), recorded.View!.Size);
+            Assert.AreSame(recorded.View, recorded.Image, "a recorded crop: the mp4 gets the cropped frame");
+            var viewOnly = ZapitFrameDepth.Frame(frame, false, state, 0, 0, recordCrop: false);
+            Assert.AreEqual(new Size(32, 24), viewOnly.View!.Size);
+            Assert.AreEqual(new Size(64, 48), viewOnly.Image!.Size, "a view-only crop: the mp4 stays whole");
+        }
+
         // The display and the measurement split: a grid run's shown frame is the stretched picture, cut to
         // the crop, while its still stays whole at Mono8's scale for the spot detection; outside a grid run the still is
         // the stretched picture, whole.

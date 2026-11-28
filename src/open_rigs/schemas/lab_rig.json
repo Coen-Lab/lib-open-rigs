@@ -2050,6 +2050,12 @@
           "title": "CalibrationPfsPath",
           "type": "string",
           "x-rig-artefact": true
+        },
+        "recordCrop": {
+          "default": true,
+          "description": "Whether the crop (Zapit-Main.Crop) cuts the recording too: then it is fixed from Go. False: the crop cuts only the live view, the recording stays whole, and the crop can change at any time.",
+          "title": "RecordCrop",
+          "type": "boolean"
         }
       },
       "required": [

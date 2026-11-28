@@ -94,6 +94,10 @@ class ZapitCamera(BaseSchema):
         default="calibration/Zapit-Calibration.pfs",
         description="The calibration workflow's camera settings (fixed exposure, free running), relative to rig.yml's folder.",
     )
+    record_crop: bool = Field(
+        default=True,
+        description="Whether the crop (Zapit-Main.Crop) cuts the recording too: then it is fixed from Go. False: the crop cuts only the live view, the recording stays whole, and the crop can change at any time.",
+    )
 
 
 # The Zapit-Bonsai fields a block naming its NI device (zapit.device) must all give.

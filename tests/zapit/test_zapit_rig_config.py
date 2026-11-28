@@ -35,6 +35,14 @@ def test_bad_values_are_refused(change):
         ZapitRig.from_dict({**BLOCK, **change})
 
 
+def test_the_camera_records_its_crop_unless_record_crop_is_false():
+    assert ZapitRig.from_dict(BLOCK).camera.record_crop
+    off = ZapitRig.from_dict({**BLOCK, "camera": {"serialNumber": "1", "recordCrop": False}})
+    assert off.camera.record_crop is False and off.camera.session_pfs_path == "calibration/Zapit-Session.pfs"
+    with pytest.raises(ZapitConfigError, match="recordCrop must be true or false"):
+        ZapitRig.from_dict({**BLOCK, "camera": {"serialNumber": "1", "recordCrop": "no"}})
+
+
 def test_a_zero_ceiling_means_laser_disabled_and_reads():
     assert ZapitRig.from_dict({**BLOCK, "ceilingMw": 0}).ceiling_mw == 0.0
 

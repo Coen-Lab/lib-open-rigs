@@ -4886,10 +4886,13 @@ namespace OpenRigs.Devices.Rigs
     
         private string _calibrationPfsPath;
     
+        private bool _recordCrop;
+    
         public ZapitCamera()
         {
             _sessionPfsPath = "calibration/Zapit-Session.pfs";
             _calibrationPfsPath = "calibration/Zapit-Calibration.pfs";
+            _recordCrop = true;
         }
     
         protected ZapitCamera(ZapitCamera other)
@@ -4897,6 +4900,7 @@ namespace OpenRigs.Devices.Rigs
             _serialNumber = other._serialNumber;
             _sessionPfsPath = other._sessionPfsPath;
             _calibrationPfsPath = other._calibrationPfsPath;
+            _recordCrop = other._recordCrop;
         }
     
         /// <summary>
@@ -4955,6 +4959,26 @@ namespace OpenRigs.Devices.Rigs
             }
         }
     
+        /// <summary>
+        /// Whether the crop (Zapit-Main.Crop) cuts the recording too: then it is fixed from Go. False: the crop cuts only the live view, the recording stays whole, and the crop can change at any time.
+        /// </summary>
+        [Newtonsoft.Json.JsonPropertyAttribute("recordCrop")]
+        [YamlDotNet.Serialization.YamlMemberAttribute(Alias="recordCrop")]
+        [System.ComponentModel.DescriptionAttribute("Whether the crop (Zapit-Main.Crop) cuts the recording too: then it is fixed from " +
+            "Go. False: the crop cuts only the live view, the recording stays whole, and the " +
+            "crop can change at any time.")]
+        public bool RecordCrop
+        {
+            get
+            {
+                return _recordCrop;
+            }
+            set
+            {
+                _recordCrop = value;
+            }
+        }
+    
         public System.IObservable<ZapitCamera> Generate()
         {
             return System.Reactive.Linq.Observable.Defer(() => System.Reactive.Linq.Observable.Return(new ZapitCamera(this)));
@@ -4969,7 +4993,8 @@ namespace OpenRigs.Devices.Rigs
         {
             stringBuilder.Append("SerialNumber = " + _serialNumber + ", ");
             stringBuilder.Append("SessionPfsPath = " + _sessionPfsPath + ", ");
-            stringBuilder.Append("CalibrationPfsPath = " + _calibrationPfsPath);
+            stringBuilder.Append("CalibrationPfsPath = " + _calibrationPfsPath + ", ");
+            stringBuilder.Append("RecordCrop = " + _recordCrop);
             return true;
         }
     
