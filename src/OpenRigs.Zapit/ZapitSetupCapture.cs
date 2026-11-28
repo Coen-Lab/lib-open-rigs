@@ -72,6 +72,11 @@ namespace OpenRigs.Zapit
         /// refused Point never holds the run. Tests shorten it.</summary>
         internal TimeSpan FrameTimeout { get; set; } = TimeSpan.FromSeconds(2);
 
+        /// <summary>How long an aim holds the beam unless a new aim comes: then the lines are zeroed (Off), so a controller
+        /// that dies never leaves the laser on. The agent re-sends its aim every 1 s and turns off one unrenewed for 5 s
+        /// itself; this backstop is twice that. Tests shorten it.</summary>
+        internal TimeSpan AimTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
         sealed class Run
         {
             public string Folder = "";
@@ -113,7 +118,8 @@ namespace OpenRigs.Zapit
         /// to the same rules. A still with no frame within FrameTimeout is refused. When the aims end (Go), or at each Laser Off
         /// (laserOffs, Zapit-Main.LaserOff), a grid run or still in progress is refused and, as for a beam still aimed, the
         /// lines are zeroed; Laser Off with no step running still sends a Zero of its own (Aim "Off Laser Off"), and after it
-        /// no aim is held. An aim whose Point ZapitDaq refuses (a play armed) is reported Refused with ZapitDaq's reason.</summary>
+        /// no aim is held. An aim whose Point ZapitDaq refuses (a play armed) is reported Refused with ZapitDaq's reason. An aim
+        /// not renewed within AimTimeout is turned off (Off, the lines zeroed).</summary>
         public IObservable<ZapitSetupStep> Process(IObservable<string> gridRuns, IObservable<string> stills, IObservable<string> banks,
             IObservable<ZapitDaqEvent> events, IObservable<IplImage> frames, IObservable<string> aims, IObservable<string> laserOffs) => Observable.Create<ZapitSetupStep>(observer =>
         {
@@ -128,6 +134,26 @@ namespace OpenRigs.Zapit
             void Refuse(string why) => Emit(new ZapitSetupStep { Stage = "Refused", Detail = why });
             var watchdog = new SerialDisposable();
             var watch = 0;
+            var aimWatchdog = new SerialDisposable();
+            var aimWatch = 0;
+            void StopAiming()
+            {
+                aiming = false;
+                aimWatch++;
+                aimWatchdog.Disposable = Disposable.Empty;
+            }
+            void AimTimedOut(int id)
+            {
+                if (id != aimWatch || !aiming) return;
+                StopAiming();
+                Emit(new ZapitSetupStep
+                {
+                    Aim = true,
+                    Stage = "Off",
+                    Detail = string.Format(CultureInfo.InvariantCulture, "no aim for {0} s", AimTimeout.TotalSeconds),
+                    Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
+                });
+            }
             string? Inside(string path)
             {
                 string full;
@@ -207,7 +233,7 @@ namespace OpenRigs.Zapit
                     if (LaserProblem(r.LaserVolts) is string laser) throw new InvalidDataException(laser);
                     if (Directory.EnumerateFiles(folder!, "*.png").Any()) throw new InvalidDataException("the folder already holds frames");
                     run = r;
-                    aiming = false;
+                    StopAiming();
                 }
                 catch (Exception error) when (error is IOException || error is InvalidDataException || error is Newtonsoft.Json.JsonException || error is NullReferenceException || error is FormatException || error is ArgumentException || error is OverflowException || error is InvalidCastException)
                 {
@@ -228,7 +254,7 @@ namespace OpenRigs.Zapit
                     return;
                 }
                 still = path;
-                aiming = false;
+                StopAiming();
                 Watch();
                 Emit(new ZapitSetupStep { Stage = "Pointing", Detail = still, Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
             }
@@ -261,6 +287,8 @@ namespace OpenRigs.Zapit
                 if (LaserProblem(volts[2]) is string laser) { No(laser + ": " + request); return; }
                 aiming = true;
                 aimSent = true;
+                var id = ++aimWatch;   // the aim watchdog: a new aim restarts it
+                aimWatchdog.Disposable = Scheduler.Default.Schedule(AimTimeout, () => Locked<int>(AimTimedOut)(id));
                 Emit(new ZapitSetupStep
                 {
                     Aim = true,
@@ -295,7 +323,7 @@ namespace OpenRigs.Zapit
             {
                 var stepping = run != null || still != null;
                 EndStep("Laser Off");   // its Refused step carries the Zero
-                aiming = false;
+                StopAiming();
                 if (!stepping) Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Laser Off", Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
             }
 
@@ -305,7 +333,7 @@ namespace OpenRigs.Zapit
                 {
                     EndStep("Go");
                     if (!aiming) return;
-                    aiming = false;
+                    StopAiming();
                     Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Go", Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
                 }
             }
@@ -323,7 +351,7 @@ namespace OpenRigs.Zapit
                     aimSent = false;
                     if (e.Kind == ZapitDaqEventKind.Refused && aiming)   // a play armed: no beam, so the metric does not read Aiming
                     {
-                        aiming = false;
+                        StopAiming();
                         Emit(new ZapitSetupStep { Aim = true, Stage = "Refused", Detail = e.Detail ?? "ZapitDaq refused the aim" });
                     }
                     return;
@@ -381,6 +409,7 @@ namespace OpenRigs.Zapit
             };
             return new CompositeDisposable(
                 watchdog,
+                aimWatchdog,
                 events.Subscribe(Locked<ZapitDaqEvent>(OnEvent), observer.OnError),
                 frames.Subscribe(Locked<IplImage>(OnFrame), observer.OnError),
                 gridRuns.Subscribe(Locked<string>(Start), observer.OnError),

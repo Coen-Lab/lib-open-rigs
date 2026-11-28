@@ -25,10 +25,10 @@ namespace OpenRigs.Zapit.Tests
             public readonly Subject<string> LaserOffs = new Subject<string>();
 
             // pointed: ZapitDaq answers each Point with Pointed; false as while a play is armed (Refused, which a run does not read).
-            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10, double laserCeilingVolts = 5, bool pointed = true)
+            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10, double laserCeilingVolts = 5, bool pointed = true, TimeSpan? aimTimeout = null)
             {
                 Directory.CreateDirectory(Pending);
-                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2), CeilingMw = ceilingMw, LaserMaxVolts = 5, LaserCeilingVolts = laserCeilingVolts }
+                subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2), AimTimeout = aimTimeout ?? TimeSpan.FromSeconds(10), CeilingMw = ceilingMw, LaserMaxVolts = 5, LaserCeilingVolts = laserCeilingVolts }
                     .Process(Grids, Stills, Banks, Events, Frames, Aims, LaserOffs)
                     .Subscribe(step =>
                     {
@@ -58,6 +58,41 @@ namespace OpenRigs.Zapit.Tests
                 subscription.Dispose();
                 Directory.Delete(Path.GetDirectoryName(Pending), true);
             }
+        }
+
+        // The aim watchdog (from PR #9): an aim not renewed within AimTimeout is turned off once, the lines zeroed.
+        [TestMethod]
+        public void AnAimNotRenewedIsZeroedAfterTheTimeout()
+        {
+            using var rig = new Rig(aimTimeout: TimeSpan.FromMilliseconds(100));
+            rig.Aims.OnNext("1,1,0.4");
+            var until = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < until && !rig.Steps.ToArray().Any(s => s.Stage == "Off")) System.Threading.Thread.Sleep(10);
+            System.Threading.Thread.Sleep(300);
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            var offs = rig.Steps.ToArray().Where(s => s.Stage == "Off").ToArray();
+            Assert.AreEqual(1, offs.Length, "turned off once: " + string.Join("; ", rig.Steps));
+            Assert.AreEqual("Off no aim for 0.1 s", offs[0].ToString());
+            Assert.IsTrue(offs[0].Aim);
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, offs[0].Command.Kind);
+        }
+
+        // An aim renewed within AimTimeout stays on, however long in all; a grid run or a Laser Off ends the watchdog with the aim.
+        [TestMethod]
+        public void ARenewedAimStaysOnAndAnEndedAimIsNotTimedOutLater()
+        {
+            using var rig = new Rig(aimTimeout: TimeSpan.FromMilliseconds(400));
+            for (int i = 0; i < 10; i++) { rig.Aims.OnNext("1,1,0.4"); System.Threading.Thread.Sleep(100); }
+            Assert.IsFalse(rig.Steps.ToArray().Any(s => s.Stage == "Off"), string.Join("; ", rig.Steps));
+            rig.Grids.OnNext(rig.Run("Frames_T", "{\"volts\": [[1, 0]], \"laserVolts\": 0.3}"));
+            System.Threading.Thread.Sleep(800);
+            Assert.IsFalse(rig.Steps.ToArray().Any(s => s.Stage == "Off"), "the grid run ended the aim: " + string.Join("; ", rig.Steps));
+            rig.LaserOffs.OnNext("");   // ends the grid run
+            rig.Aims.OnNext("1,1,0.4");
+            rig.LaserOffs.OnNext("");   // ends the aim: Off Laser Off, and no Off no aim after it
+            System.Threading.Thread.Sleep(800);
+            Assert.IsNull(rig.Error, rig.Error?.ToString());
+            Assert.AreEqual("Off Laser Off", string.Join("; ", rig.Steps.ToArray().Where(s => s.Stage == "Off")));
         }
 
         // Audit 24 Nov 2026 L2: Go (the aims ending) during a grid run ends it, zeroed; no laser-on Point follows.
