@@ -95,6 +95,34 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual("Off Laser Off", string.Join("; ", rig.Steps.ToArray().Where(s => s.Stage == "Off")));
         }
 
+        // A play armed, Go, or a Point ZapitDaq refuses each ends the aim with no late watchdog Off: the play is never cut short.
+        [TestMethod]
+        public void APlayArmedGoOrARefusedPointLeavesNoLateWatchdogOff()
+        {
+            var timeout = TimeSpan.FromMilliseconds(200);
+            using (var rig = new Rig(aimTimeout: timeout))
+            {
+                rig.Aims.OnNext("1,1,0.4");
+                rig.Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Armed });
+                System.Threading.Thread.Sleep(600);
+                Assert.IsFalse(rig.Steps.ToArray().Any(s => s.Stage == "Off"), "armed: " + string.Join("; ", rig.Steps));
+            }
+            using (var rig = new Rig(aimTimeout: timeout))
+            {
+                rig.Aims.OnNext("1,1,0.4");
+                rig.Aims.OnCompleted();   // Go
+                System.Threading.Thread.Sleep(600);
+                Assert.AreEqual("Off Go", string.Join("; ", rig.Steps.ToArray().Where(s => s.Stage == "Off")));
+            }
+            using (var rig = new Rig(aimTimeout: timeout, pointed: false))
+            {
+                rig.Aims.OnNext("1,1,0.4");
+                System.Threading.Thread.Sleep(600);
+                Assert.IsNull(rig.Error, rig.Error?.ToString());
+                Assert.IsFalse(rig.Steps.ToArray().Any(s => s.Stage == "Off"), "refused: " + string.Join("; ", rig.Steps));
+            }
+        }
+
         // Audit 24 Nov 2026 L2: Go (the aims ending) during a grid run ends it, zeroed; no laser-on Point follows.
         [TestMethod]
         public void GoDuringAGridRunEndsItWithTheLinesZeroed()

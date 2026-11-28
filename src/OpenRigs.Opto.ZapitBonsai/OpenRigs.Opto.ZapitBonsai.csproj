@@ -4,7 +4,7 @@
     <Description>The trial loop's opto adapter for Zapit on an NI DAQ (Zapit-Bonsai, OpenRigs.Zapit): its opto system for OpenRigs.Trials, each trial's Arm, early stop and trigger, the task's connect, setup, camera and log includes, and its Go limits.</Description>
     <PackageTags>$(PackageTags) Opto Zapit</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.8</Version>
+    <Version>0.1.1-coen-lab.9</Version>
   </PropertyGroup>
 
   <ItemGroup>

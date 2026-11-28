@@ -340,6 +340,8 @@ namespace OpenRigs.Zapit
 
             void OnEvent(ZapitDaqEvent e)
             {
+                // A play armed replaces the aim (ZapitDaq ends the Point): the watchdog's Zero would cut the play short.
+                if (e.Kind == ZapitDaqEventKind.Armed && aiming) StopAiming();
                 if (loading && (e.Kind == ZapitDaqEventKind.BankLoaded || e.Kind == ZapitDaqEventKind.Refused))
                 {
                     loading = false;
