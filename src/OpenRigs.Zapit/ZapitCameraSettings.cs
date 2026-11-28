@@ -54,7 +54,7 @@ namespace OpenRigs.Zapit
     /// <summary>
     /// One Zapit camera frame, three ways (a grid run's frames at Mono8's scale are nearly black in the window): View, what
     /// the window streams, the session's stretched picture cut to the crop (ZapitFrameDepth.Crop), which is for viewing only
-    /// (Pip, 28 Nov 2026), so it can change before or after Go; Image, what the mp4 records, the same picture whole;
+    ///, so it can change before or after Go; Image, what the mp4 records, the same picture whole;
     /// Still, what Zapit's setup saves (stills, a grid run's point and background frames), the whole frame, the stretched
     /// picture too except during a grid run, when it is Mono8's scale (counts / 16), which the spot detection's 90 %-of-peak
     /// threshold and 500 px size limit were tuned on. A Mono8 camera's frame is all three, as it comes (View cropped).
