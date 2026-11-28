@@ -14,7 +14,7 @@ namespace OpenRigs.Zapit
     /// amplification only for a frame below about 0.4 % of full scale (lights off). A grid
     /// run's frames (its exposure and gain set) are scaled to Mono8's range (counts / 16), so the beam keeps the
     /// unsaturated peak the spot detection's 90 %-of-peak threshold and 500 px size limit were tuned on (a beam saturated
-    /// at 255 is a wide flat top). Crop cuts the shown frame to a crop that fits inside it.</para>
+    /// at 255 is a wide flat top). Crop cuts the viewed frame to a crop that fits inside it; the recorded frame stays whole.</para>
     /// </summary>
     internal static class ZapitFrameDepth
     {
@@ -61,17 +61,18 @@ namespace OpenRigs.Zapit
             return eight;
         }
 
-        /// <summary>A grabbed frame as the shown image (stretched, cropped) and the still Zapit's setup saves (whole; Mono8's
-        /// scale in a grid run), each null for a null frame.</summary>
-        public static void Split(IplImage? image, bool grid, Rect crop, out IplImage? shown, out IplImage? still, out string? cropRefusal)
+        /// <summary>A grabbed frame as the viewed image (stretched, cropped), the recorded one (stretched, whole) and the
+        /// still Zapit's setup saves (whole; Mono8's scale in a grid run), each null for a null frame.</summary>
+        public static void Split(IplImage? image, bool grid, Rect crop, out IplImage? shown, out IplImage? still, out string? cropRefusal, out IplImage? recorded)
         {
-            shown = still = image;
+            shown = still = recorded = image;
             cropRefusal = null;
             if (image == null) return;
             if (image.Depth != IplDepth.U8)
             {
                 shown = ToEightBit(image, false, StretchTop(image));
                 still = grid ? ToEightBit(image, true, 0) : shown;
+                recorded = shown;
             }
             shown = Crop(shown!, crop, out cropRefusal);
         }
@@ -82,8 +83,8 @@ namespace OpenRigs.Zapit
         public static ZapitFrame Frame(IplImage? image, bool grid, ZapitCropState crop, long frameId, long timestamp)
         {
             var cut = crop.Current;
-            Split(image, grid, cut, out var shown, out var still, out var refusal);
-            return new ZapitFrame { Image = shown, Still = still, CropReports = crop.Finish(cut, refusal), FrameID = frameId, Timestamp = timestamp };
+            Split(image, grid, cut, out var shown, out var still, out var refusal, out var recorded);
+            return new ZapitFrame { View = shown, Image = recorded, Still = still, CropReports = crop.Finish(cut, refusal), FrameID = frameId, Timestamp = timestamp };
         }
 
         /// <summary>Why <paramref name="crop"/> cannot be cut from a frame of <paramref name="frame"/>'s size, or null when it
@@ -96,8 +97,8 @@ namespace OpenRigs.Zapit
 
         /// <summary><paramref name="image"/> cut to <paramref name="crop"/> (pixels of the frame), a new image, exactly as
         /// asked; <paramref name="image"/> itself for no crop (an empty one), the whole frame as the crop, or a crop that does
-        /// not fit (never clamped: <paramref name="refusal"/> says why). The Zapit camera's shown frame: the window and the
-        /// mp4 cropped to the brain; the stills stay whole, so every fit stays in the whole frame's pixels.</summary>
+        /// not fit (never clamped: <paramref name="refusal"/> says why). The Zapit camera's viewed frame: the window cropped
+        /// to the brain; the mp4 and the stills stay whole, so every fit stays in the whole frame's pixels.</summary>
         public static IplImage Crop(IplImage image, Rect crop, out string? refusal)
         {
             refusal = null;

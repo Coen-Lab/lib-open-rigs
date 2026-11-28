@@ -600,19 +600,22 @@ namespace OpenRigs.Zapit.Tests
             frame.Set(new Scalar(48));
             frame[20, 30] = new Scalar(1600);   // the beam
             var crop = new Rect(16, 8, 32, 24);
-            ZapitFrameDepth.Split(frame, true, crop, out var shown, out var still, out _);
+            ZapitFrameDepth.Split(frame, true, crop, out var shown, out var still, out _, out var recorded);
             Assert.AreEqual(new Size(32, 24), shown!.Size);
             Assert.AreEqual(255, (int)shown[20 - 8, 30 - 16].Val0);   // stretched: the beam white
             Assert.AreEqual(255, (int)shown[0, 0].Val0);               // and the skull's 48 at the stretch's top
             Assert.AreEqual(new Size(64, 48), still!.Size);
+            Assert.AreEqual(new Size(64, 48), recorded!.Size);         // the crop is for viewing only: the mp4 is whole
+            Assert.AreEqual(255, (int)recorded[20, 30].Val0);          // and stretched as the view is
             Assert.AreEqual(100, (int)still[20, 30].Val0);             // counts over 16
             Assert.AreEqual(3, (int)still[0, 0].Val0);
-            ZapitFrameDepth.Split(frame, false, default, out shown, out still, out _);
+            ZapitFrameDepth.Split(frame, false, default, out shown, out still, out _, out recorded);
             Assert.AreEqual(new Size(64, 48), shown!.Size);
             Assert.AreSame(shown, still);
             var mono8 = new IplImage(new Size(64, 48), IplDepth.U8, 1);
-            ZapitFrameDepth.Split(mono8, true, crop, out shown, out still, out _);
+            ZapitFrameDepth.Split(mono8, true, crop, out shown, out still, out _, out recorded);
             Assert.AreSame(mono8, still);
+            Assert.AreSame(mono8, recorded);
             Assert.AreEqual(new Size(32, 24), shown!.Size);
         }
 

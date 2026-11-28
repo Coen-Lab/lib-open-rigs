@@ -81,7 +81,8 @@ namespace OpenRigs.LiveView
                 if (depth >= 3) continue;
                 var members = item.Key.GetProperties().Where(p => p.GetIndexParameters().Length == 0)
                     .Select(p => new KeyValuePair<string, Type>(p.Name, p.PropertyType))
-                    .Concat(item.Key.GetFields().Select(f => new KeyValuePair<string, Type>(f.Name, f.FieldType)));
+                    .Concat(item.Key.GetFields().Select(f => new KeyValuePair<string, Type>(f.Name, f.FieldType)))
+                    .OrderBy(m => m.Key == "View" ? 0 : 1);   // a frame's View (the Zapit camera's cropped one) before its Image (recorded whole)
                 foreach (var member in members)
                 {
                     var path = item.Value.Length == 0 ? member.Key : item.Value + "." + member.Key;

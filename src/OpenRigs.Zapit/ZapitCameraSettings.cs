@@ -52,15 +52,20 @@ namespace OpenRigs.Zapit
     }
 
     /// <summary>
-    /// One Zapit camera frame, two ways (a grid run's frames at Mono8's scale are nearly black in the window): Image, what
-    /// the window streams and the mp4 records, always the session's stretched picture, cut to the crop (ZapitFrameDepth.Crop);
+    /// One Zapit camera frame, three ways (a grid run's frames at Mono8's scale are nearly black in the window): View, what
+    /// the window streams, the session's stretched picture cut to the crop (ZapitFrameDepth.Crop), which is for viewing only
+    /// (Pip, 28 Nov 2026), so it can change before or after Go; Image, what the mp4 records, the same picture whole;
     /// Still, what Zapit's setup saves (stills, a grid run's point and background frames), the whole frame, the stretched
     /// picture too except during a grid run, when it is Mono8's scale (counts / 16), which the spot detection's 90 %-of-peak
-    /// threshold and 500 px size limit were tuned on. A Mono8 camera's frame is both, as it comes (Image cropped).
+    /// threshold and 500 px size limit were tuned on. A Mono8 camera's frame is all three, as it comes (View cropped).
     /// </summary>
     public class ZapitFrame
     {
-        /// <summary>The shown frame: a Mono12 frame stretched, a Mono8 frame as it comes; cropped; streamed and recorded.</summary>
+        /// <summary>The frame the window streams: a Mono12 frame stretched, a Mono8 frame as it comes; cut to the crop.
+        /// The live view takes it before Image (LiveViewPlan.ImagePath prefers a member named View).</summary>
+        public OpenCV.Net.IplImage? View { get; set; }
+
+        /// <summary>The frame the mp4 records: as View, but whole, never cropped.</summary>
         public OpenCV.Net.IplImage? Image { get; set; }
 
         /// <summary>The whole frame Zapit's setup saves: a Mono12 frame stretched, or at Mono8's scale during a grid run; a Mono8 frame as it comes.</summary>
@@ -252,10 +257,11 @@ namespace OpenRigs.Zapit
     /// The Zapit camera: Bonsai.Pylon's PylonCapture (its serial number and session .pfs), whose exposure and gain the
     /// setup phase sets for a grid run's frames while it grabs, and puts back after. PylonCapture has no exposure or gain
     /// property; its Configure hands over the opened camera, kept here, and loads the .pfs (ZapitCameraOpening).
-    /// Every frame is 8-bit (ZapitFrameDepth), given two ways (ZapitFrame): Image, the shown and recorded picture, a Mono12
-    /// frame stretched to its StretchTop always, cut to the crop the setup sent (SetCrop; the whole frame until one comes);
-    /// Still, the whole frame Zapit's setup saves, stretched too except during a grid run, when it is Mono8's scale
-    /// (counts over 16) for the spot detection. A Mono8 .pfs's frames pass through (Image cropped).
+    /// Every frame is 8-bit (ZapitFrameDepth), given three ways (ZapitFrame): View, the streamed picture, a Mono12 frame
+    /// stretched to its StretchTop always, cut to the crop the setup sent (SetCrop; the whole frame until one comes);
+    /// Image, the recorded picture, the same whole; Still, the whole frame Zapit's setup saves, stretched too except during
+    /// a grid run, when it is Mono8's scale (counts over 16) for the spot detection. A Mono8 .pfs's frames pass through
+    /// (View cropped).
     /// </summary>
     [Description("Grabs the Zapit camera as PylonCapture does (serial number, session .pfs), each frame 8-bit (Mono12: stretched to the frame's StretchTop; Mono8 as it comes) as Image, cut to the crop, and whole as Still (a grid run's Mono12 frames at Mono8's scale, counts over 16, there). Input: ZapitCameraSettings from Zapit's setup, each applied at once (exposure, gain, auto off), the camera's own put back (Restore), or the shown frame's crop (SetCrop).")]
     public class ZapitPylonCapture : PylonCapture

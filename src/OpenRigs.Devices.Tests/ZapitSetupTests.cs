@@ -76,6 +76,11 @@ namespace OpenRigs.Devices.Tests
                 var unnumbered = Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Refused ");
                 StringAssert.StartsWith(unnumbered, "Refused #0 a crop request is #<n> x,y,w,h");
                 StringAssert.EndsWith(unnumbered, "; Now Cropped 16,16,32,16");
+                // The crop is for viewing only (the mp4 stays whole), so it is taken after Go too (Pip, 28 Nov 2026).
+                Assert.IsTrue((bool)Ask(socket, new { cmd = "go" })["ok"], "Go refused");
+                Assert.AreEqual("Cropping #7 Full Frame", Command(socket, "Zapit-Main.Crop", "#7 full", "Zapit-Main.Crop", "Cropping"));
+                SimulatedZapitCamera.SendFrame();
+                Assert.AreEqual("Full Frame #7", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Full"));
             });
         }
 

@@ -32,7 +32,7 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void TheZapitStreamIsTheShownImageNotTheStill()
         {
-            Assert.AreEqual("Value.Image", StreamImages(ZapitDaq)["Camera-Zapit.video"]);
+            Assert.AreEqual("Value.View", StreamImages(ZapitDaq)["Camera-Zapit.video"]);
         }
 
         // MATLAB Zapit's block alone opens no camera, so the live view shows none.
@@ -185,7 +185,10 @@ namespace OpenRigs.Devices.Tests
     /// <summary>A frame's members ZapitCamera reads, as OpenRigs.Zapit's ZapitFrame has them.</summary>
     public class StandInZapitFrame
     {
-        /// <summary>The shown image, streamed and recorded (ZapitFrame.Image).</summary>
+        /// <summary>The viewed image, streamed (ZapitFrame.View).</summary>
+        public OpenCV.Net.IplImage View { get; set; }
+
+        /// <summary>The recorded image, whole (ZapitFrame.Image).</summary>
         public OpenCV.Net.IplImage Image { get; set; }
 
         /// <summary>The whole frame Zapit's setup saves (ZapitFrame.Still).</summary>

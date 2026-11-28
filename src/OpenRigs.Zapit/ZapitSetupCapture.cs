@@ -434,7 +434,7 @@ namespace OpenRigs.Zapit
     }
 
     /// <summary>
-    /// Zapit-Main.Crop's args as the Zapit camera's crop (the window and the mp4 cut to the brain, the
+    /// Zapit-Main.Crop's args as the Zapit camera's crop (the window, for viewing only, cut to the brain, the
     /// agent's crop round the grid area), each with its request number, "#n x,y,w,h" or "#n full" (n a whole number from 1),
     /// echoed in every answer so the agent matches answers to requests: "x,y,w,h" in pixels of the camera's frame (whole numbers, x and y from 0, w and
     /// h even and from 16) is Stage Cropping with that crop on Camera; "#n full" is Stage Cropping (Detail "#n Full Frame") with the
@@ -446,7 +446,7 @@ namespace OpenRigs.Zapit
     /// starts at Go, so its frame size never changes.
     /// </summary>
     [Combinator]
-    [Description("Zapit-Main.Crop's args (#n x,y,w,h in pixels of the camera's frame, or #n full for the whole frame; n a whole number from 1) as the Zapit camera's crop for the shown and recorded frame: Cropping (the crop, or why it is none, on Camera; the camera answers).")]
+    [Description("Zapit-Main.Crop's args (#n x,y,w,h in pixels of the camera's frame, or #n full for the whole frame; n a whole number from 1) as the Zapit camera's crop for the viewed frame (the mp4 stays whole): Cropping (the crop, or why it is none, on Camera; the camera answers).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitCropRequest
     {
