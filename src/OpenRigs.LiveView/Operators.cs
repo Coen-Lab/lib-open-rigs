@@ -126,14 +126,15 @@ namespace OpenRigs.LiveView
         /// <summary>Whether the part shown is the whole frame.</summary>
         public bool IsWhole { get { return X == 0 && Y == 0 && Width == SourceWidth && Height == SourceHeight; } }
 
-        /// <summary>The largest tileWidth x tileHeight shaped rectangle centred in a sourceWidth x sourceHeight frame.</summary>
+        /// <summary>The largest tileWidth x tileHeight shaped rectangle centred in a sourceWidth x sourceHeight frame,
+        /// never under 1 pixel a side (a tile of extreme shape, such as 1000 x 1, would round one to 0).</summary>
         public static FrameTrim For(int sourceWidth, int sourceHeight, int tileWidth, int tileHeight)
         {
             long width = sourceWidth, height = sourceHeight;
             if (tileWidth > 0 && tileHeight > 0)
             {
-                if (width * tileHeight > height * tileWidth) width = Math.Min(sourceWidth, (height * tileWidth + tileHeight / 2) / tileHeight);
-                else height = Math.Min(sourceHeight, (width * tileHeight + tileWidth / 2) / tileWidth);
+                if (width * tileHeight > height * tileWidth) width = Math.Min(sourceWidth, Math.Max(1, (height * tileWidth + tileHeight / 2) / tileHeight));
+                else height = Math.Min(sourceHeight, Math.Max(1, (width * tileHeight + tileWidth / 2) / tileWidth));
             }
             return new FrameTrim
             {

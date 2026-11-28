@@ -187,6 +187,9 @@ namespace OpenRigs.LiveView.Tests
                 Check("a frame of the tile's shape (Camera-Zapit cut to 4:3) is whole", zapitCrop.IsWhole, rect(zapitCrop));
                 var halfTile = FrameTrim.For(1936, 1216, 160, 240);
                 Check("the tile's shape is rig.yml's width and height", rect(halfTile) == "562,0,811,1216 of 1936x1216", rect(halfTile));
+                var flat = FrameTrim.For(640, 480, 1, 1000);
+                var thin = FrameTrim.For(640, 480, 1000, 1);
+                Check("a tile of extreme shape still leaves at least 1 pixel a side", flat.Width == 1 && thin.Height == 1, rect(flat) + " / " + rect(thin));
 
                 Console.WriteLine("The workflow's path, as the manifest has it:");
                 var repo = Path.Combine(root, "repo");
