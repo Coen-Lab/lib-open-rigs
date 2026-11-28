@@ -778,6 +778,8 @@ namespace OpenRigs.Control
                         return true;
                     });
                     state.SetPhase(ExperimentPhase.Stopping);
+                    // Before the teardown starts, so Bonsai stays up while the devices close their ports.
+                    EndAfterStop.HoldOnStop();
                     stop = new ExperimentStoppedException("Experiment stopped: " + why);
                     return Ok();
                 }

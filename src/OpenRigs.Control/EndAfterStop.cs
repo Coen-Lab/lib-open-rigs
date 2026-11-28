@@ -13,34 +13,89 @@ namespace OpenRigs.Control
     /// Ends headless Bonsai if it is still running GraceSeconds after the controller's stop (exit code 0) or after the
     /// workflow began to end for any other reason, an error (exit code 1): a device's teardown held up (the live view's
     /// publisher threads keep the process alive until every device's teardown reaches them) would otherwise keep Bonsai
-    /// running until the controller kills it, and headless Bonsai exits 0 after an error. Nothing in the editor.
+    /// running until the controller kills it, and headless Bonsai exits 0 after an error. It also keeps headless Bonsai
+    /// running HoldSeconds once the workflow begins to end, so devices finish closing their serial ports first: a workflow
+    /// that logs nothing has no writer thread to do that, and Bonsai exiting mid-close crashed it in SerialStream.Finalize
+    /// (ObjectDisposedException) on every preflight stop. Nothing in the editor.
     /// </summary>
     [Combinator]
     [WorkflowElementCategory(ElementCategory.Source)]
-    [Description("Ends headless Bonsai if it is still running GraceSeconds after the controller's stop (exit code 0) or after the workflow began to end for any other reason, an error (exit code 1); nothing in the editor.")]
+    [Description("Keeps headless Bonsai running HoldSeconds once the workflow begins to end, so devices finish closing their ports, and ends it if it is still running GraceSeconds after the controller's stop (exit code 0) or after the workflow began to end for any other reason, an error (exit code 1); nothing in the editor.")]
     public class EndAfterStop
     {
         double graceSeconds = 2;
+        double holdSeconds = 1;
 
         /// <summary>Gets or sets the seconds the workflow's own teardown is given after the stop; 0 or less leaves it to the controller's kill.</summary>
         [Description("Seconds the workflow's own teardown is given after the stop; 0 or less leaves it to the controller's kill.")]
         public double GraceSeconds { get { return graceSeconds; } set { graceSeconds = value; } }
 
-        /// <summary>Never gives anything; in headless Bonsai (--no-editor), watches for the stop from a background thread.</summary>
+        /// <summary>Gets or sets the seconds headless Bonsai is kept running once the workflow begins to end; 0 or less keeps it for nothing.</summary>
+        [Description("Seconds headless Bonsai is kept running once the workflow begins to end, so devices finish closing their ports; 0 or less keeps it for nothing. Below GraceSeconds.")]
+        public double HoldSeconds { get { return holdSeconds; } set { holdSeconds = value; } }
+
+        /// <summary>Never gives anything; in headless Bonsai (--no-editor), watches for the stop from a background thread and holds the process once the workflow ends.</summary>
         public IObservable<string> Process()
         {
+            var grace = GraceSeconds;
+            var hold = HoldSeconds;
+            if (grace > 0 && hold >= grace)
+                return Observable.Throw<string>(new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                    "EndAfterStop: HoldSeconds ({0}) must be below GraceSeconds ({1}), or the grace ends every clean exit", hold, grace)));
             return Observable.Create<string>(observer =>
+                Environment.GetCommandLineArgs().Contains("--no-editor") ? Start(grace, hold) : Disposable.Empty);
+        }
+
+        static double armedHold;
+        static int stopHeld;
+
+        /// <summary>
+        /// What Process does in headless Bonsai: arms the hold, so the controller's stop starts it (HoldOnStop) before any
+        /// device's teardown, and watches for the stop when <paramref name="grace"/> is above 0. Once disposed it holds only
+        /// if no stop did: a second hold after the stop's could outlast the grace and end a clean exit as a held-up one.
+        /// </summary>
+        public static IDisposable Start(double grace, double hold)
+        {
+            Volatile.Write(ref armedHold, hold);
+            Volatile.Write(ref stopHeld, 0);
+            var ending = new ManualResetEventSlim(false);
+            if (grace > 0)
             {
-                var grace = GraceSeconds;
-                if (grace <= 0 || !Environment.GetCommandLineArgs().Contains("--no-editor")) return Disposable.Empty;
-                var ending = new ManualResetEventSlim(false);
                 var watch = new Thread(() => Watch(ending, TimeSpan.FromSeconds(grace)));
                 watch.IsBackground = true;
                 watch.Name = "EndAfterStop";
                 watch.Start();
-                // Disposed means the workflow is ending: the watch goes on, since a teardown held up is what it is for.
-                return Disposable.Create(ending.Set);
+            }
+            // Disposed means the workflow is ending: the watch goes on, since a teardown held up is what it is for. Still
+            // armed, so a second EndAfterStop disposed first takes nothing from the stop.
+            return Disposable.Create(() =>
+            {
+                ending.Set();
+                if (Volatile.Read(ref stopHeld) == 0) Hold(hold); // an ending after an error, with no stop
             });
+        }
+
+        /// <summary>Called by the control server as it takes a stop: starts the armed hold, if an EndAfterStop runs headless.</summary>
+        public static Thread HoldOnStop()
+        {
+            var held = Hold(Volatile.Read(ref armedHold));
+            if (held != null) Volatile.Write(ref stopHeld, 1);
+            return held;
+        }
+
+        /// <summary>The last hold started, for the tests.</summary>
+        public static Thread LastHold { get; private set; }
+
+        /// <summary>Starts a foreground thread that keeps the process running <paramref name="seconds"/>; null for 0 or less.</summary>
+        public static Thread Hold(double seconds)
+        {
+            if (seconds <= 0) return null;
+            var hold = new Thread(() => Thread.Sleep(TimeSpan.FromSeconds(seconds)));
+            hold.IsBackground = false;
+            hold.Name = "EndAfterStop hold";
+            hold.Start();
+            LastHold = hold;
+            return hold;
         }
 
         /// <summary>

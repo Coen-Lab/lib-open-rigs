@@ -351,6 +351,29 @@ namespace OpenRigs.Control.Tests
                 var gave = 0;
                 using (new EndAfterStop().Process().Subscribe(_ => gave++)) { }
                 Check("outside headless Bonsai it watches nothing and gives nothing", gave == 0, gave.ToString());
+                Check("the hold is below the grace, so a teardown that ends lets Bonsai exit by itself", new EndAfterStop().HoldSeconds < new EndAfterStop().GraceSeconds, "hold not below grace");
+                var hold = EndAfterStop.Hold(0.2);
+                Check("the hold is a foreground thread, so it keeps the process running", hold != null && hold.IsAlive && !hold.IsBackground, hold == null ? "none" : hold.IsBackground ? "background" : "ended");
+                Check("the hold ends by itself", hold != null && hold.Join(2000), "still running");
+                Check("a hold of 0 starts nothing", EndAfterStop.Hold(0) == null, "a thread");
+                Exception tooLong = null;
+                new EndAfterStop { HoldSeconds = 2 }.Process().Subscribe(_ => { }, e => tooLong = e);
+                Check("a hold not below the grace stops the workflow at Start", tooLong is InvalidOperationException && tooLong.Message.Contains("HoldSeconds (2) must be below GraceSeconds (2)"), tooLong == null ? "taken" : tooLong.Message);
+                Check("with no EndAfterStop running headless, a stop holds nothing", EndAfterStop.HoldOnStop() == null, "a hold");
+                // Grace 0, so no watch ends this process.
+                var errored = EndAfterStop.Start(0, 0.3);
+                var before = EndAfterStop.LastHold;
+                errored.Dispose();
+                var onDispose = EndAfterStop.LastHold;
+                Check("an ending with no stop holds at disposal", onDispose != null && onDispose != before && onDispose.IsAlive && !onDispose.IsBackground, "no new foreground hold");
+                var stopped = EndAfterStop.Start(0, 0.3);
+                var second = EndAfterStop.Start(0, 0.3);
+                second.Dispose();
+                var onStop = EndAfterStop.HoldOnStop();
+                Check("headless, the controller's stop starts the hold at once, though another EndAfterStop was disposed first", onStop != null && onStop.IsAlive && !onStop.IsBackground, onStop == null ? "none" : "not a live foreground thread");
+                stopped.Dispose();
+                Check("after a stop, disposal adds no second hold that could outlast the grace", EndAfterStop.LastHold == onStop, "a second hold");
+                Check("the holds end by themselves", onStop != null && onStop.Join(2000) && onDispose.Join(2000), "still running");
             }
 
             Console.WriteLine("Two servers on one port:");
