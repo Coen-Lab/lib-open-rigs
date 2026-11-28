@@ -29,6 +29,8 @@ REWARD_VALVE_DEVICE = "RewardValve"
 ZAPIT_TRIGGER = "ZapitTrigger"
 CAMERA_TRIGGER = "CameraTrigger"
 PHOTODIODE = "Photodiode"
+# Seconds a ZapitTrigger pulse must outlast zapit.maxTrialSeconds by: the laser's ramp-down (at most 0.5 s) and TriggerOff after it.
+ZAPIT_PULSE_MARGIN_S = 1.0
 # The Behavior board lines that can pulse, so can carry a reward valve (OpenRigs.Devices PulseLines).
 PULSE_LINES = ("DO0", "DO1", "DO2", "DO3", "DOPort0", "DOPort1", "DOPort2")
 # The Behavior board lines that read a digital input, so can carry a photodiode.
@@ -181,6 +183,16 @@ class LabRig(Rig):
                         f"behaviorBoard {name}: ZapitTrigger {zapit[0]} needs a FixedPulse above 0 ms in pulseController.outputs, "
                         f"at least the longest the workflow holds it, for the board to end it after a workflow dies {WHERE}. "
                         f"Add it, as in `{zapit[0]}: {{ discriminatorType: FixedPulse, pulseWidthMs: 10000 }}`."
+                    )
+                # A trial's laser runs up to zapit.maxTrialSeconds, and TriggerOff follows its ramp-down: a shorter pulse
+                # turns the masking light off mid-trial.
+                longest = self.zapit.max_trial_seconds if self.zapit is not None else None
+                if longest is not None and output.root.pulse_width_ms < (longest + ZAPIT_PULSE_MARGIN_S) * 1000:
+                    raise ValueError(
+                        f"behaviorBoard {name}: ZapitTrigger {zapit[0]}'s pulseWidthMs {output.root.pulse_width_ms:g} is shorter than "
+                        f"zapit.maxTrialSeconds ({longest:g} s) plus {ZAPIT_PULSE_MARGIN_S:g} s for the ramp-down, so the board would "
+                        f"end it, and any masking light on it, mid-trial {WHERE}. "
+                        f"Make it at least {(longest + ZAPIT_PULSE_MARGIN_S) * 1000:g}."
                     )
         if len(zapit_boards) > 1:
             raise ValueError(

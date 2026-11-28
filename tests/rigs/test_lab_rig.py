@@ -1,6 +1,8 @@
 import copy
+from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from open_rigs.rigs.lab_rig import LabRig
@@ -288,6 +290,18 @@ def test_zapit_line_needs_a_width(output):
     with pytest.raises(ValidationError, match="ZapitTrigger DO3 needs a FixedPulse above 0 ms") as refused:
         LabRig.model_validate(rig)
     assert "`DO3: { discriminatorType: FixedPulse, pulseWidthMs: 10000 }`" in str(refused.value)
+
+
+def test_zapit_line_outlasts_the_longest_trial():
+    # B2-both's zapit.maxTrialSeconds is 3: a pulse under 3 s plus the ramp-down margin ends the masking light mid-trial.
+    rig = yaml.safe_load((Path(__file__).parents[2] / "fixtures" / "rig-yml" / "B2-both.yml").read_text(encoding="utf-8"))
+    outputs = rig["behaviorBoard"]["main"]["pulseController"]["outputs"]
+    outputs["DO3"]["pulseWidthMs"] = 3999
+    with pytest.raises(ValidationError, match=r"pulseWidthMs 3999 is shorter than zapit.maxTrialSeconds \(3 s\) plus 1 s") as refused:
+        LabRig.model_validate(rig)
+    assert "Make it at least 4000." in str(refused.value)
+    outputs["DO3"]["pulseWidthMs"] = 4000
+    LabRig.model_validate(rig)
 
 
 def test_a_rig_without_zapit_needs_no_zapit_line():
