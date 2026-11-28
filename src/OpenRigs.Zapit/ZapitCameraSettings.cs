@@ -276,7 +276,7 @@ namespace OpenRigs.Zapit
         public ZapitPylonCapture() => opening = new ZapitCameraOpening(() => SerialNumber, () => ParameterFile, file => ParameterFile = file);
 
         /// <summary>Whether the crop cuts the recorded frame (Image) too: rig.yml's zapit.camera.recordCrop, true by default.
-        /// Then Zapit's setup takes crops until Go only, so the mp4 keeps one frame size; false, the crop cuts only View.</summary>
+        /// Then Zapit's setup refuses crops from Go, so the mp4 keeps one frame size; false, the crop cuts only View.</summary>
         [Description("Whether the crop cuts the recorded frame too (rig.yml's zapit.camera.recordCrop; then fixed from Go), or only the live view.")]
         public bool RecordCrop { get; set; } = true;
 

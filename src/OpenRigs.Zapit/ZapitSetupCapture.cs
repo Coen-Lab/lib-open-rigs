@@ -443,7 +443,7 @@ namespace OpenRigs.Zapit
     /// alone knows its frame's size and the crop in force, and answers from its next frame, Cropped, Full Frame or Refused
     /// (a crop outside the frame is dropped, never clamped), each Refused saying which crop is now in force ("; Now Full
     /// Frame" or "; Now Cropped x,y,w,h"), through ZapitCropReport. A recorded crop (rig.yml's zapit.camera.recordCrop,
-    /// the default) is taken until Go only (ZapitSetup), so the mp4's frame size never changes; a view-only one at any time.
+    /// the default) is refused from Go (Fixed), so the mp4's frame size never changes; a view-only one is taken at any time.
     /// </summary>
     [Combinator]
     [Description("Zapit-Main.Crop's args (#n x,y,w,h in pixels of the camera's frame, or #n full for the whole frame; n a whole number from 1) as the Zapit camera's crop for the viewed frame (and the mp4's when recordCrop): Cropping (the crop, or why it is none, on Camera; the camera answers).")]
@@ -453,8 +453,25 @@ namespace OpenRigs.Zapit
         /// <summary>The smallest crop side, in pixels.</summary>
         public const int LeastSide = 16;
 
-        /// <summary>Each request as a Cropping #n step for the camera to answer.</summary>
-        public IObservable<ZapitSetupStep> Process(IObservable<string> source) => source.Select(Parse);
+        /// <summary>Whether the crop is fixed: the crop is recorded (rig.yml's zapit.camera.recordCrop) and Go has come, set
+        /// by ZapitSetup's CropRecorded?. Each request is then refused by the camera, which names the crop in force.</summary>
+        [Description("Whether the crop is fixed (recorded, and Go has come): each request is then refused, naming the crop in force.")]
+        public bool Fixed { get; set; }
+
+        /// <summary>The reason a request is refused once the crop is fixed.</summary>
+        public const string FixedReason = "the crop is recorded (rig.yml's zapit.camera.recordCrop), so it is fixed from Go";
+
+        /// <summary>Each request as a Cropping #n step for the camera to answer; refused once the crop is Fixed.</summary>
+        public IObservable<ZapitSetupStep> Process(IObservable<string> source) => source.Select(request => Fixed ? Refix(Parse(request)) : Parse(request));
+
+        /// <summary>A parsed request refused because the crop is fixed, under its own number (0 without one) and echo.</summary>
+        static ZapitSetupStep Refix(ZapitSetupStep parsed)
+        {
+            var number = parsed.Camera?.CropRequest ?? 0;
+            var prefix = "#" + number.ToString(CultureInfo.InvariantCulture) + " ";
+            var echo = parsed.Detail != null && parsed.Detail.StartsWith(prefix, StringComparison.Ordinal) ? parsed.Detail.Substring(prefix.Length) : parsed.Detail ?? "";
+            return Rejected(number, echo, FixedReason);
+        }
 
         /// <summary>A request that is no crop, as a step the camera answers (it alone knows the crop in force).</summary>
         static ZapitSetupStep Rejected(int number, string echo, string reason) =>

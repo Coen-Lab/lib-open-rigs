@@ -79,8 +79,9 @@ namespace OpenRigs.Devices.Tests
             });
         }
 
-        // rig.yml's zapit.camera.recordCrop: true (the default), the crop cuts the mp4 too, so none is taken after Go;
-        // false, the crop is for the live view only and is taken after Go too.
+        // rig.yml's zapit.camera.recordCrop: true (the default), the crop cuts the mp4 too, so from Go each crop is refused
+        // by the camera, naming the crop in force (and Camera-Zapit.Settings stays open); false, the crop is for the live
+        // view only and is taken after Go too.
         [TestMethod]
         [Timeout(60000)]
         public void ARecordedCropIsFixedFromGoAViewOnlyCropIsNot()
@@ -98,7 +99,8 @@ namespace OpenRigs.Devices.Tests
                     SimulatedZapitCamera.SendFrame();
                     Thread.Sleep(500);
                     var metric = (string)Ask(socket, new { cmd = "status" })["metrics"]["Zapit-Main.Crop"];
-                    Assert.AreEqual(recorded ? "Cropped #1 16,16,32,16" : "Full Frame #2", metric, recorded ? "a recorded crop changed after Go" : "a view-only crop refused after Go");
+                    Assert.AreEqual(recorded ? "Refused #2 " + OpenRigs.Zapit.ZapitCropRequest.FixedReason + "; Now Cropped 16,16,32,16" : "Full Frame #2", metric,
+                        recorded ? "a recorded crop after Go is refused, naming the crop in force" : "a view-only crop is taken after Go");
                 }, "  camera:\n    serialNumber: '40123456'\n" + (recorded ? "" : "    recordCrop: false\n"));
             }
         }

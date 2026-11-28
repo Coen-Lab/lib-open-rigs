@@ -590,6 +590,25 @@ namespace OpenRigs.Zapit.Tests
             CollectionAssert.AreEqual(new[] { 48 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 3), false, ZapitFrameDepth.StretchTop(frame))));   // 3 of 16, not 255
         }
 
+        // Once the crop is Fixed (recorded, and Go has come) every request is a refusal for the camera to answer under its
+        // own number, naming the crop in force; before, requests are parsed as ever.
+        [TestMethod]
+        public void AFixedCropRefusesEveryRequestUnderItsNumber()
+        {
+            var request = new ZapitCropRequest { Fixed = true };
+            ZapitSetupStep step = null!;
+            using (request.Process(System.Reactive.Linq.Observable.Return("#3 16,16,32,16")).Subscribe(s => step = s)) { }
+            Assert.AreEqual("Cropping #3 16,16,32,16", step.ToString());
+            Assert.AreEqual(3, step.Camera!.CropRequest);
+            Assert.AreEqual(ZapitCropRequest.FixedReason, step.Camera.RejectReason);
+            using (request.Process(System.Reactive.Linq.Observable.Return("#4 full")).Subscribe(s => step = s)) { }
+            Assert.AreEqual(4, step.Camera!.CropRequest);
+            Assert.AreEqual(ZapitCropRequest.FixedReason, step.Camera.RejectReason);
+            request.Fixed = false;
+            using (request.Process(System.Reactive.Linq.Observable.Return("#5 full")).Subscribe(s => step = s)) { }
+            Assert.IsNull(step.Camera!.RejectReason);
+        }
+
         // rig.yml's zapit.camera.recordCrop: the mp4's frame (Image) is the cropped View when the crop is recorded, else whole.
         [TestMethod]
         public void TheRecordedFrameIsCutOnlyWhenTheCropIsRecorded()
