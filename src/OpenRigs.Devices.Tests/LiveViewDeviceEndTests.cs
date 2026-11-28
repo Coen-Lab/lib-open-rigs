@@ -46,7 +46,7 @@ namespace OpenRigs.Devices.Tests
         }
 
         // A rig.yml that names zapit.device, in a config root of its own; the root is removed after.
-        static void WithRig(Action<string> run)
+        internal static void WithRig(Action<string> run)
         {
             var root = Path.Combine(Path.GetTempPath(), "LiveViewDeviceEndTests", Guid.NewGuid().ToString("N"));
             try
@@ -80,15 +80,15 @@ namespace OpenRigs.Devices.Tests
         }
 
         // A PublishSubject, or with latest a BehaviorSubject, so a subscriber that comes late still gets the last value.
-        static void Publish<T>(ExpressionBuilderGraph workflow, string subject, Source<T> source, bool latest = false)
+        internal static void Publish<T>(ExpressionBuilderGraph workflow, string subject, Source<T> source, bool latest = false)
         {
             var declared = latest ? (ExpressionBuilder)new Bonsai.Reactive.BehaviorSubject { Name = subject } : new Bonsai.Reactive.PublishSubject { Name = subject };
             workflow.AddEdge(workflow.Add(new CombinatorBuilder { Combinator = source }), workflow.Add(declared), new ExpressionBuilderArgument(0));
         }
 
-        // Runs the stand-ins' workflow until a message on its video (or data) port names the stream, or fails after 15 s or
+        // Runs the stand-ins' workflow until a message on its video (or data) port names the stream, and returns it; fails after 15 s or
         // when the workflow stops. A port found free can be taken before StreamDevices binds it: then new ports, 3 tries.
-        static void AssertSeen(string root, bool onVideo, string stream, Action<ExpressionBuilderGraph> publish)
+        internal static NetMQMessage AssertSeen(string root, bool onVideo, string stream, Action<ExpressionBuilderGraph> publish)
         {
             for (var attempt = 1; ; attempt++)
             {
@@ -107,7 +107,7 @@ namespace OpenRigs.Devices.Tests
                         NetMQMessage message = null;
                         if (!subscriber.TryReceiveMultipartMessage(TimeSpan.FromMilliseconds(200), ref message)) continue;
                         last = string.Join(" ", message.Select(frame => Encoding.UTF8.GetString(frame.ToByteArray())));
-                        if (last.Contains(stream)) return;
+                        if (last.Contains(stream)) return message;
                     }
                 }
                 if (attempt < 3 && TestPorts.Taken(stopped)) continue;

@@ -26,6 +26,9 @@
   <ItemGroup>
     <PackageReference Include="Bonsai.Core" />
     <PackageReference Include="YamlDotNet" />
+    <!-- A camera's frame cut to its tile's shape (TrimToTile), and the cut added to its message's header (AddTrimToHeader) -->
+    <PackageReference Include="NetMQ" />
+    <PackageReference Include="OpenCV.Net" />
   </ItemGroup>
 
 </Project>

@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A camera: the image found in its data (by type), sampled, shrunk and JPEG-encoded by
-     OpenRigs.Streaming's PackVideoMessage, on the video port. The data's end is not passed on
-     (IgnoreCompletion), as it would close VideoMessage for every camera. -->
+<!-- A camera: the image found in its data (by type), sampled, cut to the tile's shape keeping its centre
+     (TrimToTile), shrunk to the tile and JPEG-encoded as OpenRigs.Streaming's PackVideoMessage does, on the
+     video port. PackVideoMessage itself would stretch a frame of another shape to the tile, and sends its
+     message before anything could be added to it; here the header also says where the frame was cut
+     (AddTrimToHeader), so a viewer can map a point on the picture back to the frame. The data's end is not
+     passed on (IgnoreCompletion), as it would close VideoMessage for every camera. -->
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:cv="clr-namespace:Bonsai.Vision;assembly=Bonsai.Vision"
+                 xmlns:dsp="clr-namespace:Bonsai.Dsp;assembly=Bonsai.Dsp"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Workflow>
@@ -11,26 +17,83 @@
       <Expression xsi:type="SubscribeSubject">
         <Name>{{Subject}}</Name>
       </Expression>
-      <Expression xsi:type="MemberSelector">
-        <Selector>{{ImagePath}}</Selector>
-      </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackVideoMessage.bonsai">
-        <SampleInterval>{{Interval}}</SampleInterval>
-        <FrameSize>
-          <Width>{{Width}}</Width>
-          <Height>{{Height}}</Height>
-        </FrameSize>
-        <Interpolation>Area</Interpolation>
-        <StreamName>{{Stream}}</StreamName>
-      </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="lv:IgnoreCompletion" />
       </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>{{ImagePath}}</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:SampleInterval">
+          <rx:Interval>{{Interval}}</rx:Interval>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:TrimToTile">
+          <lv:Width>{{Width}}</lv:Width>
+          <lv:Height>{{Height}}</lv:Height>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Image</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="cv:Resize">
+          <cv:Size>
+            <cv:Width>{{Width}}</cv:Width>
+            <cv:Height>{{Height}}</cv:Height>
+          </cv:Size>
+          <cv:Interpolation>Area</cv:Interpolation>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="cv:EncodeImage">
+          <cv:Extension>.jpg</cv:Extension>
+          <cv:CompressionParameters />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="dsp:ConvertToArray">
+          <dsp:Depth xsi:nil="true" />
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:ElementIndex" />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:BuildMessage.bonsai">
+        <StreamName>{{Stream}}</StreamName>
+        <Encoding>jpeg</Encoding>
+        <PayloadType>Image</PayloadType>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Trim</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Zip" />
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:AddTrimToHeader" />
+      </Expression>
+      <Expression xsi:type="MulticastSubject">
+        <Name>VideoMessage</Name>
+      </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="3" Label="Source1" />
-      <Edge From="3" To="1" Label="Source1" />
+      <Edge From="0" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="4" To="5" Label="Source1" />
+      <Edge From="4" To="11" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="8" To="9" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="10" To="12" Label="Source1" />
+      <Edge From="11" To="12" Label="Source2" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

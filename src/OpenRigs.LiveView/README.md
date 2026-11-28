@@ -8,11 +8,13 @@ When the workflow is built, `StreamDevices` reads `<ConfigRoot>\<MACHINE-NAME>\r
 
 | Kind in rig.yml | Stream | Default | From the data |
 |-----------------|--------|---------|---------------|
-| `camera` | `Camera-Overhead.video` on the video port | 5 frames/s, 320 x 240 (shrunk by Area interpolation, which averages the pixels and so does not alias), JPEG | the first `IplImage` in it, found by type (`Value.Image` for a frame paired with its trigger) |
+| `camera` | `Camera-Overhead.video` on the video port | 5 frames/s, 320 x 240 (cut to that shape about its centre, then shrunk by Area interpolation, which averages the pixels and so does not alias), JPEG | the first `IplImage` in it, found by type (`Value.Image` for a frame paired with its trigger) |
 | `behaviorBoard` | `BehaviorBoard-Main.encoder` on the data port | 10/s | the raw encoder count from `AnalogData` (a `HarpMessage` stream) |
 | `behaviorBoard` | `BehaviorBoard-Main.channels` on the data port | every change; analog inputs 100/s | every channel of the board, for a controller's Board tab |
 | `licketySplit` | `LicketySplit-Left.channels` on the data port | every change | `LickState`, shaped as the board's channels |
 | `stepperDriver` | `StepperDriver-A.channels` on the data port | every change; positions 10/s | `MotorStopped` (sent as `{State, Changed}`, Harp.StepperDriver 0.4.0's `MotorStoppedPayload`, not a bitmask), `DigitalInputState` (home switches), `MotorRaisedError`, and `AccumulatedSteps` when the workflow has the driver send them, shaped as the board's channels |
+
+A camera's frame is never stretched to the tile. Every camera is treated alike: the frame is cut to the tile's shape about its centre (`TrimToTile`), the largest such rectangle, and only then shrunk. A frame that already has the tile's shape (a 1280 x 960 camera, or Camera-Zapit cropped to 4:3 by Rig Control) is shown whole; a 1936 x 1216 frame loses 157 pixels at each side and is shown 1621 x 1216 wide. Each frame's header says where it was cut, after the fields every message has: `"sourceSize":[1936,1216],"trim":[157,0,1621,1216]`, the frame's width and height as it came and the part shown as x, y, width and height in its pixels. A viewer that maps a click on the picture to the frame, or draws on the picture at a point of the frame, maps through `trim`: the point (u, v), as fractions of the picture, is at x + u * width, y + v * height of the frame. A reader that does not know these fields ignores them (Rig Control's and OpenRigs.Streaming's readers take the fields they name).
 
 Each `channels` message is `{"Register": <name>, "Value": {"Seconds": <board time>, "Value": <value>}}`, the register named as Harp.Behavior names it and the value with the board's own timestamp, so a 1 ms pulse can be drawn at its real length:
 
@@ -49,7 +51,7 @@ A bad value is reported in `liveview` and the default kept. A workflow that read
 
 ## Ports and Other Streaming
 
-Data on TCP `DataPort` (5556), video on `VideoPort` (5558), on every interface, opened at Start; a port in use stops the workflow there. `StreamDevices` contains OpenRigs.Streaming's StreamController (it declares `DataMessage`, `VideoMessage` and `StreamIdentity`), so a workflow uses one or the other, never both. Other streams can still be sent from the workflow with OpenRigs.Streaming's `PackDataMessage` and `PackVideoMessage`, which find those subjects.
+Data on TCP `DataPort` (5556), video on `VideoPort` (5558), on every interface, opened at Start; a port in use stops the workflow there. `StreamDevices` contains OpenRigs.Streaming's StreamController (it declares `DataMessage`, `VideoMessage` and `StreamIdentity`), so a workflow uses one or the other, never both. Other streams can still be sent from the workflow with OpenRigs.Streaming's `PackDataMessage` and `PackVideoMessage`, which find those subjects. A camera here does what `PackVideoMessage` does, with its own nodes: `PackVideoMessage` would stretch a frame of another shape, and sends its message before the cut could be added to the header.
 
 ## Things to Know
 
@@ -63,8 +65,8 @@ Data on TCP `DataPort` (5556), video on `VideoPort` (5558), on every interface, 
 
 ## Needs
 
-`Bonsai.Core`, `YamlDotNet`, and in the workflow's environment `OpenRigs.Streaming`, `Bonsai.ZeroMQ`, `Bonsai.Vision` (cameras) and `Harp.Behavior` (Behavior boards).
+`Bonsai.Core`, `YamlDotNet`, `OpenCV.Net` and `NetMQ` (both already installed with OpenRigs.Streaming), and in the workflow's environment `OpenRigs.Streaming`, `Bonsai.ZeroMQ`, `Bonsai.Vision` (cameras) and `Harp.Behavior` (Behavior boards).
 
 ## Tested
 
-`dotnet run --project src\OpenRigs.LiveView.Tests` decides the plan from rig.yml files in a temporary folder, with stand-ins for the device data types: what is streamed and skipped and why, the `liveView:` settings, the session key, and the workflow's path. Exit 0 when every check passes. The inner workflow it builds is checked by building a workflow that uses it (the workflow's own check).
+`dotnet run --project src\OpenRigs.LiveView.Tests` decides the plan from rig.yml files in a temporary folder, with stand-ins for the device data types: what is streamed and skipped and why, the `liveView:` settings, the session key, the workflow's path, and the part of a frame each shape of camera keeps. Exit 0 when every check passes. The inner workflow it builds is checked by building a workflow that uses it (the workflow's own check). `src\OpenRigs.Devices.Tests`' `LiveViewTrimTests` run the camera's inner workflow on ports of their own: a 1936 x 1216 frame arrives 320 x 240 with its centre square still square, its side strips gone and its header carrying `sourceSize` and `trim`; a 4:3 frame arrives whole.

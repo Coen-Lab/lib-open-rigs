@@ -4,10 +4,9 @@ using System.Linq;
 using System.Reactive.Linq;
 using OpenRigs.LiveView;
 
-// Stand-ins for the device data types, which the recipes recognise by full name, so the plan can
-// be tested without Bonsai.Harp or OpenCV.Net installed.
+// A stand-in for a board's data type, which the recipes recognise by full name, so the plan can be
+// tested without Bonsai.Harp installed. A camera's IplImage is OpenCV.Net's own, which LiveView uses.
 namespace Bonsai.Harp { public class HarpMessage { } }
-namespace OpenCV.Net { public class IplImage { } }
 // OpenRigs.Logging's LoggedRows, found by full name among the loaded assemblies.
 namespace OpenRigs.Logging { public class LoggedRows { } }
 
@@ -177,6 +176,17 @@ namespace OpenRigs.LiveView.Tests
                 var refused = false;
                 try { SessionKey.FromPathPrefix(@"C:\data\TC002\003B1"); } catch (ArgumentException) { refused = true; }
                 Check("a folder not named sub-/ses- is refused", refused, "taken");
+
+                Console.WriteLine("A camera's frame cut to its tile's shape:");
+                Func<FrameTrim, string> rect = t => string.Format("{0},{1},{2},{3} of {4}x{5}", t.X, t.Y, t.Width, t.Height, t.SourceWidth, t.SourceHeight);
+                var wide = FrameTrim.For(1936, 1216, 320, 240);
+                Check("a wider frame (Camera-Zapit's whole 1936 x 1216) loses equal strips at its sides", rect(wide) == "157,0,1621,1216 of 1936x1216", rect(wide));
+                var tall = FrameTrim.For(480, 640, 320, 240);
+                Check("a taller frame loses equal strips top and bottom", rect(tall) == "0,140,480,360 of 480x640", rect(tall));
+                var zapitCrop = FrameTrim.For(1024, 768, 320, 240);
+                Check("a frame of the tile's shape (Camera-Zapit cut to 4:3) is whole", zapitCrop.IsWhole, rect(zapitCrop));
+                var halfTile = FrameTrim.For(1936, 1216, 160, 240);
+                Check("the tile's shape is rig.yml's width and height", rect(halfTile) == "562,0,811,1216 of 1936x1216", rect(halfTile));
 
                 Console.WriteLine("The workflow's path, as the manifest has it:");
                 var repo = Path.Combine(root, "repo");
