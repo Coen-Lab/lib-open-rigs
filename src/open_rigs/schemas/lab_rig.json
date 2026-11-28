@@ -1968,7 +1968,7 @@
             }
           ],
           "default": null,
-          "description": "The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.",
+          "description": "ZapitDaq's longest trial buffer in seconds, chosen per rig and required with the other Zapit-Bonsai fields: a task's laser above it is refused at Go.",
           "title": "MaxTrialSeconds"
         },
         "micronsPerPixel": {

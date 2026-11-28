@@ -7,7 +7,7 @@ every output zeroed (Zapit-Main.LaserOff). A stop (Laser Off, Stop, Go) clears t
 
 ``plan_play`` chooses what plays: the condition at the bank's laser-on power (the task's ``laserPowerMw``, held under
 ``ceilingMw`` when the bank was built, and refused here above it), for the task's laser duration, else
-``PLAY_DEFAULT_S``, never longer than ZapitDaq's trial buffer takes with the ramp (as lib-open-rigs ZapitBank.Cycles judges
+``PLAY_DEFAULT_SECONDS``, never longer than the task's Zapit trial buffer takes with the ramp (as lib-open-rigs ZapitBank.Cycles judges
 it). ``ConditionPlay`` runs the sequence on its own thread with the device actions given to it, so a caller (the rig app's
 agent) only relays the request and shows the state. Its laser is never "off" while it may be on: from the Arm until the clear
 and the zero are delivered it reads "play", and a clear or zero not delivered reads "unknown" until ``retry`` delivers one.
@@ -22,10 +22,10 @@ from dataclasses import dataclass
 from typing import Callable
 
 SETUP_TRIAL = 0  # lib-open-rigs ZapitPlay.SetupTrial: a task's trials count from 1
-PLAY_DEFAULT_S = 1.0  # a play when the task gives no laser duration: long enough to see, short of any trial buffer
-ARM_TIMEOUT_S = 3.0  # ZapitDaq arms a trial in well under this (ZapitDaqTrial.ArmSeconds); none by then is a refusal
-END_MARGIN_S = 0.1  # the line is cleared this long after the trial's own end (the DAQ ends it, laser and LED at 0 V)
-POWER_MATCH = 1e-4  # relative: a power asked matches a bank variant's within this
+PLAY_DEFAULT_SECONDS = 1.0  # a play when the task gives no laser duration: long enough to see, short of any trial buffer
+ARM_TIMEOUT_SECONDS = 3.0  # ZapitDaq arms a trial in well under this (ZapitDaqTrial.ArmSeconds); none by then is a refusal
+END_MARGIN_SECONDS = 0.1  # the line is cleared this long after the trial's own end (the DAQ ends it, laser and LED at 0 V)
+POWER_MATCH = 1e-4  # relative: a power asked matches a bank variant's within this (never the ceiling: that is exact)
 
 
 class PlayRefused(ValueError):
@@ -48,7 +48,7 @@ class PlayPlan:
         return f"{self.condition},{self.power_mw!r},{self.seconds!r}"
 
 
-def _rows(cycles: int, n: int, variant: dict) -> int:
+def trial_rows(cycles: int, n: int, variant: dict) -> int:
     """A trial's rows with its ramp tail, as ZapitBank.TrialRows counts them (no ramp: a one-row tail at 0 V that
     replaces the body's last row)."""
     tail_cycles = int(variant.get("tail_cycles") or 0)
@@ -56,17 +56,26 @@ def _rows(cycles: int, n: int, variant: dict) -> int:
     return cycles * n - replaces + (tail_cycles * n if tail_cycles else 1)
 
 
+def most_cycles(cap_rows: int, n: int, variant: dict) -> int:
+    """The most whole scan cycles whose trial fits `cap_rows` (0 when none), worked out as ZapitBank.Cycles does:
+    _rows is cycles * n plus a tail that does not depend on the cycles."""
+    fixed = trial_rows(0, n, variant)
+    return max((cap_rows - fixed) // n, 0)
+
+
 def plan_play(index: dict, condition: int, ceiling_mw: float, buffer_seconds: float | None,
               task_seconds: float | None = None, power_mw: float | None = None) -> PlayPlan:
     """The play of `condition` (1-based) from the bank's `index` (open_rigs.zapit.bank's JSON): at `power_mw` where the
     bank has it, else its first laser-on power (the task's); for `task_seconds` (the task's laser duration), else
-    PLAY_DEFAULT_S, shortened to the most whole scan cycles that fit `buffer_seconds` (ZapitDaq's trial buffer) with the
+    PLAY_DEFAULT_SECONDS, shortened to the most whole scan cycles that fit `buffer_seconds` (the task's trial buffer, open_rigs.core.task.zapit_trial_seconds) with the
     ramp. Raises PlayRefused with the laser disabled (ceilingMw 0), no buffer known, no such condition, no laser-on
     variant, a power above ceilingMw, or no laser that fits."""
+    if isinstance(condition, bool) or type(condition) is not int or condition < 0:
+        raise PlayRefused(f"the condition is {condition!r}, not a whole number of 0 or more")
     if not ceiling_mw > 0:
-        raise PlayRefused("the laser is disabled (ceilingMw 0), so there is nothing to play")
-    if buffer_seconds is None or not buffer_seconds > 0:
-        raise PlayRefused("ZapitDaq's trial buffer is not known, so no play can be sized")
+        raise PlayRefused("rig.yml's zapit.ceilingMw is 0 (laser disabled), so there is nothing to play")
+    if buffer_seconds is None or not math.isfinite(buffer_seconds) or not buffer_seconds > 0:
+        raise PlayRefused("the task's Zapit trial buffer is not known, so no play can be sized")
     conditions = index["conditions"]
     if not 1 <= condition <= len(conditions):
         raise PlayRefused(f"the waveforms have no condition {condition}; they have {len(conditions)}")
@@ -82,22 +91,24 @@ def plan_play(index: dict, condition: int, ceiling_mw: float, buffer_seconds: fl
             raise PlayRefused(f"condition {condition} has no waveform at {power_mw:g} mW (it has {held} mW)")
     power = float(variant["power_mw"])
     delivered = float(variant.get("capped_power_mw", power))
-    if power > ceiling_mw * (1 + POWER_MATCH) or delivered > ceiling_mw * (1 + POWER_MATCH):
+    if power > ceiling_mw or delivered > ceiling_mw:  # exact, as ZapitPlay refuses power > CeilingMw
         raise PlayRefused(f"condition {condition}'s {power:g} mW is above this rig's ceilingMw ({ceiling_mw:g} mW)")
     rate = float(index["sample_rate"])
     n = int(conditions[condition - 1]["scan_cycle"]["length"])
+    if task_seconds is not None and not math.isfinite(task_seconds):
+        raise PlayRefused(f"the task's laser duration is {task_seconds!r}, which is not a number of seconds")
     cap_rows = math.floor(buffer_seconds * rate + 1e-6)
-    asked = float(task_seconds) if task_seconds is not None and task_seconds > 0 else PLAY_DEFAULT_S
+    asked = float(task_seconds) if task_seconds is not None and task_seconds > 0 else PLAY_DEFAULT_SECONDS
     note = "" if task_seconds is not None and task_seconds > 0 else f"the task gives no laser duration, so {asked:g} s"
     cycles = math.ceil(asked * rate / n - 1e-9)
-    if _rows(cycles, n, variant) > cap_rows:
-        most = max(c for c in range(0, cycles + 1) if c == 0 or _rows(c, n, variant) <= cap_rows)
+    if trial_rows(cycles, n, variant) > cap_rows:
+        most = most_cycles(cap_rows, n, variant)
         if most < 1:
-            raise PlayRefused(f"no laser of condition {condition} fits ZapitDaq's {buffer_seconds:g} s trial buffer "
+            raise PlayRefused(f"no laser of condition {condition} fits the task's {buffer_seconds:g} s Zapit trial buffer "
                               "with its ramp")
         cycles = most
-        note = f"{asked:g} s with its ramp is longer than ZapitDaq's {buffer_seconds:g} s trial buffer, so {cycles * n / rate:g} s"
-    return PlayPlan(condition, power, cycles * n / rate, _rows(cycles, n, variant) / rate, note)
+        note = f"{asked:g} s with its ramp is longer than the task's {buffer_seconds:g} s Zapit trial buffer, so {cycles * n / rate:g} s"
+    return PlayPlan(condition, power, cycles * n / rate, trial_rows(cycles, n, variant) / rate, note)
 
 
 def play_problem(*, went: bool, laser_disabled: bool, bank_loaded: bool, sample_accepted: bool, busy: bool = False,
@@ -105,7 +116,7 @@ def play_problem(*, went: bool, laser_disabled: bool, bank_loaded: bool, sample_
     """Why Play Condition cannot be pressed now, "" when it can: before Go only, with the laser enabled, once the
     waveforms are loaded and the sample accepted, while no setup step runs, no play is on and none was left unknown."""
     if went:
-        return "Play Condition is before Go only"
+        return "Play Condition is taken before Go only"
     if laser_disabled:
         return "the laser is disabled (ceilingMw 0)"
     if not sample_accepted:
@@ -136,7 +147,7 @@ class ConditionPlay:
 
     def __init__(self, arm: Callable[[str], None], line: Callable[[bool], None], zero: Callable[[], None],
                  stage: Callable[[], str], clock: Callable[[], float] = time.monotonic,
-                 arm_timeout_s: float = ARM_TIMEOUT_S, end_margin_s: float = END_MARGIN_S, poll_s: float = 0.02):
+                 arm_timeout_s: float = ARM_TIMEOUT_SECONDS, end_margin_s: float = END_MARGIN_SECONDS, poll_s: float = 0.02):
         self._arm, self._line, self._zero, self._stage = arm, line, zero, stage
         self.clock, self.arm_timeout_s, self.end_margin_s, self.poll_s = clock, arm_timeout_s, end_margin_s, poll_s
         self._lock = threading.Lock()  # the line's raise and a stop's clear, one at a time

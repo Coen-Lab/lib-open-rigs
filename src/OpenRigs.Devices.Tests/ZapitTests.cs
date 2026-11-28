@@ -162,6 +162,11 @@ namespace OpenRigs.Devices.Tests
         [DataRow("stimLocations01:\n  offRampDownDuration_ms: 600\n", "more than 500 ms")]
         [DataRow("stimModulationFreqHz: 5\nstimLocations01:\n  offRampDownDuration_ms: 200\n", "not longer than one 5 Hz cycle")]
         [DataRow("stimLocations01:\n  laserPowerInMW: 2\n", "has no offRampDownDuration_ms")]
+        [DataRow("stimLocations01:\n  offRampDownDuration_ms: .nan\n", "stimLocations01's offRampDownDuration_ms is '.nan', not a finite number")]
+        [DataRow("stimLocations01:\n  offRampDownDuration_ms: 1e999\n", "stimLocations01's offRampDownDuration_ms is '1e999', not a finite number")]
+        [DataRow("stimLocations01:\n  offRampDownDuration_ms: 250,5\n", "stimLocations01's offRampDownDuration_ms is '250,5', not a finite number")]
+        [DataRow("stimModulationFreqHz: 4O\nstimLocations01:\n  offRampDownDuration_ms: 250\n", "stimModulationFreqHz is '4O', not a number above 0")]
+        [DataRow("stimLocations99999999999:\n  offRampDownDuration_ms: 250\n", "stimLocations99999999999, a number too large")]
         [DataRow("laserPowerInMW: 2\n", "has no conditions")]
         [DataRow("stimLocations01:\n  AP: -0.7\n  offRampDownDuration_ms: 250\n", "stimLocations01 has no ML")]
         [DataRow("stimLocations01:\n  offRampDownDuration_ms: 250\n", "stimLocations01 has no ML or AP")]
@@ -170,8 +175,10 @@ namespace OpenRigs.Devices.Tests
         [DataRow("stimLocations01:\n  ML: 1.5, 2\n  AP: -0.7\n  offRampDownDuration_ms: 250\n", "stimLocations01's ML is '1.5, 2', not a number")]
         public void ConditionsFileRefused(string text, string message)
         {
-            var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitConditions.Check(WriteConditions(text)));
+            var path = WriteConditions(text);
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitConditions.Check(path));
             StringAssert.Contains(ex.Message, message);
+            StringAssert.Contains(ex.Message, path, "the message names the file");
         }
 
         [TestMethod]

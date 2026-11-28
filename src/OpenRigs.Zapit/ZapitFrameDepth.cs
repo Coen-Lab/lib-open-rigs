@@ -9,7 +9,9 @@ namespace OpenRigs.Zapit
     /// pixel equal to the grab's own Mono12 buffer); recording (FfmpegRecording), the live view's JPEG and the setup PNGs
     /// all take 8 bits. A Mono8 frame passes through untouched, so a rig whose .pfs stays Mono8 sees no change.
     /// <para>Session frames are stretched from 0 to StretchTop (the frame's own 97.3rd percentile, at least MinTop counts)
-    /// to 0-255, saturating, so the skull sits near 80 of 255 and a near-dark frame is not amplified to noise. A grid
+    /// to 0-255, saturating, so the skull sits near 80 of 255. A dim scene is brought back to normal brightness too (2 %
+    /// light shows at the usual mean), so a lighting failure does not show as a dark picture; MinTop stops the
+    /// amplification only for a frame below about 0.4 % of full scale (lights off). A grid
     /// run's frames (its exposure and gain set) are scaled to Mono8's range (counts / 16), so the beam keeps the
     /// unsaturated peak the spot detection's 90 %-of-peak threshold and 500 px size limit were tuned on (a beam saturated
     /// at 255 is a wide flat top). Crop cuts the shown frame to a crop that fits inside it.</para>
@@ -24,7 +26,9 @@ namespace OpenRigs.Zapit
         /// 8 x 8 average put it near 24).</summary>
         public const double WhitePercentile = 97.3;
 
-        /// <summary>The least StretchTop, in counts: a near-dark frame (lights off) keeps its low counts, not noise amplified up to 255 times.</summary>
+        /// <summary>The least StretchTop, in counts (about 0.4 % of Mono12's 4095): the stretch's gain is at most 255 / 16, so
+        /// only a frame darker than that (lights off) stays dark rather than noise amplified up to 255 times; any brighter
+        /// frame is stretched to full brightness.</summary>
         public const double MinTop = 16;
 
         /// <summary>The 16-bit count a session frame's stretch puts at 255: the frame averaged over 8 x 8 pixels, about what
@@ -57,11 +61,36 @@ namespace OpenRigs.Zapit
             return eight;
         }
 
+        /// <summary>A grabbed frame as the shown image (stretched, cropped) and the still Zapit's setup saves (whole; Mono8's
+        /// scale in a grid run), each null for a null frame.</summary>
+        public static void Split(IplImage? image, bool grid, Rect crop, out IplImage? shown, out IplImage? still, out string? cropRefusal)
+        {
+            shown = still = image;
+            cropRefusal = null;
+            if (image == null) return;
+            if (image.Depth != IplDepth.U8)
+            {
+                shown = ToEightBit(image, false, StretchTop(image));
+                still = grid ? ToEightBit(image, true, 0) : shown;
+            }
+            shown = Crop(shown!, crop, out cropRefusal);
+        }
+
+        /// <summary>The Zapit camera's frame for a grab (ZapitPylonCapture's, or a test's): <paramref name="image"/> split
+        /// (<paramref name="grid"/>: a grid run's exposure is on the camera) and cut to <paramref name="crop"/>'s crop, carrying
+        /// the crop's answer when this frame is the first cut to it.</summary>
+        public static ZapitFrame Frame(IplImage? image, bool grid, ZapitCropState crop, long frameId, long timestamp)
+        {
+            var cut = crop.Current;
+            Split(image, grid, cut, out var shown, out var still, out var refusal);
+            return new ZapitFrame { Image = shown, Still = still, CropReports = crop.Finish(cut, refusal), FrameID = frameId, Timestamp = timestamp };
+        }
+
         /// <summary>Why <paramref name="crop"/> cannot be cut from a frame of <paramref name="frame"/>'s size, or null when it
-        /// fits: x and y from 0, width and height above 0, all inside the frame. An empty crop (no width or height) is the
-        /// caller's "no crop" and is not asked.</summary>
+        /// fits: x and y from 0, width and height above 0, all inside the frame (compared as width > frame - x, so a huge x
+        /// cannot overflow the sum). An empty crop (no width or height) is the caller's "no crop" and is not asked.</summary>
         public static string? Refusal(Size frame, Rect crop) =>
-            crop.X < 0 || crop.Y < 0 || crop.Width <= 0 || crop.Height <= 0 || crop.X + crop.Width > frame.Width || crop.Y + crop.Height > frame.Height
+            crop.X < 0 || crop.Y < 0 || crop.Width <= 0 || crop.Height <= 0 || crop.Width > frame.Width - crop.X || crop.Height > frame.Height - crop.Y
                 ? $"the crop {crop.X},{crop.Y},{crop.Width},{crop.Height} does not fit the camera's {frame.Width} x {frame.Height} frame"
                 : null;
 
@@ -99,6 +128,16 @@ namespace OpenRigs.Zapit
         /// answer to a crop set before it that no frame has answered yet.</summary>
         public void Reject(string reason, int requestNumber) { lock (gate) { rejection = reason; rejectionNumber = requestNumber; } }
 
+        /// <summary>Takes <paramref name="settings"/> when it is a crop request: a crop (an empty one the whole frame) or the
+        /// rejection of one. False for any other settings (a grid run's exposure), which it leaves alone.</summary>
+        public bool Apply(ZapitCameraSettings settings)
+        {
+            if (!settings.SetCrop) return false;
+            if (settings.RejectReason != null) Reject(settings.RejectReason, settings.CropRequest);
+            else Set(settings.CropWidth > 0 && settings.CropHeight > 0 ? new Rect(settings.CropX, settings.CropY, settings.CropWidth, settings.CropHeight) : default, settings.CropRequest);
+            return true;
+        }
+
         /// <summary>No crop and nothing to answer (the camera closed).</summary>
         public void Reset() { lock (gate) { crop = default; number = 0; pending = false; rejection = null; } }
 
@@ -124,7 +163,7 @@ namespace OpenRigs.Zapit
                         crop = default;   // never a clamped crop: the whole frame
                         answers.Add(Refused(number, refusal));
                     }
-                    else answers.Add(cut.Width <= 0 ? new ZapitSetupStep { Stage = "Full", Detail = $"Frame #{number}" }
+                    else answers.Add(cut.Width <= 0 ? new ZapitSetupStep { Stage = "Full Frame", Detail = $"#{number}" }
                         : new ZapitSetupStep { Stage = "Cropped", Detail = $"#{number} {cut.X},{cut.Y},{cut.Width},{cut.Height}" });
                 }
                 if (rejection != null)   // then the request that was no crop, with the crop in force after the first

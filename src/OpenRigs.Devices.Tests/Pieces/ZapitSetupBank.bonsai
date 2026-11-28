@@ -7,7 +7,7 @@
                  xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>ZapitSetup with a simulated ZapitDaq and the controller, as ConnectForTaskZapitDaq has them: ZapitSetupTests sets CONFIG_ROOT, sends Zapit-Main.LoadBank and Zapit-Main.Aim and reads the Zapit-Main.Setup and Zapit-Main.Aim metrics; ZapitRig is the test rig.yml's zapit block.</Description>
+  <Description>ZapitSetup with a simulated ZapitDaq and the controller, as ConnectForTaskZapitDaq has them: ZapitSetupTests sets CONFIG_ROOT and CONTROL_PORT, sends Zapit-Main.LoadBank, Setup, Aim, Crop, Play, Trigger and LaserOff, and Go, and reads their metrics; ZapitRig is the test rig.yml's zapit block. SimulatedZapitCamera sends the test's frames, cut to the crop; the ZapitTrigger line is DO3, and RecordedCommands keeps what reaches BehaviorBoard-Main.Commands and Zapit.Commands.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
@@ -16,7 +16,7 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Control:ExperimentControl.bonsai">
         <SubjectId>test</SubjectId>
         <SessionId>001</SessionId>
-        <ControlEndpoint>@tcp://127.0.0.1:55763</ControlEndpoint>
+        <ControlEndpoint>@tcp://127.0.0.1:CONTROL_PORT</ControlEndpoint>
         <Parameters />
         <Commands />
       </Expression>
@@ -74,8 +74,8 @@
       <Expression xsi:type="rx:AsyncSubject">
         <Name>Zapit.LaserCeilingVolts</Name>
       </Expression>
-      <Expression xsi:type="rx:AsyncSubject" TypeArguments="beh:DigitalOutputs">
-        <rx:Name>ZapitTriggerLine</rx:Name>
+      <Expression xsi:type="rx:AsyncSubject">
+        <Name>ZapitTriggerLine</Name>
       </Expression>
       <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
         <rx:Name>BehaviorBoard-Main.Commands</rx:Name>
@@ -89,6 +89,21 @@
       <Expression xsi:type="MulticastSubject">
         <Name>Camera-Zapit.Data</Name>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="t:StandInTriggerLine" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>BehaviorBoard-Main.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="t:RecordedCommands" />
+      </Expression>
+      <Expression xsi:type="SubscribeSubject">
+        <Name>Zapit.Commands</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="t:RecordedCommands" />
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="7" To="8" Label="Source1" />
@@ -99,6 +114,9 @@
       <Edge From="15" To="16" Label="Source1" />
       <Edge From="19" To="20" Label="Source1" />
       <Edge From="20" To="21" Label="Source1" />
+      <Edge From="22" To="17" Label="Source1" />
+      <Edge From="23" To="24" Label="Source1" />
+      <Edge From="25" To="26" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

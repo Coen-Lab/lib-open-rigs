@@ -4707,12 +4707,12 @@ namespace OpenRigs.Devices.Rigs
         }
     
         /// <summary>
-        /// The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.
+        /// ZapitDaq's longest trial buffer in seconds, chosen per rig and required with the other Zapit-Bonsai fields: a task's laser above it is refused at Go.
         /// </summary>
         [Newtonsoft.Json.JsonPropertyAttribute("maxTrialSeconds")]
         [YamlDotNet.Serialization.YamlMemberAttribute(Alias="maxTrialSeconds")]
-        [System.ComponentModel.DescriptionAttribute("The longest trial buffer, in seconds: a task\'s laserCapSeconds above it is refuse" +
-            "d at Go, and a trial until the outcome is finite at it.")]
+        [System.ComponentModel.DescriptionAttribute("ZapitDaq\'s longest trial buffer in seconds, chosen per rig and required with the " +
+            "other Zapit-Bonsai fields: a task\'s laser above it is refused at Go.")]
         public double? MaxTrialSeconds
         {
             get

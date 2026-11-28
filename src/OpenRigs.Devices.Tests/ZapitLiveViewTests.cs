@@ -158,7 +158,7 @@ namespace OpenRigs.Devices.Tests
     /// PylonCapture's place in ZapitCamera with the members ZapitCamera reads: Bonsai.Pylon's types need Basler's pylon
     /// runtime, which a desk does not have, and only the frame's members matter to the build.
     /// </summary>
-    public class StandInPylonCapture : Bonsai.Source<StandInGrab>
+    public class StandInPylonCapture : Bonsai.Source<StandInZapitFrame>
     {
         /// <summary>Mapped from rig.yml's zapit.camera.serialNumber.</summary>
         public string SerialNumber { get; set; }
@@ -169,21 +169,21 @@ namespace OpenRigs.Devices.Tests
         /// <summary>No frames: the workflow is only built, with the grid's camera settings as its input as ZapitPylonCapture takes them.</summary>
         /// <param name="settings">Camera-Zapit.Settings.</param>
         /// <returns>A sequence that never produces a frame.</returns>
-        public IObservable<StandInGrab> Generate(IObservable<OpenRigs.Zapit.ZapitCameraSettings> settings)
+        public IObservable<StandInZapitFrame> Generate(IObservable<OpenRigs.Zapit.ZapitCameraSettings> settings)
         {
-            return System.Reactive.Linq.Observable.Never<StandInGrab>();
+            return System.Reactive.Linq.Observable.Never<StandInZapitFrame>();
         }
 
         /// <summary>No frames: the workflow is only built.</summary>
         /// <returns>A sequence that never produces a frame.</returns>
-        public override IObservable<StandInGrab> Generate()
+        public override IObservable<StandInZapitFrame> Generate()
         {
-            return System.Reactive.Linq.Observable.Never<StandInGrab>();
+            return System.Reactive.Linq.Observable.Never<StandInZapitFrame>();
         }
     }
 
     /// <summary>A frame's members ZapitCamera reads, as OpenRigs.Zapit's ZapitFrame has them.</summary>
-    public class StandInGrab
+    public class StandInZapitFrame
     {
         /// <summary>The shown image, streamed and recorded (ZapitFrame.Image).</summary>
         public OpenCV.Net.IplImage Image { get; set; }

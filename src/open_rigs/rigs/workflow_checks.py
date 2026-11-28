@@ -9,7 +9,6 @@ from pathlib import Path
 
 import yaml
 
-import open_rigs.rigs
 from open_rigs.rigs import workflow_lint as lint
 from open_rigs.rigs.lab_rig import LabRig
 
@@ -31,7 +30,7 @@ def tests(root: Path) -> dict[str, Callable[[], None]]:
 
     def test_no_fixed_width_pulse_reaches_a_reward_valve():
         # Every reward is its RewardValve piece's calibrated pulse; checked against the lab's rig template's valve lines.
-        template = (Path(open_rigs.rigs.__file__).parent / "rig-template.yml").read_text(encoding="utf-8").replace("CHANGE-ME", "X")
+        template = (Path(__file__).parent / "rig-template.yml").read_text(encoding="utf-8").replace("CHANGE-ME", "X")
         rig = LabRig.model_validate(yaml.safe_load(template))
         assert rig.reward_valve_lines() and lint.fixed_width_pulses_on_reward_valves(workflow(), rig.reward_valve_lines()) == []
 

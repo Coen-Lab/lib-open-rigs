@@ -311,14 +311,20 @@ class Optogenetics(TaskBlock):
 
 
 def zapit_trial_seconds(combinations, ramp_down_seconds: float) -> tuple[float, str]:
-    """ZapitDaq's per-trial buffer (its MaxTrialSeconds), in seconds, for a session on Zapit-Bonsai that may draw any of
-    `combinations`, and why the session cannot run ("" when it can). Each combination is a whole taskParameters, by alias
-    as JSON (a trainingStages row or a trial condition over the task's own): every task runs the same trial loop and the
-    standard task blocks, so the buffer comes from trialStructure.itiMinSeconds,
-    stimulusToResponseWindowSeconds and responseWindowSeconds, and optogenetics.laserToStimulusSeconds alone:
+    """The task's Zapit trial buffer in seconds, which must fit ZapitDaq's MaxTrialSeconds (rig.yml's zapit.maxTrialSeconds,
+    the rig's chosen limit this does not write to), for a session on Zapit-Bonsai that may draw any of `combinations`, and why the
+    session cannot run ("" when it can). The rig app that launches the session, not this library, calls it at Go. Each
+    combination is a whole taskParameters, by alias as JSON (a trainingStages row or a trial condition over the task's own): every task runs the same trial loop and the
+    standard task blocks, so the buffer comes from trialStructure.itiMinSeconds, stimulusToResponseWindowSeconds,
+    responseWindowSeconds and responseWindowAlwaysFull, and optogenetics.laserToStimulusSeconds alone:
 
     - a trial's end (OpenRigs.Trials TrialEndSeconds): stimulusToResponseWindowSeconds + responseWindowSeconds (0 without),
-      the response window always running in full;
+      the window counted unless trialStructure.responseWindowAlwaysFull is explicitly false (the next interval then starts
+      at the choice, so a window of 0). An absent flag counts as true: a task that fixes the field to true (decision-
+      making) leaves it out of its task files, and counting that as false would refuse its standard laser. A task
+      without the ResponseWindowAlwaysFull block, whose choice does end the trial, is then given the longer buffer;
+      a laser that overruns it stops the session at the next Arm (ZapitDaq refuses to arm while a trial plays), never
+      fires late;
     - the shortest laser trigger to the next trigger: the shortest lead plus trial end, plus the shortest interval less
       the lead, each over the combinations (any may follow any);
     - less OpenRigs.Trials OptoLimits.OverheadSeconds: BusyAfterEndSeconds, the conditions file's largest ramp-down
@@ -334,27 +340,40 @@ def zapit_trial_seconds(combinations, ramp_down_seconds: float) -> tuple[float, 
         values = {"trialStructure.itiMinSeconds": structure.get("itiMinSeconds"),
                   "trialStructure.stimulusToResponseWindowSeconds": structure.get("stimulusToResponseWindowSeconds"),
                   "optogenetics.laserToStimulusSeconds": opto.get("laserToStimulusSeconds")}
+        numbers: dict[str, float] = {}
         for name, value in values.items():
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-                return 0.0, f"{name} is {value!r}, so ZapitDaq's trial buffer cannot be worked out"
+                return 0.0, f"{name}: it is {value!r}, not a number, so the task's Zapit trial buffer cannot be worked out"
+            numbers[name] = float(value)
         window = structure.get("responseWindowSeconds") or 0.0
         if isinstance(window, bool) or not isinstance(window, (int, float)) or not math.isfinite(window):
-            return 0.0, f"trialStructure.responseWindowSeconds is {window!r}, so ZapitDaq's trial buffer cannot be worked out"
-        lead, iti = float(values["optogenetics.laserToStimulusSeconds"]), float(values["trialStructure.itiMinSeconds"])
+            return 0.0, f"trialStructure.responseWindowSeconds: it is {window!r}, not a number, so the task's Zapit trial buffer cannot be worked out"
+        if structure.get("responseWindowAlwaysFull") is False:  # absent counts as true (see the docstring)
+            window = 0.0
+        lead, iti = numbers["optogenetics.laserToStimulusSeconds"], numbers["trialStructure.itiMinSeconds"]
         if lead + ZAPIT_ARM_SECONDS > iti + 1e-9:  # OptoLimits.LeadProblem
-            return 0.0, (f"optogenetics.laserToStimulusSeconds ({lead:g} s) plus Zapit's {ZAPIT_ARM_SECONDS:g} s arm time must be at "
-                         f"most trialStructure.itiMinSeconds ({iti:g} s), the shortest interval")
+            label = (combination or {}).get("label")
+            where = f" in Stage {label}" if label else " in the Task's Own Parameters"
+            return 0.0, (f"trialStructure.itiMinSeconds: the shortest interval{where} is {iti:g} s, but optogenetics.laserToStimulusSeconds "
+                         f"({lead:g} s) plus Zapit's {ZAPIT_ARM_SECONDS:g} s arm time must fit within it: lengthen the interval "
+                         "or shorten the lead")
         leads.append(lead)
-        ends.append(float(values["trialStructure.stimulusToResponseWindowSeconds"]) + float(window))
+        ends.append(numbers["trialStructure.stimulusToResponseWindowSeconds"] + float(window))
         itis.append(iti)
     if not leads:
-        return 0.0, "the task has no trial combination, so ZapitDaq's trial buffer cannot be worked out"
+        return 0.0, "the task has no trial combination, so the task's Zapit trial buffer cannot be worked out"
     gap = min(lead + end for lead, end in zip(leads, ends)) + min(iti - lead for lead, iti in zip(leads, itis))
-    overhead = float(ramp_down_seconds) + ZAPIT_ARM_SECONDS  # OptoLimits.OverheadSeconds
+    ramp = float(ramp_down_seconds)
+    if not math.isfinite(ramp) or ramp < 0:
+        return 0.0, f"the Zapit conditions file's largest ramp-down is {ramp:g} s, so the task's Zapit trial buffer cannot be worked out"
+    overhead = ramp + ZAPIT_ARM_SECONDS  # OptoLimits.OverheadSeconds
     seconds = max(gap - overhead, 0.0)
+    if not math.isfinite(seconds):
+        return 0.0, "the task's Zapit trial buffer is not a finite number of seconds, so it cannot be worked out"
     if seconds <= 1e-9:
-        return 0.0, (f"the shortest laser trigger to the next ({gap:g} s) leaves no ZapitDaq trial buffer after the Zapit "
-                     f"conditions file's {float(ramp_down_seconds):g} s ramp-down and Zapit's {ZAPIT_ARM_SECONDS:g} s arm time")
+        return 0.0, (f"trialStructure.itiMinSeconds: the shortest laser trigger to the next ({gap:g} s) leaves no Zapit trial buffer "
+                     f"after the Zapit conditions file's {ramp:g} s ramp-down and Zapit's {ZAPIT_ARM_SECONDS:g} s arm time: "
+                     "lengthen it or shorten the conditions file's ramp-down")
     return seconds, ""
 
 
@@ -372,7 +391,7 @@ def zapit_open_ended_laser(combinations) -> str:
         if not any(isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 for v in values):
             label = (combination or {}).get("label")
             where = f" in Stage {label}" if label else " in the Task's Own Parameters"
-            return f"Zapit Needs a Laser Duration: optogenetics.laserDurationSeconds Is Not Set{where}"
+            return f"optogenetics.laserDurationSeconds: Zapit needs a laser duration (or a laserCapSeconds), and none is set{where}"
     return ""
 
 

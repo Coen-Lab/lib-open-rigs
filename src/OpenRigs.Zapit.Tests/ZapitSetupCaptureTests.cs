@@ -22,12 +22,20 @@ namespace OpenRigs.Zapit.Tests
             readonly IDisposable subscription;
             byte shade;
 
-            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10, double laserCeilingVolts = 5)
+            public readonly Subject<string> LaserOffs = new Subject<string>();
+
+            // pointed: ZapitDaq answers each Point with Pointed; false as while a play is armed (Refused, which a run does not read).
+            public Rig(TimeSpan? frameTimeout = null, double ceilingMw = 10, double laserCeilingVolts = 5, bool pointed = true)
             {
                 Directory.CreateDirectory(Pending);
                 subscription = new ZapitSetupCapture { PendingFolder = Pending, FrameTimeout = frameTimeout ?? TimeSpan.FromSeconds(2), CeilingMw = ceilingMw, LaserMaxVolts = 5, LaserCeilingVolts = laserCeilingVolts }
-                    .Process(Grids, Stills, Banks, Events, Frames, Aims)
-                    .Subscribe(step => { Steps.Add(step); if (step.Command?.Kind == ZapitDaqCommandKind.Point) Events.OnNext(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed }); }, e => Error = e);
+                    .Process(Grids, Stills, Banks, Events, Frames, Aims, LaserOffs)
+                    .Subscribe(step =>
+                    {
+                        lock (Steps) Steps.Add(step);
+                        if (step.Command?.Kind == ZapitDaqCommandKind.Point)
+                            Events.OnNext(new ZapitDaqEvent { Kind = pointed ? ZapitDaqEventKind.Pointed : ZapitDaqEventKind.Refused, Detail = "ZapitDaq cannot Point while Play Condition is armed" });
+                    }, e => Error = e);
             }
 
             public string Run(string name, string grid)
@@ -68,6 +76,58 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual(ZapitDaqCommandKind.Zero, after[0].Command.Kind);
         }
 
+        // Round 3 S2: Laser Off during a grid run ends it, zeroed, the camera's own settings put back: the next frame points
+        // no laser-on Point, and an aim is no longer held for Go to switch off.
+        [TestMethod]
+        public void LaserOffDuringAGridRunEndsItWithTheLinesZeroed()
+        {
+            using var rig = new Rig();
+            var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2], [-1, 0.5], [2, 2]], \"laserVolts\": 0.3, \"skipFrames\": 0, \"backgrounds\": 1, \"camera\": {\"exposureUs\": 500, \"gainDb\": 0}}");
+            rig.Grids.OnNext(folder);
+            rig.Frame();   // the first point saved, the second pointed
+            Assert.AreEqual(2, rig.Steps.Count(s => s.Command?.Kind == ZapitDaqCommandKind.Point && s.Command.LaserVolts > 0));
+            var before = rig.Steps.Count;
+            rig.LaserOffs.OnNext("");
+            for (int i = 0; i < 6; i++) rig.Frame();
+            var after = rig.Steps.Skip(before).ToList();
+            Assert.AreEqual(1, after.Count, string.Join("; ", after));
+            StringAssert.StartsWith(after[0].ToString(), "Refused Laser Off came during a setup step");
+            StringAssert.EndsWith(after[0].Detail, folder);
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, after[0].Command.Kind);
+            Assert.IsTrue(after[0].Camera.Restore);
+            Assert.IsFalse(File.Exists(Path.Combine(folder, "point_0001.png")));
+
+            rig.Aims.OnNext("1,1,0.3");
+            rig.LaserOffs.OnNext("");   // no step running: still a Zero of the setup's own, after the aim's Point
+            Assert.AreEqual("Off Laser Off", rig.Steps.Last().ToString());
+            Assert.IsTrue(rig.Steps.Last().Aim);
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, rig.Steps.Last().Command.Kind);
+            var beforeGo = rig.Steps.Count;
+            rig.Aims.OnCompleted();   // Go: the aim was ended by Laser Off, so no Off Go
+            Assert.AreEqual(beforeGo, rig.Steps.Count);
+            rig.Grids.OnNext(rig.Run("Frames_U", "{\"volts\": [[1, 2]], \"laserVolts\": 0.3}"));
+            Assert.AreEqual("Pointing", rig.Steps.Last().Stage, "a new run is taken after Laser Off");
+            Assert.IsNull(rig.Error);
+        }
+
+        // Round 3 S4: a grid run whose first Point ZapitDaq refuses (a play armed) is refused after FrameTimeout, zeroed,
+        // and the next setup step is taken; it no longer waits for a Pointed that never comes.
+        [TestMethod]
+        public void AGridRunWhosePointIsRefusedTimesOutAndTheNextStepIsTaken()
+        {
+            using var rig = new Rig(frameTimeout: TimeSpan.FromMilliseconds(50), pointed: false);
+            var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2]], \"laserVolts\": 0.3}");
+            rig.Grids.OnNext(folder);
+            for (int i = 0; i < 100 && rig.Steps.Count < 2; i++) System.Threading.Thread.Sleep(10);
+            var refused = rig.Steps.Last();
+            StringAssert.StartsWith(refused.ToString(), "Refused ZapitDaq did not point the galvos");
+            StringAssert.EndsWith(refused.Detail, folder);
+            Assert.AreEqual(ZapitDaqCommandKind.Zero, refused.Command.Kind);
+            rig.Stills.OnNext(Path.Combine(rig.Pending, "still.png"));
+            Assert.AreEqual("Pointing", rig.Steps.Last().Stage);
+            Assert.IsNull(rig.Error);
+        }
+
         // Audit 24 Nov 2026 L6: a grid's laserVolts is held to the aim's rules and refused, never sent to ZapitDaq.
         [TestMethod]
         public void AGridsLaserVoltsOutsideTheRigsLimitsAreRefused()
@@ -81,6 +141,28 @@ namespace OpenRigs.Zapit.Tests
                 StringAssert.Contains(rig.Steps.Single().Detail, why);
                 Assert.IsNull(rig.Steps.Single().Command);
             }
+        }
+
+        // Round 4 U2: a skipFrames or backgrounds past int, NaN, fractional or over 100 is refused naming grid.json and the
+        // field; it no longer stops the workflow (an OverflowException) or saves backgrounds until the disk fills.
+        [TestMethod]
+        public void AGridsFrameCountsOutOfRangeAreRefusedNamingTheField()
+        {
+            foreach (var (field, value) in new[] { ("skipFrames", "1e10"), ("skipFrames", "99999999999"), ("skipFrames", "NaN"), ("skipFrames", "-1"), ("skipFrames", "101"), ("skipFrames", "\"3\""),
+                ("backgrounds", "2e9"), ("backgrounds", "0"), ("backgrounds", "1.5"), ("backgrounds", "123456789012345678901234567890") })
+            {
+                using var rig = new Rig();
+                var folder = rig.Run("Frames_T", "{\"volts\": [[1, 2]], \"laserVolts\": 0.3, \"" + field + "\": " + value + "}");
+                rig.Grids.OnNext(folder);
+                Assert.IsNull(rig.Error, field + " " + value + ": " + rig.Error);
+                var step = rig.Steps.Single();
+                Assert.AreEqual("Refused", step.Stage);
+                StringAssert.StartsWith(step.Detail, Path.Combine(folder, "grid.json") + " is refused: its " + field + " must be a whole number from ");
+                Assert.IsNull(step.Command);
+            }
+            using var fine = new Rig();
+            fine.Grids.OnNext(fine.Run("Frames_T", "{\"volts\": [[1, 2]], \"laserVolts\": 0.3, \"skipFrames\": 100, \"backgrounds\": 2.0}"));
+            Assert.AreEqual("Pointing", fine.Steps.Last().Stage);
         }
 
         // Audit 24 Nov 2026 C3: a still with no camera frame is refused after FrameTimeout, and the next setup step is taken.
@@ -407,7 +489,7 @@ namespace OpenRigs.Zapit.Tests
         // Mono12 as Bonsai.Pylon gives it (16-bit, raw 0-4095 counts): session frames stretched 0 to the top to 255
         // (B2's dim view peaks near 46); a grid run's frames are Mono8's scale, counts over 16.
         [TestMethod]
-        public void Mono12FramesAreStretchedMinToMaxAndAGridRunsOver16()
+        public void Mono12FramesAreStretchedZeroToTheTopAndAGridRunsOver16()
         {
             var dim = Row(IplDepth.U16, 10, 11, 28, 46);
             var session = ZapitFrameDepth.ToEightBit(dim, mono8Scale: false, top: 46);
@@ -455,18 +537,18 @@ namespace OpenRigs.Zapit.Tests
             frame.Set(new Scalar(48));
             frame[20, 30] = new Scalar(1600);   // the beam
             var crop = new Rect(16, 8, 32, 24);
-            ZapitPylonCapture.Split(frame, true, crop, out var shown, out var still, out _);
+            ZapitFrameDepth.Split(frame, true, crop, out var shown, out var still, out _);
             Assert.AreEqual(new Size(32, 24), shown!.Size);
             Assert.AreEqual(255, (int)shown[20 - 8, 30 - 16].Val0);   // stretched: the beam white
             Assert.AreEqual(255, (int)shown[0, 0].Val0);               // and the skull's 48 at the stretch's top
             Assert.AreEqual(new Size(64, 48), still!.Size);
             Assert.AreEqual(100, (int)still[20, 30].Val0);             // counts over 16
             Assert.AreEqual(3, (int)still[0, 0].Val0);
-            ZapitPylonCapture.Split(frame, false, default, out shown, out still, out _);
+            ZapitFrameDepth.Split(frame, false, default, out shown, out still, out _);
             Assert.AreEqual(new Size(64, 48), shown!.Size);
             Assert.AreSame(shown, still);
             var mono8 = new IplImage(new Size(64, 48), IplDepth.U8, 1);
-            ZapitPylonCapture.Split(mono8, true, crop, out shown, out still, out _);
+            ZapitFrameDepth.Split(mono8, true, crop, out shown, out still, out _);
             Assert.AreSame(mono8, still);
             Assert.AreEqual(new Size(32, 24), shown!.Size);
         }
@@ -493,6 +575,179 @@ namespace OpenRigs.Zapit.Tests
             {
                 Assert.AreSame(frame, ZapitFrameDepth.Crop(frame, bad, out refusal), bad.ToString());
                 StringAssert.Contains(refusal, "100 x 60");
+            }
+        }
+
+        // The camera's own refusal (GenApi's "AutoFunctionROIWidth 1920 > Max 964") reaches the operator naming the camera,
+        // its serial, the .pfs and what to do, the original error kept inside.
+        [TestMethod]
+        public void TheCamerasRefusalNamesTheCameraItsFileAndTheFix()
+        {
+            var raw = new InvalidOperationException("AutoFunctionROIWidth 1920 > Max 964");
+            var settings = ZapitCameraRefusal.Settings("40123456", @"C:\rig\zapit.pfs", raw);
+            Assert.AreSame(raw, settings.InnerException);
+            foreach (var part in new[] { "Zapit camera", "40123456", @"C:\rig\zapit.pfs", "AutoFunctionROIWidth 1920 > Max 964. The camera's settings", "MATLAB Zapit", "power-cycle" })
+                StringAssert.Contains(settings.Message, part);
+            // A message that already ends a sentence gets no second full stop.
+            StringAssert.Contains(ZapitCameraRefusal.Open("40123456", new InvalidOperationException("No device is available.")).Message, "No device is available. Check that");
+            var exposure = ZapitCameraRefusal.Exposure("40123456", raw);
+            Assert.AreSame(raw, exposure.InnerException);
+            StringAssert.Contains(exposure.Message, "Zapit camera");
+            StringAssert.Contains(exposure.Message, "40123456");
+            StringAssert.Contains(ZapitCameraRefusal.Exposure("40123456", raw, restore: true).Message, "back its own exposure");
+        }
+
+        // A missing or unreadable .pfs is said as that, with where it should be, not as the camera refusing its values
+        // (power-cycle); a readable one, or none named, passes on to the camera.
+        [TestMethod]
+        public void AMissingOrUnreadableSettingsFileIsSaidAsThatNotACameraRefusal()
+        {
+            var folder = Path.Combine(Path.GetTempPath(), "ZapitCameraFile", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                var pfs = Path.Combine(folder, "Zapit-Session.pfs");
+                var missing = Assert.ThrowsException<InvalidOperationException>(() => ZapitCameraRefusal.CheckFile("40123456", pfs));
+                foreach (var part in new[] { "Zapit camera", "40123456", "missing", pfs, "sessionPfsPath" })
+                    StringAssert.Contains(missing.Message, part);
+                Assert.IsFalse(missing.Message.Contains("power-cycle"), missing.Message);
+                File.WriteAllText(pfs, "# pfs");
+                ZapitCameraRefusal.CheckFile("40123456", pfs);
+                ZapitCameraRefusal.CheckFile("40123456", null);
+                using (new FileStream(pfs, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    var held = Assert.ThrowsException<InvalidOperationException>(() => ZapitCameraRefusal.CheckFile("40123456", pfs));
+                    StringAssert.Contains(held.Message, "cannot be read");
+                    StringAssert.Contains(held.Message, pfs);
+                    Assert.IsInstanceOfType(held.InnerException, typeof(IOException));
+                    Assert.IsFalse(held.Message.Contains("power-cycle"), held.Message);
+                }
+            }
+            finally { Directory.Delete(folder, true); }
+        }
+
+        // ZapitPylonCapture's opening against Bonsai.Pylon 0.4.0's PylonCapture.Generate, in its order: read ParameterFile,
+        // open the camera, load the file if one is named, then Configure (which ZapitCameraOpening.Configure is part of).
+        sealed class PylonOrder
+        {
+            public string? ParameterFile;
+            public string? FileTheBaseRead = "unread";
+            public Exception? OpenError;
+            public Exception? Refusal;   // the camera refuses the .pfs's values, whoever loads it
+            public bool Opened, Configured;
+            public readonly ZapitCameraOpening Opening;
+
+            public PylonOrder(string? parameterFile)
+            {
+                ParameterFile = parameterFile;
+                Opening = new ZapitCameraOpening(() => "24876055", () => ParameterFile, file => ParameterFile = file);
+            }
+
+            void Load(string file)
+            {
+                if (!File.Exists(file)) throw new FileNotFoundException("Pylon could not find the feature stream.", file);
+                if (Refusal != null) throw Refusal;
+            }
+
+            IObservable<int> Base() => System.Reactive.Linq.Observable.Create<int>(observer =>
+            {
+                try
+                {
+                    FileTheBaseRead = ParameterFile;
+                    if (OpenError != null) throw OpenError;
+                    Opened = true;
+                    if (!string.IsNullOrEmpty(FileTheBaseRead)) Load(FileTheBaseRead!);
+                    Opening.Configure(Load);
+                    Configured = true;
+                    observer.OnCompleted();
+                }
+                catch (Exception error) { observer.OnError(error); }
+                return System.Reactive.Disposables.Disposable.Empty;
+            });
+
+            public Exception? Run()
+            {
+                Exception? said = null;
+                Opening.Open(Base).Subscribe(_ => { }, e => said = e);
+                return said;
+            }
+        }
+
+        // With four cameras on a rig, each failure of the Zapit camera's opening is said for its cause: Pylon's own open error
+        // (unplugged, wrong serial, held) as could not be opened; a missing .pfs as missing, the camera never touched; the
+        // camera refusing the .pfs's values (GenApi's "AutoFunctionROIWidth 1920 > Max 964") as that, with power-cycle.
+        // Bonsai.Pylon loads the file before Configure, so the base is handed none and gets it back once open.
+        [TestMethod]
+        public void EachCameraOpeningFailureIsSaidForItsCause()
+        {
+            var folder = Path.Combine(Path.GetTempPath(), "ZapitCameraOpening", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                var pfs = Path.Combine(folder, "Zapit-Session.pfs");
+                File.WriteAllText(pfs, "# pfs");
+
+                var unplugged = new PylonOrder(pfs) { OpenError = new InvalidOperationException("No device is available or no device contains the provided device info properties.") };
+                var said = unplugged.Run();
+                Assert.AreSame(unplugged.OpenError, said!.InnerException);
+                foreach (var part in new[] { "Zapit camera", "24876055", "could not be opened", unplugged.OpenError.Message, "plugged in", "MATLAB Zapit", "Pylon Viewer", "untick Zapit-Bonsai" })
+                    StringAssert.Contains(said.Message, part);
+                Assert.AreEqual(pfs, unplugged.ParameterFile, "the base's ParameterFile is put back after a failed open");
+
+                var refusing = new PylonOrder(pfs) { Refusal = new InvalidOperationException("AutoFunctionROIWidth 1920 > Max 964") };
+                said = refusing.Run();
+                Assert.IsNull(refusing.FileTheBaseRead, "the base must be handed no ParameterFile: it loads it before Configure");
+                Assert.AreSame(refusing.Refusal, said!.InnerException);
+                foreach (var part in new[] { "refused its settings file", pfs, "AutoFunctionROIWidth 1920 > Max 964", "power-cycle" })
+                    StringAssert.Contains(said.Message, part);
+                Assert.IsFalse(said.Message.Contains("could not be opened"), said.Message);
+                Assert.AreEqual(pfs, refusing.ParameterFile);
+
+                var fine = new PylonOrder(pfs);
+                Assert.IsNull(fine.Run());
+                Assert.IsTrue(fine.Configured);
+                Assert.AreEqual(pfs, fine.ParameterFile, "the base's ParameterFile is put back once the camera is open");
+
+                var missing = new PylonOrder(Path.Combine(folder, "Gone.pfs"));
+                said = missing.Run();
+                StringAssert.Contains(said!.Message, "missing");
+                Assert.IsFalse(said.Message.Contains("could not be opened"), said.Message);
+                Assert.IsFalse(missing.Opened, "a missing file is said before the camera is opened");
+
+                var none = new PylonOrder(null);
+                Assert.IsNull(none.Run());
+                Assert.IsTrue(none.Configured);
+            }
+            finally { Directory.Delete(folder, true); }
+        }
+
+        // An error once the camera was opened passes as it is.
+        [TestMethod]
+        public void AnErrorAfterTheCameraOpenedPassesAsItIs()
+        {
+            var raw = new InvalidOperationException("Grab stopped.");
+            Exception? said = null;
+            ZapitCameraRefusal.NameOpenErrors(System.Reactive.Linq.Observable.Throw<int>(raw), () => true, "24876055").Subscribe(_ => { }, e => said = e);
+            Assert.AreSame(raw, said);
+        }
+
+        // A crop whose edge plus size overflows an int (x + width wrapped negative, so it "fitted" and cvCopy killed Bonsai)
+        // is refused, whole frame shown.
+        [TestMethod]
+        public void ACropTooFarOutToAddUpIsRefusedNotCut()
+        {
+            var frame = new IplImage(new Size(64, 48), IplDepth.U8, 1);
+            var state = new ZapitCropState();
+            foreach (var request in new[] { "#1 2147483640,0,16,16", "#1 0,2147483640,16,16", "#1 2147483640,2147483640,2147483646,2147483646" })
+            {
+                Assert.IsTrue(state.Apply(ZapitCropRequest.Parse(request).Camera!), request);
+                var cut = state.Current;
+                var shown = ZapitFrameDepth.Crop(frame, cut, out var refusal);
+                Assert.AreSame(frame, shown, request);
+                Assert.IsNotNull(refusal, request);
+                var answers = state.Finish(cut, refusal);
+                Assert.AreEqual("Refused", answers![0].Stage, request);
+                StringAssert.Contains(answers[0].Detail, "Now Full Frame", request);
             }
         }
 
@@ -667,6 +922,21 @@ namespace OpenRigs.Zapit.Tests
             other.Aims.OnCompleted();
             Assert.AreEqual("Off Go", other.Steps.Last().ToString());
             Assert.AreEqual(ZapitDaqCommandKind.Zero, other.Steps.Last().Command.Kind);
+        }
+
+        // Round 4 W4: an aim ZapitDaq refuses (a play armed) reads Refused with ZapitDaq's reason on the Aim metric, not
+        // Aiming, and Go has no beam to switch off.
+        [TestMethod]
+        public void AnAimZapitDaqRefusesReadsRefused()
+        {
+            using var rig = new Rig(pointed: false);
+            rig.Aims.OnNext("1,1,0.3");
+            var aims = rig.Steps.Where(s => s.Aim).Select(s => s.ToString()).ToArray();
+            CollectionAssert.AreEqual(new[] { "Aiming 1,1,0.3", "Refused ZapitDaq cannot Point while Play Condition is armed" }, aims);
+            Assert.IsNull(rig.Steps.Last().Command);
+            rig.Aims.OnCompleted();
+            Assert.IsFalse(rig.Steps.Any(s => s.Stage == "Off"), "no beam was aimed: no Off at Go");
+            Assert.IsNull(rig.Error);
         }
 
         [TestMethod]

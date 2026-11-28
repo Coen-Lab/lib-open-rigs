@@ -3,9 +3,10 @@ trial over TCP (host, port, hardwareTriggered), and ZapitDaq (OpenRigs.Zapit), t
 galvos, the laser and the masking LED, with its Basler camera (the Zapit-Bonsai fields, open_rigs.zapit's key names). A blue rig
 running both carries both sets in its one zapit block."""
 import json
+import math
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 import yaml
 from pydantic import Field, model_validator
@@ -49,13 +50,20 @@ def max_ramp_down_seconds(path: str | Path) -> float:
     def ramp(v):
         if not isinstance(v, dict):
             return None
-        attributes = v.get("Attributes") if isinstance(v.get("Attributes"), dict) else {}
+        attributes = v.get("Attributes")
+        if not isinstance(attributes, dict):
+            attributes = {}
         return v.get("offRampDownDuration_ms", attributes.get("offRampDownDuration_ms"))
 
-    missing = [k for k, v in conditions.items() if ramp(v) is None]
+    ramp_ms = {k: ramp(v) for k, v in conditions.items()}
+    missing = [k for k, v in ramp_ms.items() if v is None]
     if not conditions or missing:
         raise ValueError(f"the Zapit conditions file {path} has {'no conditions' if not conditions else ', '.join(missing) + ' with no offRampDownDuration_ms'}")
-    return max(float(ramp(v)) for v in conditions.values()) / 1000
+    ramps = [float(v) for v in ramp_ms.values() if v is not None]
+    bad = [k for k, x in zip(conditions, ramps) if not math.isfinite(x) or x < 0]
+    if bad:
+        raise ValueError(f"the Zapit conditions file {path} has {', '.join(bad)} with an offRampDownDuration_ms that is not a finite number of 0 or more")
+    return max(ramps) / 1000
 
 
 def bank_ramp_down_seconds(bank: str | Path) -> float:
@@ -91,7 +99,7 @@ class ZapitCamera(BaseSchema):
 # The Zapit-Bonsai fields a block naming its NI device (zapit.device) must all give.
 ZAPIT_DAQ_REQUIRED = ("device", "galvo_x_channel", "galvo_y_channel", "laser_channel", "led_channel", "photodiode_channel",
                       "trigger_channel", "sample_rate", "laser_min_max_mw", "laser_min_max_control_volts", "ceiling_mw",
-                      "microns_per_pixel", "volts_per_pixel", "camera")
+                      "max_trial_seconds", "microns_per_pixel", "volts_per_pixel", "camera")
 
 
 class Zapit(BaseSchema):
@@ -112,17 +120,15 @@ class Zapit(BaseSchema):
     laser_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao2"], description="The AO line setting the laser's power (its control volts).")
     led_channel: Optional[str] = Field(default=None, pattern=r"^ao\d+$", examples=["ao3"], description="The AO line driving the masking LED.")
     photodiode_channel: Optional[str] = Field(default=None, pattern=r"^ai\d+$", examples=["ai0"], description="The AI line reading the photodiode, for the laser curve.")
-    blanking_times_ms: Optional[List[float]] = Field(default=None, min_length=3, max_length=3, description="The laser blanking time, onset shift and offset shift, in ms, as open_rigs.zapit reads them. Absent, open_rigs.zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.")
+    blanking_times_ms: Optional[List[Annotated[float, Field(allow_inf_nan=False)]]] = Field(default=None, min_length=3, max_length=3, description="The laser blanking time, onset shift and offset shift, in ms, as open_rigs.zapit reads them. Absent, open_rigs.zapit uses MATLAB's 0.3, -0.12, 0.25. Optional, and not part of the Zapit-Bonsai fields a block gives together.")
     trigger_channel: Optional[str] = Field(default=None, pattern=r"^PFI\d+$", examples=["PFI0"], description="The PFI line the Behavior board's ZapitTrigger line is cabled to; each trial starts on it.")
-    sample_rate: Optional[float] = Field(default=None, gt=0, examples=[100000], description="AO samples a second, per channel; every bank is built at it.")
-    laser_min_max_mw: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.")
-    laser_min_max_control_volts: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="The laser's control volts at its lowest and highest power.")
-    ceiling_mw: Optional[float] = Field(default=None, ge=0, description="This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): open_rigs.zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
-    max_trial_seconds: Optional[float] = Field(default=None, gt=0, description="The longest trial buffer, in seconds: a task's laserCapSeconds above it is refused at Go, and a trial until the outcome is finite at it.")
-    # max_trial_seconds is no longer one of ZAPIT_DAQ_REQUIRED: ZapitDaq's buffer comes from the task's timing (open_rigs.core.task
-    # zapit_trial_seconds), which the launcher gives ZapitDaq for each launch; a value a person wrote here is not used.
-    microns_per_pixel: Optional[float] = Field(default=None, gt=0, description="The Zapit camera's scale at the sample, in microns a pixel.")
-    volts_per_pixel: Optional[float] = Field(default=None, gt=0, description="The galvos' volts a camera pixel, the scanner calibration's starting guess.")
+    sample_rate: Optional[float] = Field(default=None, allow_inf_nan=False, gt=0, examples=[100000], description="AO samples a second, per channel; every bank is built at it.")
+    laser_min_max_mw: Optional[List[Annotated[float, Field(allow_inf_nan=False)]]] = Field(default=None, min_length=2, max_length=2, description="The laser's lowest and highest power, in mW, at laserMinMaxControlVolts.")
+    laser_min_max_control_volts: Optional[List[Annotated[float, Field(allow_inf_nan=False)]]] = Field(default=None, min_length=2, max_length=2, description="The laser's control volts at its lowest and highest power.")
+    ceiling_mw: Optional[float] = Field(default=None, allow_inf_nan=False, ge=0, description="This rig's laser ceiling, a peak power in mW (a task's laserPowerMw is time-averaged per point, below its peak): open_rigs.zapit caps every volts value it hands out (bank, aiming, scanner calibration) at it. 0 means the laser is disabled: every laser volts value is 0 V.")
+    max_trial_seconds: Optional[float] = Field(default=None, allow_inf_nan=False, gt=0, description="ZapitDaq's longest trial buffer in seconds, chosen per rig and required with the other Zapit-Bonsai fields: a task's laser above it is refused at Go.")
+    microns_per_pixel: Optional[float] = Field(default=None, allow_inf_nan=False, gt=0, description="The Zapit camera's scale at the sample, in microns a pixel.")
+    volts_per_pixel: Optional[float] = Field(default=None, allow_inf_nan=False, gt=0, description="The galvos' volts a camera pixel, the scanner calibration's starting guess.")
     invert_x_scanner: bool = Field(default=False, description="Whether the X galvo moves against the camera's X.")
     invert_y_scanner: bool = Field(default=False, description="Whether the Y galvo moves against the camera's Y.")
     camera: Optional[ZapitCamera] = Field(default=None, description="Zapit's Basler camera, Camera-Zapit in the data and live view.")

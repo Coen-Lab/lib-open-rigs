@@ -60,10 +60,10 @@ namespace OpenRigs.Zapit
     /// </summary>
     public class ZapitFrame
     {
-        /// <summary>The shown frame: stretched, cropped; streamed and recorded.</summary>
+        /// <summary>The shown frame: a Mono12 frame stretched, a Mono8 frame as it comes; cropped; streamed and recorded.</summary>
         public OpenCV.Net.IplImage? Image { get; set; }
 
-        /// <summary>The whole frame Zapit's setup saves: stretched, or Mono8's scale during a grid run.</summary>
+        /// <summary>The whole frame Zapit's setup saves: a Mono12 frame stretched, or at Mono8's scale during a grid run; a Mono8 frame as it comes.</summary>
         public OpenCV.Net.IplImage? Still { get; set; }
 
         /// <summary>The grab's ID (PylonCapture's GrabResult.ID), as the recording's frame log keeps it.</summary>
@@ -77,6 +77,108 @@ namespace OpenRigs.Zapit
         /// size is known only from a frame). A refused crop is dropped, the whole frame shown, never a clamped one;
         /// ZapitCropReport sends them in order to the metric Zapit-Main.Crop.</summary>
         public ZapitSetupStep[]? CropReports { get; set; }
+    }
+
+    /// <summary>The errors the Zapit camera's settings raise, said to the operator: the camera, its serial and what to do, with the
+    /// camera's own words and exception kept inside.</summary>
+    internal static class ZapitCameraRefusal
+    {
+        /// <summary>The error's own message as a sentence, so the next sentence does not run on from it (GenApi's carry no full stop).</summary>
+        static string Said(Exception error)
+        {
+            var message = error.Message.TrimEnd();
+            return message.EndsWith(".", StringComparison.Ordinal) ? message : message + ".";
+        }
+
+        /// <summary>The camera could not be opened (not found, or held by another program): any error before Configure, the
+        /// .pfs being loaded only there (ZapitCameraOpening).</summary>
+        public static InvalidOperationException Open(string? serialNumber, Exception error) => new InvalidOperationException(
+            $"The Zapit camera (serial {serialNumber}) could not be opened: {Said(error)} " +
+            "Check that it is plugged in and not held by another program (MATLAB Zapit, Pylon Viewer), or untick Zapit-Bonsai for this session.", error);
+
+        /// <summary><paramref name="frames"/> with an error raised before the camera was opened (<paramref name="opened"/>
+        /// still false) said as <see cref="Open"/>; later errors as they come.</summary>
+        public static IObservable<T> NameOpenErrors<T>(IObservable<T> frames, Func<bool> opened, string? serialNumber) =>
+            frames.Catch<T, Exception>(error => Observable.Throw<T>(opened() ? error : Open(serialNumber, error)));
+
+        /// <summary>Throws, naming the file and where it should be, when <paramref name="parameterFile"/> is named but missing
+        /// or cannot be read: not the camera refusing its values.</summary>
+        public static void CheckFile(string? serialNumber, string? parameterFile)
+        {
+            if (string.IsNullOrEmpty(parameterFile)) return;
+            var path = System.IO.Path.GetFullPath(parameterFile);
+            if (!System.IO.File.Exists(path))
+                throw new InvalidOperationException(
+                    $"The settings file of the Zapit camera (serial {serialNumber}) is missing: it should be at {path} (rig.yml's zapit.camera.sessionPfsPath). " +
+                    "Save the .pfs there from this camera, or untick Zapit-Bonsai for this session.");
+            try { using (System.IO.File.OpenRead(path)) { } }
+            catch (Exception error) when (error is System.IO.IOException || error is UnauthorizedAccessException)
+            {
+                throw new InvalidOperationException(
+                    $"The settings file {path} of the Zapit camera (serial {serialNumber}) cannot be read: {Said(error)} " +
+                    "Close the program holding it or fix its permissions, or untick Zapit-Bonsai for this session.", error);
+            }
+        }
+
+        /// <summary>The opened camera refused the .pfs's values as it was loaded (ZapitCameraOpening.Configure).</summary>
+        public static InvalidOperationException Settings(string? serialNumber, string? parameterFile, Exception error) => new InvalidOperationException(
+            $"The Zapit camera (serial {serialNumber}) refused its settings file {parameterFile}: {Said(error)} " +
+            "The camera's settings do not match the file. A crop left on the camera by another program (such as MATLAB Zapit) limits its width: " +
+            "power-cycle or reset the camera, or save the .pfs again from this camera.", error);
+
+        /// <summary>The camera did not take the grid run's exposure and gain, or (<paramref name="restore"/>) did not take back its own.</summary>
+        public static InvalidOperationException Exposure(string? serialNumber, Exception error, bool restore = false) => new InvalidOperationException(
+            $"The Zapit camera (serial {serialNumber}) did not take " + (restore ? "back its own exposure and gain after the grid" : "the grid's exposure and gain") + $": {error.Message}", error);
+    }
+
+    /// <summary>
+    /// Opens the Zapit camera so each error is said for its cause. Bonsai.Pylon's PylonCapture.Generate (0.4.0) opens the camera,
+    /// loads its ParameterFile, then calls Configure, so a .pfs the camera refuses would fail before Configure, looking like a
+    /// camera that cannot be opened. So the file is checked before the camera is touched, the base is handed no ParameterFile
+    /// (put back once it has read it), and the .pfs is loaded in Configure: an error before Configure is the camera's own.
+    /// </summary>
+    internal sealed class ZapitCameraOpening
+    {
+        readonly Func<string?> serialNumber;
+        readonly Func<string?> getParameterFile;
+        readonly Action<string?> setParameterFile;
+        string? parameterFile;   // the .pfs this opening loads in Configure
+        volatile bool opened;   // Configure reached: the camera was found and opened
+
+        public ZapitCameraOpening(Func<string?> serialNumber, Func<string?> getParameterFile, Action<string?> setParameterFile)
+        {
+            this.serialNumber = serialNumber;
+            this.getParameterFile = getParameterFile;
+            this.setParameterFile = setParameterFile;
+        }
+
+        /// <summary><paramref name="grab"/> (PylonCapture's Generate) with no ParameterFile, after the file is checked; its errors
+        /// before Configure said as the camera not opening.</summary>
+        public IObservable<T> Open<T>(Func<IObservable<T>> grab) => Observable.Defer(() =>
+        {
+            var file = getParameterFile();
+            ZapitCameraRefusal.CheckFile(serialNumber(), file);
+            parameterFile = file;
+            opened = false;
+            setParameterFile(null);
+            return ZapitCameraRefusal.NameOpenErrors(grab(), () => opened, serialNumber()).Finally(PutBack);
+        });
+
+        /// <summary>The camera is open: puts ParameterFile back and loads the .pfs with <paramref name="load"/>, a refusal said as one.</summary>
+        public void Configure(Action<string> load)
+        {
+            opened = true;
+            PutBack();
+            var file = parameterFile;
+            if (string.IsNullOrEmpty(file)) return;
+            try { load(file!); }
+            catch (Exception error) { throw ZapitCameraRefusal.Settings(serialNumber(), file, error); }
+        }
+
+        void PutBack()
+        {
+            if (getParameterFile() == null) setParameterFile(parameterFile);
+        }
     }
 
     /// <summary>The camera features a grid run sets, by GenICam name: a Basler camera's, or a test's.</summary>
@@ -148,8 +250,8 @@ namespace OpenRigs.Zapit
 
     /// <summary>
     /// The Zapit camera: Bonsai.Pylon's PylonCapture (its serial number and session .pfs), whose exposure and gain the
-    /// setup phase sets for a grid run's frames while it grabs, and puts back after. PylonCapture loads its .pfs only as
-    /// the camera opens and has no exposure or gain property; its Configure hands over the opened camera, kept here.
+    /// setup phase sets for a grid run's frames while it grabs, and puts back after. PylonCapture has no exposure or gain
+    /// property; its Configure hands over the opened camera, kept here, and loads the .pfs (ZapitCameraOpening).
     /// Every frame is 8-bit (ZapitFrameDepth), given two ways (ZapitFrame): Image, the shown and recorded picture, a Mono12
     /// frame stretched to its StretchTop always, cut to the crop the setup sent (SetCrop; the whole frame until one comes);
     /// Still, the whole frame Zapit's setup saves, stretched too except during a grid run, when it is Mono8's scale
@@ -162,60 +264,35 @@ namespace OpenRigs.Zapit
         CameraExposure? exposure;
         volatile bool gridApplied;   // a grid run's exposure is on the camera: Mono12 stills go to Mono8's scale
         readonly ZapitCropState crop = new ZapitCropState();   // the shown frame's crop (empty: the whole frame) and its pending answer
+        readonly ZapitCameraOpening opening;
 
-        /// <summary>Loads the .pfs as PylonCapture does and keeps the opened camera for the settings.</summary>
+        public ZapitPylonCapture() => opening = new ZapitCameraOpening(() => SerialNumber, () => ParameterFile, file => ParameterFile = file);
+
+        /// <summary>Loads the .pfs into the opened camera (the base was handed none: ZapitCameraOpening) and keeps the camera for the settings.</summary>
         protected override void Configure(Camera camera)
         {
+            opening.Configure(file => camera.Parameters.Load(file, ParameterPath.CameraDevice));
             base.Configure(camera);
             lock (cameraLock) exposure = new CameraExposure(new BaslerFeatures(camera.Parameters));
         }
 
-        /// <summary>The camera's frames as PylonCapture grabs them, each made 8-bit and stretched (ZapitFrameDepth), whole.</summary>
-        public override IObservable<PylonDataFrame> Generate() => base.Generate().Select(frame =>
-        {
-            if (frame.Image == null || frame.Image.Depth == OpenCV.Net.IplDepth.U8) return frame;
-            return new PylonDataFrame(ZapitFrameDepth.ToEightBit(frame.Image, false, ZapitFrameDepth.StretchTop(frame.Image)), frame.GrabResult);
-        });
-
-        /// <summary>A grabbed frame as the shown image (stretched, cropped) and the still Zapit's setup saves (whole; Mono8's
-        /// scale in a grid run), each null for a null frame.</summary>
-        internal static void Split(OpenCV.Net.IplImage? image, bool grid, OpenCV.Net.Rect crop, out OpenCV.Net.IplImage? shown, out OpenCV.Net.IplImage? still, out string? cropRefusal)
-        {
-            shown = still = image;
-            cropRefusal = null;
-            if (image == null) return;
-            if (image.Depth != OpenCV.Net.IplDepth.U8)
-            {
-                shown = ZapitFrameDepth.ToEightBit(image, false, ZapitFrameDepth.StretchTop(image));
-                still = grid ? ZapitFrameDepth.ToEightBit(image, true, 0) : shown;
-            }
-            shown = ZapitFrameDepth.Crop(shown!, crop, out cropRefusal);
-        }
-
         /// <summary>The camera's frames, with each of <paramref name="settings"/> applied to it while it grabs: each frame
-        /// shown stretched and cropped (Image), and whole for Zapit's setup (Still).</summary>
+        /// shown cropped, a Mono12 frame stretched (Image), and whole for Zapit's setup (Still).</summary>
         public IObservable<ZapitFrame> Generate(IObservable<ZapitCameraSettings> settings) => Observable.Create<ZapitFrame>(observer =>
             new CompositeDisposable(
-                base.Generate().Select(frame =>
-                {
-                    var cut = crop.Current;
-                    Split(frame.Image, gridApplied, cut, out var shown, out var still, out var refusal);
-                    return new ZapitFrame { Image = shown, Still = still, CropReports = crop.Finish(cut, refusal), FrameID = frame.GrabResult?.ID ?? 0, Timestamp = frame.GrabResult?.Timestamp ?? 0 };
-                }).Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; } crop.Reset(); }).Subscribe(observer),
+                opening.Open(() => base.Generate())
+                    .Select(frame => ZapitFrameDepth.Frame(frame.Image, gridApplied, crop, frame.GrabResult?.ID ?? 0, frame.GrabResult?.Timestamp ?? 0))
+                    .Finally(() => { lock (cameraLock) { exposure = null; gridApplied = false; } crop.Reset(); }).Subscribe(observer),
                 settings.Subscribe(s =>
                 {
                     lock (cameraLock)
                     {
                         try
                         {
-                            if (s.SetCrop)   // the shown frame only: from the next frame, whatever the camera does
-                            {
-                                if (s.RejectReason != null) { crop.Reject(s.RejectReason, s.CropRequest); return; }
-                                crop.Set(s.CropWidth > 0 && s.CropHeight > 0 ? new OpenCV.Net.Rect(s.CropX, s.CropY, s.CropWidth, s.CropHeight) : default, s.CropRequest);
-                                return;
-                            }
+                            if (crop.Apply(s)) return;   // the shown frame only: from the next frame, whatever the camera does
                             if (exposure == null) throw new InvalidOperationException("The Zapit camera is not open, so the grid's exposure cannot be set.");
-                            exposure.Apply(s);
+                            try { exposure.Apply(s); }
+                            catch (Exception error) { throw ZapitCameraRefusal.Exposure(SerialNumber, error, s.Restore); }
                             gridApplied = exposure.GridApplied;
                         }
                         catch (Exception error) { observer.OnError(error); }   // stops the workflow naming it

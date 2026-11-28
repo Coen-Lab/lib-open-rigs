@@ -177,17 +177,19 @@ namespace OpenRigs.Zapit
         public int Cycles(int condition, ZapitBankVariant variant, double durationSeconds, double maxTrialSeconds)
         {
             int cycleRows = Conditions[condition - 1].ScanCycle.Length;
-            var capRows = (long)Math.Floor(maxTrialSeconds * SampleRate + 1e-6);
+            // Counted in double and checked against the cap before any cast to int, so a long trial cannot wrap round
+            // to a short or negative row count; the cap keeps every row index an int.
+            var capRows = Math.Min(Math.Floor(maxTrialSeconds * SampleRate + 1e-6), int.MaxValue);
             if (durationSeconds < 0 || double.IsNaN(durationSeconds))
                 throw new InvalidOperationException($"A Zapit trial cannot last {durationSeconds} s.");
             var cycles = durationSeconds > 0
-                ? (int)Math.Ceiling(durationSeconds * SampleRate / cycleRows - 1e-9)
-                : (int)((capRows + variant.TailReplaces - variant.TailRows) / cycleRows);
-            if (cycles < 1 || TrialRows(condition, variant, cycles) > capRows)
+                ? Math.Ceiling(durationSeconds * SampleRate / cycleRows - 1e-9)
+                : Math.Floor((capRows + variant.TailReplaces - variant.TailRows) / cycleRows);
+            if (!(cycles >= 1) || !(durationSeconds * SampleRate <= capRows) || !(cycles * cycleRows - variant.TailReplaces + variant.TailRows <= capRows))
                 throw new InvalidOperationException(durationSeconds > 0
                     ? $"A Zapit trial of {durationSeconds} s with its ramp is longer than maxTrialSeconds ({maxTrialSeconds} s)."
                     : $"Condition {condition}'s ramp does not fit maxTrialSeconds ({maxTrialSeconds} s).");
-            return cycles;
+            return (int)cycles;
         }
 
         /// <summary>The trial's samples from <paramref name="firstRow"/> to its end, one row per channel (galvo X, galvo Y,

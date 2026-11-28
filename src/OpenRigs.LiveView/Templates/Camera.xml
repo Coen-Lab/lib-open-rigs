@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A camera: the image found in its data (by type), sampled, shrunk and JPEG-encoded by
-     OpenRigs.Streaming's PackVideoMessage, on the video port. -->
+     OpenRigs.Streaming's PackVideoMessage, on the video port. The data's end is not passed on
+     (IgnoreCompletion), as it would close VideoMessage for every camera. -->
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Workflow>
     <Nodes>
@@ -21,9 +23,13 @@
         <Interpolation>Area</Interpolation>
         <StreamName>{{Stream}}</StreamName>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:IgnoreCompletion" />
+      </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="0" To="3" Label="Source1" />
+      <Edge From="3" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
     </Edges>
   </Workflow>

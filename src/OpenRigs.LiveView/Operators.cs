@@ -80,6 +80,27 @@ namespace OpenRigs.LiveView
         }
     }
 
+    /// <summary>
+    /// Passes on a device's data and any error, but not its end. Each stream ends in a
+    /// MulticastSubject into the shared DataMessage or VideoMessage, which passes an end on too:
+    /// a device whose data ends (Camera-Zapit.Data in a session that opens no Zapit) would close
+    /// that subject, and every other device's stream on its port with it.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Combinator)]
+    [Description("Passes on each element and error, never the end, so a device whose data ends leaves the shared streams open.")]
+    public class IgnoreCompletion
+    {
+        /// <summary>Passes on each element and error of a sequence, never its end.</summary>
+        /// <typeparam name="TSource">The type of the elements.</typeparam>
+        /// <param name="source">The device's data.</param>
+        /// <returns>The same elements and error, never ending.</returns>
+        public IObservable<TSource> Process<TSource>(IObservable<TSource> source)
+        {
+            return source.Concat(Observable.Never<TSource>());
+        }
+    }
+
     /// <summary>One message of a board's channels stream: the register it came from and its value with the board's timestamp.</summary>
     public class BoardChannelMessage
     {

@@ -45,9 +45,20 @@ namespace OpenRigs.Devices.Zapit
 
         static readonly Regex ConditionKey = new Regex(@"^stimLocations(\d+)\s*:", RegexOptions.CultureInvariant);
         static readonly Regex TopLevelKey = new Regex(@"^([A-Za-z_]\w*)\s*:", RegexOptions.Multiline | RegexOptions.CultureInvariant);
-        static readonly Regex RampDown = new Regex(@"offRampDownDuration_ms\s*:\s*([0-9.eE+-]+)", RegexOptions.CultureInvariant);
+        // A value runs to its line's end, a YAML comment, or the end of its flow mapping's entry ("," then the next key, "}" or
+        // "]"), so "250,5" or ".nan" is read whole and refused, not as 250 or ".".
+        const string Value = @"[ \t]*:[ \t]*([^\r\n#,}\]]*(?:,[ \t]*[0-9][^\r\n#,}\]]*)*)";
+        static readonly Regex RampDown = new Regex("offRampDownDuration_ms" + Value, RegexOptions.CultureInvariant);
         static readonly Regex Coordinate = new Regex(@"^[ \t]+(ML|AP)[ \t]*:[ \t]*(.*?)[ \t]*\r?$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
-        static readonly Regex ModulationFrequency = new Regex(@"stimModulationFreqHz\s*:\s*([0-9.eE+-]+)", RegexOptions.CultureInvariant);
+        static readonly Regex ModulationFrequency = new Regex("stimModulationFreqHz" + Value, RegexOptions.CultureInvariant);
+
+        // A finite number written in invariant culture (a decimal point, no thousands separator), or null.
+        static double? Finite(string value)
+        {
+            double parsed;
+            if (!double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) || double.IsNaN(parsed) || double.IsInfinity(parsed)) return null;
+            return parsed;
+        }
 
         /// <summary>
         /// The conditions in the file, each with its points, and its max ramp-down, after checking they are numbered 1 to N,
@@ -62,7 +73,14 @@ namespace OpenRigs.Devices.Zapit
             foreach (var line in text.Split('\n'))
             {
                 var match = ConditionKey.Match(line);
-                if (match.Success) numbers.Add(int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture));
+                if (!match.Success) continue;
+                int number;
+                if (!int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out number))
+                {
+                    throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                        "The Zapit conditions file '{0}' has a condition stimLocations{1}, a number too large: they must be exactly 1 to N.", path, match.Groups[1].Value));
+                }
+                numbers.Add(number);
             }
             if (numbers.Count == 0)
             {
@@ -169,10 +187,11 @@ namespace OpenRigs.Devices.Zapit
             var frequency = Match.Empty;
             if (blocks.TryGetValue("stimModulationFreqHz", out block)) frequency = ModulationFrequency.Match(block);
             if (!frequency.Success && blocks.TryGetValue("stimLocations01", out block)) frequency = ModulationFrequency.Match(block);
-            var hz = frequency.Success ? double.Parse(frequency.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture) : double.NaN;
-            var cycleMs = frequency.Success ? 1000.0 / hz : 0;
-
             var problems = new List<string>();
+            var hz = frequency.Success ? Finite(frequency.Groups[1].Value) : null;
+            if (frequency.Success && !(hz > 0))
+                problems.Add(string.Format(CultureInfo.InvariantCulture, "stimModulationFreqHz is '{0}', not a number above 0", frequency.Groups[1].Value.Trim()));
+            var cycleMs = hz > 0 ? 1000.0 / hz.Value : 0;
             foreach (var pair in blocks)
             {
                 if (!ConditionKey.IsMatch(pair.Key + ":")) continue;
@@ -182,7 +201,13 @@ namespace OpenRigs.Devices.Zapit
                     problems.Add(pair.Key + " has no offRampDownDuration_ms");
                     continue;
                 }
-                var rampMs = double.Parse(ramp.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture);
+                var read = Finite(ramp.Groups[1].Value);
+                if (read == null)
+                {
+                    problems.Add(string.Format(CultureInfo.InvariantCulture, "{0}'s offRampDownDuration_ms is '{1}', not a finite number", pair.Key, ramp.Groups[1].Value.Trim()));
+                    continue;
+                }
+                var rampMs = read.Value;
                 maxMs = Math.Max(maxMs, rampMs);
                 if (rampMs < MinimumRampDownSeconds * 1000)
                     problems.Add(string.Format(CultureInfo.InvariantCulture, "{0} ramps down over {1} ms, less than {2} ms", pair.Key, rampMs, MinimumRampDownSeconds * 1000));

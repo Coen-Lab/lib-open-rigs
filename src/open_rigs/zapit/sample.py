@@ -68,6 +68,8 @@ def sample_from_clicks(bregma_px, second_px, settings: ScannerSettings, second_a
     if not (np.isfinite(second_ap_mm) and second_ap_mm != 0):
         raise ValueError(f"The second point's AP must be a number of mm other than 0, not {second_ap_mm!r}")
     px = np.array([bregma_px, second_px], dtype=float).reshape(2, 2)
+    if not np.isfinite(px).all():
+        raise ValueError(f"The clicks must be finite pixels, not bregma {bregma_px!r} and second point {second_px!r}")
     if np.allclose(px[0], px[1]):
         raise ValueError("Bregma and the second point were clicked at the same place")
     return Sample(np.array([[0.0, 0.0], [0.0, float(second_ap_mm)]]), settings.pixels_to_mm(px), px,

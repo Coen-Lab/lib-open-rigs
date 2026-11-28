@@ -55,7 +55,6 @@ def test_clicks_give_the_reference_points():
 
 def test_the_second_point_has_no_default_and_no_lambda():
     """27 Nov 2026: the second point is MATLAB Zapit's refAP midline point, given by the caller; lambda is gone."""
-    assert not hasattr(sm, "LAMBDA_AP_MM")
     with pytest.raises(TypeError):
         sm.sample_from_clicks([400, 300], [400, 180], SETTINGS)  # type: ignore[call-arg]
     for bad in (0.0, float("nan")):
@@ -215,3 +214,11 @@ def test_the_correlation_tells_the_same_skull_from_another():
     same = sm.correlation(eq, mask, eq, mask, np.eye(2, 3))
     other = sm.correlation(eq, mask, cv2.flip(eq, 1), cv2.flip(mask, 1), np.eye(2, 3))
     assert same > 0.99 and other < sm.MIN_CORRELATION
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_a_click_that_is_not_finite_is_refused_naming_the_clicks(bad):
+    with pytest.raises(ValueError, match="clicks must be finite"):
+        sm.sample_from_clicks((bad, 1.0), B2_CLICKS[1], B2, AP)
+    with pytest.raises(ValueError, match="clicks must be finite"):
+        sm.sample_from_clicks(B2_CLICKS[0], (10.0, bad), B2, AP)

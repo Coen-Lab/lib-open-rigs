@@ -42,10 +42,11 @@ namespace OpenRigs.Zapit
     /// and its last (FramesSaved, or a refusal) puts the camera's own back; per point it points the galvos with the laser
     /// on, skips skipFrames camera frames and saves the next as <c>point_NNNN.png</c>, then with the laser off saves
     /// backgrounds frames as <c>background_K.png</c> (lossless PNG, as open_rigs.zapit's fit reads them), zeroes the lines and
-    /// reports FramesSaved. A run with no camera frame within 2 s of Pointed (or of its last frame) is refused and zeroed. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
+    /// reports FramesSaved. A run with no Pointed within 2 s of its start, or no camera frame within 2 s of Pointed (or of its
+    /// last frame), is refused and zeroed, and so is one in progress at Laser Off. A still saves the next frame, laser off, as the PNG named. No maths: the volts are the agent's.
     /// </summary>
     [Combinator]
-    [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named; each bank .json in pending is loaded (LoadBank); each aim (xVolts,yVolts,laserVolts) points the beam there. Inputs: grid run folders, still paths, bank paths, ZapitDaq's events, the camera's images, aims. Output: ZapitDaq commands and the stages to report as Zapit-Main.Setup.")]
+    [Description("Zapit's setup phase: each grid run (a pending folder holding grid.json) points the galvos at each grid point, saving one frame per point and laser-off backgrounds as PNGs; each still saves the next frame as the PNG named; each bank .json in pending is loaded (LoadBank); each aim (xVolts,yVolts,laserVolts) points the beam there. Inputs: grid run folders, still paths, bank paths, ZapitDaq's events, the camera's images, aims, Laser Off (ends a grid run or still). Output: ZapitDaq commands and the stages to report as Zapit-Main.Setup.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class ZapitSetupCapture
     {
@@ -66,8 +67,9 @@ namespace OpenRigs.Zapit
         [Description("The laser ceiling as control volts (ceilingMw through the laser curve, from the launch): an aim or grid above it is refused; 0 refuses any above 0 V.")]
         public double LaserCeilingVolts { get; set; }
 
-        /// <summary>How long a grid run waits for a camera frame after Pointed (or after the last frame) before it is
-        /// refused and the lines zeroed, so a stalled camera never holds the beam on one spot. Tests shorten it.</summary>
+        /// <summary>How long a grid run waits for its first Pointed, or for a camera frame after Pointed (or after the last
+        /// frame), before it is refused and the lines zeroed, so a stalled camera never holds the beam on one spot and a
+        /// refused Point never holds the run. Tests shorten it.</summary>
         internal TimeSpan FrameTimeout { get; set; } = TimeSpan.FromSeconds(2);
 
         sealed class Run
@@ -85,16 +87,35 @@ namespace OpenRigs.Zapit
         /// <summary>The camera put back after a run that set it, else null.</summary>
         static ZapitCameraSettings? Restore(Run r) => r.Camera == null ? null : new ZapitCameraSettings { Restore = true };
 
+        /// <summary>The most frames a grid.json may skip per point, and the most backgrounds it may save.</summary>
+        internal const int MostFrames = 100;
+
+        /// <summary>grid.json's whole-number <paramref name="field"/> from <paramref name="least"/> to <paramref name="most"/>,
+        /// or <paramref name="fallback"/> when it is absent; anything else is refused naming the field.</summary>
+        static int Count(JObject json, string field, int fallback, int least, int most)
+        {
+            var token = json[field];
+            if (token == null || token.Type == JTokenType.Null) return fallback;
+            double value;
+            try { value = token.Type == JTokenType.Integer || token.Type == JTokenType.Float ? token.Value<double>() : double.NaN; }
+            catch (Exception error) when (error is OverflowException || error is InvalidCastException || error is FormatException) { value = double.NaN; }
+            if (!(value >= least && value <= most) || value != Math.Floor(value))
+                throw new InvalidDataException(string.Format(CultureInfo.InvariantCulture, "its {0} must be a whole number from {1} to {2}, not {3}", field, least, most, token.ToString(Newtonsoft.Json.Formatting.None)));
+            return (int)value;
+        }
+
         /// <summary>The setup steps for the requests, as frames and ZapitDaq's events come. A bank request (its
         /// Settings_ZapitBank_&lt;DateTime&gt;.json) inside the pending folder becomes ZapitDaq's LoadBank (stage Loading);
         /// one outside it is refused, and one ZapitDaq answers Refused (over the ceiling) is reported Refused with its reason. Laser
         /// volts get ZapitDaq's 1e-4 V float slack. An aim ("xVolts,yVolts,laserVolts", the agent's volts through the scanner fit and laser
         /// curve) points the galvos with the laser on until the next aim, LaserOff or setup step; it is refused at ceilingMw 0,
         /// above LaserMaxVolts or LaserCeilingVolts, outside +/-10 V or during a grid run or still; a grid's laserVolts is held
-        /// to the same rules. A still with no frame within FrameTimeout is refused. When the aims end (Go), a grid run or still
-        /// in progress is refused and, as for a beam still aimed, the lines are zeroed.</summary>
+        /// to the same rules. A still with no frame within FrameTimeout is refused. When the aims end (Go), or at each Laser Off
+        /// (laserOffs, Zapit-Main.LaserOff), a grid run or still in progress is refused and, as for a beam still aimed, the
+        /// lines are zeroed; Laser Off with no step running still sends a Zero of its own (Aim "Off Laser Off"), and after it
+        /// no aim is held. An aim whose Point ZapitDaq refuses (a play armed) is reported Refused with ZapitDaq's reason.</summary>
         public IObservable<ZapitSetupStep> Process(IObservable<string> gridRuns, IObservable<string> stills, IObservable<string> banks,
-            IObservable<ZapitDaqEvent> events, IObservable<IplImage> frames, IObservable<string> aims) => Observable.Create<ZapitSetupStep>(observer =>
+            IObservable<ZapitDaqEvent> events, IObservable<IplImage> frames, IObservable<string> aims, IObservable<string> laserOffs) => Observable.Create<ZapitSetupStep>(observer =>
         {
             var pending = Path.GetFullPath(PendingFolder);
             var gate = new object();
@@ -102,6 +123,7 @@ namespace OpenRigs.Zapit
             string? still = null;
             var aiming = false;
             var loading = false;   // a LoadBank awaits ZapitDaq's BankLoaded or Refused
+            var aimSent = false;   // an aim's Point awaits ZapitDaq's Pointed or Refused
             void Emit(ZapitSetupStep step) => observer.OnNext(step);
             void Refuse(string why) => Emit(new ZapitSetupStep { Stage = "Refused", Detail = why });
             var watchdog = new SerialDisposable();
@@ -135,7 +157,9 @@ namespace OpenRigs.Zapit
                 Emit(new ZapitSetupStep
                 {
                     Stage = "Refused",
-                    Detail = $"no camera frame came within {FrameTimeout.TotalSeconds} s of Pointed, so the lines are zeroed and the run is refused: {folder}",
+                    Detail = run0.Skip < 0
+                        ? $"ZapitDaq did not point the galvos (Pointed) within {FrameTimeout.TotalSeconds} s (it refuses a Point while Play Condition is armed), so the lines are zeroed and the run is refused: {folder}"
+                        : $"no camera frame came within {FrameTimeout.TotalSeconds} s of Pointed, so the lines are zeroed and the run is refused: {folder}",
                     Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
                     Camera = Restore(run0),
                 });
@@ -169,8 +193,8 @@ namespace OpenRigs.Zapit
                         Folder = folder!,
                         Volts = json["volts"]!.Select(p => p.Select(v => (double)v).ToArray()).ToArray(),
                         LaserVolts = (double)json["laserVolts"]!,
-                        SkipFrames = (int?)json["skipFrames"] ?? 3,
-                        Backgrounds = (int?)json["backgrounds"] ?? 4,
+                        SkipFrames = Count(json, "skipFrames", 3, 0, MostFrames),
+                        Backgrounds = Count(json, "backgrounds", 4, 1, MostFrames),
                     };
                     if (json["camera"] is JObject camera)
                     {
@@ -178,18 +202,19 @@ namespace OpenRigs.Zapit
                         if (!(r.Camera.ExposureUs >= 10 && r.Camera.ExposureUs <= 1e6) || !(r.Camera.GainDb >= 0 && r.Camera.GainDb <= 48))
                             throw new InvalidDataException("its camera exposureUs must be 10 to 1000000 and gainDb 0 to 48");
                     }
-                    if (r.Volts.Length == 0 || r.Volts.Any(p => p.Length != 2 || p.Any(v => !(Math.Abs(v) <= ZapitBank.RangeVolts))) || !(Math.Abs(r.LaserVolts) <= ZapitBank.RangeVolts) || r.SkipFrames < 0 || r.Backgrounds < 1)
-                        throw new InvalidDataException("its volts must be [x, y] pairs within +/-10 V, with skipFrames from 0 and backgrounds from 1");
+                    if (r.Volts.Length == 0 || r.Volts.Any(p => p.Length != 2 || p.Any(v => !(Math.Abs(v) <= ZapitBank.RangeVolts))) || !(Math.Abs(r.LaserVolts) <= ZapitBank.RangeVolts))
+                        throw new InvalidDataException("its volts must be [x, y] pairs within +/-10 V");
                     if (LaserProblem(r.LaserVolts) is string laser) throw new InvalidDataException(laser);
                     if (Directory.EnumerateFiles(folder!, "*.png").Any()) throw new InvalidDataException("the folder already holds frames");
                     run = r;
                     aiming = false;
                 }
-                catch (Exception error) when (error is IOException || error is InvalidDataException || error is Newtonsoft.Json.JsonException || error is NullReferenceException || error is FormatException || error is ArgumentException)
+                catch (Exception error) when (error is IOException || error is InvalidDataException || error is Newtonsoft.Json.JsonException || error is NullReferenceException || error is FormatException || error is ArgumentException || error is OverflowException || error is InvalidCastException)
                 {
                     Refuse(grid + " is refused: " + error.Message);
                     return;
                 }
+                Watch();   // from the start: a Point ZapitDaq refuses never gets its Pointed
                 Emit(new ZapitSetupStep { Stage = "Pointing", Detail = run.Folder, Command = PointAt(run), Camera = run.Camera });
             }
 
@@ -235,6 +260,7 @@ namespace OpenRigs.Zapit
                 if (!(Math.Abs(volts[0]) <= ZapitBank.RangeVolts) || !(Math.Abs(volts[1]) <= ZapitBank.RangeVolts)) { No("the galvo volts must be within +/-10 V: " + request); return; }
                 if (LaserProblem(volts[2]) is string laser) { No(laser + ": " + request); return; }
                 aiming = true;
+                aimSent = true;
                 Emit(new ZapitSetupStep
                 {
                     Aim = true,
@@ -244,25 +270,40 @@ namespace OpenRigs.Zapit
                 });
             }
 
+            // Ends a grid run or still in progress, refused, the lines zeroed and the camera's own settings put back.
+            void EndStep(string by)
+            {
+                if (run == null && still == null) return;
+                var ended = run;
+                var what = run?.Folder ?? still;
+                run = null;
+                still = null;
+                watchdog.Disposable = Disposable.Empty;
+                Emit(new ZapitSetupStep
+                {
+                    Stage = "Refused",
+                    Detail = by + " came during a setup step, so the lines are zeroed and it is refused: " + what,
+                    Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
+                    Camera = ended == null ? null : Restore(ended),
+                });
+            }
+
+            // Laser Off: the beam stays off, so a grid run does not point it again at its next point, nor an aim stay on.
+            // Always with a Zero of this node's own, sent under the gate: the workflow's direct Zero can reach ZapitDaq
+            // before a Point this node was sending at that moment (a grid's next point, an aim), and this one comes after it.
+            void LaserOff(string request)
+            {
+                var stepping = run != null || still != null;
+                EndStep("Laser Off");   // its Refused step carries the Zero
+                aiming = false;
+                if (!stepping) Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Laser Off", Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
+            }
+
             void AimsEnded()
             {
                 lock (gate)
                 {
-                    if (run != null || still != null)
-                    {
-                        var ended = run;
-                        var what = run?.Folder ?? still;
-                        run = null;
-                        still = null;
-                        watchdog.Disposable = Disposable.Empty;
-                        Emit(new ZapitSetupStep
-                        {
-                            Stage = "Refused",
-                            Detail = "Go came during a setup step, so the lines are zeroed and it is refused: " + what,
-                            Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
-                            Camera = ended == null ? null : Restore(ended),
-                        });
-                    }
+                    EndStep("Go");
                     if (!aiming) return;
                     aiming = false;
                     Emit(new ZapitSetupStep { Aim = true, Stage = "Off", Detail = "Go", Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero } });
@@ -275,6 +316,16 @@ namespace OpenRigs.Zapit
                 {
                     loading = false;
                     if (e.Kind == ZapitDaqEventKind.Refused) Refuse(e.Detail ?? "ZapitDaq refused the bank");   // over the ceiling: the session runs on
+                    return;
+                }
+                if (aimSent && (e.Kind == ZapitDaqEventKind.Pointed || e.Kind == ZapitDaqEventKind.Refused))
+                {
+                    aimSent = false;
+                    if (e.Kind == ZapitDaqEventKind.Refused && aiming)   // a play armed: no beam, so the metric no longer reads Aiming
+                    {
+                        aiming = false;
+                        Emit(new ZapitSetupStep { Aim = true, Stage = "Refused", Detail = e.Detail ?? "ZapitDaq refused the aim" });
+                    }
                     return;
                 }
                 if (run != null && e.Kind == ZapitDaqEventKind.Pointed && run.Skip < 0)
@@ -335,7 +386,8 @@ namespace OpenRigs.Zapit
                 gridRuns.Subscribe(Locked<string>(Start), observer.OnError),
                 stills.Subscribe(Locked<string>(Still), observer.OnError),
                 banks.Subscribe(Locked<string>(Bank), observer.OnError),
-                aims.Subscribe(Locked<string>(Aim), observer.OnError, AimsEnded));
+                aims.Subscribe(Locked<string>(Aim), observer.OnError, AimsEnded),
+                laserOffs.Subscribe(Locked<string>(LaserOff), observer.OnError));
         });
     }
 

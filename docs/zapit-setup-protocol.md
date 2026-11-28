@@ -23,10 +23,10 @@ Zapit's setup phase runs inside the session workflow, between launch and Go, on 
   - `BankLoaded <json>`
   - `Refused <why>`
 
-  Hand aiming has its own metric, `status.metrics["Zapit-Main.Aim"]`: `Aiming <xVolts>,<yVolts>,<laserVolts>`, `Off Go` or `Refused <why>`, so an aim never overwrites `BankLoaded`. Play Condition has its own too, `status.metrics["Zapit-Main.Play"]` (below).
+  Hand aiming has its own metric, `status.metrics["Zapit-Main.Aim"]`: `Aiming <xVolts>,<yVolts>,<laserVolts>`, `Off Go`, `Off Laser Off` or `Refused <why>`, so an aim never overwrites `BankLoaded`. Play Condition has its own too, `status.metrics["Zapit-Main.Play"]` (below).
 
   The metric keeps only the latest value. The agent sends one request, then polls until that request's terminal stage comes back: `FramesSaved`, `StillSaved`, `BankLoaded` or `Refused`.
-- **Live.** The camera `Camera-Zapit` is streamed by StreamDevices as the camera Zapit, on a rig whose `zapit` block names `zapit.device`. Its frames are on `Camera-Zapit.Data`, published at `ConnectForTaskZapitDaq`'s top level (a subject inside its `Zapit` SelectMany would be out of StreamDevices' reach), and they are the frames the setup phase saves.
+- **Live.** The camera `Camera-Zapit` is streamed by StreamDevices as the camera Zapit, on a rig whose `zapit` block names `zapit.device`. Its frames are on `Camera-Zapit.Data`, published at `ConnectForTaskZapitDaq`'s top level (a subject inside its `Zapit` SelectMany would be out of StreamDevices' reach), and they are the cropped image (`Image`; a Mono12 frame stretched, a Mono8 frame as it comes), not the frames the setup phase saves: the setup saves the whole frame (`Still`), so a crop never changes a still or a grid run's frames.
 - **Log.** Every ZapitDaq event is a row in `WorkflowData_Events`, with `Event` set to `Zapit` and `Value` set to the trial number.
 
 ## Files
@@ -43,12 +43,14 @@ Every path the agent sends must be inside `RigConfigs\<RIG>\pending\`, the folde
 
 ## Order
 
-1. **Launch.** The workflow opens ZapitDaq and the Zapit camera, then reports Ready. Before step 2, the agent waits until `Zapit-Main.Setup` appears in `status.commands` and Camera-Zapit frames arrive in live view.
+1. **Launch.** The workflow opens ZapitDaq and the Zapit camera, then reports Ready. A missing or unreadable .pfs stops the camera before it is opened, naming the file and rig.yml's `zapit.camera.sessionPfsPath`; a camera that refuses the file's values is reported as such, and one that cannot be opened names the Zapit camera and its serial. Before step 2, the agent waits until `Zapit-Main.Setup` appears in `status.commands` and Camera-Zapit frames arrive in live view.
 2. **Still.** The agent sends `Zapit-Main.Still <new png>`. The workflow zeroes the lines, saves the next frame and reports `StillSaved <png>`. The scanner settings come from the still's size, so the still comes first. The agent may take a new still as often as needed.
 3. **Scanner grid.** The agent writes `grid.json` into a new `Frames_<DT>` folder and sends `Zapit-Main.Setup <folder>`.
    - For each point, the workflow points the galvos with the laser on (ZapitDaq `Point`), waits for `Pointed`, skips `skipFrames` frames and saves the next one.
    - It then saves `backgrounds` frames with the laser off at the last point.
    - Finally it zeroes every line and reports `FramesSaved <folder>`.
+   - A run with no `Pointed` within 2 s of its start (ZapitDaq refuses a `Point` while Play Condition is armed), or no camera frame within 2 s of `Pointed` or of its last frame, is refused and zeroed; the `Refused` says the Point was never answered in the first case.
+   - `Zapit-Main.LaserOff` or Go during a run or still ends it: `Refused Laser Off came during a setup step, so the lines are zeroed and it is refused: <folder or png>` (`Go` in place of `Laser Off` at Go), the lines zeroed and the camera's own settings put back. `Zapit-Main.LaserOff` always sends a `Zero` of its own after anything the setup was sending; with no step running, the Aim metric shows `Off Laser Off`.
    - The agent fits the frames (`fit_scanner_run`). If the fit is refused, the agent says why and reruns with a new folder.
 4. **Accuracy.** The same steps, in an `Accuracy_<DT>` folder (`measure_accuracy_run`).
 
@@ -87,7 +89,7 @@ Every refusal comes from the camera, so it follows `Cropping #<n> …` (the next
 
 ## Hand aiming
 
-Between a passed scanner fit and Go, the agent can point the beam by hand (its Point and Cat & Mouse). It sends `Zapit-Main.Aim <xVolts>,<yVolts>,<laserVolts>`: the galvo volts come from the sample mm through the scanner fit, and the laser volts from the scanner grid's power (2 mW by default, never above `ceilingMw`) through the laser curve, as `calibration_plan` makes them. The workflow points the galvos with the laser on (ZapitDaq `Point`) and reports `Aiming`. The beam stays there until the next aim, `Zapit-Main.LaserOff`, a grid run or a still. An aim or grid above the ceiling as volts (the launch property `LaserCeilingVolts`: `ceilingMw` through the laser curve) is refused, and ZapitDaq refuses any laser sample above it. Go ends a grid run or still still in progress (`Refused`, the lines zeroed), and once a trial is armed ZapitDaq answers any `Point` with `Refused`.
+Between a passed scanner fit and Go, the agent can point the beam by hand (its Point and Cat & Mouse). It sends `Zapit-Main.Aim <xVolts>,<yVolts>,<laserVolts>`: the galvo volts come from the sample mm through the scanner fit, and the laser volts from the scanner grid's power (2 mW by default, never above `ceilingMw`) through the laser curve, as `calibration_plan` makes them. The workflow points the galvos with the laser on (ZapitDaq `Point`) and reports `Aiming`. The beam stays there until the next aim, `Zapit-Main.LaserOff` (after it no aim is held), a grid run or a still. An aim or grid above the ceiling as volts (the launch property `LaserCeilingVolts`: `ceilingMw` through the laser curve) is refused, and ZapitDaq refuses any laser sample above it. Go ends a grid run or still still in progress (`Refused`, the lines zeroed), and once a trial is armed ZapitDaq answers any `Point` with `Refused`. An aim sent while a Play Condition is armed is answered on the Aim metric, `Refused ZapitDaq cannot Point while Play Condition is armed`.
 
 The workflow refuses an aim, and keeps running, when:
 
@@ -102,11 +104,11 @@ After Go it ignores aims. If the beam is still aimed at Go, it zeroes the lines 
 
 Once the bank is loaded and the sample accepted, before Go, the agent can play one condition's real trial, as the task's trials play it (open_rigs.zapit `play`: `plan_play` chooses it, `ConditionPlay` runs the sequence). There is no new ZapitDaq command:
 
-1. `Zapit-Main.Play <condition>,<powerMw>,<seconds>`: the workflow's `ZapitPlay` sends ZapitDaq its own `Arm` of that condition from the loaded bank as trial 0, laser on at that power (one of the bank's, at most `ceilingMw`), for that long with its ramp (it must fit ZapitDaq's `MaxTrialSeconds`). It reports on `status.metrics["Zapit-Main.Play"]`: `Arming <args>`, `Armed <condition>`, `Playing <condition>`, `Ended <condition> <how>`, `Off Go` or `Refused <why>`. With no bank, a play already armed, the laser disabled, or a condition, power or duration the bank cannot play, it answers `Refused` and runs on.
+1. `Zapit-Main.Play <condition>,<powerMw>,<seconds>`: the workflow's `ZapitPlay` sends ZapitDaq its own `Arm` of that condition from the loaded bank as trial 0, laser on at that power (one of the bank's, at most `ceilingMw`), for that long with its ramp (it must fit ZapitDaq's `MaxTrialSeconds`: a play whose rows exceed it is refused, however long the duration, as `Refused a Zapit trial of <seconds> s with its ramp is longer than maxTrialSeconds (<n> s)`). It reports on `status.metrics["Zapit-Main.Play"]`: `Arming <args>`, `Armed <condition>`, `Playing <condition>`, `Ended <condition> <how>` (`<how>` ZapitDaq's event: `Ended` its own end, `Stopped`, `Underflowed` or `Zeroed`), `Off Go` or `Refused <why>`. With no bank, a play already armed, the laser disabled, a request that does not parse, or a condition, power or duration the bank cannot play, it answers `Refused` and runs on (a condition the bank lacks: `Refused the Zapit waveforms have no condition 4; they have 3`).
 2. Once `Armed`, `Zapit-Main.Trigger on` raises the ZapitTrigger line (the masking light with it), which starts the trial on ZapitDaq's trigger terminal, as a trial's trigger does (the simulated twin gets its `Trigger` with it).
 3. After the trial with its ramp, `Zapit-Main.Trigger off` clears the line and `Zapit-Main.LaserOff` zeroes every output.
 
-`Zapit-Main.LaserOff` before Go also clears the line, and so does the play's own end (`Ended`: its end, a stop or a Zero), whatever the agent does; at Go a play still armed is zeroed (`Off Go`), and when the workflow stops the board piece clears the line. ZapitDaq answers a `Point`, `Staircase` or `LoadBank` while the play is armed with `Refused` (the session runs on), and after it aiming stays open: only a task's trial (1 on) closes `Point`. After Go the workflow ignores `Play` and `Trigger`.
+`Zapit-Main.LaserOff` before Go also clears the line, and so does the play's own end (`Ended`: its end, a stop or a Zero), whatever the agent does; every Go clears the line (a play still armed is zeroed too: `Off Go`), and when the workflow stops the board piece clears the line. ZapitDaq answers a `Point`, `Staircase` or `LoadBank` while the play is armed with `Refused` (the session runs on), and after it aiming stays open: only a task's trial (trial 1 on) closes `Point`. After Go the workflow ignores `Play` and `Trigger`.
 
 ## Refusals
 
@@ -114,14 +116,14 @@ The workflow reports `Refused <why>` and keeps running if a request:
 
 - names a path outside `pending\`;
 - names a folder with no `grid.json`;
-- has a `grid.json` that is malformed, has volts outside ±10 V, has `skipFrames` below 0 or has `backgrounds` below 1;
+- has a `grid.json` that is malformed, has volts outside ±10 V, has a `skipFrames` that is not a whole number from 0 to 100, or a `backgrounds` that is not a whole number from 1 to 100 (`Refused <grid.json path> is refused: its skipFrames must be a whole number from 0 to 100, not <value>`);
 - names a folder that already holds PNGs;
 - names a still that is not a new `.png` in an existing folder;
 - names a bank that is not a `.json`;
 - arrives while another Setup or Still is in progress;
 - names a bank over the rig's ceiling: built under a higher `ceilingMw`, delivering more than it, or with laser samples above `LaserCeilingVolts` (0 when the launch has no laser curve). ZapitDaq answers `Refused` and keeps any bank loaded before.
 
-A bank that ZapitDaq refuses otherwise (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still`, `Zapit-Main.LoadBank` and `Zapit-Main.Aim`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp.
+A bank that ZapitDaq refuses otherwise (bad hash, wrong sample rate, a value out of range, an unknown version) stops the workflow and names the reason, so the agent checks the bank first. After Go, the workflow ignores `Zapit-Main.Setup`, `Zapit-Main.Still`, `Zapit-Main.LoadBank`, `Zapit-Main.Aim`, `Zapit-Main.Play`, `Zapit-Main.Trigger` and `Zapit-Main.Crop`, and the metric stays where it was, so the agent must not send them. `Zapit-Main.LaserOff` is taken at any time: ZapitDaq `Zero` sets the galvos, laser and LED to 0 V at once, with no ramp, and a grid run or still in progress is refused (`Refused Laser Off came during a setup step, so the lines are zeroed and it is refused: <folder or png>`).
 
 ## Reruns
 
@@ -131,7 +133,7 @@ Before Go, any step can be repeated:
 - a new still for the sample;
 - a new `Zapit-Main.LoadBank`, which replaces the loaded bank.
 
-The workflow keeps no setup state of its own beyond the loaded bank.
+Beyond the loaded bank, the workflow keeps the crop in force and any armed or playing Play Condition until Go; a rerun replaces its own result only.
 
 ## Subjects the task workflows use
 

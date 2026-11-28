@@ -8,7 +8,7 @@ When the workflow is built, `StreamDevices` reads `<ConfigRoot>\<MACHINE-NAME>\r
 
 | Kind in rig.yml | Stream | Default | From the data |
 |-----------------|--------|---------|---------------|
-| `camera` | `Camera-Overhead.video` on the video port | 5 frames/s, 320 x 240, JPEG | the first `IplImage` in it, found by type (`Value.Image` for a frame paired with its trigger) |
+| `camera` | `Camera-Overhead.video` on the video port | 5 frames/s, 320 x 240 (shrunk by Area interpolation, which averages the pixels and so does not alias), JPEG | the first `IplImage` in it, found by type (`Value.Image` for a frame paired with its trigger) |
 | `behaviorBoard` | `BehaviorBoard-Main.encoder` on the data port | 10/s | the raw encoder count from `AnalogData` (a `HarpMessage` stream) |
 | `behaviorBoard` | `BehaviorBoard-Main.channels` on the data port | every change; analog inputs 100/s | every channel of the board, for a controller's Board tab |
 | `licketySplit` | `LicketySplit-Left.channels` on the data port | every change | `LickState`, shaped as the board's channels |
@@ -54,6 +54,7 @@ Data on TCP `DataPort` (5556), video on `VideoPort` (5558), on every interface, 
 ## Things to Know
 
 - **Last in the workflow.** Bonsai knows only the subjects built before a node, so a device published after `StreamDevices` is reported as not published.
+- **A device's data ending stops only that device.** Every stream sends into the one `DataMessage` or `VideoMessage`, and an end sent into it would close it for every stream on that port. So each device's data passes through `IgnoreCompletion` first, which passes its frames and errors on but not its end: `Camera-Zapit.Data` ends at once in a session that opens no Zapit, and the other cameras are still sent.
 - **Nothing throws at build.** The editor builds a workflow when it opens, on any machine: a missing or unreadable rig.yml streams no devices and says why in `liveview`.
 - **The inner workflow is generated.** It is one group, `LiveView`, remade from rig.yml whenever what it would hold changes. Saving the workflow writes it out (about 190 lines for a camera and a board); reopening rebuilds it, so edits made inside it are lost.
 - **Its settings live inside it.** Bonsai copies a group whenever the editor opens a workflow, the player shows a layout, or a workflow is saved, and the copy keeps only the group's name, description and inner workflow. So `DataPort` and `VideoPort` are kept in a `StreamDevicesSettings` node beside `LiveView` (set them on `StreamDevices`, which reads and writes that node). Without the copy's constructor and this node, the editor stops at open ("Constructor on type 'OpenRigs.LiveView.StreamDevices' not found"), and `--no-editor` too wherever a layout file exists. In such a copy every node is wrapped for inspection, and the generated `LiveView` is wrapped the same way.

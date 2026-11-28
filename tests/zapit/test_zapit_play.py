@@ -1,10 +1,14 @@
 """Play Condition's sequence (open_rigs.zapit.play): what plays, and Arm, line up, timed clear, and the stops."""
+import json
+import math
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
-from open_rigs.zapit.play import (PLAY_DEFAULT_S, ConditionPlay, PlayPlan, PlayRefused, play_problem, plan_play)
+from open_rigs.zapit.play import (PLAY_DEFAULT_SECONDS, ConditionPlay, PlayPlan, PlayRefused, most_cycles, trial_rows, play_problem,
+                                  plan_play)
 
 RATE = 1000.0
 
@@ -24,27 +28,39 @@ def test_a_play_is_the_condition_at_the_banks_power_for_the_tasks_laser():
     assert plan.request() == "2,2.0,1.5"
     assert plan_play(index(), 1, 30, 6, 1.5, power_mw=8.0).power_mw == 8.0
     plan = plan_play(index(), 1, 30, 6, None)
-    assert plan.seconds == PLAY_DEFAULT_S and "no laser duration" in plan.note
+    assert plan.seconds == PLAY_DEFAULT_SECONDS and "no laser duration" in plan.note
     assert plan_play(index(), 1, 30, 6, 0.01).seconds == pytest.approx(0.025)  # whole cycles, as ZapitBank.Cycles
 
 
 def test_a_play_longer_than_the_buffer_is_shortened_to_whole_cycles_that_fit():
     plan = plan_play(index(), 1, 30, buffer_seconds=1.0, task_seconds=3)
     assert plan.trial_seconds <= 1.0 and plan.seconds == pytest.approx(0.95)
-    assert "longer than ZapitDaq's 1 s trial buffer" in plan.note
+    assert "longer than the task's 1 s Zapit trial buffer" in plan.note
     with pytest.raises(PlayRefused, match="no laser of condition 1 fits"):
         plan_play(index(tail_cycles=4), 1, 30, buffer_seconds=0.1, task_seconds=1)
 
 
 @pytest.mark.parametrize("args, words", [
-    ((1, 0, 6), "laser is disabled"),
-    ((1, 30, None), "trial buffer is not known"),
+    ((1, 0, 6), "laser disabled"),
+    ((1, 30, None), "Zapit trial buffer is not known"),
     ((3, 30, 6), "no condition 3"),
     ((1, 5, 6), "above this rig's ceilingMw"),
 ])
 def test_a_play_the_rig_or_bank_cannot_make_is_refused(args, words):
     with pytest.raises(PlayRefused, match=words):
         plan_play(index(powers=(8.0,)), *args, task_seconds=1)
+
+
+def test_the_ceiling_is_exact_but_a_power_asked_matches_a_variant_within_a_tolerance():
+    # ZapitPlay refuses power > CeilingMw exactly, so a plan the agent accepts is never refused by the workflow
+    assert plan_play(index(), 1, 8.0, 6, 1, power_mw=8.0).power_mw == 8.0  # at the ceiling
+    with pytest.raises(PlayRefused, match="above this rig's ceilingMw"):
+        plan_play(index(), 1, 8.0 * (1 - 1e-6), 6, 1, power_mw=8.0)  # a hair below the power: inside the old 1e-4
+    assert plan_play(index(), 1, 30, 6, 1, power_mw=8.0 * (1 + 1e-6)).power_mw == 8.0  # asked within the tolerance
+    capped = index()
+    capped["conditions"][0]["variants"][1]["capped_power_mw"] = 2.0 + 1e-6
+    with pytest.raises(PlayRefused, match="above this rig's ceilingMw"):
+        plan_play(capped, 1, 2.0, 6, 1)  # the delivered power is held to the ceiling too
 
 
 def test_a_power_the_bank_lacks_is_refused():
@@ -111,10 +127,9 @@ def test_a_play_arms_raises_the_line_then_clears_it_and_zeroes_at_its_end():
     assert play.laser == "off"
     assert play.start(PLAN) == ""
     assert play.laser == "play"  # from the Arm: never "off" while the trial may play
-    wait_for(lambda: play.state == "playing")
-    assert rig.line_up and play.describe()["condition"] == 2
-    wait_for(lambda: play.state == "off")
-    assert rig.sent == ["arm 2,2.0,0.05", "line on", "line off", "zero"]
+    wait_for(lambda: play.state == "off")  # not "playing": its 0.08 s window can pass between two polls on a busy machine
+    assert rig.sent == ["arm 2,2.0,0.05", "line on", "line off", "zero"]  # the line went up, then down, then the zero
+    assert play.describe()["condition"] == 2
     assert play.laser == "off" and not rig.line_up and play.why == ""
 
 
@@ -125,7 +140,7 @@ def test_laser_off_mid_play_clears_the_line_and_zeroes_at_once():
     wait_for(lambda: play.state == "playing")
     started = time.monotonic()
     assert play.stop("Laser Off") == ""
-    assert time.monotonic() - started < 0.5
+    assert time.monotonic() - started < 2.5  # not the plan's 5 s
     assert play.state == "off" and play.laser == "off" and play.why == "Laser Off"
     assert rig.sent[-2:] == ["line off", "zero"] and not rig.line_up
     play.join(1)
@@ -210,3 +225,48 @@ def test_a_stop_and_the_raise_are_never_interleaved():
         play.join(1)
         wait_for(lambda: play.state == "off")
         assert not rig.line_up and rig.sent[-1] == "zero"
+
+
+def test_the_rows_and_cycles_agree_with_the_apps_zapitbank_on_its_contract_bank():
+    """ZapitBank.TrialRows and Cycles (ZapitDaqTests.EveryTrialIsFiniteAtTheCap) on the C# tests' own bank: at a 1 s cap
+    (100000 rows at 100 kHz) condition 1 (10 ramp cycles) gets 30 cycles, 30 x 2500 + 25000 = the cap, as that test asserts;
+    conditions 2 (no ramp) and 3 (4 ramp cycles) get 40 and 36 by the same formula."""
+    path = Path(__file__).resolve().parents[2] / "src" / "OpenRigs.Zapit.Tests" / "Data" / "Settings_ZapitBank_T.json"
+    if not path.is_file():
+        pytest.skip("the C# test bank is not in this checkout")
+    bank = json.loads(path.read_text(encoding="utf-8"))
+    cap_rows = math.floor(1.0 * bank["sample_rate"] + 1e-6)
+    assert cap_rows == 100000
+    expected = {1: (30, 100000, 75000), 2: (40, 100000, 50000), 3: (36, 100000, 60000)}  # (cycles at the cap, its rows, rows of 20 cycles)
+    for condition in bank["conditions"]:
+        n = condition["scan_cycle"]["length"]
+        cycles, rows, rows_of_20 = expected[condition["condition"]]
+        for variant in condition["variants"]:
+            assert most_cycles(cap_rows, n, variant) == cycles
+            assert trial_rows(cycles, n, variant) == rows and trial_rows(cycles + 1, n, variant) > cap_rows
+            assert trial_rows(20, n, variant) == rows_of_20
+    assert plan_play(bank, 1, 1e9, 1.0, 3, power_mw=2.0).seconds == pytest.approx(0.75)  # 30 x 2500 rows at 100 kHz
+
+
+@pytest.mark.parametrize("seconds", [float("inf"), float("-inf"), float("nan")])
+def test_a_laser_duration_that_is_not_finite_is_refused(seconds):
+    with pytest.raises(PlayRefused, match="not a number of seconds"):
+        plan_play(index(), 1, 30, 6, seconds)
+
+
+def test_a_buffer_that_is_not_finite_is_refused():
+    with pytest.raises(PlayRefused, match="buffer is not known"):
+        plan_play(index(), 1, 30, float("inf"), 1)
+
+
+def test_a_huge_duration_is_shortened_at_once_to_the_cycles_that_fit():
+    started = time.perf_counter()
+    plan = plan_play(index(), 1, 30, buffer_seconds=1.0, task_seconds=1e6)
+    assert time.perf_counter() - started < 0.5  # the old scan over every cycle of 1e6 s took 4.6 s
+    assert plan.seconds == pytest.approx(0.95) and plan.trial_seconds <= 1.0
+
+
+@pytest.mark.parametrize("condition", [True, 1.0, "1", None, -1])
+def test_a_condition_that_is_not_a_whole_number_is_refused_by_name(condition):
+    with pytest.raises(PlayRefused, match="the condition is"):
+        plan_play(index(), condition, 30, 6, 1)

@@ -241,9 +241,11 @@ namespace OpenRigs.Zapit.Tests
             var armed = h.Next(ZapitDaqEventKind.Armed);
             Assert.AreEqual(100000, armed.Samples);
             Assert.IsTrue(armed.Streamed);
-            // The first window before the start: to the last laser sample at 0 V within the 6253 the feeder keeps ahead (the
-            // 10000-sample lead less the longest write, 1247 samples to a laser sample at 0 V, and the 2500-sample cycle).
-            Assert.IsTrue(h.Device.SamplesWritten > 6253 - 1247 && h.Device.SamplesWritten <= 6253, $"first window {h.Device.SamplesWritten}");
+            // The first window before the start: Arm writes to the last laser sample at 0 V within the 6253 the feeder keeps
+            // ahead (the 10000-sample lead less the longest write, 1247 samples to a laser sample at 0 V, and the 2500-sample
+            // cycle). The feeder, woken before Armed, may already have topped that up by one write while below 6253, so up to
+            // 6253 + 1247 ahead, which still keeps an early stop's ramp within the lead: read here, either can be seen.
+            Assert.IsTrue(h.Device.SamplesWritten > 6253 - 1247 && h.Device.SamplesWritten <= 6253 + 1247, $"first window {h.Device.SamplesWritten}");
             Assert.AreEqual(0, h.Device.MaxLaserAtWriteEnd);
             var whole = bank.Assemble(1, variant, 30);
             h.Device.Trigger();
@@ -643,6 +645,119 @@ namespace OpenRigs.Zapit.Tests
             AssertZeros(h.Device.OnDemandWrites.Last());
         }
 
+        // LaserOff during a grid run: a Zero on one thread, its Zeroed waiting for the setup node's lock, which the camera's
+        // thread holds as it sends the next Point. No event is sent under ZapitDaq's own lock, so the Point goes through
+        // (its Pointed delivered by the thread already delivering) and both threads finish.
+        [TestMethod]
+        public void AZeroWhoseEventWaitsOnASubscriberDoesNotBlockAnotherThreadsPoint()
+        {
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, Simulated = true };
+            var commands = new Subject<ZapitDaqCommand>();
+            var setupLock = new object();
+            var zeroedWaits = new ManualResetEventSlim();
+            var kinds = new BlockingCollection<ZapitDaqEventKind>();
+            var subscription = node.Process(commands).Subscribe(e =>
+            {
+                if (e.Kind == ZapitDaqEventKind.Zeroed)
+                {
+                    zeroedWaits.Set();
+                    lock (setupLock) { }
+                }
+                kinds.Add(e.Kind);
+            });
+            var pointSent = new ManualResetEventSlim();
+            var camera = new Thread(() =>
+            {
+                lock (setupLock)
+                {
+                    zeroedWaits.Wait(5000);
+                    commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, GalvoXVolts = 1, GalvoYVolts = 2, LaserVolts = 0.5 });
+                    pointSent.Set();
+                }
+            }) { IsBackground = true };
+            camera.Start();
+            var laserOff = new Thread(() => commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero })) { IsBackground = true };
+            laserOff.Start();
+            Assert.IsTrue(pointSent.Wait(5000), "the Point waited on ZapitDaq while its Zeroed waited on the Point's sender: deadlock");
+            Assert.IsTrue(laserOff.Join(5000) && camera.Join(5000));
+            Assert.IsTrue(kinds.TryTake(out var first, 5000));
+            Assert.IsTrue(kinds.TryTake(out var second, 5000));
+            CollectionAssert.AreEqual(new[] { ZapitDaqEventKind.Zeroed, ZapitDaqEventKind.Pointed }, new[] { first, second }, "in the order ZapitDaq did them");
+            subscription.Dispose();   // only once the threads are free: a deadlocked session would hold its lock for ever
+        }
+
+        // The monitor delivers a trial's Started to a subscriber waiting on a lock the disposing thread holds (as a node
+        // disposed on an error path under its own lock): Dispose returns once its wait on the monitor runs out.
+        [TestMethod]
+        public void DisposeDoesNotWaitForeverOnAMonitorHeldBySubscriber()
+        {
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, Simulated = true };
+            var commands = new Subject<ZapitDaqCommand>();
+            var setupLock = new object();
+            var monitorWaits = new ManualResetEventSlim();
+            var subscription = node.Process(commands).Subscribe(e =>
+            {
+                if (Thread.CurrentThread.Name != "ZapitDaq" || monitorWaits.IsSet) return;
+                monitorWaits.Set();
+                lock (setupLock) { }
+            });
+            commands.OnNext(Load(Unpack()));
+            lock (setupLock)
+            {
+                commands.OnNext(Arm(1, 1, true, 2.0, 0.05));
+                commands.OnNext(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Trigger });
+                Assert.IsTrue(monitorWaits.Wait(5000), "the monitor delivered no event");
+                var disposer = new Thread(subscription.Dispose) { IsBackground = true };
+                disposer.Start();
+                Assert.IsTrue(disposer.Join(5000), "Dispose waited on the monitor, which waited on this thread's lock");
+            }
+        }
+
+        // The twin whose count read fails once Fail is set, so the monitor's poll sends an error from its own thread.
+        sealed class PollFails : IZapitDevice
+        {
+            public readonly SimulatedZapitDevice Twin = new SimulatedZapitDevice { AutoTrigger = false };
+            public volatile bool Fail;
+            public void WriteOnDemand(double[] volts) => Twin.WriteOnDemand(volts);
+            public void ArmFinite(double[,] samples, double sampleRate, string triggerTerminal) => Twin.ArmFinite(samples, sampleRate, triggerTerminal);
+            public void CreateFinite(long samples, double sampleRate, string triggerTerminal) => Twin.CreateFinite(samples, sampleRate, triggerTerminal);
+            public void Write(double[,] samples) => Twin.Write(samples);
+            public void StartClocked() => Twin.StartClocked();
+            public long SamplesGenerated => Fail ? throw new InvalidOperationException("DAQmx: the device was removed.") : Twin.SamplesGenerated;
+            public long OnboardSamples => Twin.OnboardSamples;
+            public bool HasClockedTask => Twin.HasClockedTask;
+            public bool IsDone => Twin.IsDone;
+            public void StopClocked() => Twin.StopClocked();
+            public double[] Staircase(double[,] samples, double sampleRate) => Twin.Staircase(samples, sampleRate);
+            public void Dispose() => Twin.Dispose();
+        }
+
+        // A subscriber that throws from OnError on the monitor's thread is written to the log, not left to end the process.
+        [TestMethod]
+        public void ASubscriberThrowingFromOnErrorOnTheMonitorDoesNotEndTheProcess()
+        {
+            var device = new PollFails();
+            var node = new ZapitDaq { SampleRate = 100000, MaxTrialSeconds = 1, CeilingMw = 1e9, LaserMaxVolts = 5, LaserCeilingVolts = 5, DeviceFactory = () => device };
+            var commands = new Subject<ZapitDaqCommand>();
+            var thrown = new ManualResetEventSlim();
+            var log = new StringWriter();
+            var stderr = Console.Error;
+            Console.SetError(log);
+            try
+            {
+                using (node.Process(commands).Subscribe(_ => { }, e => { thrown.Set(); throw new InvalidOperationException("the subscriber's own failure"); }))
+                {
+                    commands.OnNext(Load(Unpack()));
+                    commands.OnNext(Arm(1, 1, true, 2.0, 0.05));
+                    device.Fail = true;
+                    Assert.IsTrue(thrown.Wait(5000), "the monitor sent no error");
+                    for (int i = 0; i < 100 && !log.ToString().Contains("the subscriber's own failure"); i++) Thread.Sleep(10);
+                }
+            }
+            finally { Console.SetError(stderr); }
+            StringAssert.Contains(log.ToString(), "ZapitDaq: a subscriber threw from OnError on the monitor thread");
+        }
+
         // NI reports a generation error at Stop: the twin, its clocked task stopping with an error, as NI's does.
         sealed class StopFails : IZapitDevice
         {
@@ -736,6 +851,19 @@ namespace OpenRigs.Zapit.Tests
             h.Send(Load(Unpack()));
             h.Next(ZapitDaqEventKind.BankLoaded);
             StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 2.0, 1.0)), "longer than maxTrialSeconds (1 s)");
+            // Trials whose rows pass int are refused, not wrapped round to a short or negative trial.
+            foreach (var seconds in new[] { 30000, 42949.6, 1e12 })
+                StringAssert.Contains(Assert.ThrowsException<InvalidOperationException>(() => bank.Cycles(1, bank.Variant(1, true, 2.0), seconds, 6)).Message, "longer than maxTrialSeconds (6 s)");
+            Assert.AreEqual(30, bank.Cycles(1, bank.Variant(1, true, 2.0), 0, 1.0));
+        }
+
+        [TestMethod]
+        public void ATrialWhoseRowsPassIntIsRefusedBeforeArm()
+        {
+            using var h = new Harness(maxTrialSeconds: 6);
+            h.Send(Load(Unpack()));
+            h.Next(ZapitDaqEventKind.BankLoaded);
+            StringAssert.Contains(h.ErrorMessage(Arm(1, 1, true, 2.0, 42949.6)), "longer than maxTrialSeconds (6 s)");
         }
 
         [TestMethod]
@@ -1111,9 +1239,9 @@ namespace OpenRigs.Zapit.Tests
             h.Next(ZapitDaqEventKind.BankLoaded);
             h.Send(Arm(ZapitPlay.SetupTrial, 2, true, 2.0, 0.05));
             h.Next(ZapitDaqEventKind.Armed);
-            StringAssert.Contains(h.Refusal(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 }), "cannot Point while trial 0 is armed");
-            StringAssert.Contains(h.Refusal(Load(path)), "cannot LoadBank while trial 0 is armed");
-            StringAssert.Contains(h.Refusal(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Staircase, LaserLevelsVolts = new[] { 0.0, 1 }, SamplesPerLevel = 10 }), "cannot Staircase while trial 0 is armed");
+            StringAssert.Contains(h.Refusal(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Point, LaserVolts = 0.3 }), "cannot Point while Play Condition is armed");
+            StringAssert.Contains(h.Refusal(Load(path)), "cannot LoadBank while Play Condition is armed");
+            StringAssert.Contains(h.Refusal(new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Staircase, LaserLevelsVolts = new[] { 0.0, 1 }, SamplesPerLevel = 10 }), "cannot Staircase while Play Condition is armed");
             Assert.IsTrue(h.Device.HasClockedTask);   // the armed trial untouched
             h.Device.Trigger();
             h.Now = 0.001;
@@ -1160,7 +1288,7 @@ namespace OpenRigs.Zapit.Tests
         public void PlayArmsTheConditionAsATrialAndReportsItsStages()
         {
             using var p = new PlayHarness();
-            StringAssert.Contains(p.Ask("1,2,0.05").Detail, "no Zapit bank is loaded");
+            StringAssert.Contains(p.Ask("1,2,0.05").Detail, "no Zapit waveforms are loaded");
             p.Loaded();
             var arming = p.Ask("2,2.0,0.05");
             Assert.AreEqual("Arming", arming.Stage);
@@ -1194,11 +1322,15 @@ namespace OpenRigs.Zapit.Tests
             p.Loaded();
             StringAssert.Contains(p.Ask("1,2").Detail, "a play is condition,powerMw,seconds");
             StringAssert.Contains(p.Ask("1.5,2,0.05").Detail, "a play is condition,powerMw,seconds");
-            StringAssert.Contains(p.Ask("4,2,0.05").Detail, "no condition 4");
+            Assert.AreEqual("the Zapit waveforms have no condition 4; they have 3", p.Ask("4,2,0.05").Detail);
             StringAssert.Contains(p.Ask("1,3,0.05").Detail, "with the laser on at 3 mW");
-            StringAssert.Contains(p.Ask("1,8,0.05").Detail, "at most ceilingMw (5 mW)");
+            StringAssert.Contains(p.Ask("1,8,0.05").Detail, "a play's power must be above 0 mW and at most ceilingMw (5 mW), not 8 mW");
             StringAssert.Contains(p.Ask("1,2,0").Detail, "more than 0 s");
             StringAssert.Contains(p.Ask("1,2,5").Detail, "longer than maxTrialSeconds (1 s)");
+            StringAssert.StartsWith(p.Ask("1,2,5").Detail, "a Zapit trial of 5 s");
+            // Rows past int: 30000 s wrapped to a negative count and was armed; 42949.6 s wrapped to a 0.177 s trial.
+            StringAssert.Contains(p.Ask("1,2,30000").Detail, "longer than maxTrialSeconds (1 s)");
+            StringAssert.Contains(p.Ask("1,2,42949.6").Detail, "longer than maxTrialSeconds (1 s)");
             Assert.IsTrue(p.Steps.All(s => s.Stage == "Refused" && s.Command == null));
             Assert.IsNull(p.Error);
             using var off = new PlayHarness(ceilingMw: 0);
