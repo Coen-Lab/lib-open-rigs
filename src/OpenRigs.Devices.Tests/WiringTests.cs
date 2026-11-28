@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Reactive.Linq;
 using Harp.Behavior;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -22,9 +24,15 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual(DigitalOutputs.DO3, WiredOutput.Find(rig, "BehaviorBoard-Main", "ZapitTrigger"));
         }
 
+        // A rig without Zapit has no ZapitTrigger line: None, which SetZapitTriggerLine refuses (ZapitTests).
+        [TestMethod]
+        public void NoLineWiredToTheDeviceIsNone()
+        {
+            Assert.AreEqual(default(DigitalOutputs), WiredOutput.Find(Rig("      DO1: { device: RewardValve }\n"), "BehaviorBoard-Main", "ZapitTrigger"));
+        }
+
         [DataTestMethod]
-        [DataRow("      DO1: { device: RewardValve }\n", "has 0 lines with device ZapitTrigger (none)")]
-        [DataRow("      DO2: { device: ZapitTrigger }\n      DO3: { device: ZapitTrigger }\n", "has 2 lines with device ZapitTrigger (DO2, DO3)")]
+        [DataRow("      DO2: { device: ZapitTrigger }\n      DO3: { device: ZapitTrigger }\n", "has 2 lines with device ZapitTrigger (DO2, DO3); it needs at most one")]
         [DataRow("      DO0: { device: ZapitTrigger }\n", "is on DO0")]
         public void RefusesAnythingButOnePulseLine(string wiring, string message)
         {
@@ -132,16 +140,40 @@ namespace OpenRigs.Devices.Tests
             StringAssert.Contains(Assert.ThrowsException<ArgumentException>(() => WiredRewardValve.Find(TwoBoards(), valve)).Message, "such as RewardValve-Left");
         }
 
-        static Rigs.LabRig PulsedRig(string enabled, string wiring)
+        const string ZapitWiring = "      DO1: { device: RewardValve, name: left }\n      DO2: { device: RewardValve, name: right }\n      DO3: { device: ZapitTrigger }\n";
+
+        static Rigs.LabRig PulsedRig(string enabled, string wiring, string zapitOutput = "{ discriminatorType: FixedPulse, pulseWidthMs: 10000 }")
         {
-            return LabRigTests.Deserialize("behaviorBoard:\n  main:\n    portName: COM1\n    pulseController:\n      outputPulseEnable: " + enabled + "\n    wiring:\n" + wiring);
+            return LabRigTests.Deserialize("behaviorBoard:\n  main:\n    portName: COM1\n    pulseController:\n      outputPulseEnable: " + enabled +
+                "\n      outputs:\n        DO1: { discriminatorType: CalibratedPulse, artefact: a.json }\n        DO2: { discriminatorType: CalibratedPulse, artefact: b.json }\n        DO3: " + zapitOutput +
+                "\n    wiring:\n" + wiring);
         }
 
         [TestMethod]
-        public void PulseLinesLoseTheZapitTriggerLine()
+        public void PulseLinesKeepTheZapitTriggerLine()
         {
-            var rig = PulsedRig("DO1, DO2, DO3", "      DO1: { device: RewardValve, name: left }\n      DO2: { device: RewardValve, name: right }\n      DO3: { device: ZapitTrigger }\n");
-            Assert.AreEqual(DigitalOutputs.DO1 | DigitalOutputs.DO2, PulseEnabledLines.Find(rig, "BehaviorBoard-Main"));
+            var rig = PulsedRig("DO1, DO2, DO3", ZapitWiring);
+            Assert.AreEqual(DigitalOutputs.DO1 | DigitalOutputs.DO2 | DigitalOutputs.DO3, PulseEnabledLines.Find(rig, "BehaviorBoard-Main"));
+        }
+
+        // A Zapit line out of pulse mode, or with no width, would stay high, and its masking light on, if the workflow died.
+        [DataTestMethod]
+        [DataRow("DO1, DO2", "{ discriminatorType: FixedPulse, pulseWidthMs: 10000 }", "puts the ZapitTrigger on DO3, which its pulseController.outputPulseEnable does not pulse")]
+        [DataRow("DO1, DO2, DO3", "{ discriminatorType: FixedPulse, pulseWidthMs: 0 }", "ZapitTrigger on DO3 needs a FixedPulse above 0 ms")]
+        [DataRow("DO1, DO2, DO3", "{ discriminatorType: CalibratedPulse, artefact: c.json }", "ZapitTrigger on DO3 needs a FixedPulse above 0 ms")]
+        public void RefusesAZapitLineTheBoardWouldNotEnd(string enabled, string zapitOutput, string message)
+        {
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => PulseEnabledLines.Find(PulsedRig(enabled, ZapitWiring, zapitOutput), "BehaviorBoard-Main"));
+            StringAssert.Contains(ex.Message, message);
+        }
+
+        [TestMethod]
+        public void SetupWritesTheZapitLineWidthBeforeEnablingIt()
+        {
+            var all = new PulseSetupWrites { Board = "BehaviorBoard-Main" }.Process(Observable.Return(PulsedRig("DO1, DO2, DO3", ZapitWiring))).ToArray().Wait();
+            CollectionAssert.AreEqual(new[] { 35, 59, 45 }, all.Select(w => w.Address).ToArray());
+            Assert.AreEqual((ushort)10000, all[1].GetPayloadUInt16(), "PulseDO3, the ZapitTrigger's width");
+            Assert.AreEqual((ushort)0x3800, all[2].GetPayloadUInt16(), "DO1 to DO3 pulse-enabled");
         }
 
         [TestMethod]

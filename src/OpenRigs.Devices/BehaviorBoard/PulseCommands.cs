@@ -70,7 +70,7 @@ namespace OpenRigs.Devices
                 cameras = (ushort)WiredLines.Find(settings, "CameraTrigger");
                 zapit = (ushort)WiredLines.Find(settings, "ZapitTrigger");
                 var controller = settings.PulseController;
-                pulsed = controller == null ? (ushort)0 : (ushort)((ushort)controller.OutputPulseEnable & ~zapit);
+                pulsed = controller == null ? (ushort)0 : (ushort)controller.OutputPulseEnable;
                 var outputs = controller == null ? null : controller.Outputs;
                 if (outputs == null) return;
                 foreach (var line in new[] { Tuple.Create("DO1", (object)outputs.DO1), Tuple.Create("DO2", (object)outputs.DO2), Tuple.Create("DO3", (object)outputs.DO3) })

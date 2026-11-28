@@ -1,4 +1,5 @@
-"""The four rigs' rig.yml as they are on the share (fixtures/rig-yml, byte copies: MATLAB Zapit's block on all four) load
+"""The four rigs' rig.yml as they are on the share (fixtures/rig-yml, byte copies but for the ZapitTrigger line in pulse mode,
+DO3 in outputPulseEnable with a 10 s FixedPulse, which the lab rig model requires: MATLAB Zapit's block on all four) load
 unchanged, and so does a blue rig carrying ZapitDaq's fields beside MATLAB Zapit's (B2-both)."""
 from pathlib import Path
 

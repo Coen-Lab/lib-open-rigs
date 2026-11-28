@@ -31,11 +31,11 @@ behaviorBoard:
     portName: COM5
     usbSerial: AB0M7PLB
     pulseController:
-      outputPulseEnable: "DO1, DO2"
+      outputPulseEnable: "DO1, DO2, DO3"
       outputs:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }
-        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 10000 }
     wiring:
       DO0: { device: CameraTrigger, targets: [Camera-Face] }
       DO1: { device: RewardValve, name: left }
@@ -61,7 +61,7 @@ In Python the same board is `LabRig(behavior_board={"main": BehaviorBoard(port_n
 ![BehaviorBoard](~/assets/workflows/devices/BehaviorBoard.svg){data-bonsai="~/src/OpenRigs.Devices/BehaviorBoard.bonsai"}
 :::
 
-`BehaviorBoard` is the board's device piece (see [Building Blocks](../../articles/building-blocks.md)): `Name` (`BehaviorBoard-<Entry>`) picks its entry under `behaviorBoard` in `rig.yml`, published as the `AsyncSubject` `<Name>`. It opens the board on its `portName` behind `<Name>.Data` and `<Name>.Commands` (a `BehaviorSubject`, so a per-trial graph that sends a command and completes leaves it open) and logs the board as `<Name>` once the experiment folder exists and the Harp clock is set. However the workflow stops, it clears the lines `wiring` gives a `ZapitTrigger` once the board has closed its port (`ClearOutputsOnStop`). The board's lines are driven by the line pieces below, each taking the board's `Name` as `Board`.
+`BehaviorBoard` is the board's device piece (see [Building Blocks](../../articles/building-blocks.md)): `Name` (`BehaviorBoard-<Entry>`) picks its entry under `behaviorBoard` in `rig.yml`, published as the `AsyncSubject` `<Name>`. It opens the board on its `portName` behind `<Name>.Data` and `<Name>.Commands` (a `BehaviorSubject`, so a per-trial graph that sends a command and completes leaves it open) and logs the board as `<Name>` once the experiment folder exists and the Harp clock is set. The board's lines are driven by the line pieces below, each taking the board's `Name` as `Board`.
 
 ## Line pieces
 
@@ -71,11 +71,11 @@ In Python the same board is `LabRig(behavior_board={"main": BehaviorBoard(port_n
 ![PulseOutputs](~/assets/workflows/devices/PulseOutputs.svg){data-bonsai="~/src/OpenRigs.Devices/PulseOutputs.bonsai"}
 :::
 
-`PulseOutputs` (`PulseOutputs.bonsai`) is a board's pulsed lines: 0.5 s after the board's first message it closes DO1 to DO3 and the pulsed lines, then pulse-enables the lines `rig.yml`'s `outputPulseEnable` names without the ZapitTrigger's (`PulseEnabledLines`, `PulseSetupWrites`), then announces `PulsesEnabled`. It declares the board's `<Board>.TriggerCalibratedPulse` (`Tuple<string, int>`: a line such as `DO1` and the width in milliseconds) and fires each pulse sent into it (`CalibratedPulseWrites`): the width to that line's `PulseDO` or `PulseDOPort` register, then the line set, in that order on the board's command subject, so the board applies the new width before it fires. Any line the board can pulse takes one: DO0 to DO3 and DOPort0 to DOPort2. It stops the workflow at Start if a line `wiring` gives a `RewardValve` is not pulse-enabled, as a reward would then open the valve and leave it open. Each `RewardValve` piece sends its rewards through its own board's subject ([Building Blocks](../../articles/building-blocks.md#task-side-includes)); a calibration fires its own `FirePulses` into it.
+`PulseOutputs` (`PulseOutputs.bonsai`) is a board's pulsed lines: 0.5 s after the board's first message it closes DO1 to DO3 and the pulsed lines, writes the ZapitTrigger line's `FixedPulse` width to its `PulseDO` register, then pulse-enables the lines `rig.yml`'s `outputPulseEnable` names (`PulseSetupWrites`), then announces `PulsesEnabled`. It declares the board's `<Board>.TriggerCalibratedPulse` (`Tuple<string, int>`: a line such as `DO1` and the width in milliseconds) and fires each pulse sent into it (`CalibratedPulseWrites`): the width to that line's `PulseDO` or `PulseDOPort` register, then the line set, in that order on the board's command subject, so the board applies the new width before it fires. Any line the board can pulse takes one: DO0 to DO3 and DOPort0 to DOPort2. It stops the workflow at Start if a line `wiring` gives a `RewardValve` is not pulse-enabled, as a reward would then open the valve and leave it open, or if the ZapitTrigger line is not pulse-enabled or has no `FixedPulse` above 0 ms. Each `RewardValve` piece sends its rewards through its own board's subject ([Building Blocks](../../articles/building-blocks.md#task-side-includes)); a calibration fires its own `FirePulses` into it.
 
 ### ZapitTriggerLine
 
-`ZapitTriggerLine.bonsai` publishes the line `wiring` gives the `ZapitTrigger` as the `AsyncSubject` `ZapitTriggerLine`, which Zapit's trials hold high. It is never pulsed, and the board piece clears it at stop. Stops the workflow at Start unless exactly one line on the board has the `ZapitTrigger` and it is DO1, DO2 or DO3.
+`ZapitTriggerLine.bonsai` publishes the line `wiring` gives the `ZapitTrigger` as the `AsyncSubject` `ZapitTriggerLine`, which Zapit's trials hold high from the trigger until they clear it. The line is in pulse mode with its `FixedPulse` width from `rig.yml` (`PulseOutputs` writes it), so if the workflow dies with it high, the board ends it, and the masking light on it, after that width; the width is at least the longest a trial holds it, so a trial clears it first. A rig without Zapit leaves the line out of `wiring`: `ZapitTriggerLine` is then `None`, and setting it (`SetZapitTriggerLine`) stops the workflow. Stops the workflow at Start if more than one line on the board has the `ZapitTrigger` or its line is not DO1, DO2 or DO3.
 
 ### CameraTriggerController
 

@@ -13,10 +13,10 @@ RIG = {
     "rootPath": "C:\\Data",
     "behaviorBoard": {"main": {
         **HARP,
-        "pulseController": {"outputPulseEnable": "DO1, DO2", "outputs": {
+        "pulseController": {"outputPulseEnable": "DO1, DO2, DO3", "outputs": {
             "DO1": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/RewardValve-Left.json"},
             "DO2": {"discriminatorType": "CalibratedPulse", "artefact": "calibration/RewardValve-Right.json"},
-            "DO3": {"discriminatorType": "FixedPulse", "pulseWidthMs": 0},
+            "DO3": {"discriminatorType": "FixedPulse", "pulseWidthMs": 10000},
         }},
         "wiring": {
             **CAMERA_LINE,
@@ -189,7 +189,7 @@ def test_three_valves_on_any_pulsed_line():
     main = rig["behaviorBoard"]["main"]
     main["wiring"]["DOPort0"] = {"device": "RewardValve", "name": "centre"}
     main["pulseController"]["outputs"]["DOPort0"] = {"discriminatorType": "CalibratedPulse", "artefact": "calibration/RewardValve-Centre.json"}
-    main["pulseController"]["outputPulseEnable"] = "DO1, DO2, DOPort0"
+    main["pulseController"]["outputPulseEnable"] = "DO1, DO2, DO3, DOPort0"
     valves = LabRig.model_validate(rig).reward_valves()
     assert valves == {"RewardValve-Left": ("BehaviorBoard-Main", "DO1"), "RewardValve-Right": ("BehaviorBoard-Main", "DO2"),
                       "RewardValve-Centre": ("BehaviorBoard-Main", "DOPort0")}
@@ -269,19 +269,36 @@ def test_wiring_refused(wiring, message, example):
     assert example in str(refused.value)
 
 
-@pytest.mark.parametrize("pulsed, kept", [("DO1, DO2, DO3", "DO1, DO2"), (None, "DO1, DO2"), ("DO3", "None")])
-def test_zapit_line_not_pulsed(pulsed, kept):
-    # A pulse-enabled line ends itself after its PulseDOx width; the Zapit line is held until the workflow clears it.
+@pytest.mark.parametrize("pulsed, added", [("DO1, DO2", "DO1, DO2, DO3"), ("None", "DO3")])
+def test_zapit_line_pulsed(pulsed, added):
+    # The board ends a pulse-enabled line after its PulseDOx width, so a workflow that dies leaves the Zapit line on no longer.
     rig = copy.deepcopy(RIG)
-    controller = rig["behaviorBoard"]["main"]["pulseController"]
-    if pulsed is None:
-        del controller["outputPulseEnable"]  # the default pulse-enables DO1 to DO3
-    else:
-        controller["outputPulseEnable"] = pulsed
-    with pytest.raises(ValidationError, match="ZapitTrigger DO3 is in pulseController.outputPulseEnable") as refused:
+    rig["behaviorBoard"]["main"]["pulseController"]["outputPulseEnable"] = pulsed
+    with pytest.raises(ValidationError, match="ZapitTrigger DO3 is not in pulseController.outputPulseEnable") as refused:
         LabRig.model_validate(rig)
     assert "(lab rig model, open_rigs.rigs.lab_rig)" in str(refused.value)
-    assert f'`outputPulseEnable: "{kept}"`' in str(refused.value)
+    assert f'`outputPulseEnable: "{added}"`' in str(refused.value)
+
+
+@pytest.mark.parametrize("output", [{"discriminatorType": "FixedPulse", "pulseWidthMs": 0},
+                                    {"discriminatorType": "CalibratedPulse", "artefact": "calibration/Zapit.json"}])
+def test_zapit_line_needs_a_width(output):
+    rig = copy.deepcopy(RIG)
+    rig["behaviorBoard"]["main"]["pulseController"]["outputs"]["DO3"] = output
+    with pytest.raises(ValidationError, match="ZapitTrigger DO3 needs a FixedPulse above 0 ms") as refused:
+        LabRig.model_validate(rig)
+    assert "`DO3: { discriminatorType: FixedPulse, pulseWidthMs: 10000 }`" in str(refused.value)
+
+
+def test_a_rig_without_zapit_needs_no_zapit_line():
+    # A rig with no Zapit drops the zapit block and the line; the DO3 entry stays, unpulsed.
+    rig = copy.deepcopy(RIG)
+    del rig["zapit"]
+    main = rig["behaviorBoard"]["main"]
+    del main["wiring"]["DO3"]
+    main["pulseController"]["outputPulseEnable"] = "DO1, DO2"
+    main["pulseController"]["outputs"]["DO3"]["pulseWidthMs"] = 0
+    LabRig.model_validate(rig)
 
 
 def test_penalty_sound_channel_required():

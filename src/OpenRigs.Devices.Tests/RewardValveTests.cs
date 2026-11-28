@@ -53,9 +53,10 @@ namespace OpenRigs.Devices.Tests
         [TestMethod]
         public void SetupClosesThenPulseEnablesTheLines()
         {
-            var writes = new PulseSetupWrites().Process(Observable.Return(DigitalOutputs.DO1 | DigitalOutputs.DOPort1)).ToArray().Wait();
-            CollectionAssert.AreEqual(new[] { 35, 45 }, writes.Select(w => w.Address).ToArray());
-            Assert.AreEqual((ushort)0x3802, Value(writes[0]), "DO1 to DO3 closed as before, the ZapitTrigger's among them, and the port line");
+            var rig = LabRigTests.Deserialize("behaviorBoard:\n  main:\n    portName: COM1\n    pulseController:\n      outputPulseEnable: DO1, DOPort1\n    wiring:\n      DO1: { device: RewardValve, name: left }\n");
+            var writes = new PulseSetupWrites { Board = "BehaviorBoard-Main" }.Process(Observable.Return(rig)).ToArray().Wait();
+            CollectionAssert.AreEqual(new[] { 35, 45 }, writes.Select(w => w.Address).ToArray(), "no ZapitTrigger line, so no width");
+            Assert.AreEqual((ushort)0x3802, Value(writes[0]), "DO1 to DO3 closed as before, and the port line");
             Assert.AreEqual((ushort)0x802, Value(writes[1]));
         }
 

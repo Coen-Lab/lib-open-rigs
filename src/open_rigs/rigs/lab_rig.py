@@ -22,7 +22,7 @@ from open_rigs.components.video import SpinnakerCamera, VideoEncoder
 from open_rigs.components.wiring import BoardWiring
 from open_rigs.components.zapit import Zapit
 from open_rigs.core.rig import Rig
-from open_rigs.devices import CalibratedPulse, HarpTimestampGeneratorGen3, LicketySplit, SpoutPositions
+from open_rigs.devices import CalibratedPulse, FixedPulse, HarpTimestampGeneratorGen3, LicketySplit, SpoutPositions
 from open_rigs.devices.behavior_board import PulseOutputs
 
 REWARD_VALVE_DEVICE = "RewardValve"
@@ -163,16 +163,25 @@ class LabRig(Rig):
                         f"behaviorBoard {name}: RewardValve {alias} needs a CalibratedPulse in pulseController.outputs {WHERE}. "
                         f"Add it, as in `{alias}: {{ discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-{_title(valves[alias].name)}.json }}`."
                     )
-            # A pulse-enabled line ends itself after its PulseDOx width; the Zapit line (and any masking light on it)
-            # is held from the trigger until the workflow clears it.
+            # The Zapit line (and any masking light on it) is held from the trigger until the workflow clears it; in pulse
+            # mode the board also ends it after its PulseDOx width, so a workflow that dies with it high leaves it on no longer.
             pulsed = board.pulse_controller.output_pulse_enable.root.replace(",", " ").split() if board.pulse_controller else []
-            if zapit and zapit[0] in pulsed:
-                kept = ", ".join(line for line in pulsed if line != zapit[0]) or "None"
+            pulsed = [line for line in pulsed if line != "None"]
+            if zapit and zapit[0] not in pulsed:
+                added = ", ".join(pulsed + [zapit[0]])
                 raise ValueError(
-                    f"behaviorBoard {name}: ZapitTrigger {zapit[0]} is in pulseController.outputPulseEnable, so the board "
-                    f"would end it after PulseDO{zapit[0][-1]} instead of holding it until the workflow clears it {WHERE}. "
-                    f'Take {zapit[0]} out, as in `outputPulseEnable: "{kept}"`.'
+                    f"behaviorBoard {name}: ZapitTrigger {zapit[0]} is not in pulseController.outputPulseEnable, so a workflow "
+                    f"that dies with it high would leave it, and any masking light on it, on {WHERE}. "
+                    f'Add {zapit[0]}, as in `outputPulseEnable: "{added}"`.'
                 )
+            if zapit:
+                output = getattr(outputs, _OUTPUT_FIELDS.get(zapit[0], ""), None) if outputs else None
+                if output is None or not isinstance(output.root, FixedPulse) or output.root.pulse_width_ms <= 0:
+                    raise ValueError(
+                        f"behaviorBoard {name}: ZapitTrigger {zapit[0]} needs a FixedPulse above 0 ms in pulseController.outputs, "
+                        f"at least the longest the workflow holds it, for the board to end it after a workflow dies {WHERE}. "
+                        f"Add it, as in `{zapit[0]}: {{ discriminatorType: FixedPulse, pulseWidthMs: 10000 }}`."
+                    )
         if len(zapit_boards) > 1:
             raise ValueError(
                 f"behaviorBoard {' and '.join(zapit_boards)} each wire a ZapitTrigger, and a rig has one {WHERE}. "
