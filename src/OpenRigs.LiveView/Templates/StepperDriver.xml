@@ -2,7 +2,8 @@
 <!-- A Harp stepper driver, as one stream shaped as a Behavior board's channels, each value with the
      driver's timestamp: which motors are stopped, its digital inputs (the stage's home switches) and
      motor errors at every change, sent again every 2 s for a late viewer; and the motors' positions,
-     sampled, when the workflow has the driver send them (AccumulatedStepsSamplingRate). -->
+     sampled, when the workflow has the driver send them (AccumulatedStepsSamplingRate). The data's
+     end is not passed on (IgnoreCompletion), as it would close DataMessage for every stream. -->
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
@@ -68,15 +69,20 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
         <StreamName>{{Stream}}</StreamName>
       </Expression>
+      <!-- 12: the data, never its end -->
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:IgnoreCompletion" />
+      </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="0" To="12" Label="Source1" />
+      <Edge From="12" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
-      <Edge From="0" To="3" Label="Source1" />
+      <Edge From="12" To="3" Label="Source1" />
       <Edge From="3" To="4" Label="Source1" />
-      <Edge From="0" To="5" Label="Source1" />
+      <Edge From="12" To="5" Label="Source1" />
       <Edge From="5" To="6" Label="Source1" />
-      <Edge From="0" To="7" Label="Source1" />
+      <Edge From="12" To="7" Label="Source1" />
       <Edge From="7" To="8" Label="Source1" />
       <Edge From="8" To="9" Label="Source1" />
       <Edge From="2" To="10" Label="Source1" />

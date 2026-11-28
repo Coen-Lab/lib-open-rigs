@@ -1,8 +1,15 @@
-"""The sample: bregma and lambda from two clicks, or registration of the mouse's last reference still.
+"""The sample: bregma and a second midline point from two clicks, or registration of the mouse's last reference still.
+
+The two points are atlas coordinates [ML, AP] in mm: bregma [0, 0] and the caller's second point [0, ap] on the midline
+(MATLAB Zapit's refAP point, pointer.m refPointsStereotaxic = [0 0; 0 refAP], +AP anterior; the rig app gives it,
+3 mm posterior). They set the
+conversion from atlas units to the still (position, rotation and scale), so the second point's distance is in atlas mm,
+scaled to each mouse by where it is clicked, not a skull landmark's (lambda is a Paxinos skull landmark the Allen atlas
+does not define).
 
 Registration scales the reference to the new image's micronsPerPixel, masks the skull and head-plate, matches ORB
 features, finds the consistent ones with a RANSAC similarity and refits them as rigid (rotation and shift: the scale
-is known from micronsPerPixel, and a free one put lambda 100 um off on B2's real pair, audit E F3). The similarity's
+is known from micronsPerPixel, and a free one put a point 100 um off on a real pair of stills). The similarity's
 scale is kept only as the not-the-same-head check. It passes on enough inliers, a small turn and the masked
 correlation of the equalised stills after the move; the limits, and the other tunables, are the constants below.
 """
@@ -17,7 +24,7 @@ from open_rigs.zapit.scanner import ScannerSettings
 
 MIN_INLIERS = 30          # a registration needs at least this many RANSAC inliers ...
 # ... and the equalised stills, the reference moved onto the new one, must correlate at least this inside both masks.
-# B2's real pair 0.91, wrong pairs 0.18-0.23 (audit E); an inlier residual separated nothing (always under RANSAC's).
+# A real pair 0.91, wrong pairs 0.18-0.23; an inlier residual separated nothing (always under RANSAC's).
 MIN_CORRELATION = 0.6
 MAX_ROTATION_DEG = 20.0   # a head-fixed mouse turns a few degrees between sessions; the skull turned 180 deg passed
 MIN_OVERLAP_PX = 1000     # fewer masked pixels in common than this is no overlap to correlate
@@ -31,14 +38,13 @@ ORB_FAST_THRESHOLD = 5
 CLAHE_CLIP = 3.0
 MASK_ERODE_FRACTION = 0.03   # the mask is pulled in from the skull's edge by this fraction of the image width
 SATURATED = 250           # glare at or above this grey level (8 bit) is masked out
-LAMBDA_AP_MM = -4.2       # lambda's AP from bregma, the mouse atlas value; the second reference point
 
 
 @dataclass
 class Sample:
     """The two reference points in stereotaxic mm and as seen in the image (sample mm, as ``ScannerMapping`` gives
     them), with the pixels they were clicked at, so a later registration can carry them across."""
-    ref_stereotaxic: np.ndarray          # (2, 2) [ML, AP]: bregma, lambda
+    ref_stereotaxic: np.ndarray          # (2, 2) [ML, AP]: bregma, the second point
     ref_sample_mm: np.ndarray            # (2, 2)
     ref_px: np.ndarray                   # (2, 2) [col, row] in the image
     microns_per_pixel: float
@@ -56,12 +62,17 @@ class Sample:
                    np.array(d["ref_px"], float), float(d["microns_per_pixel"]), (int(d["image_size"][0]), int(d["image_size"][1])), d["method"])
 
 
-def sample_from_clicks(bregma_px, lambda_px, settings: ScannerSettings, lambda_ap_mm: float = LAMBDA_AP_MM) -> Sample:
-    """The sample from clicks on the live tile: bregma, then lambda, as (col, row) pixels of the saved still."""
-    px = np.array([bregma_px, lambda_px], dtype=float).reshape(2, 2)
+def sample_from_clicks(bregma_px, second_px, settings: ScannerSettings, second_ap_mm: float) -> Sample:
+    """The sample from clicks on the live tile: bregma, then the midline point at atlas AP `second_ap_mm` (the
+    caller's one constant; no default here, so no second copy of it), as (col, row) pixels of the saved still."""
+    if not (np.isfinite(second_ap_mm) and second_ap_mm != 0):
+        raise ValueError(f"The second point's AP must be a number of mm other than 0, not {second_ap_mm!r}")
+    px = np.array([bregma_px, second_px], dtype=float).reshape(2, 2)
+    if not np.isfinite(px).all():
+        raise ValueError(f"The clicks must be finite pixels, not bregma {bregma_px!r} and second point {second_px!r}")
     if np.allclose(px[0], px[1]):
-        raise ValueError("Bregma and lambda were clicked at the same place")
-    return Sample(np.array([[0.0, 0.0], [0.0, float(lambda_ap_mm)]]), settings.pixels_to_mm(px), px,
+        raise ValueError("Bregma and the second point were clicked at the same place")
+    return Sample(np.array([[0.0, 0.0], [0.0, float(second_ap_mm)]]), settings.pixels_to_mm(px), px,
                   settings.microns_per_pixel, settings.image_size)
 
 
@@ -150,7 +161,7 @@ def register_sample(reference_image: np.ndarray, reference: Sample, image: np.nd
                     settings: ScannerSettings) -> Registration:
     """Register ``image`` (the new still, at ``settings``) to ``reference_image`` (the mouse's last accepted still,
     described by ``reference``). Returns the move from reference pixels to new pixels, the inlier count as the score
-    and pass or fail; on a pass, ``sample`` carries the reference's bregma and lambda into the new image."""
+    and pass or fail; on a pass, ``sample`` carries the reference's two points into the new image."""
     import cv2
     s = reference.microns_per_pixel / settings.microns_per_pixel      # reference px -> new px scale
     ref = grey8(reference_image)

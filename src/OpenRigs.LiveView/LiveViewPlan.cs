@@ -67,7 +67,9 @@ namespace OpenRigs.LiveView
         /// <summary>
         /// The member path to the first IplImage in the data, breadth first and at most three
         /// members deep (Value.Image for a camera's frame paired with its trigger), "it" if the
-        /// data is the image, or null if it holds none.
+        /// data is the image, or null if it holds none. At each level a member named View comes
+        /// before every other: the Zapit camera's frame streams its cropped View, not its Image
+        /// (recorded whole); any device type with a View member is streamed by it.
         /// </summary>
         public static string ImagePath(Type type)
         {
@@ -81,7 +83,8 @@ namespace OpenRigs.LiveView
                 if (depth >= 3) continue;
                 var members = item.Key.GetProperties().Where(p => p.GetIndexParameters().Length == 0)
                     .Select(p => new KeyValuePair<string, Type>(p.Name, p.PropertyType))
-                    .Concat(item.Key.GetFields().Select(f => new KeyValuePair<string, Type>(f.Name, f.FieldType)));
+                    .Concat(item.Key.GetFields().Select(f => new KeyValuePair<string, Type>(f.Name, f.FieldType)))
+                    .OrderBy(m => m.Key == "View" ? 0 : 1);   // a frame's View (the Zapit camera's cropped one) before its Image (recorded whole)
                 foreach (var member in members)
                 {
                     var path = item.Value.Length == 0 ? member.Key : item.Value + "." + member.Key;
@@ -141,6 +144,7 @@ namespace OpenRigs.LiveView
                 { "Interval", XmlConvert.ToString(TimeSpan.FromSeconds(1.0 / Rate)) },
                 { "Width", Width.ToString(CultureInfo.InvariantCulture) },
                 { "Height", Height.ToString(CultureInfo.InvariantCulture) },
+                { "Fit", Name == "Camera-" + LiveViewPlan.ZapitInstance ? "true" : "false" },   // the Zapit camera's whole frame, with black, never cut
                 { "ImagePath", ImagePath ?? string.Empty },
                 { "Channels", ChannelsStream ?? string.Empty },
                 { "AnalogInterval", Recipe.AnalogRate > 0 ? XmlConvert.ToString(TimeSpan.FromSeconds(1.0 / Recipe.AnalogRate)) : string.Empty },

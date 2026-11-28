@@ -8,6 +8,7 @@
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns:t="clr-namespace:OpenRigs.Devices.Tests;assembly=OpenRigs.Devices.Tests"
+                 xmlns:beh="clr-namespace:Harp.Behavior;assembly=Harp.Behavior"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Description>ConnectForTaskZapitDaq with what it needs from a task workflow, and StreamDevices last, as a task workflow has them. ZapitLiveViewTests sets CONFIG_ROOT and builds it, never runs it.</Description>
   <Workflow>
@@ -55,6 +56,12 @@
         <Name>LiveView</Name>
         <lv:DataPort>5556</lv:DataPort>
         <lv:VideoPort>5558</lv:VideoPort>
+      </Expression>
+      <Expression xsi:type="rx:AsyncSubject" TypeArguments="beh:DigitalOutputs">
+        <rx:Name>ZapitTriggerLine</rx:Name>
+      </Expression>
+      <Expression xsi:type="rx:BehaviorSubject" TypeArguments="harp:HarpMessage">
+        <rx:Name>BehaviorBoard-Main.Commands</rx:Name>
       </Expression>
     </Nodes>
     <Edges>

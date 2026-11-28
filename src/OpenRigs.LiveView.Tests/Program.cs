@@ -4,10 +4,9 @@ using System.Linq;
 using System.Reactive.Linq;
 using OpenRigs.LiveView;
 
-// Stand-ins for the device data types, which the recipes recognise by full name, so the plan can
-// be tested without Bonsai.Harp or OpenCV.Net installed.
+// A stand-in for a board's data type, which the recipes recognise by full name, so the plan can be
+// tested without Bonsai.Harp installed. A camera's IplImage is OpenCV.Net's own, which LiveView uses.
 namespace Bonsai.Harp { public class HarpMessage { } }
-namespace OpenCV.Net { public class IplImage { } }
 // OpenRigs.Logging's LoggedRows, found by full name among the loaded assemblies.
 namespace OpenRigs.Logging { public class LoggedRows { } }
 
@@ -149,6 +148,7 @@ namespace OpenRigs.LiveView.Tests
                 var zapit = Plan(root, "zapit:\n  host: 127.0.0.1\n  device: Dev1\n", zapitPublished).Streamed.SingleOrDefault();
                 Check("a published Camera-Zapit.Data (rig.yml's zapit camera) is streamed by the camera recipe when zapit.device is set",
                     zapit != null && zapit.Name == "Camera-Zapit", zapit == null ? "none" : zapit.ToString());
+                Check("the Zapit camera is fitted whole with black, every other camera cut", zapit != null && zapit.TemplateValues()["Fit"] == "true" && cameraValues["Fit"] == "false", zapit == null ? "none" : zapit.TemplateValues()["Fit"] + " / " + cameraValues["Fit"]);
                 foreach (var zapitRig in new[] { "zapit:\n  host: 127.0.0.1\n  port: 1488\n", "zapit:\n  device: null\n", "camera:\n  overhead:\n    serialNumber: '1'\n" })
                 {
                     var noDevice = Plan(root, zapitRig, zapitPublished);
@@ -177,6 +177,25 @@ namespace OpenRigs.LiveView.Tests
                 var refused = false;
                 try { SessionKey.FromPathPrefix(@"C:\data\TC002\003B1"); } catch (ArgumentException) { refused = true; }
                 Check("a folder not named sub-/ses- is refused", refused, "taken");
+
+                Console.WriteLine("A camera's frame cut to its tile's shape:");
+                Func<FrameTrim, string> rect = t => string.Format("{0},{1},{2},{3} of {4}x{5}", t.X, t.Y, t.Width, t.Height, t.SourceWidth, t.SourceHeight);
+                var wide = FrameTrim.For(1936, 1216, 320, 240);
+                Check("a wider frame (Camera-Zapit's whole 1936 x 1216) loses equal strips at its sides", rect(wide) == "157,0,1621,1216 of 1936x1216", rect(wide));
+                var tall = FrameTrim.For(480, 640, 320, 240);
+                Check("a taller frame loses equal strips top and bottom", rect(tall) == "0,140,480,360 of 480x640", rect(tall));
+                var zapitCrop = FrameTrim.For(1024, 768, 320, 240);
+                Check("a frame of the tile's shape (Camera-Zapit cut to 4:3) is whole", zapitCrop.IsWhole, rect(zapitCrop));
+                var halfTile = FrameTrim.For(1936, 1216, 160, 240);
+                Check("the tile's shape is rig.yml's width and height", rect(halfTile) == "562,0,811,1216 of 1936x1216", rect(halfTile));
+                var flat = FrameTrim.For(640, 480, 1, 1000);
+                var thin = FrameTrim.For(640, 480, 1000, 1);
+                var fitWide = FrameTrim.Fit(1936, 1216, 320, 240);
+                Check("fitted, a wider frame keeps every pixel, black above and below", rect(fitWide) == "0,-118,1936,1452 of 1936x1216", rect(fitWide));
+                var fitTall = FrameTrim.Fit(480, 640, 320, 240);
+                Check("fitted, a taller frame keeps every pixel, black at its sides", rect(fitTall) == "-186,0,853,640 of 480x640", rect(fitTall));
+                Check("fitted, a frame of the tile's shape is whole", FrameTrim.Fit(1024, 768, 320, 240).IsWhole, rect(FrameTrim.Fit(1024, 768, 320, 240)));
+                Check("a tile of extreme shape still leaves at least 1 pixel a side", flat.Width == 1 && thin.Height == 1, rect(flat) + " / " + rect(thin));
 
                 Console.WriteLine("The workflow's path, as the manifest has it:");
                 var repo = Path.Combine(root, "repo");

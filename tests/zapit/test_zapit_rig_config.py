@@ -18,7 +18,7 @@ def test_a_full_block_reads():
     assert r.camera.serial_number == "40123456" and r.camera.session_pfs_path == "calibration/Zapit-Session.pfs"
 
 
-@pytest.mark.parametrize("key", [k for k in BLOCK if k not in ("invertXScanner",)])
+@pytest.mark.parametrize("key", [k for k in BLOCK if k != "invertXScanner"])
 def test_a_missing_required_field_is_refused_by_name(key):
     b = {k: v for k, v in BLOCK.items() if k != key}
     with pytest.raises(ZapitConfigError, match=key):
@@ -33,6 +33,14 @@ def test_a_missing_required_field_is_refused_by_name(key):
 def test_bad_values_are_refused(change):
     with pytest.raises(ZapitConfigError):
         ZapitRig.from_dict({**BLOCK, **change})
+
+
+def test_the_camera_records_its_crop_unless_record_crop_is_false():
+    assert ZapitRig.from_dict(BLOCK).camera.record_crop
+    off = ZapitRig.from_dict({**BLOCK, "camera": {"serialNumber": "1", "recordCrop": False}})
+    assert off.camera.record_crop is False and off.camera.session_pfs_path == "calibration/Zapit-Session.pfs"
+    with pytest.raises(ZapitConfigError, match="recordCrop must be true or false"):
+        ZapitRig.from_dict({**BLOCK, "camera": {"serialNumber": "1", "recordCrop": "no"}})
 
 
 def test_a_zero_ceiling_means_laser_disabled_and_reads():
@@ -63,3 +71,54 @@ def test_legacy_keys_are_ignored_and_new_keys_read():
 def test_bad_new_keys_are_refused(change):
     with pytest.raises(ZapitConfigError):
         ZapitRig.from_dict({**BLOCK, **change})
+
+
+def test_max_trial_seconds_is_required_as_zapitdaq_s_fixed_ceiling():
+    # ConnectForTaskZapitDaq passes it to ZapitDaq, which refuses to start without it.
+    with pytest.raises(ZapitConfigError, match="maxTrialSeconds"):
+        ZapitRig.from_dict({k: v for k, v in BLOCK.items() if k != "maxTrialSeconds"})
+    assert ZapitRig.from_dict(BLOCK).max_trial_seconds == 3.0
+    with pytest.raises(ZapitConfigError, match="maxTrialSeconds"):
+        ZapitRig.from_dict({**BLOCK, "maxTrialSeconds": 0})
+
+
+def test_the_lab_rig_model_needs_max_trial_seconds_with_the_daq_fields():
+    from pydantic import ValidationError
+
+    from open_rigs.components.zapit import Zapit
+    daq = {k: v for k, v in BLOCK.items() if k != "invertXScanner"}
+    del daq["maxTrialSeconds"]
+    with pytest.raises(ValidationError, match="maxTrialSeconds"):
+        Zapit.model_validate(daq)
+    assert Zapit.model_validate(BLOCK).max_trial_seconds == 3.0
+
+
+@pytest.mark.parametrize("key", ["ceilingMw", "sampleRate", "maxTrialSeconds", "voltsPerPixel"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_a_number_that_is_not_finite_is_refused_by_both_validators(key, value):
+    from pydantic import ValidationError
+
+    from open_rigs.components.zapit import Zapit
+    with pytest.raises(ZapitConfigError, match=key):
+        ZapitRig.from_dict({**BLOCK, key: value})
+    with pytest.raises(ValidationError):
+        Zapit.model_validate({**BLOCK, key: value})
+
+
+def test_a_laser_pair_that_is_not_finite_is_refused():
+    with pytest.raises(ZapitConfigError, match="laserMinMaxMw"):
+        ZapitRig.from_dict({**BLOCK, "laserMinMaxMw": [0.0, float("inf")]})
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_blanking_times_must_be_finite_and_named(value):
+    with pytest.raises(ZapitConfigError, match="blankingTimesMs"):
+        ZapitRig.from_dict({**BLOCK, "blankingTimesMs": [0.3, value, 0.0]})
+
+
+def test_a_key_yaml_does_not_read_as_text_or_a_root_that_is_no_mapping_is_refused_by_name():
+    with pytest.raises(ZapitConfigError, match="unknown keys: 1, None"):
+        ZapitRig.from_dict({**BLOCK, 1: "x", None: "y"})
+    for text in (["a", "b"], 5):
+        with pytest.raises(ZapitConfigError, match="must be a mapping"):
+            read_rig_zapit(text)

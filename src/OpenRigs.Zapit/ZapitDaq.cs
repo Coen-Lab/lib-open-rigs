@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
@@ -6,6 +7,7 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Xml.Serialization;
@@ -32,7 +34,9 @@ namespace OpenRigs.Zapit
     /// and deleted and every line zeroed on a short-lived on-demand task.
     /// Calibration: on-demand points, and a laser staircase read back through the photodiode on the AO clock. Every line is
     /// zeroed on subscribe and on unsubscribe, however the workflow stops. A Point once trials are armed, and a bank over the
-    /// ceiling, are Refused (an event; the session runs on); any other refusal or DAQ error is an error. No laser sample above
+    /// ceiling, are Refused (an event; the session runs on), as are a Point, Staircase or LoadBank while a trial is armed;
+    /// any other refusal or DAQ error is an error. Play Condition's trial (<see cref="ZapitPlay.SetupTrial"/>, trial 0, armed
+    /// only before Go) is a trial like any other but leaves Point and Staircase open after it. No laser sample above
     /// <see cref="LaserCeilingVolts"/> is written except by the staircase (the calibration that measures the laser curve the
     /// ceiling comes from), and a bank holding one, built under a ceiling above <see cref="CeilingMw"/> (peak), or delivering
     /// more average power than it asked (average), is refused at LoadBank. The simulated twin starts a trial on a Trigger
@@ -276,11 +280,17 @@ namespace OpenRigs.Zapit
         {
             readonly ZapitDaq node;
             readonly IZapitDevice device;
-            readonly IObserver<ZapitDaqEvent> observer;   // called only under the gate, so the commands' and the monitor's calls never race
+            readonly IObserver<ZapitDaqEvent> observer;   // called only from Deliver, one thread at a time, with no gate held
             readonly object gate = new object();
-            // Every device call is made under the device gate, taken after the gate and never before it, and no event is
-            // emitted under it: the feeder takes only the device gate, so a slow subscriber holding the gate never starves it.
+            // Every device call is made under the device gate, taken after the gate and never before it: the feeder takes only
+            // the device gate, so a slow subscriber never starves it.
             readonly object deviceGate = new object();
+            // The events, posted under the gate and delivered once it is let go (Deliver), in order, by one thread at a time, so
+            // a subscriber's lock is never waited on with the gate held. A setup node holding its own lock sends ZapitDaq a
+            // command while ZapitDaq's event waits for that lock on another thread (LaserOff during a grid run as a frame
+            // sends the next point): with events sent under the gate, the two threads waited on each other for ever.
+            readonly Queue<Notification<ZapitDaqEvent>> outbox = new Queue<Notification<ZapitDaqEvent>>();
+            bool delivering;   // under the outbox: a thread is delivering, and delivers what others post meanwhile
             readonly Thread monitor;
             readonly Thread feeder;
             readonly ManualResetEventSlim feeding = new ManualResetEventSlim(false);
@@ -288,7 +298,7 @@ namespace OpenRigs.Zapit
             ZapitBank? bank;
             Trial? trial;
             Feed? feed;   // under the device gate: the streamed trial the feeder tops up
-            bool trialsArmed;   // a trial was armed: Point is refused for the rest of the session
+            bool trialsArmed;   // a task's trial was armed (not Play Condition's): Point is refused for the rest of the session
             ZapitBank? planned;   // the bank plan is for
             StreamPlan? plan;
             bool leadChecked;   // plan passed CheckLead on this DAQ
@@ -328,24 +338,27 @@ namespace OpenRigs.Zapit
                     }
                     catch (Exception error)
                     {
-                        if (!disposed) observer.OnError(error);
+                        if (!disposed) Post(Notification.CreateOnError<ZapitDaqEvent>(error));
                     }
                 }
+                Deliver();
             }
 
             public void Fail(Exception error)
             {
-                lock (gate) observer.OnError(error);
+                Post(Notification.CreateOnError<ZapitDaqEvent>(error));
+                Deliver();
             }
 
             public void Complete()
             {
-                lock (gate) observer.OnCompleted();
+                Post(Notification.CreateOnCompleted<ZapitDaqEvent>());
+                Deliver();
             }
 
             void LoadBank(ZapitDaqCommand command)
             {
-                RefuseWhilePlaying(command);
+                if (RefusedWhileArmed(command)) return;
                 var loaded = ZapitBank.Load(command.Path ?? throw new InvalidOperationException("LoadBank needs the bank's Path."));
                 if (loaded.SampleRate != node.SampleRate)
                     throw new InvalidOperationException($"The Zapit bank was built for {loaded.SampleRate} samples/s; the rig runs {node.SampleRate}.");
@@ -403,7 +416,7 @@ namespace OpenRigs.Zapit
                     throw new InvalidOperationException($"Trial {command.Trial} cannot arm while trial {trial.Command.Trial} still plays.");
                 if (trial != null) Finish(ZapitDaqEventKind.Stopped);   // armed but never triggered
                 if (disposed) return;   // a subscriber disposed the node inside that event: the lines are zeroed
-                trialsArmed = true;
+                if (command.Trial != ZapitPlay.SetupTrial) trialsArmed = true;   // Play Condition's, before Go, leaves aiming open
                 var watch = Stopwatch.StartNew();
                 var variant = loaded.Variant(command.Condition, command.LaserOn, command.PowerMw);
                 var cycles = loaded.Cycles(command.Condition, variant, command.DurationSeconds, node.MaxTrialSeconds);
@@ -493,10 +506,10 @@ namespace OpenRigs.Zapit
             {
                 if (trialsArmed)
                 {
-                    Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "ZapitDaq takes no Point once trials are armed (after Go)." });
+                    Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "ZapitDaq takes no Point once trials are armed (after Go)" });
                     return;
                 }
-                RefuseWhilePlaying(command);
+                if (RefusedWhileArmed(command)) return;
                 RefuseLaser(new[] { command.LaserVolts }, "The aiming point");
                 lock (deviceGate) device.WriteOnDemand(new[] { command.GalvoXVolts, command.GalvoYVolts, command.LaserVolts, 0 });
                 Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Pointed });
@@ -507,10 +520,10 @@ namespace OpenRigs.Zapit
                 // Between trials too: the staircase is not held to the ceiling's volts (below), so it is calibration only.
                 if (trialsArmed)
                 {
-                    Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "ZapitDaq takes no Staircase once trials are armed (after Go)." });
+                    Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = "ZapitDaq takes no Staircase once trials are armed (after Go)" });
                     return;
                 }
-                RefuseWhilePlaying(command);
+                if (RefusedWhileArmed(command)) return;
                 var levels = command.LaserLevelsVolts;
                 if (levels == null || levels.Length == 0 || command.SamplesPerLevel < 1)
                     throw new InvalidOperationException("A Zapit staircase needs laser levels and at least one sample per level.");
@@ -547,9 +560,14 @@ namespace OpenRigs.Zapit
 
             static double[] Laser(double[,] samples) => Enumerable.Range(0, samples.GetLength(1)).Select(i => samples[2, i]).ToArray();
 
-            void RefuseWhilePlaying(ZapitDaqCommand command)
+            // A Point, Staircase or LoadBank while a trial is armed (Play Condition's, before Go) is Refused, an event: the
+            // session runs on, the trial untouched.
+            bool RefusedWhileArmed(ZapitDaqCommand command)
             {
-                if (trial != null) throw new InvalidOperationException($"ZapitDaq cannot {command.Kind} while trial {trial.Command.Trial} is armed.");
+                if (trial != null) Poll(trial);   // it may have ended since the monitor's last look
+                if (disposed || trial == null) return disposed;
+                Emit(new ZapitDaqEvent { Kind = ZapitDaqEventKind.Refused, Detail = $"ZapitDaq cannot {command.Kind} while " + (trial.Command.Trial == ZapitPlay.SetupTrial ? "Play Condition" : $"trial {trial.Command.Trial}") + " is armed" });
+                return true;
             }
 
             // Stops and deletes any clocked task and zeroes every line, the zero written even when the stop reports an error;
@@ -621,7 +639,58 @@ namespace OpenRigs.Zapit
             {
                 e.Time = DateTimeOffset.Now;
                 e.Underflows = underflows;
-                observer.OnNext(e);
+                Post(Notification.CreateOnNext(e));
+            }
+
+            void Post(Notification<ZapitDaqEvent> notification)
+            {
+                lock (outbox) outbox.Enqueue(notification);
+            }
+
+            // With no gate held: sends the events posted so far, unless another thread is sending them, which then sends these
+            // too, so no caller waits on a subscriber another thread holds. A call with nothing to send claims nothing, so a
+            // command's events come inside its call unless the monitor is sending events of its own at that moment.
+            void Deliver()
+            {
+                lock (outbox)
+                {
+                    if (delivering || outbox.Count == 0) return;
+                    delivering = true;
+                }
+                while (true)
+                {
+                    Notification<ZapitDaqEvent> next;
+                    lock (outbox)
+                    {
+                        if (outbox.Count == 0 || disposed)
+                        {
+                            outbox.Clear();
+                            delivering = false;
+                            return;
+                        }
+                        next = outbox.Dequeue();
+                    }
+                    try { next.Accept(observer); }
+                    catch (Exception error)
+                    {
+                        lock (outbox) delivering = false;
+                        if (next.Kind != NotificationKind.OnNext) Rethrow(error, next.Kind);
+                        else
+                        {
+                            try { observer.OnError(error); }   // a subscriber's error, as when events were sent inside the command
+                            catch (Exception terminal) { Rethrow(terminal, NotificationKind.OnError); }
+                        }
+                        return;
+                    }
+                }
+            }
+
+            // A subscriber's throw from OnError or OnCompleted goes back to the caller; on the monitor's thread, which has
+            // no caller to take it and where it would end the process, it is written to the log instead.
+            void Rethrow(Exception error, NotificationKind kind)
+            {
+                if (Thread.CurrentThread != monitor) ExceptionDispatchInfo.Capture(error).Throw();
+                Console.Error.WriteLine($"ZapitDaq: a subscriber threw from {kind} on the monitor thread: {error}");
             }
 
             // fresh: read the DAQ's count of a streamed trial (Arm, EarlyStop) rather than the feeder's last; the monitor takes the
@@ -789,17 +858,21 @@ namespace OpenRigs.Zapit
                     {
                         lock (gate)
                         {
-                            if (!disposed) observer.OnError(error);
+                            if (!disposed) Post(Notification.CreateOnError<ZapitDaqEvent>(error));
                         }
+                        Deliver();
                         return;
                     }
+                    Deliver();
                     Thread.Sleep(1);
                 }
             }
 
             // Zeroes first, under the gate: the monitor and the feeder touch the device only under the device gate and stop
-            // once they see disposed. A dispose from inside an event (the gate already held, or on the monitor's own thread)
-            // never joins the monitor, which would wait on that gate for ever; the feeder never takes the gate.
+            // once they see disposed, and no event is sent after it. A dispose from inside an event the monitor sends (on its
+            // own thread) or with the gate held never joins the monitor; the feeder never takes the gate. The monitor is
+            // waited on for 1 s at most: it may be sending an event to a subscriber that waits on a lock this caller holds,
+            // and it touches the device only under the gate after checking disposed, so the lines stay at 0 V either way.
             public void Dispose()
             {
                 lock (gate)
@@ -826,7 +899,7 @@ namespace OpenRigs.Zapit
                     }
                 }
                 if (Thread.CurrentThread != feeder) feeder.Join();
-                if (Thread.CurrentThread != monitor && !System.Threading.Monitor.IsEntered(gate)) monitor.Join();
+                if (Thread.CurrentThread != monitor && !System.Threading.Monitor.IsEntered(gate)) monitor.Join(TimeSpan.FromSeconds(1));
             }
         }
     }

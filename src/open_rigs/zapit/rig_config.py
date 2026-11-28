@@ -9,6 +9,7 @@ the key is absent; a present value is used as given. The calibration ``.pfs`` is
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,6 +24,7 @@ _OPTIONAL = ("invertXScanner", "invertYScanner", "blankingTimesMs")
 _LEGACY = ("host", "port", "hardwareTriggered")
 MATLAB_BLANKING_MS = (0.3, -0.12, 0.25)
 _CAMERA = ("serialNumber", "sessionPfsPath", "calibrationPfsPath")
+_CAMERA_FLAGS = ("recordCrop",)
 
 
 class ZapitConfigError(ValueError):
@@ -34,6 +36,7 @@ class ZapitCamera:
     serial_number: str
     session_pfs_path: str = "calibration/Zapit-Session.pfs"          # relative to rig.yml's folder
     calibration_pfs_path: str = "calibration/Zapit-Calibration.pfs"
+    record_crop: bool = True        # the crop cuts the recording too, so it is fixed from Go; False: the live view only
 
 
 @dataclass(frozen=True)
@@ -49,7 +52,7 @@ class ZapitRig:
     laser_min_max_mw: tuple[float, float]
     laser_min_max_control_volts: tuple[float, float]
     ceiling_mw: float               # caps every volts value handed out (not the laser-curve staircase); 0 = laser disabled
-    max_trial_seconds: float        # a task's LaserCapSeconds above this is refused at Go
+    max_trial_seconds: float        # ZapitDaq's longest trial buffer in seconds, chosen per rig
     microns_per_pixel: float
     volts_per_pixel: float
     camera: ZapitCamera
@@ -64,7 +67,7 @@ class ZapitRig:
         missing = [k for k in _REQUIRED if block.get(k) is None]
         if missing:
             raise ZapitConfigError(f"rig.yml zapit block is missing: {', '.join(missing)}")
-        unknown = sorted(set(block) - set(_REQUIRED) - set(_OPTIONAL) - set(_LEGACY))
+        unknown = sorted(str(k) for k in set(block) - set(_REQUIRED) - set(_OPTIONAL) - set(_LEGACY))
         if unknown:
             raise ZapitConfigError(f"rig.yml zapit block has unknown keys: {', '.join(unknown)}")
         b = block
@@ -76,14 +79,15 @@ class ZapitRig:
 
         def num(k, positive=True):
             v = b[k]
-            if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 or (positive and v == 0):
+            if (isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0
+                    or (positive and v == 0)):
                 raise ZapitConfigError(f"zapit.{k} must be {'a positive' if positive else 'a non-negative'} number, not {v!r}")
             return float(v)
 
         def pair(k):
             v = b[k]
             if (not isinstance(v, (list, tuple)) or len(v) != 2 or any(isinstance(x, bool) or not isinstance(
-                    x, (int, float)) for x in v) or not v[1] > v[0]):
+                    x, (int, float)) or not math.isfinite(x) for x in v) or not v[1] > v[0]):
                 raise ZapitConfigError(f"zapit.{k} must be two numbers rising from the first to the second")
             return float(v[0]), float(v[1])
 
@@ -97,16 +101,19 @@ class ZapitRig:
         if "blankingTimesMs" in b:
             v = b["blankingTimesMs"]
             if (not isinstance(v, (list, tuple)) or len(v) != 3 or any(
-                    isinstance(x, bool) or not isinstance(x, (int, float)) for x in v) or v[0] <= 0):
-                raise ZapitConfigError("zapit.blankingTimesMs must be three numbers, the first positive")
+                    isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) for x in v) or v[0] <= 0):
+                raise ZapitConfigError("zapit.blankingTimesMs must be three finite numbers, the first positive")
             blanking = (float(v[0]), float(v[1]), float(v[2]))
         c = b["camera"]
-        if not isinstance(c, dict) or set(c) - set(_CAMERA) or any(
+        if not isinstance(c, dict) or set(c) - set(_CAMERA + _CAMERA_FLAGS) or any(
                 not isinstance(c.get(k, "x"), str) or not c.get(k, "x").strip() for k in _CAMERA):
-            raise ZapitConfigError(f"zapit.camera must be a mapping of {', '.join(_CAMERA)} (non-empty text)")
+            raise ZapitConfigError(f"zapit.camera must be a mapping of {', '.join(_CAMERA)} (non-empty text) and recordCrop (true or false)")
+        if not isinstance(c.get("recordCrop", True), bool):
+            raise ZapitConfigError(f"zapit.camera.recordCrop must be true or false, not {c['recordCrop']!r}")
         if "serialNumber" not in c:
             raise ZapitConfigError("zapit.camera.serialNumber is missing")
-        camera = ZapitCamera(c["serialNumber"].strip(), *(c[k].strip() for k in _CAMERA[1:] if k in c))
+        camera = ZapitCamera(c["serialNumber"].strip(), *(c[k].strip() for k in _CAMERA[1:] if k in c),
+                             record_crop=c.get("recordCrop", True))
         mw, cv = pair("laserMinMaxMw"), pair("laserMinMaxControlVolts")
         rig = cls(text("device"), text("galvoXChannel"), text("galvoYChannel"), text("laserChannel"),
                   text("ledChannel"), text("photodiodeChannel"), text("triggerChannel"), num("sampleRate"), mw, cv,
@@ -124,6 +131,8 @@ def read_rig_zapit(rig_yml, require: bool = True) -> ZapitRig | None:
     (a desk or a rig without Zapit), otherwise refused."""
     if isinstance(rig_yml, (str, Path)):
         rig_yml = yaml.safe_load(Path(rig_yml).read_text(encoding="utf-8")) or {}
+    if not isinstance(rig_yml, dict):
+        raise ZapitConfigError("rig.yml must be a mapping with a zapit block")
     block = rig_yml.get("zapit")
     if block is None:
         if require:

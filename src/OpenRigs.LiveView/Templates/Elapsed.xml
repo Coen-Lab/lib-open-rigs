@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Seconds since the experiment folder appeared, once a second, as the elapsed stream. -->
+<!-- Seconds since the experiment folder appeared, once a second, as the elapsed stream. Its end is not passed on
+     (IgnoreCompletion), as it would close DataMessage for every stream. -->
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
@@ -14,6 +15,9 @@
           <lv:Interval>PT1S</lv:Interval>
         </Combinator>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:IgnoreCompletion" />
+      </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
         <StreamName>elapsed</StreamName>
       </Expression>
@@ -21,6 +25,7 @@
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

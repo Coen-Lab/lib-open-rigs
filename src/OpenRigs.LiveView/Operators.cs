@@ -1,12 +1,15 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Xml;
 using System.Xml.Serialization;
 using Bonsai;
+using NetMQ;
+using OpenCV.Net;
 using OpenRigs.Shared;
 
 namespace OpenRigs.LiveView
@@ -76,6 +79,173 @@ namespace OpenRigs.LiveView
             {
                 var watch = Stopwatch.StartNew();
                 return Observable.Timer(TimeSpan.Zero, Interval).Select(__ => Math.Round(watch.Elapsed.TotalSeconds, 1));
+            });
+        }
+    }
+
+    /// <summary>
+    /// Passes on a device's data and any error, but not its end. Each stream ends in a
+    /// MulticastSubject into the shared DataMessage or VideoMessage, which passes an end on too:
+    /// a device whose data ends (Camera-Zapit.Data in a session that opens no Zapit) would close
+    /// that subject, and every other device's stream on its port with it.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Combinator)]
+    [Description("Passes on each element and error, never the end, so a device whose data ends leaves the shared streams open.")]
+    public class IgnoreCompletion
+    {
+        /// <summary>Passes on each element and error of a sequence, never its end.</summary>
+        /// <typeparam name="TSource">The type of the elements.</typeparam>
+        /// <param name="source">The device's data.</param>
+        /// <returns>The same elements and error, never ending.</returns>
+        public IObservable<TSource> Process<TSource>(IObservable<TSource> source)
+        {
+            return source.Concat(Observable.Never<TSource>());
+        }
+    }
+
+    /// <summary>
+    /// The part of a camera's frame its live view shows: the largest rectangle of the tile's shape
+    /// centred in the frame, in the frame's pixels.
+    /// </summary>
+    public class FrameTrim
+    {
+        /// <summary>The frame's width as it came, in pixels.</summary>
+        public int SourceWidth { get; set; }
+        /// <summary>The frame's height as it came, in pixels.</summary>
+        public int SourceHeight { get; set; }
+        /// <summary>The left edge of the part shown, in pixels of the frame.</summary>
+        public int X { get; set; }
+        /// <summary>The top edge of the part shown, in pixels of the frame.</summary>
+        public int Y { get; set; }
+        /// <summary>The width of the part shown, in pixels of the frame.</summary>
+        public int Width { get; set; }
+        /// <summary>The height of the part shown, in pixels of the frame.</summary>
+        public int Height { get; set; }
+
+        /// <summary>Whether the part shown is the whole frame.</summary>
+        public bool IsWhole { get { return X == 0 && Y == 0 && Width == SourceWidth && Height == SourceHeight; } }
+
+        /// <summary>The smallest tileWidth x tileHeight shaped rectangle holding the whole sourceWidth x sourceHeight
+        /// frame at its centre: X or Y is negative by the black added at each side.</summary>
+        public static FrameTrim Fit(int sourceWidth, int sourceHeight, int tileWidth, int tileHeight)
+        {
+            long width = sourceWidth, height = sourceHeight;
+            if (tileWidth > 0 && tileHeight > 0)
+            {
+                if (width * tileHeight > height * tileWidth) height = Math.Max(sourceHeight, (width * tileHeight + tileWidth / 2) / tileWidth);
+                else width = Math.Max(sourceWidth, (height * tileWidth + tileHeight / 2) / tileHeight);
+            }
+            return new FrameTrim
+            {
+                SourceWidth = sourceWidth,
+                SourceHeight = sourceHeight,
+                X = -(int)((width - sourceWidth) / 2),
+                Y = -(int)((height - sourceHeight) / 2),
+                Width = (int)width,
+                Height = (int)height,
+            };
+        }
+
+        /// <summary>The largest tileWidth x tileHeight shaped rectangle centred in a sourceWidth x sourceHeight frame,
+        /// never under 1 pixel a side (a tile of extreme shape, such as 1000 x 1, would round one to 0).</summary>
+        public static FrameTrim For(int sourceWidth, int sourceHeight, int tileWidth, int tileHeight)
+        {
+            long width = sourceWidth, height = sourceHeight;
+            if (tileWidth > 0 && tileHeight > 0)
+            {
+                if (width * tileHeight > height * tileWidth) width = Math.Min(sourceWidth, Math.Max(1, (height * tileWidth + tileHeight / 2) / tileHeight));
+                else height = Math.Min(sourceHeight, Math.Max(1, (width * tileHeight + tileWidth / 2) / tileWidth));
+            }
+            return new FrameTrim
+            {
+                SourceWidth = sourceWidth,
+                SourceHeight = sourceHeight,
+                X = (int)(sourceWidth - width) / 2,
+                Y = (int)(sourceHeight - height) / 2,
+                Width = (int)width,
+                Height = (int)height,
+            };
+        }
+    }
+
+    /// <summary>A camera's frame cut to its live-view tile's shape, and where in the frame it was cut.</summary>
+    public class TrimmedFrame
+    {
+        /// <summary>The part of the frame shown, sharing the frame's pixels.</summary>
+        public IplImage Image { get; set; }
+        /// <summary>Where that part is in the frame.</summary>
+        public FrameTrim Trim { get; set; }
+    }
+
+    /// <summary>
+    /// Cuts each frame to the shape of the live-view tile, keeping its centre, so that resizing it to
+    /// the tile shrinks it evenly and never stretches it. A frame already of that shape is passed whole.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    [Description("Cuts each frame to the tile's shape, keeping its centre, so resizing it to the tile never stretches it.")]
+    public class TrimToTile
+    {
+        /// <summary>Gets or sets the tile's width; only its shape with Height is used.</summary>
+        [Description("The tile's width; only its shape with Height is used.")]
+        public int Width { get; set; } = 320;
+
+        /// <summary>Gets or sets the tile's height; only its shape with Width is used.</summary>
+        [Description("The tile's height; only its shape with Width is used.")]
+        public int Height { get; set; } = 240;
+
+        /// <summary>Gets or sets whether the whole frame is kept, black added at its sides to the tile's shape,
+        /// instead of cut (the Zapit camera, so a frame with no crop is shown whole).</summary>
+        [Description("Keep the whole frame, adding black at its sides to the tile's shape, instead of cutting it.")]
+        public bool Fit { get; set; }
+
+        /// <summary>Cuts each frame to the tile's shape.</summary>
+        /// <param name="source">The camera's frames.</param>
+        /// <returns>Each frame's centre of the tile's shape, and where it was cut.</returns>
+        public IObservable<TrimmedFrame> Process(IObservable<IplImage> source)
+        {
+            return source.Select(image =>
+            {
+                var trim = Fit ? FrameTrim.Fit(image.Width, image.Height, Width, Height) : FrameTrim.For(image.Width, image.Height, Width, Height);
+                if (trim.IsWhole) return new TrimmedFrame { Image = image, Trim = trim };
+                if (!Fit) return new TrimmedFrame { Image = image.GetSubRect(new Rect(trim.X, trim.Y, trim.Width, trim.Height)), Trim = trim };
+                var canvas = new IplImage(new Size(trim.Width, trim.Height), image.Depth, image.Channels);
+                canvas.SetZero();
+                CV.Copy(image, canvas.GetSubRect(new Rect(-trim.X, -trim.Y, image.Width, image.Height)));
+                return new TrimmedFrame { Image = canvas, Trim = trim };
+            });
+        }
+    }
+
+    /// <summary>
+    /// Adds to a video message's header where its frame was cut (TrimToTile): "sourceSize", the
+    /// frame's [width, height] as it came, and "trim", the part shown, [x, y, width, height] in its
+    /// pixels. A viewer maps a point on the picture back to the frame with them.
+    /// </summary>
+    [Combinator]
+    [WorkflowElementCategory(ElementCategory.Transform)]
+    [Description("Adds the frame's size and the part of it shown (sourceSize, trim) to each video message's header.")]
+    public class AddTrimToHeader
+    {
+        /// <summary>Adds the trim to each message's header, its second frame.</summary>
+        /// <param name="source">Each message paired with the trim of the frame it carries.</param>
+        /// <returns>The messages, their headers with sourceSize and trim.</returns>
+        public IObservable<NetMQMessage> Process(IObservable<Tuple<NetMQMessage, FrameTrim>> source)
+        {
+            return source.Select(pair =>
+            {
+                var message = pair.Item1;
+                var trim = pair.Item2;
+                var frames = message.ToList();
+                var header = frames[1].ConvertToString();
+                var at = header.LastIndexOf('}');
+                if (at < 0) return message;
+                header = header.Substring(0, at) + string.Format(CultureInfo.InvariantCulture,
+                    ",\"sourceSize\":[{0},{1}],\"trim\":[{2},{3},{4},{5}]",
+                    trim.SourceWidth, trim.SourceHeight, trim.X, trim.Y, trim.Width, trim.Height) + header.Substring(at);
+                frames[1] = new NetMQFrame(header);
+                return new NetMQMessage(frames);
             });
         }
     }

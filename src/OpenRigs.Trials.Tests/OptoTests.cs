@@ -154,6 +154,22 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual(ZapitBonsaiOptoSystem.Limits(bank, true).BusyAfterEndSeconds + ZapitDaqTrial.ArmSeconds, ZapitBonsaiOptoSystem.Limits(bank, true).OverheadSeconds, 1e-12);
         }
 
+        // Python's open_rigs.core.task zapit_trial_seconds copies OptoLimits' rule for the rig app: the shortest trigger to
+        // trigger less OverheadSeconds, the lead held to LeadProblem. tests/task/test_lab_blocks.py's
+        // test_zapit_trial_seconds_agrees_with_optolimits asserts the same buffers for the same cases.
+        [TestMethod]
+        public void OptoLimitsGiveTheBuffersPythonsZapitTrialSecondsGives()
+        {
+            // lead, itiMinSeconds, stimulus to window, window, ramp-down; the buffer (NaN: the lead is refused)
+            var cases = new[] { (0.1, 2.5, 0.5, 2.0, 0.25, 4.55), (0.1, 2.0, 0.2, 1.0, 0.25, 2.75), (3.2, 3.4, 0.5, 2.0, 0.5, 5.2), (3.3, 3.4, 0.5, 2.0, 0.5, double.NaN) };
+            foreach (var (lead, iti, toWindow, window, rampDown, buffer) in cases)
+            {
+                var limits = ZapitBonsaiOptoSystem.Limits(rampDown);
+                Assert.AreEqual(double.IsNaN(buffer), limits.LeadProblem(lead, iti) != null, "lead " + lead);
+                if (!double.IsNaN(buffer)) Assert.AreEqual(buffer, lead + toWindow + window + (iti - lead) - limits.OverheadSeconds, 1e-9, "lead " + lead);
+            }
+        }
+
         // The two Zapits' policies, as the loop had them hard-coded before the port.
         [TestMethod]
         public void TheZapitsPoliciesAreTheLoopsOldOnes()

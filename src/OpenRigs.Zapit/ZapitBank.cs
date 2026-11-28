@@ -159,14 +159,17 @@ namespace OpenRigs.Zapit
         public ZapitBankVariant Variant(int condition, bool laserOn, double powerMw)
         {
             if (condition < 1 || condition > Conditions.Count)
-                throw new InvalidOperationException($"The Zapit bank has no condition {condition}; it has {Conditions.Count}.");
+                throw new ZapitMissingCondition(condition, Conditions.Count, null);
             return Conditions[condition - 1].Variants.FirstOrDefault(v => v.LaserOn == laserOn && (!laserOn || v.PowerMw == powerMw))
-                ?? throw new InvalidOperationException($"The Zapit bank has no condition {condition} with the laser {(laserOn ? "on at " + powerMw + " mW" : "off")}.");
+                ?? throw new ZapitMissingCondition(condition, Conditions.Count, laserOn ? "on at " + powerMw + " mW" : "off");
         }
 
         /// <summary>The rows of a trial of <paramref name="cycles"/> cycles: the body, then the ramp tail.</summary>
-        public int TrialRows(int condition, ZapitBankVariant variant, int cycles) =>
-            BodyRows(condition, variant, cycles) + variant.TailRows;
+        public int TrialRows(int condition, ZapitBankVariant variant, int cycles) => (int)Rows(condition, variant, cycles);
+
+        // TrialRows in double, so Cycles can check a trial against the cap before any cast to int.
+        double Rows(int condition, ZapitBankVariant variant, double cycles) =>
+            cycles * Conditions[condition - 1].ScanCycle.Length - variant.TailReplaces + variant.TailRows;
 
         /// <summary>The rows before the ramp tail of a trial of <paramref name="cycles"/> cycles.</summary>
         public int BodyRows(int condition, ZapitBankVariant variant, int cycles) =>
@@ -177,17 +180,19 @@ namespace OpenRigs.Zapit
         public int Cycles(int condition, ZapitBankVariant variant, double durationSeconds, double maxTrialSeconds)
         {
             int cycleRows = Conditions[condition - 1].ScanCycle.Length;
-            var capRows = (long)Math.Floor(maxTrialSeconds * SampleRate + 1e-6);
+            // Counted in double and checked against the cap before any cast to int, so a long trial cannot wrap round
+            // to a short or negative row count; the cap keeps every row index an int.
+            var capRows = Math.Min(Math.Floor(maxTrialSeconds * SampleRate + 1e-6), int.MaxValue);
             if (durationSeconds < 0 || double.IsNaN(durationSeconds))
                 throw new InvalidOperationException($"A Zapit trial cannot last {durationSeconds} s.");
             var cycles = durationSeconds > 0
-                ? (int)Math.Ceiling(durationSeconds * SampleRate / cycleRows - 1e-9)
-                : (int)((capRows + variant.TailReplaces - variant.TailRows) / cycleRows);
-            if (cycles < 1 || TrialRows(condition, variant, cycles) > capRows)
+                ? Math.Ceiling(durationSeconds * SampleRate / cycleRows - 1e-9)
+                : Math.Floor((capRows + variant.TailReplaces - variant.TailRows) / cycleRows);
+            if (!(cycles >= 1) || !(durationSeconds * SampleRate <= capRows) || !(Rows(condition, variant, cycles) <= capRows))
                 throw new InvalidOperationException(durationSeconds > 0
                     ? $"A Zapit trial of {durationSeconds} s with its ramp is longer than maxTrialSeconds ({maxTrialSeconds} s)."
                     : $"Condition {condition}'s ramp does not fit maxTrialSeconds ({maxTrialSeconds} s).");
-            return cycles;
+            return (int)cycles;
         }
 
         /// <summary>The trial's samples from <paramref name="firstRow"/> to its end, one row per channel (galvo X, galvo Y,
@@ -253,6 +258,36 @@ namespace OpenRigs.Zapit
 
         /// <summary>Laser on at each power the task can draw, and laser off.</summary>
         public IReadOnlyList<ZapitBankVariant> Variants { get; }
+    }
+
+    /// <summary>A condition, or a condition's laser column, that a <see cref="ZapitBank"/> does not have.</summary>
+    public sealed class ZapitMissingCondition : InvalidOperationException
+    {
+        internal ZapitMissingCondition(int condition, int count, string? laser)
+            : base(Words(condition, count, laser, "The Zapit bank has", "it has") + ".")
+        {
+            Condition = condition;
+            Count = count;
+            Laser = laser;
+        }
+
+        /// <summary>The condition asked for.</summary>
+        public int Condition { get; }
+
+        /// <summary>The bank's number of conditions.</summary>
+        public int Count { get; }
+
+        /// <summary>The laser asked for ("on at 2 mW" or "off") when the condition exists without it; null when the bank has
+        /// no such condition.</summary>
+        public string? Laser { get; }
+
+        /// <summary>The refusal with the caller's words for the bank: <paramref name="has"/> ("The Zapit bank has") and
+        /// <paramref name="itHas"/> ("it has").</summary>
+        public string Say(string has, string itHas) => Words(Condition, Count, Laser, has, itHas);
+
+        static string Words(int condition, int count, string? laser, string has, string itHas) => laser == null
+            ? $"{has} no condition {condition}; {itHas} {count}"
+            : $"{has} no condition {condition} with the laser {laser}";
     }
 
     /// <summary>A condition's laser column at one power (or off) in a <see cref="ZapitBank"/>.</summary>
