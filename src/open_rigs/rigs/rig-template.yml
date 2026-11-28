@@ -26,13 +26,15 @@ behaviorBoard:
     portName: COM1
     usbSerial: CHANGE-ME
     pulseController:
-      outputPulseEnable: "DO1, DO2"   # never DO3: the ZapitTrigger line is held, not pulsed (lab rig model refuses it)
+      outputPulseEnable: "DO1, DO2, DO3"   # DO3, the ZapitTrigger line, too (lab rig model requires it)
       # Each reward valve is a CalibratedPulse: its curve, in calibration\ beside this file, plans every
-      # reward's pulses at the gap it was calibrated at. The ZapitTrigger line is held high, never pulsed.
+      # reward's pulses at the gap it was calibrated at. The ZapitTrigger line is held from the trigger until the workflow
+      # clears it, and the board ends it after its FixedPulse width if the workflow dies: at least the longest a trial holds it.
+      # A rig without Zapit leaves out its wiring line and the zapit block; DO3 is then a FixedPulse of 0, not pulse-enabled.
       outputs:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }
-        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 10000 }
     # What each line drives (lab rig model, open_rigs.rigs.lab_rig): each RewardValve by its name
     # (name: left is the piece RewardValve-Left), one ZapitTrigger and the Photodiode on the screen's sync square
     # (DIPort0; the projector's gamma calibration reads the same Photodiode on ADC0, so it needs no line here).

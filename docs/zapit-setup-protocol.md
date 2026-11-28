@@ -108,7 +108,7 @@ Once the bank is loaded and the sample accepted, before Go, the agent can play o
 2. Once `Armed`, `Zapit-Main.Trigger on` raises the ZapitTrigger line (the masking light with it), which starts the trial on ZapitDaq's trigger terminal, as a trial's trigger does (the simulated twin gets its `Trigger` with it).
 3. After the trial with its ramp, `Zapit-Main.Trigger off` clears the line and `Zapit-Main.LaserOff` zeroes every output.
 
-`Zapit-Main.LaserOff` before Go also clears the line, and so does the play's own end (`Ended`: its end, a stop or a Zero), whatever the agent does; every Go clears the line (a play still armed is zeroed too: `Off Go`), and when the workflow stops the board piece clears the line. ZapitDaq answers a `Point`, `Staircase` or `LoadBank` while the play is armed with `Refused` (the session runs on), and after it aiming stays open: only a task's trial (trial 1 on) closes `Point`. After Go the workflow ignores `Play` and `Trigger`.
+`Zapit-Main.LaserOff` before Go also clears the line, and so does the play's own end (`Ended`: its end, a stop or a Zero), whatever the agent does; every Go clears the line (a play still armed is zeroed too: `Off Go`), and if the workflow dies with the line high the board ends it after its pulse width (`ZapitTriggerLine`). ZapitDaq answers a `Point`, `Staircase` or `LoadBank` while the play is armed with `Refused` (the session runs on), and after it aiming stays open: only a task's trial (trial 1 on) closes `Point`. After Go the workflow ignores `Play` and `Trigger`.
 
 ## Refusals
 

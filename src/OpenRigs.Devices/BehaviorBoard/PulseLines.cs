@@ -1,7 +1,9 @@
 using Bonsai;
 using Bonsai.Harp;
 using Harp.Behavior;
+using OpenRigs.Devices.Rigs;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reactive.Linq;
 
@@ -37,23 +39,43 @@ namespace OpenRigs.Devices
     }
 
     /// <summary>
-    /// A Behavior board's pulsed lines put in pulse mode: each set of lines (PulseEnabledLines) as the writes that
-    /// close DO1 to DO3 and those lines (a line left high by a run that died, the ZapitTrigger's among them) and then
-    /// pulse-enable the lines, so a line in pulse mode ends each pulse itself.
+    /// A Behavior board's pulsed lines put in pulse mode, for each rig: the writes that close DO1 to DO3 and the pulsed
+    /// lines (PulseEnabledLines; a line left high by a run that died), set the ZapitTrigger line's PulseDO width to its
+    /// FixedPulse in rig.yml, and then pulse-enable the lines, so a line in pulse mode ends each pulse itself: the
+    /// ZapitTrigger's after its width, unless the workflow clears it first.
     /// </summary>
     [Combinator]
-    [Description("Each set of pulsed lines (PulseEnabledLines) as two writes for the board's Commands subject: DO1 to DO3 and the lines closed (OutputClear), then the lines pulse-enabled (OutputPulseEnable).")]
+    [Description("The board's pulsed lines (rig.yml's pulseController.outputPulseEnable, from the lab rig model, RigConfigs) as writes for its Commands subject: DO1 to DO3 and the lines closed (OutputClear), the ZapitTrigger line's width (its FixedPulse), then the lines pulse-enabled (OutputPulseEnable). Stops the workflow if a RewardValve or ZapitTrigger line is not pulse-enabled or the ZapitTrigger line has no width.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class PulseSetupWrites
     {
-        /// <summary>The writes for each set of lines.</summary>
-        public IObservable<HarpMessage> Process(IObservable<DigitalOutputs> source)
+        /// <summary>Gets or sets the board's name, Kind-Instance.</summary>
+        [Description("The board's name, such as BehaviorBoard-Main.")]
+        public string Board { get; set; }
+
+        /// <summary>The writes for each rig.</summary>
+        public IObservable<HarpMessage> Process(IObservable<LabRig> source)
         {
-            return source.SelectMany(lines => new[]
+            var board = Board;
+            return source.SelectMany(rig => Writes(rig, board));
+        }
+
+        /// <summary>The writes that put <paramref name="board"/>'s pulsed lines in pulse mode, or an exception naming why not.</summary>
+        public static HarpMessage[] Writes(LabRig rig, string board)
+        {
+            var lines = PulseEnabledLines.Find(rig, board);
+            var entry = OpenRigs.Core.RigDevice.Find(rig.BehaviorBoard, board);
+            var zapit = WiredLines.Find(entry, "ZapitTrigger");
+            var writes = new List<HarpMessage>
             {
                 HarpMessage.FromUInt16(PulseLines.OutputClear, MessageType.Write, (ushort)(lines | DigitalOutputs.DO1 | DigitalOutputs.DO2 | DigitalOutputs.DO3)),
-                HarpMessage.FromUInt16(PulseLines.OutputPulseEnable, MessageType.Write, (ushort)lines),
-            });
+            };
+            if (zapit != default(DigitalOutputs))
+            {
+                writes.Add(HarpMessage.FromUInt16(PulseLines.PulseRegister((ushort)zapit), MessageType.Write, (ushort)PulseEnabledLines.ZapitPulseWidthMs(entry, board, zapit)));
+            }
+            writes.Add(HarpMessage.FromUInt16(PulseLines.OutputPulseEnable, MessageType.Write, (ushort)lines));
+            return writes.ToArray();
         }
     }
 

@@ -13,11 +13,11 @@ namespace OpenRigs.Devices
 {
     /// <summary>
     /// The Behavior board output line rig.yml's <c>wiring</c> gives one device, such as the
-    /// ZapitTrigger, read once at start. Stops the workflow, naming rig.yml, unless exactly one line on
-    /// the named board has that device and it is DO1, DO2 or DO3.
+    /// ZapitTrigger, read once at start, or None when no line has it. Stops the workflow, naming rig.yml,
+    /// when more than one line on the named board has that device or its line is not DO1, DO2 or DO3.
     /// </summary>
     [Combinator]
-    [Description("The board's DO line rig.yml's wiring gives Device (such as ZapitTrigger), for each input. Stops the workflow unless exactly one line on Board has it and that line is DO1, DO2 or DO3.")]
+    [Description("The board's DO line rig.yml's wiring gives Device (such as ZapitTrigger), for each input, or None when no line has it. Stops the workflow if more than one line on Board has it or its line is not DO1, DO2 or DO3.")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class WiredOutput
     {
@@ -39,7 +39,7 @@ namespace OpenRigs.Devices
             return source.Select(_ => Find(RigFile, Board, Device));
         }
 
-        /// <summary>The line wired to <paramref name="device"/> on <paramref name="board"/>, or an exception saying why not.</summary>
+        /// <summary>The line wired to <paramref name="device"/> on <paramref name="board"/>, None for no line, or an exception saying why not.</summary>
         public static DigitalOutputs Find(string rigFile, string board, string device)
         {
             string problem;
@@ -55,11 +55,12 @@ namespace OpenRigs.Devices
                 let settings = line.Value as YamlMappingNode
                 where settings != null && settings.Children.Any(c => RigDevices.Scalar(c.Key) == "device" && RigDevices.Value(c.Value) == device)
                 select RigDevices.Scalar(line.Key)).ToArray();
-            if (lines.Length != 1)
+            if (lines.Length == 0) return default(DigitalOutputs);
+            if (lines.Length > 1)
             {
                 throw new InvalidOperationException(string.Format(
-                    "{0}'s wiring in {1} has {2} lines with device {3} ({4}); it needs exactly one.",
-                    board, rigFile, lines.Length, device, lines.Length == 0 ? "none" : string.Join(", ", lines)));
+                    "{0}'s wiring in {1} has {2} lines with device {3} ({4}); it needs at most one.",
+                    board, rigFile, lines.Length, device, string.Join(", ", lines)));
             }
             if (lines[0] != "DO1" && lines[0] != "DO2" && lines[0] != "DO3")
             {
@@ -212,32 +213,17 @@ namespace OpenRigs.Devices
     }
 
     /// <summary>
-    /// The lines a Behavior board pulses: rig.yml's pulseController.outputPulseEnable without any line
-    /// wiring gives the ZapitTrigger (held high by Zapit, and cleared when the workflow stops). Stops the
-    /// workflow, naming the line, when a line wired as a RewardValve is not among them: a reward would
-    /// then open the valve and leave it open.
+    /// The lines a Behavior board pulses, rig.yml's pulseController.outputPulseEnable, checked against its wiring: a
+    /// line wired as a RewardValve must be among them, or a reward would open the valve and leave it open, and so must
+    /// the ZapitTrigger's, with a FixedPulse width above 0 ms, or a workflow that died with it high would leave it on.
     /// </summary>
-    [Combinator]
-    [Description("The board's pulse-enabled lines, rig.yml's pulseController.outputPulseEnable without the ZapitTrigger's line, from the lab rig model (RigConfigs). Stops the workflow if a RewardValve line is not pulse-enabled.")]
-    [WorkflowElementCategory(ElementCategory.Transform)]
-    public class PulseEnabledLines
+    public static class PulseEnabledLines
     {
-        /// <summary>Gets or sets the board's name, Kind-Instance.</summary>
-        [Description("The board's name, such as BehaviorBoard-Main.")]
-        public string Board { get; set; }
-
-        /// <summary>The pulse-enabled lines of each rig.</summary>
-        public IObservable<DigitalOutputs> Process(IObservable<LabRig> source)
-        {
-            return source.Select(rig => Find(rig, Board));
-        }
-
-        /// <summary>The lines <paramref name="board"/> pulses, or an exception naming a valve line it would not.</summary>
+        /// <summary>The lines <paramref name="board"/> pulses, or an exception naming a valve or Zapit line it would not.</summary>
         public static DigitalOutputs Find(LabRig rig, string board)
         {
             var entry = OpenRigs.Core.RigDevice.Find(rig.BehaviorBoard, board);
-            var enabled = entry.PulseController == null ? default(DigitalOutputs) : entry.PulseController.OutputPulseEnable;
-            var pulsed = enabled & ~WiredLines.Find(entry, "ZapitTrigger");
+            var pulsed = entry.PulseController == null ? default(DigitalOutputs) : entry.PulseController.OutputPulseEnable;
             var unpulsed = WiredLines.Find(entry, "RewardValve") & ~pulsed;
             if (unpulsed != default(DigitalOutputs))
             {
@@ -245,7 +231,31 @@ namespace OpenRigs.Devices
                     "{0}'s wiring in rig.yml puts a RewardValve on {1}, which its pulseController.outputPulseEnable does not pulse: a reward would open the valve and leave it open. Add {1} to outputPulseEnable.",
                     board, unpulsed));
             }
+            var zapit = WiredLines.Find(entry, "ZapitTrigger");
+            if ((zapit & ~pulsed) != default(DigitalOutputs))
+            {
+                throw new InvalidOperationException(string.Format(
+                    "{0}'s wiring in rig.yml puts the ZapitTrigger on {1}, which its pulseController.outputPulseEnable does not pulse: a workflow that died with it high would leave it, and any masking light on it, on. Add {1} to outputPulseEnable.",
+                    board, zapit & ~pulsed));
+            }
+            if (zapit != default(DigitalOutputs)) ZapitPulseWidthMs(entry, board, zapit);
             return pulsed;
+        }
+
+        /// <summary>The width in ms the board ends the ZapitTrigger line <paramref name="zapit"/> after, its FixedPulse in
+        /// rig.yml's pulseController.outputs, or an exception when it has none above 0 ms.</summary>
+        public static int ZapitPulseWidthMs(BehaviorBoard entry, string board, DigitalOutputs zapit)
+        {
+            var outputs = entry.PulseController == null ? null : entry.PulseController.Outputs;
+            var property = typeof(PulseOutputs).GetProperty(zapit.ToString());
+            var fixedPulse = outputs == null || property == null ? null : property.GetValue(outputs) as FixedPulse;
+            if (fixedPulse == null || fixedPulse.PulseWidthMs < 1)
+            {
+                throw new InvalidOperationException(string.Format(
+                    "{0}'s ZapitTrigger on {1} needs a FixedPulse above 0 ms in rig.yml's pulseController.outputs, at least the longest a trial holds the line, so the board ends it if the workflow dies. Add it, as in {1}: {{ discriminatorType: FixedPulse, pulseWidthMs: 10000 }}.",
+                    board, zapit));
+            }
+            return fixedPulse.PulseWidthMs;
         }
     }
 

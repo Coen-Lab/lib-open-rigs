@@ -4,7 +4,7 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The ZapitTrigger line set or cleared, the same in every task: each input writes ZapitTriggerLine (the ZapitTriggerLine piece's line) high (Set true) or low (Set false) on the board, sent into BoardCommandsSubjectName. A task raises it at its laser trigger and clears it at the laser's end. Needs ZapitTriggerLine from the workflow.</Description>
+  <Description>The ZapitTrigger line set or cleared, the same in every task: each input writes ZapitTriggerLine (the ZapitTriggerLine piece's line) high (Set true) or low (Set false) on the board, sent into BoardCommandsSubjectName. A task raises it at its laser trigger and clears it at the laser's end; the board also ends it after its pulse width (ZapitTriggerLine). Stops the workflow on a rig whose wiring has no ZapitTrigger line. Needs ZapitTriggerLine from the workflow.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="WorkflowInput">

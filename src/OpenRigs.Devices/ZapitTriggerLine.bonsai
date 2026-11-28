@@ -4,7 +4,7 @@
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The Behavior board line rig.yml's wiring gives the ZapitTrigger (Board), for a rig with Zapit: publishes it as the AsyncSubject ZapitTriggerLine, which Zapit's trials hold high. Never pulsed (PulseOutputs leaves it out); the board piece clears it when the workflow stops. Stops the workflow at start unless exactly one line on Board has the ZapitTrigger and it is DO1, DO2 or DO3.</Description>
+  <Description>The Behavior board line rig.yml's wiring gives the ZapitTrigger (Board): publishes it as the AsyncSubject ZapitTriggerLine, which Zapit's trials hold high from the trigger until they clear it, or None on a rig without one, where setting it stops the workflow (SetZapitTriggerLine). The line is in pulse mode (PulseOutputs writes its FixedPulse width from rig.yml), so if the workflow dies with it high the board ends it after that width. Stops the workflow at start if more than one line on Board has the ZapitTrigger or its line is not DO1, DO2 or DO3.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">

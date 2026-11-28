@@ -18,14 +18,14 @@ behaviorBoard:
     portName: COM6
     usbSerial: BG01WA0E
     pulseController:
-      outputPulseEnable: "DO1, DO2"   # never DO3: the ZapitTrigger line is held until the workflow clears it
+      outputPulseEnable: "DO1, DO2, DO3"   # DO3, the ZapitTrigger line: the board ends it after its width if the workflow dies
       # Each line is a FixedPulse (width set here) or a CalibratedPulse (width looked up per reward
       # on a valve calibration curve in calibration\). A fixed reward line delivers ceil(ul / 2)
       # pulses of its width, assuming 2 ul per pulse; a calibrated one delivers the requested volume.
       outputs:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }   # left reward valve
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }   # right reward valve
-        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # ZapitTrigger line: held, not pulsed, so no width
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 10000 }   # ZapitTrigger line: held until the workflow clears it, at most this long
     # What each line drives (lab rig model): one RewardValve per spout, named left and right, and the ZapitTrigger.
     wiring:
       DIPort0: { device: Photodiode }

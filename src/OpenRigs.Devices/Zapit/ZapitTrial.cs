@@ -141,9 +141,14 @@ namespace OpenRigs.Devices.Zapit
             powerMw = laserOn ? laserPowerMw : 0;
         }
 
-        /// <summary>A Behavior board write that sets (<paramref name="set"/> true) or clears <paramref name="line"/>.</summary>
+        /// <summary>A Behavior board write that sets (<paramref name="set"/> true) or clears <paramref name="line"/>, or an
+        /// exception for no line (None: rig.yml's wiring has no ZapitTrigger).</summary>
         public static HarpMessage LineMessage(DigitalOutputs line, bool set)
         {
+            if (line == default(DigitalOutputs))
+            {
+                throw new InvalidOperationException("Zapit sets the ZapitTrigger line, and rig.yml's wiring has none. Add it to the board's wiring, as in DO3: { device: ZapitTrigger }, in pulseController.outputPulseEnable and with a FixedPulse in pulseController.outputs.");
+            }
             return set
                 ? OutputSet.FromPayload(MessageType.Write, line)
                 : OutputClear.FromPayload(MessageType.Write, line);
@@ -176,9 +181,9 @@ namespace OpenRigs.Devices.Zapit
         }
     }
 
-    /// <summary>A Behavior board write per input line that sets or clears it, such as the ZapitTrigger line.</summary>
+    /// <summary>A Behavior board write per input line that sets or clears it, such as the ZapitTrigger line; stops the workflow on no line (None).</summary>
     [Combinator]
-    [Description("A Behavior board write that sets (Set true) or clears the input line, such as the ZapitTrigger line.")]
+    [Description("A Behavior board write that sets (Set true) or clears the input line, such as the ZapitTrigger line. Stops the workflow on no line (None: rig.yml's wiring has no ZapitTrigger).")]
     [WorkflowElementCategory(ElementCategory.Transform)]
     public class ZapitLineMessage
     {

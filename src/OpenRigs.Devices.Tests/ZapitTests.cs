@@ -89,6 +89,14 @@ namespace OpenRigs.Devices.Tests
             Assert.AreEqual(Bonsai.Harp.MessageType.Write, clear.MessageType);
         }
 
+        // A rig without a ZapitTrigger line has None (WiredOutput): Zapit setting it stops the workflow, naming the fix.
+        [TestMethod]
+        public void NoLineIsRefused()
+        {
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => ZapitTrial.LineMessage(default(Harp.Behavior.DigitalOutputs), true));
+            StringAssert.Contains(ex.Message, "DO3: { device: ZapitTrigger }");
+        }
+
         [TestMethod]
         public void StartStimulusSetsKeysValuesAndFloats()
         {
