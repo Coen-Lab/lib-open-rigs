@@ -32,6 +32,7 @@
         <Combinator xsi:type="lv:TrimToTile">
           <lv:Width>{{Width}}</lv:Width>
           <lv:Height>{{Height}}</lv:Height>
+          <lv:Fit>{{Fit}}</lv:Fit>
         </Combinator>
       </Expression>
       <Expression xsi:type="MemberSelector">

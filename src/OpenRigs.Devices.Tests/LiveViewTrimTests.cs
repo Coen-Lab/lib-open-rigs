@@ -66,6 +66,24 @@ namespace OpenRigs.Devices.Tests
             var header = JObject.Parse(message[1].ConvertToString());
             Assert.AreEqual("[0,0,64,48]", header["trim"].ToString(Newtonsoft.Json.Formatting.None), header.ToString());
         }
+
+        // The Zapit camera's whole frame (Fit): every pixel kept on a black canvas of the tile's shape, the header's trim
+        // with negative x or y by the black added, so a viewer maps a click as for a cut frame.
+        [TestMethod]
+        public void AFittedFrameIsKeptWholeOnABlackCanvasOfTheTilesShape()
+        {
+            using (var frame = new IplImage(new Size(480, 640), IplDepth.U8, 1))
+            {
+                frame.Set(Scalar.All(200));
+                var fitted = new OpenRigs.LiveView.TrimToTile { Fit = true }.Process(Observable.Return(frame)).Wait();
+                Assert.AreEqual("-186,0,853,640", string.Join(",", fitted.Trim.X, fitted.Trim.Y, fitted.Trim.Width, fitted.Trim.Height));
+                Assert.AreEqual(853, fitted.Image.Width);
+                Assert.AreEqual(640, fitted.Image.Height);
+                Assert.AreEqual(0, fitted.Image.GetReal(320, 0), "black at the left");
+                Assert.AreEqual(200, fitted.Image.GetReal(320, 426), "the frame in the middle");
+                Assert.AreEqual(0, fitted.Image.GetReal(320, 852), "black at the right");
+            }
+        }
     }
 
     /// <summary>

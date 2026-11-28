@@ -126,6 +126,27 @@ namespace OpenRigs.LiveView
         /// <summary>Whether the part shown is the whole frame.</summary>
         public bool IsWhole { get { return X == 0 && Y == 0 && Width == SourceWidth && Height == SourceHeight; } }
 
+        /// <summary>The smallest tileWidth x tileHeight shaped rectangle holding the whole sourceWidth x sourceHeight
+        /// frame at its centre: X or Y is negative by the black added at each side.</summary>
+        public static FrameTrim Fit(int sourceWidth, int sourceHeight, int tileWidth, int tileHeight)
+        {
+            long width = sourceWidth, height = sourceHeight;
+            if (tileWidth > 0 && tileHeight > 0)
+            {
+                if (width * tileHeight > height * tileWidth) height = Math.Max(sourceHeight, (width * tileHeight + tileWidth / 2) / tileWidth);
+                else width = Math.Max(sourceWidth, (height * tileWidth + tileHeight / 2) / tileHeight);
+            }
+            return new FrameTrim
+            {
+                SourceWidth = sourceWidth,
+                SourceHeight = sourceHeight,
+                X = -(int)((width - sourceWidth) / 2),
+                Y = -(int)((height - sourceHeight) / 2),
+                Width = (int)width,
+                Height = (int)height,
+            };
+        }
+
         /// <summary>The largest tileWidth x tileHeight shaped rectangle centred in a sourceWidth x sourceHeight frame,
         /// never under 1 pixel a side (a tile of extreme shape, such as 1000 x 1, would round one to 0).</summary>
         public static FrameTrim For(int sourceWidth, int sourceHeight, int tileWidth, int tileHeight)
@@ -174,6 +195,11 @@ namespace OpenRigs.LiveView
         [Description("The tile's height; only its shape with Width is used.")]
         public int Height { get; set; } = 240;
 
+        /// <summary>Gets or sets whether the whole frame is kept, black added at its sides to the tile's shape,
+        /// instead of cut (the Zapit camera, so a frame with no crop is shown whole).</summary>
+        [Description("Keep the whole frame, adding black at its sides to the tile's shape, instead of cutting it.")]
+        public bool Fit { get; set; }
+
         /// <summary>Cuts each frame to the tile's shape.</summary>
         /// <param name="source">The camera's frames.</param>
         /// <returns>Each frame's centre of the tile's shape, and where it was cut.</returns>
@@ -181,12 +207,13 @@ namespace OpenRigs.LiveView
         {
             return source.Select(image =>
             {
-                var trim = FrameTrim.For(image.Width, image.Height, Width, Height);
-                return new TrimmedFrame
-                {
-                    Image = trim.IsWhole ? image : image.GetSubRect(new Rect(trim.X, trim.Y, trim.Width, trim.Height)),
-                    Trim = trim,
-                };
+                var trim = Fit ? FrameTrim.Fit(image.Width, image.Height, Width, Height) : FrameTrim.For(image.Width, image.Height, Width, Height);
+                if (trim.IsWhole) return new TrimmedFrame { Image = image, Trim = trim };
+                if (!Fit) return new TrimmedFrame { Image = image.GetSubRect(new Rect(trim.X, trim.Y, trim.Width, trim.Height)), Trim = trim };
+                var canvas = new IplImage(new Size(trim.Width, trim.Height), image.Depth, image.Channels);
+                canvas.SetZero();
+                CV.Copy(image, canvas.GetSubRect(new Rect(-trim.X, -trim.Y, image.Width, image.Height)));
+                return new TrimmedFrame { Image = canvas, Trim = trim };
             });
         }
     }

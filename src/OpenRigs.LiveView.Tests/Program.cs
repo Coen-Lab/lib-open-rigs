@@ -148,6 +148,7 @@ namespace OpenRigs.LiveView.Tests
                 var zapit = Plan(root, "zapit:\n  host: 127.0.0.1\n  device: Dev1\n", zapitPublished).Streamed.SingleOrDefault();
                 Check("a published Camera-Zapit.Data (rig.yml's zapit camera) is streamed by the camera recipe when zapit.device is set",
                     zapit != null && zapit.Name == "Camera-Zapit", zapit == null ? "none" : zapit.ToString());
+                Check("the Zapit camera is fitted whole with black, every other camera cut", zapit != null && zapit.TemplateValues()["Fit"] == "true" && cameraValues["Fit"] == "false", zapit == null ? "none" : zapit.TemplateValues()["Fit"] + " / " + cameraValues["Fit"]);
                 foreach (var zapitRig in new[] { "zapit:\n  host: 127.0.0.1\n  port: 1488\n", "zapit:\n  device: null\n", "camera:\n  overhead:\n    serialNumber: '1'\n" })
                 {
                     var noDevice = Plan(root, zapitRig, zapitPublished);
@@ -189,6 +190,11 @@ namespace OpenRigs.LiveView.Tests
                 Check("the tile's shape is rig.yml's width and height", rect(halfTile) == "562,0,811,1216 of 1936x1216", rect(halfTile));
                 var flat = FrameTrim.For(640, 480, 1, 1000);
                 var thin = FrameTrim.For(640, 480, 1000, 1);
+                var fitWide = FrameTrim.Fit(1936, 1216, 320, 240);
+                Check("fitted, a wider frame keeps every pixel, black above and below", rect(fitWide) == "0,-118,1936,1452 of 1936x1216", rect(fitWide));
+                var fitTall = FrameTrim.Fit(480, 640, 320, 240);
+                Check("fitted, a taller frame keeps every pixel, black at its sides", rect(fitTall) == "-186,0,853,640 of 480x640", rect(fitTall));
+                Check("fitted, a frame of the tile's shape is whole", FrameTrim.Fit(1024, 768, 320, 240).IsWhole, rect(FrameTrim.Fit(1024, 768, 320, 240)));
                 Check("a tile of extreme shape still leaves at least 1 pixel a side", flat.Width == 1 && thin.Height == 1, rect(flat) + " / " + rect(thin));
 
                 Console.WriteLine("The workflow's path, as the manifest has it:");

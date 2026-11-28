@@ -141,6 +141,7 @@ namespace OpenRigs.LiveView
                 { "Interval", XmlConvert.ToString(TimeSpan.FromSeconds(1.0 / Rate)) },
                 { "Width", Width.ToString(CultureInfo.InvariantCulture) },
                 { "Height", Height.ToString(CultureInfo.InvariantCulture) },
+                { "Fit", Name == "Camera-" + LiveViewPlan.ZapitInstance ? "true" : "false" },   // the Zapit camera's whole frame, with black, never cut
                 { "ImagePath", ImagePath ?? string.Empty },
                 { "Channels", ChannelsStream ?? string.Empty },
                 { "AnalogInterval", Recipe.AnalogRate > 0 ? XmlConvert.ToString(TimeSpan.FromSeconds(1.0 / Recipe.AnalogRate)) : string.Empty },
