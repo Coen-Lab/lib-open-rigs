@@ -4,7 +4,7 @@
     <Description>A package providing common visual stimulus functionality for all Open Rigs experiments.</Description>
     <PackageTags>$(PackageTags) Vision</PackageTags>
     <TargetFrameworks>net472</TargetFrameworks>
-    <Version>0.1.1-coen-lab.12</Version>
+    <Version>0.1.1-coen-lab.13</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenRigs.Core\OpenRigs.Core.csproj" />
+    <!-- PlayPenaltyFlash.bonsai checks the flashes (OpenRigs.Trials CheckPenaltyFlashes) against the penalty sound (OpenRigs.Audio PenaltySoundSeconds). -->
+    <ProjectReference Include="..\OpenRigs.Trials\OpenRigs.Trials.csproj" />
+    <ProjectReference Include="..\OpenRigs.Audio\OpenRigs.Audio.csproj" />
   </ItemGroup>
 
 </Project>

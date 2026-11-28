@@ -14,10 +14,10 @@ namespace OpenRigs.Core
     /// folder's name (the last input, LogController's PathPrefix): chunk k starts at start + k * ChunkSize hours and
     /// is keyed by that instant (UTC), so FormatDate names it with the offset in force at its own start. A sample
     /// timed before the start goes into chunk 0; samples that arrive before PathPrefix are dropped, as they would be
-    /// by a writer still waiting for its file name.
+    /// by a writer still waiting for its file name. A ChunkSize of 0 is one chunk for the whole run, keyed by the start.
     /// </summary>
     [Combinator]
-    [Description("Groups Harp time-series in chunks of ChunkSize hours from the experiment start, read from the experiment folder (the last input, PathPrefix), each keyed by its start (UTC). Samples timed before the start go into the first chunk.")]
+    [Description("Groups Harp time-series in chunks of ChunkSize hours from the experiment start, read from the experiment folder (the last input, PathPrefix), each keyed by its start (UTC). Samples timed before the start go into the first chunk. ChunkSize 0: one chunk for the whole run.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class GroupByTime
     {
@@ -32,8 +32,8 @@ namespace OpenRigs.Core
         // The default real-time reference is unix time in total seconds from 1904
         internal static readonly DateTime ReferenceTime = new(1904, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        /// <summary>Gets or sets the size of each chunk, in whole hours.</summary>
-        [Description("The size of each chunk, in whole hours.")]
+        /// <summary>Gets or sets the size of each chunk, in whole hours; 0 for one chunk for the whole run.</summary>
+        [Description("The size of each chunk, in whole hours; 0 for one chunk for the whole run.")]
         public int ChunkSize { get; set; }
 
         /// <summary>Gets or sets how long after the end of its chunk a group closes, judged by the heartbeats.</summary>
@@ -61,12 +61,14 @@ namespace OpenRigs.Core
 
         /// <summary>
         /// The start of the chunk holding a sample at <paramref name="seconds"/> (Harp seconds), for chunks of
-        /// <paramref name="chunkHours"/> from <paramref name="start"/>: chunk 0 for a sample before the start.
+        /// <paramref name="chunkHours"/> from <paramref name="start"/>: chunk 0 for a sample before the start, and
+        /// for every sample when <paramref name="chunkHours"/> is 0.
         /// </summary>
         public static DateTime ChunkStart(DateTime start, double seconds, int chunkHours)
         {
-            if (chunkHours < 1) throw new InvalidOperationException("GroupByTime's ChunkSize is " + chunkHours + ": give it a whole number of hours, 1 or more.");
+            if (chunkHours < 0) throw new InvalidOperationException("GroupByTime's ChunkSize is " + chunkHours + ": give it a whole number of hours, or 0 for one chunk for the whole run.");
             start = DateTime.SpecifyKind(start, DateTimeKind.Utc);
+            if (chunkHours == 0) return start;
             var chunkTicks = TimeSpan.FromHours(chunkHours).Ticks;
             var index = Math.Max(0, (ReferenceTime.AddSeconds(seconds) - start).Ticks / chunkTicks);
             return start.AddTicks(index * chunkTicks);
@@ -92,8 +94,10 @@ namespace OpenRigs.Core
             });
         }
 
+        // A chunk of the whole run (ChunkSize 0) has no end for a heartbeat to pass.
         bool ShouldCloseChunk<TElement>(IGroupedObservable<DateTime, TElement> chunk, HarpMessage heartbeat)
         {
+            if (ChunkSize == 0) return false;
             var beatTimestamp = ReferenceTime.AddSeconds(heartbeat.GetTimestamp());
             var beatDelta = beatTimestamp - chunk.Key;
             return beatDelta > new TimeSpan(ChunkSize, 0, 0) + ClosingDuration;

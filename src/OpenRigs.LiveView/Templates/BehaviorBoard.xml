@@ -2,7 +2,9 @@
 <!-- A Harp Behavior board: the raw encoder count from AnalogData, sampled, on the data port; and
      its channels, every digital input, output and port DIO change with the board's timestamp,
      the camera triggers it sends, the pulse settings that shape its outputs, and the two analog
-     inputs sampled, as one stream. State registers are sent again every 2 s for a late viewer. -->
+     inputs sampled, as one stream. State registers are sent again every 2 s for a late viewer.
+     The data's end is not passed on (IgnoreCompletion), as it would close DataMessage for every
+     stream. -->
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
@@ -176,39 +178,44 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
         <StreamName>{{Channels}}</StreamName>
       </Expression>
+      <!-- 36: the data, never its end -->
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:IgnoreCompletion" />
+      </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="0" To="36" Label="Source1" />
+      <Edge From="36" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
       <Edge From="3" To="4" Label="Source1" />
-      <Edge From="0" To="5" Label="Source1" />
+      <Edge From="36" To="5" Label="Source1" />
       <Edge From="5" To="6" Label="Source1" />
-      <Edge From="0" To="7" Label="Source1" />
+      <Edge From="36" To="7" Label="Source1" />
       <Edge From="7" To="8" Label="Source1" />
-      <Edge From="0" To="9" Label="Source1" />
+      <Edge From="36" To="9" Label="Source1" />
       <Edge From="9" To="10" Label="Source1" />
-      <Edge From="0" To="11" Label="Source1" />
+      <Edge From="36" To="11" Label="Source1" />
       <Edge From="11" To="12" Label="Source1" />
-      <Edge From="0" To="13" Label="Source1" />
+      <Edge From="36" To="13" Label="Source1" />
       <Edge From="13" To="14" Label="Source1" />
-      <Edge From="0" To="15" Label="Source1" />
+      <Edge From="36" To="15" Label="Source1" />
       <Edge From="15" To="16" Label="Source1" />
-      <Edge From="0" To="17" Label="Source1" />
+      <Edge From="36" To="17" Label="Source1" />
       <Edge From="17" To="18" Label="Source1" />
-      <Edge From="0" To="19" Label="Source1" />
+      <Edge From="36" To="19" Label="Source1" />
       <Edge From="19" To="20" Label="Source1" />
-      <Edge From="0" To="21" Label="Source1" />
+      <Edge From="36" To="21" Label="Source1" />
       <Edge From="21" To="22" Label="Source1" />
-      <Edge From="0" To="23" Label="Source1" />
+      <Edge From="36" To="23" Label="Source1" />
       <Edge From="23" To="24" Label="Source1" />
-      <Edge From="0" To="25" Label="Source1" />
+      <Edge From="36" To="25" Label="Source1" />
       <Edge From="25" To="26" Label="Source1" />
-      <Edge From="0" To="27" Label="Source1" />
+      <Edge From="36" To="27" Label="Source1" />
       <Edge From="27" To="28" Label="Source1" />
-      <Edge From="0" To="29" Label="Source1" />
+      <Edge From="36" To="29" Label="Source1" />
       <Edge From="29" To="30" Label="Source1" />
-      <Edge From="0" To="31" Label="Source1" />
+      <Edge From="36" To="31" Label="Source1" />
       <Edge From="31" To="32" Label="Source1" />
       <Edge From="32" To="33" Label="Source1" />
       <Edge From="6" To="34" Label="Source1" />

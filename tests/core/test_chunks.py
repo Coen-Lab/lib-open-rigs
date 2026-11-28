@@ -57,3 +57,14 @@ def test_chunks_come_in_time_order_not_name_order(tmp_path):
     read, _ = chunks.files(tmp_path, "Behavior_32", ".bin")
     assert [p.name for p in read] == [names[2], names[1], names[0]]
     assert chunks.time_of(read[1]) < chunks.time_of(read[2])
+
+
+def test_a_run_in_one_file_is_one_chunk_at_the_experiments_start(tmp_path):
+    # GroupByTime's ChunkSize 0: one file a device for the whole run, named as chunk 0 is, by the experiment's start.
+    start = "2026-10-25T00-30-00+01-00"
+    device = tmp_path / f"ses-001_{start}" / "Behavior"
+    device.mkdir(parents=True)
+    (device / f"Behavior_32_{start}.bin").write_bytes(b"")
+    read, skipped = chunks.files(device, "Behavior_32", ".bin")
+    assert [p.name for p in read] == [f"Behavior_32_{start}.bin"] and skipped == []
+    assert chunks.time_of(read[0]) == chunks.parse_time(start)

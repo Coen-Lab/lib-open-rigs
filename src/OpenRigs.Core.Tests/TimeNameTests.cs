@@ -71,7 +71,53 @@ namespace OpenRigs.Core.Tests
             Assert.AreEqual(start, GroupByTime.ChunkStart(start, HarpSeconds(start.AddMinutes(59)), 1));
             Assert.AreEqual(start.AddHours(1), GroupByTime.ChunkStart(start, HarpSeconds(start.AddHours(1)), 1));
             Assert.AreEqual(start.AddHours(2), GroupByTime.ChunkStart(start, HarpSeconds(start.AddHours(3.5)), 2));
-            Assert.ThrowsException<InvalidOperationException>(() => GroupByTime.ChunkStart(start, 0, 0));
+            Assert.ThrowsException<InvalidOperationException>(() => GroupByTime.ChunkStart(start, 0, -1));
+        }
+
+        [TestMethod]
+        public void ChunkStart_ChunkSizeZero_EverySampleInChunkZero()
+        {
+            var start = Utc("2026-10-25T00:30:00Z");
+            foreach (var at in new[] { HarpSeconds(start) - 10, HarpSeconds(start), HarpSeconds(start.AddHours(1)), HarpSeconds(start.AddDays(3)) })
+            {
+                Assert.AreEqual(start, GroupByTime.ChunkStart(start, at, 0));
+            }
+        }
+
+        // ChunkSize 0: a run of three hours, across the October change, is one chunk named as the folder.
+        [TestMethod]
+        public void ChunkSizeZero_ARunLongerThanAnHourIsOneChunkNamedAsTheFolder()
+        {
+            var source = new Subject<Timestamped<int>>();
+            var pathPrefix = new BehaviorSubject<string>(@"D:\Data\sub-A\ses-001_2026-10-25T00-30-00+01-00");
+            var chunks = new List<DateTime>();
+            var values = new List<int>();
+            new GroupByTime { ChunkSize = 0 }.Process(source, pathPrefix).Subscribe(g => { chunks.Add(g.Key); g.Subscribe(v => values.Add(v.Value)); });
+            var start = FormatDate.Parse("2026-10-25T00-30-00+01-00");
+            var seconds = new[] { -5.0, 0, 3599, 3600, 3601, 7200, 3 * 3600 + 1 };
+            for (var i = 0; i < seconds.Length; i++) source.OnNext(Timestamped.Create(i, HarpSeconds(start) + seconds[i]));
+            Assert.AreEqual(1, chunks.Count);
+            Assert.AreEqual("2026-10-25T00-30-00+01-00", FormatDate.Format(chunks[0], London));
+            CollectionAssert.AreEqual(Enumerable.Range(0, seconds.Length).ToArray(), values);
+        }
+
+        // ChunkSize 0: the heartbeats never close the run's one chunk, however long it runs.
+        [TestMethod]
+        public void ChunkSizeZero_HeartbeatsNeverCloseTheChunk()
+        {
+            var source = new Subject<HarpMessage>();
+            var beats = new Subject<HarpMessage>();
+            var pathPrefix = new BehaviorSubject<string>(@"D:\sub-A\ses-001_2026-11-20T14-00-00+00-00");
+            var keys = new List<DateTime>();
+            var closed = new List<DateTime>();
+            new GroupByTime { ChunkSize = 0, ClosingDuration = TimeSpan.FromSeconds(5) }.Process(source, beats, pathPrefix)
+                .Subscribe(g => { keys.Add(g.Key); g.Subscribe(_ => { }, () => closed.Add(g.Key)); });
+            var start = HarpSeconds(Utc("2026-11-20T14:00:00Z"));
+            source.OnNext(HarpMessage.FromByte(44, start + 1, MessageType.Event, 1));
+            foreach (var hours in new[] { 1, 2, 10, 100 }) beats.OnNext(HarpMessage.FromByte(44, start + hours * 3600 + 6, MessageType.Event, 1));
+            source.OnNext(HarpMessage.FromByte(44, start + 100 * 3600 + 7, MessageType.Event, 1));
+            Assert.AreEqual(0, closed.Count, "no heartbeat closes the chunk");
+            CollectionAssert.AreEqual(new[] { Utc("2026-11-20T14:00:00Z") }, keys, "one chunk for every sample");
         }
 
         // The first chunk is named as the folder; one an hour later, after the October change, carries +00-00.

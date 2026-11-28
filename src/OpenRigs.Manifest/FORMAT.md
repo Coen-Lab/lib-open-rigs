@@ -1,24 +1,24 @@
-# manifest.json, version 4
+# manifest.json, version 5
 
 One `manifest.json` in every experiment folder a rig records: what was launched, from which commit, with which settings files, what the experiment had to leave, how the run went, and every file it left.
 
-The workflow (`ExperimentManifest`, this package) is its only writer: when the experiment folder exists, when the workflow's Finished or the controller's stop comes, and when the run ends. Nobody else writes it, except a migration converter, which writes version 4 for old-format runs that never had one. What happens to the experiment afterwards goes in files of its own beside it, each with one writer: `sync.json` from the overnight copy (what became of a run that never wrote `run.final`, a renamed session, the files' hashes; where it states `run` or `session`, it wins) and `ingest.json` from the server.
+The workflow (`ExperimentManifest`, this package) is its only writer: when the experiment folder exists, when the workflow's Finished or the controller's stop comes, and when the run ends. Nobody else writes it, except a migration converter, which writes one for old-format runs that never had one. What happens to the experiment afterwards goes in files of its own beside it, each with one writer: `sync.json` from the overnight copy (what became of a run that never wrote `run.final`, a renamed session, the files' hashes; where it states `run` or `session`, it wins) and `ingest.json` from the server.
 
 Every write is `manifest.json.<pid>.tmp`, then a rename over the old file, so no reader sees half a file. UTF-8 without a BOM, `\n` line ends; a reader decodes with `utf-8-sig`. Times are UTC, `YYYY-MM-DDTHH:MM:SSZ`. A field with no value is `null`, never absent. Paths in `files` and `expected` use `/`, relative to the experiment folder, no leading `./`, no `..`. No object has two keys differing only in case: Windows PowerShell 5.1 refuses to read one.
 
-The examples are [`fixtures/manifest/v4/`](../../fixtures/manifest/v4/): `src\OpenRigs.Manifest.Tests` builds each from fixed inputs and compares it with the file byte for byte, and readers in other repositories test themselves on them. `refuse/` holds records a reader must refuse.
+The examples are [`fixtures/manifest/v5/`](../../fixtures/manifest/v5/): `src\OpenRigs.Manifest.Tests` builds each from fixed inputs and compares it with the file byte for byte, and readers in other repositories test themselves on them. `refuse/` holds records a reader must refuse.
 
 ## Version
 
-`version` is 4. It changes when a field a reader may rely on is removed, renamed or changes meaning; adding a field does not change it. A reader refuses a version it was not built for, and says so. Version 4 is version 3 with `expected[].condition` and `expected[].required`: an entry may now be required only in some experiments, so a reader that held every entry as required would be wrong. A reader of version 4 may read version 3 as version 4 with every entry `condition: null, required: true`; its fixtures stay in `fixtures/manifest/v3/`. Version 3 is version 2 without `status`, `completed`, `ingest`, `files[].sha256` and `files[].expected`, which belong to the overnight copy's and the server's own files now, and with `control.launch_id` and an `ingest_script` that is `null` rather than absent.
+`version` is 5. It changes when a field a reader may rely on is removed, renamed or changes meaning; adding a field does not change it. A reader refuses a version it was not built for, and says so. Version 5 is version 4 with `ingest_script` (a name or `null`) replaced by `ingest_scripts`: an array of registry names in the order the server runs them, `[]` when there are none, so a reader that took one name would run the wrong thing or none. A reader of version 5 may read version 4 as version 5 with `ingest_scripts` the one name, or `[]` for `null`; its fixtures stay in `fixtures/manifest/v4/`. Version 4 is version 3 with `expected[].condition` and `expected[].required`: an entry may now be required only in some experiments, so a reader that held every entry as required would be wrong. A reader of version 4 may read version 3 as version 4 with every entry `condition: null, required: true`; its fixtures stay in `fixtures/manifest/v3/`. Version 3 is version 2 without `status`, `completed`, `ingest`, `files[].sha256` and `files[].expected`, which belong to the overnight copy's and the server's own files now, and with `control.launch_id` and an `ingest_script` that is `null` rather than absent.
 
 ## Fields
 
 | Field | Meaning |
 | --- | --- |
-| `version` | 4. |
+| `version` | 5. |
 | `created` | When this file was last written. |
-| `ingest_script` | The node's `IngestScript`: the name of the server's registry entry for this kind of data, never a path or a command; `null` when blank. |
+| `ingest_scripts` | The node's `IngestScripts` (comma-separated in the Bonsai property grid) as an array: the names of the server's registry entries for this kind of data, in run order, each letters, digits, `_`, `-` or `.` and starting with a letter or digit, never a path or a command; `[]` when blank. The writer stops the workflow at its start on a name the server would refuse. |
 | `writer` | `package` and `version`, the package that wrote it, its build suffix left out. |
 | `rig` | `machine` (`COMPUTERNAME`), `user` (the Windows account) and `os`. |
 | `session` | The session as launched: `subject` and `id` from the experiment folder's name (`sub-<Subject>/ses-<Session>_<DateTime>`, which OpenRigs.Logging's `LogController` makes from the launch's `SubjectId` and `SessionId`), `started` from its `<DateTime>` (local time with its UTC offset, or UTC in older names without one), `folder` the absolute path at the write. The name is held to `fixtures\experiment-folder\v1\names.json`: a folder not so named, or named from an ID with `_ < > : " / \ \| ? * [ ]`, a control character or a trailing dot or space, has `subject`, `id` and `started` null (the older `ses-<Session>_date-<DateTime>` is not read). |

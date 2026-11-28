@@ -38,6 +38,25 @@ SPEAKER_MIXER = "OpenRigs.Audio:SpeakerMixer.bonsai"
 SPEAKER_MIXER_SOUNDS = ("StimulusSounds", "RewardToneSounds", "PenaltySounds", "BackgroundNoise")
 ZAPIT_INCLUDE = "OpenRigs.Devices:ConnectZapit.bonsai"
 ZAPIT_FOR_TASK = "OpenRigs.Devices:ConnectForTask.bonsai"
+# ZapitDaq's blocks (OpenRigs.Zapit, no MATLAB Zapit), all in its opto adapter package OpenRigs.Opto.ZapitBonsai, beside
+# MATLAB Zapit's until no workflow uses it: a workflow takes one set or the other, never both.
+ZAPIT_DAQ = "OpenRigs.Opto.ZapitBonsai:"
+ZAPIT_DAQ_FOR_TASK = ZAPIT_DAQ + "ConnectForTaskZapitDaq.bonsai"  # includes ZapitCamera and ZapitSetup
+ZAPIT_CAMERA = ZAPIT_DAQ + "ZapitCamera.bonsai"
+ZAPIT_SETUP = ZAPIT_DAQ + "ZapitSetup.bonsai"
+ZAPIT_DAQ_TRIALS = ZAPIT_DAQ + "ZapitDaqTrials.bonsai"  # includes SetZapitTriggerLine
+TASK_LOGS_ZAPIT_DAQ = ZAPIT_DAQ + "TaskLogsZapitDaq.bonsai"
+CONDITIONED_TASK_LOGS_ZAPIT_DAQ = ZAPIT_DAQ + "ConditionedTaskLogsZapitDaq.bonsai"
+# MATLAB Zapit's blocks a ZapitDaq workflow may not include.
+MATLAB_ZAPIT_INCLUDES = (ZAPIT_FOR_TASK, "OpenRigs.Devices:ConnectZapit.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai",
+                         "OpenRigs.Opto.ZapitMatlab:ZapitTrials.bonsai", "OpenRigs.Logging:TaskLogs.bonsai", "OpenRigs.Logging:ConditionedTaskLogs.bonsai")
+# Zapit's files in a ZapitDaq experiment, each written only in an optogenetics experiment (the ingest names the same): the
+# Zapit camera's video (ZapitCamera), the scanner frames, and the agent's settings files. The scanner frames, the
+# accuracy and the laser curve the bank was built from need the laser, so at ceilingMw 0 (laser disabled) the agent
+# makes none of them: their condition is ConnectForTaskZapitDaq's OptogeneticsLaserEnabled.
+ZAPIT_LASER_FILES = ("ZapitScanner/", "Settings/Settings_ZapitAccuracy_", "Settings/Settings_ZapitLaserCurve_")
+ZAPIT_FILES = ("Camera-Zapit/", *ZAPIT_LASER_FILES, "Settings/Settings_ZapitBank_", "Settings/Settings_ZapitSample_",
+               "Settings/Settings_ZapitScannerFit_", "Settings/Settings_ZapitConditions_")
 REWARDS = "OpenRigs.Devices:Rewards.bonsai"
 MANUAL_PULSES = "OpenRigs.Devices:ManualPulses.bonsai"
 BACKGROUND_NOISE = "OpenRigs.Audio:BackgroundNoise.bonsai"
@@ -55,7 +74,7 @@ TASK_LOGS = "OpenRigs.Logging:TaskLogs.bonsai"
 # TaskLogs with Settings_Combinations, its one writer: a conditioned task includes it in place of TaskLogs.
 CONDITIONED_TASK_LOGS = "OpenRigs.Logging:ConditionedTaskLogs.bonsai"
 TRIAL_OUTCOME_EFFECTS = "OpenRigs.Trials:TrialOutcomeEffects.bonsai"  # includes PlayPenaltySound, sends into RewardRequests
-ZAPIT_TRIALS = "OpenRigs.Trials:ZapitTrials.bonsai"  # includes SetZapitTriggerLine
+ZAPIT_TRIALS = "OpenRigs.Opto.ZapitMatlab:ZapitTrials.bonsai"  # MATLAB Zapit's opto adapter's; includes SetZapitTriggerLine
 # The device pieces and the core (see hardware_problems). A piece's own subjects are named by its properties.
 DEVICES = "OpenRigs.Devices:"
 READ_LAB_RIG = DEVICES + "ReadLabRig.bonsai"
@@ -147,6 +166,7 @@ SIGNATURES = RIG_LISTS | {LICK_SPOUT_STAGE: "The two-driver lick spout stage", R
 LIB_SRC = Path(__file__).parents[2]
 BLOCK_SUBJECTS = {
     ZAPIT_INCLUDE: {"ZapitCommands": "rx:BehaviorSubject", "ZapitReplies": "rx:PublishSubject"},
+    ZAPIT_DAQ_FOR_TASK: {"Zapit.Commands": "rx:BehaviorSubject", "Zapit.Events": "rx:PublishSubject", "Zapit.Bank": "rx:BehaviorSubject"},
     REWARDS: {"RewardRequests": "rx:BehaviorSubject", "RewardValves": "rx:ReplaySubject", "RewardDelivered": "rx:BehaviorSubject"},
     SPEAKER_MIXER: {name: "rx:BehaviorSubject" for name in (*SPEAKER_MIXER_SOUNDS, "LoopStimulusSounds", "StopStimulusSounds")},
     READY_GATE: {"ReadyStages": "rx:ReplaySubject", "HarpClockSet": "rx:AsyncSubject", "Ready": "rx:AsyncSubject"},
@@ -157,7 +177,8 @@ BLOCK_SUBJECTS = {
 }
 # Lab includes that include a BLOCK_SUBJECTS block, so a workflow including one has that block's subjects.
 # Each lab include that includes others, with those: a check counting an include counts it inside these too (includes).
-CARRIED_BLOCKS = {ZAPIT_FOR_TASK: (ZAPIT_INCLUDE,), TRIAL_OUTCOME_EFFECTS: (PLAY_PENALTY_SOUND,), ZAPIT_TRIALS: (SET_ZAPIT_TRIGGER_LINE,)}
+CARRIED_BLOCKS = {ZAPIT_FOR_TASK: (ZAPIT_INCLUDE,), TRIAL_OUTCOME_EFFECTS: (PLAY_PENALTY_SOUND,), ZAPIT_TRIALS: (SET_ZAPIT_TRIGGER_LINE,),
+                  ZAPIT_DAQ_FOR_TASK: (ZAPIT_CAMERA, ZAPIT_SETUP), ZAPIT_DAQ_TRIALS: (SET_ZAPIT_TRIGGER_LINE,)}
 # A piece's command subject is a BehaviorSubject, its data subject a PublishSubject (named by its properties).
 PIECE_SUBJECTS = {"CommandsSubjectName": "rx:BehaviorSubject", "DataSubjectName": "rx:PublishSubject"}
 # The lab's Bonsai setup, one copy that each workflow's .bonsai\Setup.ps1 runs from the open-rigs it pins.
@@ -166,7 +187,7 @@ SETUP_BONSAI_RUN = "open_rigs\\scripts\\setup-bonsai.ps1"
 # The prefix each check names a type by ("core:HarpDelay"), by CLR namespace. A workflow's own prefix can differ: a Bonsai
 # save numbers those of packages that fix none (OpenRigs.Core as p1:), and a workflow may name it orc:.
 PREFIXES = {"Bonsai.Reactive": "rx", "Bonsai.Dsp": "dsp", "Bonsai.Shaders": "gl", "Bonsai.Mixer": "mix", "OpenRigs.Core": "core",
-            "OpenRigs.Audio": "aud", "OpenRigs.Control": "orcl", "OpenRigs.Devices.Zapit": "zap"}
+            "OpenRigs.Audio": "aud", "OpenRigs.Control": "orcl", "OpenRigs.Devices.Zapit": "zap", "OpenRigs.Zapit": "ozap"}
 
 
 class Workflow:
@@ -695,14 +716,17 @@ def experiment_log_problems(wf: Workflow) -> list[str]:
 def zapit_include_problems(wf: Workflow) -> list[str]:
     """Zapit is lib-open-rigs' ConnectForTask, included once (ConnectZapit given the task's conditions file in an
     optogenetics experiment), and nothing of its connect, check and refusal chain is built in the workflow, nor its
-    subjects ZapitCommands and ZapitReplies declared."""
-    problems = [] if wf.text.count(f'Path="{ZAPIT_FOR_TASK}"') == 1 else ["the workflow does not include ConnectForTask once"]
-    if f'Path="{ZAPIT_INCLUDE}"' in wf.text:
-        problems.append("the workflow includes ConnectZapit itself (ConnectForTask does)")
+    subjects ZapitCommands and ZapitReplies declared. A workflow on ZapitDaq instead has zapit_daq_include_problems'."""
     kinds = {kind(n) for n in wf.root.iter(W + "Expression")}
-    problems += [f"the workflow builds {local} itself" for local in ("zap:ZapitClient", "zap:CheckZapitConditionCount") if local in kinds]
-    problems += [f"the workflow declares {name}, which ConnectZapit declares" for name in ("ZapitCommands", "ZapitReplies")
-                 if _order(wf.root, _declares(name)) is not None]
+    if f'Path="{ZAPIT_DAQ_FOR_TASK}"' in wf.text:
+        problems = zapit_daq_include_problems(wf, kinds)
+    else:
+        problems = [] if wf.text.count(f'Path="{ZAPIT_FOR_TASK}"') == 1 else ["the workflow does not include ConnectForTask once"]
+        if f'Path="{ZAPIT_INCLUDE}"' in wf.text:
+            problems.append("the workflow includes ConnectZapit itself (ConnectForTask does)")
+        problems += [f"the workflow builds {local} itself" for local in ("zap:ZapitClient", "zap:CheckZapitConditionCount") if local in kinds]
+        problems += [f"the workflow declares {name}, which ConnectZapit declares" for name in ("ZapitCommands", "ZapitReplies")
+                     if _order(wf.root, _declares(name)) is not None]
     if _order(wf.root, _declares("Optogenetics")) is not None:
         problems.append("the workflow declares Optogenetics itself (ConnectForTask does)")
     if "zap:ZapitLineMessage" in kinds:
@@ -716,6 +740,26 @@ def zapit_include_problems(wf: Workflow) -> list[str]:
             if props.get("BoardCommandsSubjectName") not in commands:
                 problems.append(f"a SetZapitTriggerLine's BoardCommandsSubjectName is {props.get('BoardCommandsSubjectName') or 'not set'}, "
                                 f"not a BehaviorBoard piece's <Name>.Commands ({', '.join(sorted(commands)) or 'no board'})")
+    return problems
+
+
+def zapit_daq_include_problems(wf: Workflow, kinds: set[str]) -> list[str]:
+    """Zapit on ZapitDaq is ConnectForTaskZapitDaq, included once (ZapitDaq, the Zapit camera and the setup phase on a
+    rig whose zapit block names its NI device), with ZapitDaqTrials and TaskLogsZapitDaq (or ConditionedTaskLogsZapitDaq),
+    and nothing of it built in the workflow: no ZapitDaq, ZapitSetupCapture or PylonCapture of its own, no ZapitCamera or
+    ZapitSetup included again, none of its subjects declared, and none of MATLAB Zapit's blocks or nodes."""
+    def name(path: str) -> str:
+        return path.split(":")[1].removesuffix(".bonsai")
+
+    problems = [] if wf.text.count(f'Path="{ZAPIT_DAQ_FOR_TASK}"') == 1 else ["the workflow does not include ConnectForTaskZapitDaq once"]
+    problems += [f"the workflow includes {name(path)}, MATLAB Zapit's, beside ConnectForTaskZapitDaq" for path in MATLAB_ZAPIT_INCLUDES if f'Path="{path}"' in wf.text]
+    problems += [f"the workflow includes {name(path)} itself (ConnectForTaskZapitDaq does)" for path in (ZAPIT_CAMERA, ZAPIT_SETUP) if f'Path="{path}"' in wf.text]
+    problems += [f"the workflow builds {local}, a MATLAB Zapit node, beside ConnectForTaskZapitDaq"
+                 for local in sorted(kinds) if local.startswith("zap:") and local != "zap:ZapitLineMessage"]
+    problems += [f"the workflow builds {local} itself (ConnectForTaskZapitDaq does)" for local in sorted(kinds)
+                 if local in ("ozap:ZapitDaq", "ozap:ZapitSetupCapture") or local.endswith(":PylonCapture")]
+    problems += [f"the workflow declares {subject}, which ConnectForTaskZapitDaq declares" for subject in BLOCK_SUBJECTS[ZAPIT_DAQ_FOR_TASK]
+                 if _order(wf.root, _declares(subject)) is not None]
     return problems
 
 
@@ -761,7 +805,7 @@ def background_noise_problems(wf: Workflow) -> list[str]:
 
 def experiment_records_problems(wf: Workflow) -> list[str]:
     """The experiment's records are OpenRigs.Logging's ExperimentRecords (LogControlEvents, RecordHarpDevices,
-    ExperimentManifest), included once with IngestScript and ExpectedFiles set, as the last top-level node but
+    ExperimentManifest), included once with ExpectedFiles set (IngestScripts blank means none), as the last top-level node but
     StreamDevices: RecordHarpDevices and ExperimentManifest find each device by the subjects published before them. Their
     rig.yml is the workflow's, ReadLabRig's, so the include takes no ConfigRoot (Bonsai stops the build on one).
     The workflow has none of the three of its own. Rewards are not records: Rewards is the workflow's own include."""
@@ -778,7 +822,8 @@ def experiment_records_problems(wf: Workflow) -> list[str]:
         problems.append("ExperimentRecords is not the last top-level node (StreamDevices alone may follow)")
     else:
         props = _properties(top[at])
-        problems += [f"ExperimentRecords has no {p}" for p in ("IngestScript", "ExpectedFiles") if not props.get(p)]
+        if not props.get("ExpectedFiles"):
+            problems.append("ExperimentRecords has no ExpectedFiles")
         if "ConfigRoot" in props:
             problems.append("ExperimentRecords sets ConfigRoot, which it no longer takes: the workflow's ConfigRoot reaches it through ReadLabRig")
     return problems
@@ -1093,8 +1138,8 @@ def task_logs_problems(wf: Workflow) -> list[str]:
     """A task's trial log, Settings_Task and Zapit's logs are OpenRigs.Logging's TaskLogs (or ConditionedTaskLogs, which
     includes it and writes Settings_Combinations), included once and given the task file as JSON; the workflow includes
     no LogTrials or ZapitLogs and logs no Settings_Task (nor, with ConditionedTaskLogs, Settings_Combinations) itself."""
-    conditioned = wf.text.count(f'Path="{CONDITIONED_TASK_LOGS}"')
-    count = wf.text.count(f'Path="{TASK_LOGS}"') + conditioned
+    conditioned = wf.text.count(f'Path="{CONDITIONED_TASK_LOGS}"') + wf.text.count(f'Path="{CONDITIONED_TASK_LOGS_ZAPIT_DAQ}"')
+    count = wf.text.count(f'Path="{TASK_LOGS}"') + wf.text.count(f'Path="{TASK_LOGS_ZAPIT_DAQ}"') + conditioned
     problems = [] if count == 1 else [f"the workflow includes TaskLogs {count} times, not once"]
     problems += [f"the workflow includes {path.split(':')[1].removesuffix('.bonsai').split('.')[-1]} itself (TaskLogs does)"
                  for path in ("OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai") if f'Path="{path}"' in wf.text]
@@ -1104,7 +1149,7 @@ def task_logs_problems(wf: Workflow) -> list[str]:
         problems.append("the workflow logs Settings_Combinations itself (ConditionedTaskLogs does)")
     for nodes, edges in _scopes(wf.root):
         for i, n in enumerate(nodes):
-            if n.get("Path") in (TASK_LOGS, CONDITIONED_TASK_LOGS) and not any(kind(nodes[a]).endswith(":SerializeToJson") for a, b, _ in edges if b == i):
+            if n.get("Path") in (TASK_LOGS, CONDITIONED_TASK_LOGS, TASK_LOGS_ZAPIT_DAQ, CONDITIONED_TASK_LOGS_ZAPIT_DAQ) and not any(kind(nodes[a]).endswith(":SerializeToJson") for a, b, _ in edges if b == i):
                 problems.append(f"{str(n.get('Path')).split(':')[1].removesuffix('.bonsai')} is not given the task file as JSON (the task's SerializeToJson)")
     return problems
 
@@ -1136,6 +1181,8 @@ FIXED_LOGS = {  # block: [(log name, the bool subject that decides whether it is
 }
 FIXED_LOGS[TASK_LOGS] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrials.bonsai"], *FIXED_LOGS["OpenRigs.Devices:ZapitLogs.bonsai"]]
 FIXED_LOGS[CONDITIONED_TASK_LOGS] = [("Settings_Combinations", None), *FIXED_LOGS[TASK_LOGS]]
+FIXED_LOGS[TASK_LOGS_ZAPIT_DAQ] = [("Settings_Task", None), *FIXED_LOGS["OpenRigs.Logging:LogTrials.bonsai"]]  # ZapitDaq's events are Events rows
+FIXED_LOGS[CONDITIONED_TASK_LOGS_ZAPIT_DAQ] = [("Settings_Combinations", None), *FIXED_LOGS[TASK_LOGS_ZAPIT_DAQ]]
 DEVICE_LOGS = ("OpenRigs.Logging:LogHarpDevice.bonsai", "OpenRigs.Logging:LogHarp.bonsai", "OpenRigs.Logging:LogHarpDemux.bonsai",
                "OpenRigs.Logging:LogVideoFfmpeg.bonsai", "OpenRigs.Logging:LogVideo.bonsai", "OpenRigs.Logging:LogRawVideo.bonsai",
                *DEVICE_GROUPS, LICK_SPOUT_STAGE, REWARD_VALVE, *RIG_LISTS)  # a device's folder: ExpectedFiles' auto (each piece logs itself)
@@ -1179,6 +1226,8 @@ def expected_files_problems(wf: Workflow) -> list[str]:
                 writes[log_prefix(name)] = None
         elif include in FIXED_LOGS:
             writes.update({log_prefix(name): condition for name, condition in FIXED_LOGS[include]})
+        elif include == ZAPIT_DAQ_FOR_TASK:
+            writes.update({prefix: "OptogeneticsLaserEnabled" if prefix in ZAPIT_LASER_FILES else "Optogenetics" for prefix in ZAPIT_FILES})
         elif include in DEVICE_LOGS:
             devices = True
         elif local == "RecordHarpDevices" or include == EXPERIMENT_RECORDS:

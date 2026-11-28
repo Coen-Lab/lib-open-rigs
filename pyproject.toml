@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8"]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,8 @@ name = "open-rigs"
 dynamic = ["version"]
 description = "Environment to generate and extend shared and reuseable schemas and a DSL for open-rigs experiments"
 readme = "README.md"
+license = "BSD-3-Clause AND LGPL-2.1-only"
+license-files = ["LICENSE", "src/open_rigs/zapit/LICENSE", "THIRD-PARTY-NOTICES.md"]
 requires-python = ">=3.11"
 dependencies = [
     "jsonschema>=4.26.0",
@@ -15,6 +17,9 @@ dependencies = [
     "pyyaml>=6",
     "swc-aeon>=0.2.0",
 ]
+
+[project.optional-dependencies]
+zapit = ["numpy>=1.26", "scipy>=1.11", "opencv-python>=4.9"]
 
 [project.scripts]
 regenerate-calibration = "open_rigs._generators.calibration:main"
@@ -38,6 +43,7 @@ line-length = 108
 
 [tool.pyright]
 useLibraryCodeForTypes = false
+extraPaths = ["tests/zapit"]   # the Zapit tests import one another, and make_fixture.py imports the bank test
 reportMissingImports = "error"
 reportIncompatibleVariableOverride = "error"
 reportImportCycles = "error"

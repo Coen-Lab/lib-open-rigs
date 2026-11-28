@@ -28,6 +28,8 @@ namespace OpenRigs.Trials.Tests
             public string laserPointsMm;
             public double laserPowerMw;
             public double laserTriggerTime;
+            public bool laserOn;
+            public bool laserStarted;
             public string choice;
         }
 
@@ -97,8 +99,21 @@ namespace OpenRigs.Trials.Tests
             Assert.AreEqual("-0.7 1.5;-0.7 -1.5", row.laserPointsMm);
             Assert.AreEqual(4.5, row.laserPowerMw);
             Assert.AreEqual(12.25, row.laserTriggerTime);
+            Assert.IsTrue(row.laserOn, "drawn on");
+            Assert.IsFalse(row.laserStarted, "no Started in the loop's times");
             Assert.AreEqual("Left", row.choice, "the task's own columns untouched");
             Assert.IsNull(row.outcome);
+        }
+
+        [TestMethod]
+        public void ZapitDaqsArmedPowerIsLoggedInPlaceOfTheTrials()
+        {
+            var times = Times(12.25);
+            times.LaserPowerMw = 3.2;   // ZapitDaq capped the trial's 4.5 mW
+            times.LaserStarted = true;
+            var row = SharedTrialColumns.Fill(new OptogeneticsRow(), Laser(), times, 3, false, true, 6, 0.75);
+            Assert.AreEqual(3.2, row.laserPowerMw);
+            Assert.IsTrue(row.laserStarted);
         }
 
         [TestMethod]
@@ -107,6 +122,7 @@ namespace OpenRigs.Trials.Tests
             var row = SharedTrialColumns.Fill(new OptogeneticsRow(), new StubTrial { TrialNumber = 7, LaserPointsMm = "ignored" }, Times(double.NaN), 3, false, false, 0, 0.75);
             Assert.AreEqual(0, row.laserCondition);
             Assert.AreEqual("", row.laserPointsMm, "condition 0: empty");
+            Assert.IsFalse(row.laserOn);
         }
 
         [TestMethod]
@@ -158,7 +174,7 @@ namespace OpenRigs.Trials.Tests
             };
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), 0, false, false, 0, 0.75)), "has no itiStartTime, itiSeconds");
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new NoTimeout(), Laser(), Times(1), 0, false, false, 0, 0.75)), "rewardOfferedUl, rewarded, penaltyTimeoutSeconds, penaltyFlashBrightness, penalised");
-            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOptogenetics(), Laser(), Times(1), 0, false, false, 0, 0.75)), "not all of laserCondition, laserPointsMm, laserPowerMw, laserTriggerTime");
+            StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new HalfOptogenetics(), Laser(), Times(1), 0, false, false, 0, 0.75)), "not all of laserCondition, laserPointsMm, laserPowerMw, laserTriggerTime, laserOn, laserStarted");
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new OptogeneticsRow(), new StubTrial { TrialNumber = 7, LaserCondition = 2 }, Times(1), 0, false, false, 0, 0.75)), "Trial 7 has laser condition 2 but no laser points");
             StringAssert.Contains(refusal(() => SharedTrialColumns.Fill(new FloatTimes(), Laser(), Times(1), 0, false, false, 0, 0.75)), "itiSeconds is a Single, not a Double");
         }

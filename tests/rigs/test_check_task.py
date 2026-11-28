@@ -59,5 +59,34 @@ def test_the_zapit_file_s_largest_ramp_down_is_the_context_where_the_file_is(tmp
     assert check_task.context(on) == {"zapit_ramp_down_seconds": 0.4}
     assert check_task.context({"optogenetics": {**on["optogenetics"], "enabled": False}}) == {}
     assert check_task.context({"optogenetics": {"enabled": True, "zapitConditionsPath": str(tmp_path / "gone.yml")}}) == {}
+    # As Zapit writes a file (the share's): in each condition's Attributes, which ZapitConditions' pattern finds too
+    path.write_text("stimLocations01:\n  ML: [1.5, -1.5]\n  AP: [-0.7, -0.7]\n"
+                    "  Attributes: {laserPowerInMW: 3.0, offRampDownDuration_ms: 250.0}\n"
+                    "stimLocations02:\n  Attributes: {laserPowerInMW: 3.0, offRampDownDuration_ms: 300.0}\n", encoding="utf-8")
+    assert check_task.context(on) == {"zapit_ramp_down_seconds": 0.3}
     path.write_text("stimLocations01:\n  laserPowerInMW: 2\n", encoding="utf-8")  # the workflow refuses it at Go
     assert check_task.context(on) == {}
+
+
+def test_a_zapit_daq_bank_s_longest_ramp_down_is_the_context_when_given(tmp_path):
+    # Two conditions of 4000-row cycles at 100 kS/s; the longest laser-on tail is 10 cycles: 0.4 s.
+    bank = tmp_path / "Settings_ZapitBank_x.json"
+    variant = {"laser_on": True, "tail_cycles": 5}
+    conditions = [{"scan_cycle": {"offset": 0, "length": 4000}, "variants": [variant, {"laser_on": False, "tail_cycles": 50}]},
+                  {"scan_cycle": {"offset": 0, "length": 4000}, "variants": [{**variant, "tail_cycles": 10}]}]
+    bank.write_text(json.dumps({"version": 2, "sample_rate": 100000, "conditions": conditions}), encoding="utf-8")
+    on = {"optogenetics": {"enabled": True, "zapitConditionsPath": str(tmp_path / "none.yml")}}
+    assert check_task.context(on, str(bank)) == {"zapit_ramp_down_seconds": 0.4}
+    assert check_task.context({"optogenetics": {**on["optogenetics"], "enabled": False}}, str(bank)) == {}
+    assert check_task.context(on, str(tmp_path / "gone.json")) == {}
+    bank.write_text(json.dumps({"version": 1}), encoding="utf-8")  # the workflow refuses it at Go
+    assert check_task.context(on, str(bank)) == {}
+
+
+def test_either_zapit_box_is_optogenetics_on(tmp_path):
+    # decision-making's two boxes in place of enabled (Zapit-Bonsai, Zapit-MATLAB; 26 Nov 2026): either ticked reads the file.
+    path = tmp_path / "conditions.yml"
+    path.write_text("stimLocations01:\n  offRampDownDuration_ms: 250\n", encoding="utf-8")
+    for box in ("zapitBonsai", "zapitMatlab"):
+        assert check_task.context({"optogenetics": {box: True, "zapitConditionsPath": str(path)}}) == {"zapit_ramp_down_seconds": 0.25}
+    assert check_task.context({"optogenetics": {"zapitBonsai": False, "zapitMatlab": False, "zapitConditionsPath": str(path)}}) == {}

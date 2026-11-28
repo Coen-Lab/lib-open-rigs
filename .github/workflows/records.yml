@@ -3,7 +3,7 @@
 # 04:57 and 05:57 UTC, put one in the 05:00 UK hour in both GMT and BST. Nothing runs on a push or pull request: local
 # tests before a push are the gate, and this keeps Actions inside its monthly budget.
 #
-# The records this repo owns: fixtures\manifest\v4 and fixtures\experiment-folder\v1 are what
+# The records this repo owns: fixtures\manifest\v5 and fixtures\experiment-folder\v1 are what
 # OpenRigs.Manifest writes and reads. The check is the package's own console program, which needs only
 # the .NET SDK and git; it starts no Bonsai. The other lab packages' console checks (Control,
 # HarpDevices, LiveView) run here too: OpenRigs.yml's dotnet test skips console programs. This repo

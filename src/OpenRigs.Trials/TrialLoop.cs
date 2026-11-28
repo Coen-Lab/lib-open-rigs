@@ -1,6 +1,5 @@
 using Bonsai;
 using OpenRigs.Core;
-using OpenRigs.Devices.Zapit;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -11,12 +10,13 @@ namespace OpenRigs.Trials
 {
     /// <summary>
     /// A task's trials on the Harp clock, the same for every task: each trial drawn at its interval's start (the last
-    /// outcome plus its timeout; trial 1 the first tick), a hardware-triggered Zapit armed during the interval once the
-    /// last laser is done, the trial start at the interval's end less the lead (TrialLoop.Lead: max(laserToStimulusSeconds,
+    /// outcome plus its timeout; trial 1 the first tick), a hardware-triggered opto system (<see cref="IOptoSystem"/>) armed
+    /// during the interval once the last laser is done, the trial start at the interval's end less the lead (TrialLoop.Lead: max(laserToStimulusSeconds,
     /// the earliest Stimulus cue's lead, 0)) or later
     /// until the quiet waits hold (QuietWait), the trigger laserToStimulusSeconds before the stimulus (the workflow stops
-    /// if Zapit has not armed the trial by then, naming the last laser when it held Zapit too long, and a trial answered
-    /// first gets no laser), the stimulus the lead after the start, the response window, the outcome and its timeout
+    /// if the system has not armed the trial by then, naming the last laser when it held the system too long, and a trial answered
+    /// first gets no laser; after a laser the workflow ends it early, UntilOutcome or UntilStimulusOff, and on a system whose end needs
+    /// a reply (IOptoSystem.EndNeedsReply) the next is armed only once it has answered that end and its EndReplyMarginSeconds more have passed), the stimulus the lead after the start, the response window, the outcome and its timeout
     /// (from the window's end when the window always runs in full, TrialTiming.ResponseWindowAlwaysFull; cues still to come that are DroppedAtOutcome never come), and with a timed stimulus (TrialTiming.StimulusDurationSeconds)
     /// its StimulusOff, once, at StimulusTiming.Time (rules that are an IStimulusAfterOutcome update it after the outcome until then; a
     /// LaserTiming.UntilStimulusOff laser ends with it, LaserOff). What is the task's own (the draw, the stimulus, the
@@ -41,6 +41,7 @@ namespace OpenRigs.Trials
 
         readonly ITrialRules<TTrial, TUpdate, TOutcome> rules;
         readonly LaserTiming laser;
+        readonly IOptoSystem opto;   // the system that arms the laser trials; null for none
         readonly bool hasWheel;
         readonly List<bool> touched = new List<bool>();
         readonly List<Timer> timers = new List<Timer>();   // by due time, then as scheduled
@@ -53,8 +54,11 @@ namespace OpenRigs.Trials
         double itiStart, nextItiStart, start, quietWait, stimulusTime, triggerDue, onset, responseStart, responseEnd, triggerTime, capAt, armAt, armSentAt;
         double laserFreeAt = double.NegativeInfinity;   // the soonest the next trial may be armed
         bool armSent, triggered, stimulated, capped;
-        TTrial awaitingReply;   // the trial whose StartStimulus Zapit has not yet answered
-        TTrial armed;           // the last trial Zapit armed
+        TTrial awaitingReply;   // the trial whose Arm the system has not yet answered (Armed)
+        TTrial armed;           // the last trial the system armed
+        double armedPowerMw;    // the power it armed it with (its Armed's PowerMw)
+        double armedSeconds;    // its whole length with the ramp (its Armed's PlaySeconds)
+        int laserStarted;       // the last trial the system reported Started: its samples were generated
         readonly IStimulusAfterOutcome<TTrial, TUpdate> after;   // the rules' stimulus after the outcome, if they have one
         TTrial onTrial;         // the trial whose timed stimulus is on (StimulusDurationSeconds), until its StimulusOff
         TrialTimes onTimes;     // its times from its outcome
@@ -62,21 +66,41 @@ namespace OpenRigs.Trials
         bool afterOutcome, hookOpen;   // its outcome has come; AfterOutcome still called (until its off or the next trial's start)
         TTrial lasing;          // the trial whose LaserTiming.UntilStimulusOff laser is on, until its LaserOff or LaserCap
         double lasingCapAt;     // its LaserCap's time
+        TTrial stopOwed;        // on a system whose end needs a reply, the triggered trial whose laser plays until stopped (LaserTiming.UntilStopped), until the event that ends it
+        TTrial stopAwaited;     // the trial whose end the system has not yet answered
+        TTrial stopped;         // the last trial ended
+        bool stopAnswered;      // the system has answered an end, counted from the next tick
+        double stopFreeAt = double.NegativeInfinity;   // the soonest the next trial may be armed after the last end's reply
 
         /// <summary>A loop running <paramref name="rules"/>' trials; the first is drawn at the first clock tick. Without
         /// a wheel (<paramref name="hasWheel"/> false) the wheel's distance stays NaN and a trial that waits for the wheel
-        /// to be quiet is refused.</summary>
-        public TrialLoop(ITrialRules<TTrial, TUpdate, TOutcome> rules, bool hasWheel)
+        /// to be quiet is refused. With no opto system, a laser trial is refused.</summary>
+        public TrialLoop(ITrialRules<TTrial, TUpdate, TOutcome> rules, bool hasWheel) : this(rules, hasWheel, null)
+        {
+        }
+
+        /// <summary>A loop as the one above, its laser trials armed by <paramref name="opto"/> (null for none), whose messages
+        /// come in through <see cref="OnOpto"/>; a laser timing the system cannot run (IOptoSystem.TimingProblem) is refused.</summary>
+        public TrialLoop(ITrialRules<TTrial, TUpdate, TOutcome> rules, bool hasWheel, IOptoSystem opto)
         {
             if (rules == null) throw new ArgumentNullException("rules");
             this.rules = rules;
             this.hasWheel = hasWheel;
             laser = rules.Laser;
+            this.opto = opto;
+            var problem = opto != null && laser != null ? opto.TimingProblem(laser) : null;
+            if (problem != null) throw new ArgumentException(problem);
             after = rules as IStimulusAfterOutcome<TTrial, TUpdate>;
         }
 
+        /// <summary>Gets the opto system that arms the laser trials; null for none.</summary>
+        public IOptoSystem Opto { get { return opto; } }
+
         /// <summary>Gets the trial drawn last: in its interval, running, or in its timeout; null before the first tick.</summary>
         public TTrial Trial { get { return trial; } }
+
+        /// <summary>Gets whether the loop waits for the opto system's reply to the end the workflow sent at its last laser's end (IOptoSystem.EndNeedsReply).</summary>
+        public bool AwaitingStopReply { get { return stopAwaited != null && !stopAnswered; } }
 
         /// <summary>A tick of the Harp clock, in seconds.</summary>
         public List<TrialEvent<TTrial, TUpdate, TOutcome>> OnClock(double seconds)
@@ -85,6 +109,12 @@ namespace OpenRigs.Trials
             if (!double.IsNaN(now) && seconds < now) throw new InvalidOperationException(string.Format("The Harp clock went backwards, from {0} s to {1} s.", now, seconds));
             now = seconds;
             var events = new List<TrialEvent<TTrial, TUpdate, TOutcome>>();
+            if (stopAwaited != null && stopAnswered)
+            {
+                stopAwaited = null;
+                stopAnswered = false;
+                stopFreeAt = now + opto.EndReplyMarginSeconds;
+            }
             if (phase == Phase.Waiting)
             {
                 nextItiStart = now;
@@ -108,13 +138,15 @@ namespace OpenRigs.Trials
                 LaserEnded(events, false);
             }
             if (trial != null && timing.Laser && laser.HardwareTriggered && !armSent && (phase == Phase.Iti || phase == Phase.Running)
-                && now >= armAt - TrialLoop.Tolerance)
+                && now >= armAt - TrialLoop.Tolerance && stopAwaited == null && now >= stopFreeAt - TrialLoop.Tolerance)
             {
-                if (awaitingReply != null) throw NeverAnswered(awaitingReply);
+                if (awaitingReply != null) throw opto.NeverArmed(awaitingReply.TrialNumber);
                 armSent = true;
                 armSentAt = now;
                 awaitingReply = trial;
-                events.Add(Event(TrialEventKind.Arm, now, trial, null));
+                var arm = Event(TrialEventKind.Arm, now, trial, null);
+                if (opto.ArmCarriesLaserSeconds && laser.UntilStopped) arm.LaserSeconds = laser.ArmedSecondsOf(trial, timing);
+                events.Add(arm);
             }
             if (phase == Phase.Iti && now >= wait.TrialStartTime - TrialLoop.Tolerance) Begin(events);
             else if (phase == Phase.Running) Run(events);
@@ -153,15 +185,34 @@ namespace OpenRigs.Trials
         }
 
         /// <summary>
-        /// A reply from Zapit: one to StartStimulus while a trial's is unanswered must arm that trial as it asked
-        /// (ZapitTrial.CheckArmed); any other reply is not the loop's.
+        /// A message from the opto system, mapped from its own by its adapter: an Armed while a trial's Arm is unanswered must arm
+        /// that trial as it asked (IOptoSystem.CheckArmed); a Started marks its samples generated, so only then, on a system that
+        /// confirms starts (IOptoSystem.ConfirmsStart), does the trial log its power (a missed trigger ends with none generated, and
+        /// logs 0 mW); an outcome within the system's StartedGraceSeconds of the trigger logs the power before Started can come, and
+        /// the system's own event rows settle it. A Started for the armed trial before its trigger stops the workflow
+        /// (IOptoSystem.StartedBeforeTrigger). An Ended while a laser played until stopped is on or its end unanswered (a system whose
+        /// end needs a reply) frees the system its EndReplyMarginSeconds from the next tick. Any other message is not the loop's; with
+        /// no opto system, none is.
         /// </summary>
-        public void OnZapitReply(ZapitReply reply)
+        public void OnOpto(OptoFeedback feedback)
         {
-            if (reply == null || reply.Command != ZapitCommandType.StartStimulus || awaitingReply == null) return;
-            var asked = (IZapitTrial)awaitingReply;   // Check: every laser trial is one
-            ZapitTrial.CheckArmed(reply, asked.TrialNumber, asked.LaserCondition, asked.LaserOn);
+            if (feedback == null || opto == null) return;
+            if (feedback.Kind == OptoFeedbackKind.Ended)
+            {
+                if (stopAwaited != null || stopOwed != null) stopAnswered = true;
+                return;
+            }
+            if (feedback.Kind == OptoFeedbackKind.Started)
+            {
+                if (armed != null && feedback.Trial == armed.TrialNumber && armed == trial && !triggered) throw opto.StartedBeforeTrigger(feedback.Trial);
+                laserStarted = feedback.Trial;
+                return;
+            }
+            if (feedback.Kind != OptoFeedbackKind.Armed || awaitingReply == null) return;
+            opto.CheckArmed(feedback, (IOptoTrial)awaitingReply);   // Check: every laser trial is one
             armed = awaitingReply;
+            armedPowerMw = feedback.On ? feedback.PowerMw : 0;
+            armedSeconds = feedback.PlaySeconds;
             awaitingReply = null;
         }
 
@@ -196,7 +247,8 @@ namespace OpenRigs.Trials
             if (t.Laser && laser == null) problems.Add("it is a laser trial, but the rules give no LaserTiming");
             if (t.Laser && laser != null && laser.End == LaserEnd.AtStimulusOff && double.IsNaN(t.StimulusDurationSeconds) && !t.ResponseToStimulusOffSeconds.HasValue)
                 problems.Add("its laser ends at the stimulus off (LaserTiming.UntilStimulusOff), but its stimulus has no off time (StimulusDurationSeconds NaN and ResponseToStimulusOffSeconds null)");
-            if (t.Laser && !(next is IZapitTrial)) problems.Add(string.Format("it is a laser trial, but its type {0} is not an IZapitTrial (its laser condition, laser on and power)", next.GetType().Name));
+            if (t.Laser && opto == null) problems.Add("it is a laser trial, but the loop has no opto system (IOptoSystem)");
+            if (t.Laser && !(next is IOptoTrial)) problems.Add(string.Format("it is a laser trial, but its type {0} is not an IOptoTrial (its laser condition, laser on and power)", next.GetType().Name));
             problems.AddRange(QuietWait.LickProblems(t.LickQuietSeconds));
             problems.AddRange(QuietWait.WheelProblems(t.WheelQuietSeconds, t.WheelQuietCm));
             if (!hasWheel && t.WheelQuietSeconds > 0) problems.Add(string.Format("it waits {0} s for the wheel to be quiet, but the loop has no wheel", t.WheelQuietSeconds));
@@ -273,6 +325,7 @@ namespace OpenRigs.Trials
             {
                 capped = true;
                 events.Add(Event(TrialEventKind.LaserCap, now, trial, null));
+                StopSent();
             }
         }
 
@@ -280,24 +333,26 @@ namespace OpenRigs.Trials
         {
             if (laser.HardwareTriggered)
             {
-                if (!armSent) throw ZapitBusy(trial.TrialNumber, now, laserFreeAt);
-                if (armed != trial && now - armSentAt < ZapitTrial.ReplyMarginSeconds - TrialLoop.Tolerance) throw ArmedLate(trial.TrialNumber, now, armSentAt);
-                if (armed != trial) throw ZapitTrial.NotArmedByTrigger(trial.TrialNumber, now);
+                if (!armSent) throw NotFree(trial.TrialNumber);
+                if (armed != trial && now - armSentAt < opto.ArmLeadSeconds - TrialLoop.Tolerance) throw opto.ArmedLate(trial.TrialNumber, now, armSentAt);
+                if (armed != trial) throw opto.NotArmedByTrigger(trial.TrialNumber, now);
             }
             else
             {
-                if (now < laserFreeAt - TrialLoop.Tolerance) throw ZapitBusy(trial.TrialNumber, now, laserFreeAt);
-                if (awaitingReply != null) throw NeverAnswered(awaitingReply);
+                if (now < laserFreeAt - TrialLoop.Tolerance || stopAwaited != null || now < stopFreeAt - TrialLoop.Tolerance) throw NotFree(trial.TrialNumber);
+                if (awaitingReply != null) throw opto.NeverArmed(awaitingReply.TrialNumber);
                 awaitingReply = trial;
             }
             triggered = true;
             triggerTime = now;
+            // A system whose end needs a reply frees the next trial with that reply; another, by laserFreeAt alone.
+            if (laser.UntilStopped && opto.EndNeedsReply) stopOwed = trial;
             events.Add(Event(TrialEventKind.Trigger, now, trial, null));
             if (laser.End == LaserEnd.AfterDuration)
             {
                 var duration = LaserTiming.DurationOf(trial);
                 Schedule(now + duration, TrialEventKind.TriggerOff, trial, null);
-                laserFreeAt = now + duration + laser.RampDownSeconds;
+                laserFreeAt = opto.FreeAt(now, duration, laser.RampDownSeconds, armedSeconds);
             }
             else if (laser.End == LaserEnd.AtStimulusOff)
             {
@@ -330,10 +385,11 @@ namespace OpenRigs.Trials
                 {
                     Schedule(now + laser.TriggerHoldSeconds, TrialEventKind.TriggerOff, trial, null);
                     laserFreeAt = now + laser.TriggerHoldSeconds;
+                    if (laser.End == LaserEnd.AtOutcome) StopSent();
                 }
                 else if (!triggered)
                 {
-                    laserFreeAt = Math.Max(laserFreeAt, triggerDue);   // never triggered: Zapit is free once its trigger would have come
+                    laserFreeAt = Math.Max(laserFreeAt, triggerDue);   // never triggered: the system is free once its trigger would have come
                 }
             }
             nextItiStart = timing.ResponseWindowAlwaysFull ? Times().TrialEndTime + timeout : now + timeout;
@@ -367,14 +423,30 @@ namespace OpenRigs.Trials
         }
 
         // The UntilStimulusOff laser has ended (with LaserOff unless its LaserCap said so): the line falls TriggerHoldSeconds later,
-        // Zapit free then, and a trial waiting in its interval to be armed is armed from then.
+        // the system free then, and a trial waiting in its interval to be armed is armed from then.
         void LaserEnded(List<TrialEvent<TTrial, TUpdate, TOutcome>> events, bool laserOff)
         {
             if (laserOff) events.Add(Event(TrialEventKind.LaserOff, now, lasing, null));
+            StopSent();
             Schedule(now + laser.TriggerHoldSeconds, TrialEventKind.TriggerOff, lasing, null);
             laserFreeAt = now + laser.TriggerHoldSeconds;
             if (phase == Phase.Iti && trial != lasing && !armSent) armAt = Math.Max(itiStart, laserFreeAt);
             lasing = null;
+        }
+
+        // The event at which the workflow ends the laser has come (once per triggered trial whose laser plays until stopped, on a
+        // system whose end needs a reply): the next trial waits for that reply, unless it is already in (the workflow's wall-clock backstop stopped it first).
+        void StopSent()
+        {
+            if (stopOwed == null) return;
+            stopped = stopOwed;
+            stopOwed = null;
+            if (stopAnswered)
+            {
+                stopAnswered = false;
+                stopFreeAt = now + opto.EndReplyMarginSeconds;
+            }
+            else stopAwaited = stopped;
         }
 
         // The ended trial's stimulus while on, until the next trial starts.
@@ -411,6 +483,8 @@ namespace OpenRigs.Trials
                 ResponseStartTime = responseStart,
                 ResponseEndTime = responseEnd,
                 LaserTriggerTime = triggerTime,
+                LaserPowerMw = opto == null || !opto.ConfirmsStart ? double.NaN : triggered && armed == trial && (laserStarted == trial.TrialNumber || now - triggerTime < opto.StartedGraceSeconds) ? armedPowerMw : 0,
+                LaserStarted = opto != null && opto.ConfirmsStart && triggered && armed == trial && laserStarted == trial.TrialNumber,
                 StimulusOffTime = StimulusTiming.Time(onset, timing.StimulusDurationSeconds, now, timing.ResponseToStimulusOffSeconds),
                 Now = now,
                 ResponseWindowAlwaysFull = timing.ResponseWindowAlwaysFull,
@@ -427,29 +501,14 @@ namespace OpenRigs.Trials
             return new TrialEvent<TTrial, TUpdate, TOutcome>(kind, seconds, owner, cue, default(TUpdate), null);
         }
 
-        // The task's laser timing, not Zapit: the last laser held Zapit past this trial's trigger (open_rigs.core.task
-        // Optogenetics.check_zapit_free_in_time refuses such a task file).
-        static InvalidOperationException ZapitBusy(int trialNumber, double triggerSeconds, double freeAt)
+        // The system not free at a trial's trigger: the task's laser timing (BusyAtTrigger), or the system's reply to the last end
+        // not in, or in too late for the margin after it.
+        Exception NotFree(int trialNumber)
         {
-            return new InvalidOperationException(string.Format(
-                "Trial {0}'s trigger came at {1} s on the Harp clock, but the last trial's laser frees Zapit only at {2} s, so the trial's StartStimulus " +
-                "could not go in time and the workflow stopped. The task's laser timing leaves too little time between trials: shorten the laser's hold " +
-                "or duration, or lengthen the shortest interval.", trialNumber, triggerSeconds, freeAt));
-        }
-
-        static InvalidOperationException ArmedLate(int trialNumber, double triggerSeconds, double sentSeconds)
-        {
-            return new InvalidOperationException(string.Format(
-                "Trial {0}'s StartStimulus went at {1} s, once the last trial's laser freed Zapit, only {2:0.###} s before its trigger at {3} s, less than " +
-                "Zapit's {4} s reply margin, so the workflow stopped. The task's laser timing leaves too little time between trials: shorten the laser's " +
-                "hold or duration, or lengthen the shortest interval.", trialNumber, sentSeconds, triggerSeconds - sentSeconds, triggerSeconds, ZapitTrial.ReplyMarginSeconds));
-        }
-
-        static InvalidOperationException NeverAnswered(TTrial unanswered)
-        {
-            return new InvalidOperationException(string.Format(
-                "Zapit never answered trial {0}'s StartStimulus, so the workflow stopped before the next one was sent. Is Zapit running and answering?",
-                unanswered.TrialNumber));
+            if (now < laserFreeAt - TrialLoop.Tolerance) return opto.BusyAtTrigger(trialNumber, now, laserFreeAt);
+            if (stopAwaited != null) return opto.EndNotAnswered(stopAwaited.TrialNumber, trialNumber, now);
+            if (now < stopFreeAt - TrialLoop.Tolerance) return opto.EndAnsweredLate(stopped.TrialNumber, trialNumber, stopFreeAt, now);
+            return opto.BusyAtTrigger(trialNumber, now, laserFreeAt);
         }
     }
 
@@ -472,24 +531,44 @@ namespace OpenRigs.Trials
         public const double Tolerance = 1e-6;
 
         /// <summary>
-        /// The trials of the first rules to come, as events: the loop is fed the Harp clock (seconds), the wheel (cm),
-        /// each spout's lick detector's state (<paramref name="licks"/>, spout 0 the first: a two-spout rig's left, then its
-        /// right), Zapit's replies and, on a rig with one, the wheel (cm; null for none), under one lock; the events leave in
-        /// order, outside it, one thread at a time (sending under the lock deadlocks a clock that ticks under its own). The
-        /// first trial's interval starts at the first tick after the rules come. The clock ending ends the sequence; a lick
-        /// detector or the wheel ending stops it naming the input, as its device has stopped sending; Zapit's replies ending
-        /// is left to the laser trial that waits for one. An error from the loop, the rules or an input stops the sequence.
+        /// The trials of the first rules to come, as events: the loop is fed the Harp clock (seconds), each spout's lick detector's
+        /// state (<paramref name="licks"/>, spout 0 the first: a two-spout rig's left, then its right), the opto system's messages
+        /// (<paramref name="optoFeedback"/>, mapped from the system's own by its adapter) and, on a rig with one, the wheel (cm; null
+        /// for none), under one lock; the events leave in order, outside it, one thread at a time (sending under the lock deadlocks a
+        /// clock that ticks under its own). The first trial's interval starts at the first tick after the rules come. The clock ending
+        /// ends the sequence; a lick detector or the wheel ending stops it naming the input, as its device has stopped sending; the opto
+        /// messages ending is left to the laser trial that waits for one. An error from the loop, the rules or an input stops the sequence.
         /// </summary>
         public static IObservable<TrialEvent<TTrial, TUpdate, TOutcome>> Observe<TTrial, TUpdate, TOutcome>(
             IObservable<ITrialRules<TTrial, TUpdate, TOutcome>> rules, IObservable<double> clock, IObservable<bool>[] licks,
-            IObservable<ZapitReply> zapitReplies, IObservable<double> wheelCm = null)
+            IOptoSystem opto, IObservable<OptoFeedback> optoFeedback, IObservable<double> wheelCm = null)
+            where TTrial : class, ITrial
+            where TOutcome : class, ITrialOutcome
+        {
+            if (opto == null) throw new ArgumentNullException("opto", "The trial loop's opto system: a task with no opto takes the overload without one.");
+            if (optoFeedback == null) throw new ArgumentNullException("optoFeedback");
+            return Run(rules, clock, licks, wheelCm, opto, optoFeedback);
+        }
+
+        /// <summary>The trials as the overload above, with no opto system: a laser trial is refused.</summary>
+        public static IObservable<TrialEvent<TTrial, TUpdate, TOutcome>> Observe<TTrial, TUpdate, TOutcome>(
+            IObservable<ITrialRules<TTrial, TUpdate, TOutcome>> rules, IObservable<double> clock, IObservable<bool>[] licks, IObservable<double> wheelCm = null)
+            where TTrial : class, ITrial
+            where TOutcome : class, ITrialOutcome
+        {
+            return Run(rules, clock, licks, wheelCm, null, null);
+        }
+
+        static IObservable<TrialEvent<TTrial, TUpdate, TOutcome>> Run<TTrial, TUpdate, TOutcome>(
+            IObservable<ITrialRules<TTrial, TUpdate, TOutcome>> rules, IObservable<double> clock, IObservable<bool>[] licks, IObservable<double> wheelCm,
+            IOptoSystem opto, IObservable<OptoFeedback> optoFeedback)
             where TTrial : class, ITrial
             where TOutcome : class, ITrialOutcome
         {
             if (licks == null || licks.Length == 0 || Array.IndexOf(licks, null) >= 0) throw new ArgumentException("The trial loop needs a lick input for each spout, none null.", "licks");
             return rules.Take(1).SelectMany(r => Observable.Create<TrialEvent<TTrial, TUpdate, TOutcome>>(observer =>
             {
-                var loop = new TrialLoop<TTrial, TUpdate, TOutcome>(r, wheelCm != null);
+                var loop = new TrialLoop<TTrial, TUpdate, TOutcome>(r, wheelCm != null, opto);
                 var gate = new object();
                 var outbox = new Queue<Action>();
                 bool sending = false, stopped = false;
@@ -554,7 +633,7 @@ namespace OpenRigs.Trials
                     var spout = i;
                     subscriptions.Add(licks[i].Subscribe(lick => run(() => loop.OnLick(spout, lick)), fail, ended("lick input " + spout)));
                 }
-                subscriptions.Add(zapitReplies.Subscribe(reply => run(() => { loop.OnZapitReply(reply); return none; }), fail));
+                if (optoFeedback != null) subscriptions.Add(optoFeedback.Subscribe(feedback => run(() => { loop.OnOpto(feedback); return none; }), fail));
                 subscriptions.Add(clock.Subscribe(seconds => run(() => loop.OnClock(seconds)), fail, () => run(() => null)));
                 return subscriptions;
             }));

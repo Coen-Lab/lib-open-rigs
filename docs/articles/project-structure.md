@@ -63,7 +63,7 @@ A .NET project that Bonsai uses to compile the generated C# schema classes (prod
 Jinja-templated example scripts that demonstrate how to instantiate each schema. These are useful as a starting point for creating parameter JSON files to pass to a running experiment.
 
 **local_packages/**
-Pre-built NuGet packages for the open-rigs C# libraries the workflow uses (`OpenRigs.Core`, `OpenRigs.Devices`, `OpenRigs.Logging`, `OpenRigs.Video`, `OpenRigs.Trials` for a task's trial loop, and on a rig with speakers `OpenRigs.Audio`). These are referenced by the Bonsai environment via the local NuGet feed configured in `.bonsai/NuGet.config`.
+Pre-built NuGet packages for the open-rigs C# libraries the workflow uses (`OpenRigs.Core`, `OpenRigs.Devices`, `OpenRigs.Logging`, `OpenRigs.Video`, `OpenRigs.Trials` for a task's trial loop, with an opto adapter for a task with optogenetics (`OpenRigs.Opto.ZapitBonsai`, `OpenRigs.Opto.ZapitMatlab`), and on a rig with speakers `OpenRigs.Audio`). These are referenced by the Bonsai environment via the local NuGet feed configured in `.bonsai/NuGet.config`.
 
 **scripts/**
 Helper scripts for deploying the project to a rig machine. See the [Build and Deploy](../tutorials/building-deploying.md) section for details.

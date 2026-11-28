@@ -565,7 +565,7 @@ def block_text(path: str) -> str:
 def test_the_fixed_logs_are_the_names_their_blocks_write():
     for path, logs in lint.FIXED_LOGS.items():
         text = block_text(path)
-        for inner in (lint.TASK_LOGS, "OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai"):
+        for inner in (lint.TASK_LOGS, lint.TASK_LOGS_ZAPIT_DAQ, "OpenRigs.Logging:LogEvents.bonsai", "OpenRigs.Logging:LogTrials.bonsai", "OpenRigs.Devices:ZapitLogs.bonsai"):
             if f'Path="{inner}"' in text:  # a block that includes another writes its logs too
                 text += block_text(inner)
         assert all(f">{name}<" in text for name, _ in logs), path
@@ -702,9 +702,22 @@ def test_each_include_read_from_the_package_is_found_by_its_description(tmp_path
     assert len(lint.required_devices(wf)) == 9
 
 def test_zapit_and_the_manual_rewards_are_the_lab_s_includes(tmp_path):
-    def root(resource: str) -> lint.ET.Element:
-        return lint.ET.fromstring((ROOT / "src" / "OpenRigs.Devices" / resource).read_bytes())
+    def root(resource: str, package: str = "OpenRigs.Devices") -> lint.ET.Element:
+        return lint.ET.fromstring((ROOT / "src" / package / resource).read_bytes())
     assert rules.zapit_for_task_problems(root("ConnectForTask.bonsai")) == []
+    assert rules.zapit_daq_for_task_problems(root("ConnectForTaskZapitDaq.bonsai", "OpenRigs.Opto.ZapitBonsai")) == []
+    # A lost mapping fails safe: ZapitDaq's CeilingMw default must be 0, and LaserMaxVolts is mapped.
+    text = (ROOT / "src" / "OpenRigs.Opto.ZapitBonsai" / "ConnectForTaskZapitDaq.bonsai").read_text(encoding="utf-8-sig")
+    lost = text.replace("<zap:CeilingMw>0<", "<zap:CeilingMw>INF<").replace(' Selector="LaserMaxControlVolts"', ' Selector="X"')
+    assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(lost)) == [
+        "ZapitDaq's LaserMaxVolts is not mapped from LaserMaxControlVolts", "ZapitDaq's CeilingMw default is not 0 (a lost mapping must fail safe)"]
+    # OpenedBy: ZapitDaq opens only when the task file's bool is true at launch, and with no OpenedBy on any Zapit-Bonsai rig.
+    closed_by = text.replace("Item1.Device != null &amp;&amp; Item2<", "Item1.Device != null &amp;&amp; !Item2<")
+    assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(closed_by)) == [
+        "ConnectForTaskZapitDaq's ZapitRig Condition does not open only when OpenedBy is true (... && Item2)"]
+    shut = text.replace("<dev:EmptyPathValue>true</dev:EmptyPathValue>", "")
+    assert rules.zapit_daq_for_task_problems(lint.ET.fromstring(shut)) == [
+        "ConnectForTaskZapitDaq's OpenedBy does not open with no OpenedBy (TaskFileSwitch EmptyPathValue true)"]
     assert rules.manual_rewards_drop_problems(root("RewardValve.bonsai")) == []
     group = '<Expression xsi:type="GroupWorkflow"><Name>Commands</Name><Workflow><Nodes /><Edges /></Workflow></Expression>'
     wf = workflow(tmp_path, include(lint.ZAPIT_FOR_TASK) + include(lint.REWARDS) + VALVES + group)
@@ -878,8 +891,10 @@ def test_the_experiment_s_records_are_one_include_last_but_the_live_view(tmp_pat
     own = workflow(tmp_path / "c", logs + include("OpenRigs.Logging:LogControlEvents.bonsai") + manifest_node("auto")
                    + include(lint.EXPERIMENT_RECORDS, "<ExpectedFiles>auto</ExpectedFiles>"))
     assert lint.experiment_records_problems(own) == [
-        "the workflow has its own ExperimentManifest (ExperimentRecords does)", "the workflow has its own LogControlEvents (ExperimentRecords does)",
-        "ExperimentRecords has no IngestScript"]
+        "the workflow has its own ExperimentManifest (ExperimentRecords does)", "the workflow has its own LogControlEvents (ExperimentRecords does)"]
+    # IngestScripts blank is none (the include's own rule); a list is fine too.
+    plural = workflow(tmp_path / "p", logs + include(lint.EXPERIMENT_RECORDS, "<IngestScripts>a,b</IngestScripts><ExpectedFiles>auto</ExpectedFiles>") + LIVE)
+    assert lint.experiment_records_problems(plural) == []
     # The rig.yml is ReadLabRig's: a ConfigRoot on the include (or on StreamDevices) is one Bonsai stops the build on.
     rooted = workflow(tmp_path / "f", logs + include(lint.EXPERIMENT_RECORDS, "<ConfigRoot>C:\\Root</ConfigRoot>" + RECORDS.split('.bonsai">', 1)[1].split("</Expression>")[0]) + LIVE)
     assert lint.experiment_records_problems(rooted) == [
@@ -1205,3 +1220,37 @@ def test_an_installed_lint_takes_a_pinned_package_at_its_own_version(tmp_path):
         with zipfile.ZipFile(tmp_path / "local_packages" / f"{package}.{version}.nupkg", "w") as z:
             z.writestr(f"{package}.nuspec", spec)
     assert lint.central_versions(tmp_path, tmp_path / "no.props")["openrigs.devices"] == "0.1.1-x.59"
+
+def test_a_zapit_daq_workflow_takes_its_own_blocks_and_none_of_matlab_zapit_s(tmp_path):
+    # ConnectForTaskZapitDaq, ZapitDaqTrials and ConditionedTaskLogsZapitDaq: Zapit's checks pass, the logs count once.
+    daq = include(lint.ZAPIT_DAQ_FOR_TASK) + include(lint.ZAPIT_DAQ_TRIALS)
+    assert lint.zapit_include_problems(workflow(tmp_path, daq)) == []
+    assert lint.task_logs_problems(workflow(tmp_path / "a", include(lint.CONDITIONED_TASK_LOGS_ZAPIT_DAQ)))[0] == (
+        "ConditionedTaskLogsZapitDaq is not given the task file as JSON (the task's SerializeToJson)")
+    # Its subjects, MATLAB Zapit's blocks and nodes, and its own pieces again are refused.
+    events = '<Expression xsi:type="rx:PublishSubject"><rx:Name>Zapit.Events</rx:Name></Expression>'
+    mixed = (include(lint.ZAPIT_FOR_TASK) + include("OpenRigs.Devices:ZapitLogs.bonsai") + include(lint.TASK_LOGS) + include(lint.ZAPIT_SETUP)
+             + '<Expression xsi:type="Combinator"><Combinator xsi:type="zap:ZapitClient" xmlns:zap="clr-namespace:OpenRigs.Devices.Zapit;assembly=OpenRigs.Devices" /></Expression>'
+             + '<Expression xsi:type="Combinator"><Combinator xsi:type="z:ZapitDaq" xmlns:z="clr-namespace:OpenRigs.Zapit;assembly=OpenRigs.Zapit" /></Expression>')
+    assert lint.zapit_include_problems(workflow(tmp_path / "b", daq + events + mixed)) == [
+        "the workflow includes ConnectForTask, MATLAB Zapit's, beside ConnectForTaskZapitDaq",
+        "the workflow includes ZapitLogs, MATLAB Zapit's, beside ConnectForTaskZapitDaq",
+        "the workflow includes TaskLogs, MATLAB Zapit's, beside ConnectForTaskZapitDaq",
+        "the workflow includes ZapitSetup itself (ConnectForTaskZapitDaq does)",
+        "the workflow builds zap:ZapitClient, a MATLAB Zapit node, beside ConnectForTaskZapitDaq",
+        "the workflow builds ozap:ZapitDaq itself (ConnectForTaskZapitDaq does)",
+        "the workflow declares Zapit.Events, which ConnectForTaskZapitDaq declares"]
+
+
+def test_a_zapit_daq_workflow_expects_zapit_s_files_under_optogenetics(tmp_path):
+    # The scanner frames and the accuracy need the beam: at ceilingMw 0 the agent makes neither, so they are under
+    # OptogeneticsLaserEnabled, the rest under Optogenetics.
+    expected = ("Settings/Settings_Task_;WorkflowData/WorkflowData_Trials_;"
+                + ";".join(f"{f}?{'OptogeneticsLaserEnabled' if f in lint.ZAPIT_LASER_FILES else 'Optogenetics'}" for f in lint.ZAPIT_FILES))
+    assert set(lint.ZAPIT_LASER_FILES) == {"ZapitScanner/", "Settings/Settings_ZapitAccuracy_", "Settings/Settings_ZapitLaserCurve_"}
+    blocks = include(lint.ZAPIT_DAQ_FOR_TASK) + include(lint.TASK_LOGS_ZAPIT_DAQ)
+    assert lint.expected_files_problems(workflow(tmp_path, blocks + manifest_node(expected))) == []
+    assert lint.expected_files_problems(workflow(tmp_path / "b", blocks + manifest_node(expected.replace("Settings/Settings_ZapitBank_?Optogenetics", "Settings/Settings_ZapitBank_")))) == [
+        "ExpectedFiles names Settings/Settings_ZapitBank_; its block writes it as Settings/Settings_ZapitBank_?Optogenetics"]
+    assert lint.expected_files_problems(workflow(tmp_path / "c", blocks + manifest_node(expected.replace("ZapitScanner/?OptogeneticsLaserEnabled", "ZapitScanner/?Optogenetics")))) == [
+        "ExpectedFiles names ZapitScanner/?Optogenetics; its block writes it as ZapitScanner/?OptogeneticsLaserEnabled"]

@@ -37,7 +37,7 @@ def announcements(file: Path) -> list[tuple[str, str]]:
 def test_each_piece_announces_the_stage_ready_waits_for():
     for path, stage in lint.READY_STAGES.items():
         read = [("ReadyStages", lint.CLOCK_READ)] if path == lint.CLOCK_FROM_BOARD else []
-        assert announcements(source(ANNOUNCED_IN.get(path, path))) == [("ReadyStages", stage)] + read, path
+        assert announcements(source(ANNOUNCED_IN.get(path) or path)) == [("ReadyStages", stage)] + read, path
     # A camera announces its own Name, mapped from its rig.yml entry's.
     assert announcements(source(lint.CAMERA)) == [("ReadyStages", "<mapped from Name>")]
     # HarpClockAgrees announces its Device, mapped from the device's own subject (its rig.yml entry's Name).

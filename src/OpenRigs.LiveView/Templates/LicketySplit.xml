@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A Lickety Split: its lick detectors' state at every change, with the device's timestamp, as one
-     stream shaped as a Behavior board's channels. Sent again every 2 s for a late viewer. -->
+     stream shaped as a Behavior board's channels. Sent again every 2 s for a late viewer. The
+     data's end is not passed on (IgnoreCompletion), as it would close DataMessage for every stream. -->
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
@@ -24,9 +25,13 @@
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Streaming:PackDataMessage.bonsai">
         <StreamName>{{Stream}}</StreamName>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="lv:IgnoreCompletion" />
+      </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="0" To="4" Label="Source1" />
+      <Edge From="4" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
       <Edge From="2" To="3" Label="Source1" />
     </Edges>

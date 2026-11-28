@@ -1,0 +1,285 @@
+{
+ "conditions_name": "contract_conditions.yml",
+ "conditions_sha256": "e3620c4896e08ec68b71ec96fe3d10243659ce5552f8dd0e29aef6c244a47bc0",
+ "bin": "Settings_ZapitBank_T.bin",
+ "version": 2,
+ "sample_rate": 100000.0,
+ "modulation_hz": 40.0,
+ "ceiling_mw": 1000000000.0,
+ "scan_channels": [
+  "galvo_x",
+  "galvo_y",
+  "led"
+ ],
+ "dtype": "float32 little-endian",
+ "layout": "scan section (scan_rows x 3, interleaved) then laser section (laser_rows x 1)",
+ "scan_rows": 7503,
+ "laser_rows": 127500,
+ "hashes": {
+  "scanner_fit": "2866c4cef7cffe413cf16547be6dcaa079c5a40c6a8e02416db24dba4c3f2144",
+  "laser_curve": "d0b2001d690bb10ece35a7bdf742c7a2ff2726cddf71339eeb23d78a46bbe23c",
+  "sample": "7d4f9f72ca9511d4710379c042856cdff89a54e90d229157cd7a6e3ea386971a",
+  "bin": "b71e4dac04b180fe634dd6ab172c575d373b3da515825b0a88b08307eecd7928"
+ },
+ "conditions": [
+  {
+   "condition": 1,
+   "points_mm": [
+    [
+     3.7329333333333334,
+     -1.7284000000000002
+    ],
+    [
+     -3.3396000000000003,
+     -1.1350666666666667
+    ]
+   ],
+   "stereotaxic_mm": [
+    [
+     3.56,
+     -1.24
+    ],
+    [
+     -3.56,
+     -1.24
+    ]
+   ],
+   "n_points": 2,
+   "scan_cycle": {
+    "offset": 0,
+    "length": 2500
+   },
+   "scan_end": {
+    "offset": 2500,
+    "length": 1
+   },
+   "variants": [
+    {
+     "laser_on": true,
+     "power_mw": 2.0,
+     "capped_power_mw": 2.0,
+     "power_capped": false,
+     "laser_cycle": {
+      "offset": 0,
+      "length": 2500
+     },
+     "laser_tail": {
+      "offset": 2500,
+      "length": 25000
+     },
+     "tail_cycles": 10,
+     "tail_replaces": 0
+    },
+    {
+     "laser_on": true,
+     "power_mw": 8.0,
+     "capped_power_mw": 8.0,
+     "power_capped": false,
+     "laser_cycle": {
+      "offset": 27500,
+      "length": 2500
+     },
+     "laser_tail": {
+      "offset": 30000,
+      "length": 25000
+     },
+     "tail_cycles": 10,
+     "tail_replaces": 0
+    },
+    {
+     "laser_on": true,
+     "power_mw": 40.0,
+     "capped_power_mw": 27.473999999999997,
+     "power_capped": true,
+     "laser_cycle": {
+      "offset": 55000,
+      "length": 2500
+     },
+     "laser_tail": {
+      "offset": 57500,
+      "length": 25000
+     },
+     "tail_cycles": 10,
+     "tail_replaces": 0
+    },
+    {
+     "laser_on": false,
+     "power_mw": 0.0,
+     "capped_power_mw": 0.0,
+     "power_capped": false,
+     "laser_cycle": null,
+     "laser_tail": null,
+     "tail_cycles": 10,
+     "tail_replaces": 0
+    }
+   ]
+  },
+  {
+   "condition": 2,
+   "points_mm": [
+    [
+     1.0719333333333332,
+     0.5355000000000001
+    ]
+   ],
+   "stereotaxic_mm": [
+    [
+     0.71,
+     0.8
+    ]
+   ],
+   "n_points": 1,
+   "scan_cycle": {
+    "offset": 2501,
+    "length": 2500
+   },
+   "scan_end": {
+    "offset": 5001,
+    "length": 1
+   },
+   "variants": [
+    {
+     "laser_on": true,
+     "power_mw": 2.0,
+     "capped_power_mw": 2.0,
+     "power_capped": false,
+     "laser_cycle": {
+      "offset": 82500,
+      "length": 2500
+     },
+     "laser_tail": null,
+     "tail_cycles": 0,
+     "tail_replaces": 1
+    },
+    {
+     "laser_on": true,
+     "power_mw": 8.0,
+     "capped_power_mw": 8.0,
+     "power_capped": false,
+     "laser_cycle": {
+      "offset": 85000,
+      "length": 2500
+     },
+     "laser_tail": null,
+     "tail_cycles": 0,
+     "tail_replaces": 1
+    },
+    {
+     "laser_on": true,
+     "power_mw": 40.0,
+     "capped_power_mw": 28.5,
+     "power_capped": true,
+     "laser_cycle": {
+      "offset": 87500,
+      "length": 2500
+     },
+     "laser_tail": null,
+     "tail_cycles": 0,
+     "tail_replaces": 1
+    },
+    {
+     "laser_on": false,
+     "power_mw": 0.0,
+     "capped_power_mw": 0.0,
+     "power_capped": false,
+     "laser_cycle": null,
+     "laser_tail": null,
+     "tail_cycles": 0,
+     "tail_replaces": 1
+    }
+   ]
+  },
+  {
+   "condition": 3,
+   "points_mm": [
+    [
+     3.1501333333333332,
+     1.2214333333333334
+    ],
+    [
+     2.2458,
+     0.5770666666666666
+    ]
+   ],
+   "stereotaxic_mm": [
+    [
+     2.73,
+     1.66
+    ],
+    [
+     1.88,
+     0.94
+    ]
+   ],
+   "n_points": 2,
+   "scan_cycle": {
+    "offset": 5002,
+    "length": 2500
+   },
+   "scan_end": {
+    "offset": 7502,
+    "length": 1
+   },
+   "variants": [
+    {
+     "laser_on": true,
+     "power_mw": 2.0,
+     "capped_power_mw": 2.0,
+     "power_capped": false,
+     "laser_cycle": {
+      "offset": 90000,
+      "length": 2500
+     },
+     "laser_tail": {
+      "offset": 92500,
+      "length": 10000
+     },
+     "tail_cycles": 4,
+     "tail_replaces": 0
+    },
+    {
+     "laser_on": true,
+     "power_mw": 8.0,
+     "capped_power_mw": 8.0,
+     "power_capped": false,
+     "laser_cycle": {
+      "offset": 102500,
+      "length": 2500
+     },
+     "laser_tail": {
+      "offset": 105000,
+      "length": 10000
+     },
+     "tail_cycles": 4,
+     "tail_replaces": 0
+    },
+    {
+     "laser_on": true,
+     "power_mw": 40.0,
+     "capped_power_mw": 14.220697178601906,
+     "power_capped": true,
+     "laser_cycle": {
+      "offset": 115000,
+      "length": 2500
+     },
+     "laser_tail": {
+      "offset": 117500,
+      "length": 10000
+     },
+     "tail_cycles": 4,
+     "tail_replaces": 0
+    },
+    {
+     "laser_on": false,
+     "power_mw": 0.0,
+     "capped_power_mw": 0.0,
+     "power_capped": false,
+     "laser_cycle": null,
+     "laser_tail": null,
+     "tail_cycles": 4,
+     "tail_replaces": 0
+    }
+   ]
+  }
+ ]
+}

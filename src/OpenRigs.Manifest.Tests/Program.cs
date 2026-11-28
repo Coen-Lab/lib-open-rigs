@@ -194,7 +194,21 @@ namespace OpenRigs.Manifest.Tests
             return o;
         }
 
-        // The records' contract (claude-tools docs\architecture\records.md): fixtures\manifest\v4\*.json are what this
+        // The IngestScripts setting: comma-separated names to a list, blank to none, a name the server would refuse to a loud stop.
+        static void IngestScripts()
+        {
+            Console.WriteLine("IngestScripts:");
+            Check("names are taken in order, trimmed", string.Join("|", ManifestWriter.IngestScriptNames(" task-a , b_2,c.d ")) == "task-a|b_2|c.d", "other");
+            Check("blank is none", ManifestWriter.IngestScriptNames(null).Count == 0 && ManifestWriter.IngestScriptNames("").Count == 0 && ManifestWriter.IngestScriptNames(" , ,").Count == 0, "some");
+            foreach (var bad in new[] { "a b", "-a", ".a", "a/b", "a;b", "a\b", "../x", "café" })
+            {
+                string refused = null;
+                try { ManifestWriter.IngestScriptNames("ok," + bad); } catch (InvalidOperationException e) { refused = e.Message; }
+                Check("IngestScripts name '" + bad + "' is refused", refused != null && refused.StartsWith("ExperimentManifest's IngestScripts has"), refused ?? "taken");
+            }
+        }
+
+        // The records' contract (claude-tools docs\architecture\records.md): fixtures\manifest\v5\*.json are what this
         // writer produces from these inputs, byte for byte. --write-fixtures writes them; otherwise each is compared.
         static void Fixtures(bool write)
         {
@@ -247,27 +261,27 @@ namespace OpenRigs.Manifest.Tests
 
             var records = new Dictionary<string, JsonObject>();
             var runningFiles = new List<object> { device };
-            records["running"] = ManifestWriter.Document(Utc("2026-11-12T10:15:03Z"), "example-task", writer, rig, session, start,
+            records["running"] = ManifestWriter.Document(Utc("2026-11-12T10:15:03Z"), new[] { "example-task" }, writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "AM006", "004B1", null, tom, null, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Running, null), false, Utc("2026-11-12T10:15:03Z"), null, null, null),
                 ManifestWriter.ExpectedSection(plan, runningFiles), none, runningFiles);
             var files = allFiles(true);
-            records["completed"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
+            records["completed"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), new[] { "example-task" }, writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
                 ManifestWriter.ExpectedSection(plan, files), none, files);
             var laserFiles = allFiles(true);
             laserFiles.Add(ManifestWriter.FileEntry("Settings/Settings_Laser_2026-11-12T10-15-40.json", 640, Utc("2026-11-12T10:15:40Z"), true));
-            records["optogenetics"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
+            records["optogenetics"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), new[] { "example-task", "example-extra" }, writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
                 ManifestWriter.ExpectedSection(laserOn, laserFiles), none, laserFiles);
-            records["ended-early"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), "example-task", writer, rig, session, start,
+            records["ended-early"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), new[] { "example-task" }, writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, null),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.EndedEarly, RunEnd.EndedEarlyError), true, started, Utc("2026-11-12T10:20:00Z"), 12950, null),
                 ManifestWriter.ExpectedSection(withCamera, files), new[] { "Camera-Overhead left no file" }, files);
             var openFiles = allFiles(false);
-            records["stopped-not-final"] = ManifestWriter.Document(Utc("2026-11-12T10:31:10Z"), "example-task", writer, rig, session, start,
+            records["stopped-not-final"] = ManifestWriter.Document(Utc("2026-11-12T10:31:10Z"), new[] { "example-task" }, writer, rig, session, start,
                 ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, new KeyValuePair<string, string>("", "someone at CONTROL-PC (no Lab PIN)")),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Stopped, null), false, started, Utc("2026-11-12T10:31:10Z"), null, "Stop from the window"),
                 ManifestWriter.ExpectedSection(plan, openFiles), none, openFiles);
@@ -277,7 +291,7 @@ namespace OpenRigs.Manifest.Tests
                 Launch = ManifestWriter.LaunchSection(new[] { "Bonsai.exe", workflow, "--start" }),
                 ConfigFiles = new List<object> { Object("path", rigYml, "missing", true, "why", "Could not find file '" + rigYml + "'.") },
             };
-            records["no-controller"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), null, writer, rig,
+            records["no-controller"] = ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), none, writer, rig,
                 ManifestWriter.SessionSection(@"D:\Data\sub-test\ses-XXXXX_2026-11-12T10-15-02"), bare,
                 ManifestWriter.ControlSection(null, ManifestWriter.LaunchProperty(bare.Launch, ManifestWriter.LaunchIdProperty)),
                 ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
@@ -295,12 +309,16 @@ namespace OpenRigs.Manifest.Tests
             var completed = Json.Serialize(records["completed"]);
             var topKeys = string.Join(",", records["completed"].Select(p => p.Key));
             var fileKeys = string.Join(",", ((JsonObject)((List<object>)records["completed"].First(p => p.Key == "files").Value)[0]).Select(p => p.Key));
-            Check("version 4 has no status, completed or ingest, and a file no sha256 or expected", Field(completed, "version") == "4"
-                && topKeys == "version,created,ingest_script,writer,rig,session,source,launch,control,config_files,spout_positions,trial_columns,stream_columns,run,expected,notes,files"
+            Check("version 5 has no status, completed or ingest, and a file no sha256 or expected", Field(completed, "version") == "5"
+                && topKeys == "version,created,ingest_scripts,writer,rig,session,source,launch,control,config_files,spout_positions,trial_columns,stream_columns,run,expected,notes,files"
                 && fileKeys == "path,size,mtime,closed", topKeys + " | " + fileKeys);
             Check("control.launch_id is the LaunchId the controller passed", Field(completed, "control.launch_id") == "rig-AM006-004B1-20261112T101500Z", Field(completed, "control.launch_id"));
             Check("... and null when none was passed", ManifestWriter.ControlSection(null, "a", "b", null, null, null, null).First(p => p.Key == "launch_id").Value == null, "not null");
-            Check("a blank ingest script is null, not left out", Field(Json.Serialize(records["no-controller"]), "ingest_script") == "null", "left out");
+            Check("no ingest scripts is [], not null or left out", Json.Serialize(records["no-controller"]).Contains("\"ingest_scripts\": []"), "not []");
+            Check("ingest scripts are an array of names, in the order given", Json.Serialize(ManifestWriter.Document(Utc("2026-11-12T10:45:04Z"), new[] { "example-task", "example-extra" }, writer, rig, session, start,
+                ManifestWriter.ControlSection(launchId, "AM006", "004B1", go, tom, tom, null), ManifestWriter.RunSection(new RunEnd(RunEnd.Completed, null), true, started, Utc("2026-11-12T10:45:03Z"), 88100, null),
+                ManifestWriter.ExpectedSection(plan, files), none, files)).Contains("\"ingest_scripts\": [\n    \"example-task\",\n    \"example-extra\"\n  ]"), "other");
+            IngestScripts();
             ExperimentFolder(repo);
         }
 
@@ -623,7 +641,7 @@ namespace OpenRigs.Manifest.Tests
                     }
                 }
                 {
-                    // Version 4: a condition's subject decides, at each write, whether its entry is required.
+                    // Since version 4: a condition's subject decides, at each write, whether its entry is required.
                     var folder = Path.Combine(root, "sub-TC002", "ses-cond_2026-10-30T19-57-12");
                     var path = new Subject<string>();
                     var optogenetics = new BehaviorSubject<bool>(false);
@@ -632,7 +650,7 @@ namespace OpenRigs.Manifest.Tests
                     path.OnNext(folder);
                     var manifest = Path.Combine(folder, ManifestWriter.FileName);
                     var off = File.ReadAllText(manifest);
-                    Check("a condition's subject false at the first write: the entry is not required", off.Contains("\"condition\": \"Optogenetics\",") && off.Contains("\"required\": false,") && Field(off, "version") == "4", off.Length.ToString());
+                    Check("a condition's subject false at the first write: the entry is not required", off.Contains("\"condition\": \"Optogenetics\",") && off.Contains("\"required\": false,") && Field(off, "version") == "5", off.Length.ToString());
                     optogenetics.OnNext(true);
                     Finished(subscription);
                     var on = File.ReadAllText(manifest);
@@ -788,7 +806,7 @@ namespace OpenRigs.Manifest.Tests
                 // auto;harp, as every lab workflow sets, wrote the note twice.
                 var autoHarp = ExpectedPlan.Create("auto;harp", emptyYml, n => typeof(object));
                 Check("auto;harp writes each note once", autoHarp.Notes.Count(n => n.Contains("has no settings")) == 1 && autoHarp.Notes.Distinct().Count() == autoHarp.Notes.Count, string.Join(" | ", autoHarp.Notes));
-                // Version 4: path?Subject is required only while the bool subject Subject is true.
+                // Since version 4: path?Subject is required only while the bool subject Subject is true.
                 var conditional = ExpectedPlan.Create("Settings/Settings_Rig_;Settings/Settings_Laser_?Optogenetics;WorkflowData/WorkflowData_Laser_?Optogenetics", null, n => null);
                 var laser = conditional.Entries[1];
                 Check("an entry with ?Subject keeps its path and names its condition", laser.Path == "Settings/Settings_Laser_" && laser.Condition == "Optogenetics" && conditional.Entries[0].Condition == null
@@ -817,7 +835,7 @@ namespace OpenRigs.Manifest.Tests
                 Console.WriteLine("The editor's copy:");
                 {
                     var xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<WorkflowBuilder Version=\"2.9.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:mf=\"clr-namespace:OpenRigs.Manifest;assembly=OpenRigs.Manifest\" xmlns=\"https://bonsai-rx.org/2018/workflow\">\n" +
-                        "  <Workflow><Nodes><Expression xsi:type=\"mf:ExperimentManifest\"><mf:IngestScript>x</mf:IngestScript><mf:ConfigFiles>a.yml</mf:ConfigFiles><mf:ExpectedFiles>b/</mf:ExpectedFiles></Expression></Nodes><Edges /></Workflow>\n</WorkflowBuilder>\n";
+                        "  <Workflow><Nodes><Expression xsi:type=\"mf:ExperimentManifest\"><mf:IngestScripts>x, y</mf:IngestScripts><mf:ConfigFiles>a.yml</mf:ConfigFiles><mf:ExpectedFiles>b/</mf:ExpectedFiles></Expression></Nodes><Edges /></Workflow>\n</WorkflowBuilder>\n";
                     WorkflowBuilder builder;
                     using (var reader = XmlReader.Create(new StringReader(xml))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
                     var copy = new WorkflowBuilder(builder.Workflow.ToInspectableGraph().FromInspectableGraph());
@@ -826,8 +844,23 @@ namespace OpenRigs.Manifest.Tests
                     using (var writer = XmlWriter.Create(saved, new XmlWriterSettings { Indent = true })) WorkflowBuilder.Serializer.Serialize(writer, copy);
                     using (var reader = XmlReader.Create(new StringReader(saved.ToString()))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
                     var node = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<ExperimentManifest>().Single();
-                    Check("its settings survive the editor's copy, a save and a reload", node.IngestScript == "x" && node.ConfigFiles == "a.yml" && node.ExpectedFiles == "b/", node.IngestScript + " " + node.ConfigFiles + " " + node.ExpectedFiles);
+                    Check("its settings survive the editor's copy, a save and a reload", node.IngestScripts == "x, y" && node.ConfigFiles == "a.yml" && node.ExpectedFiles == "b/", node.IngestScripts + " " + node.ConfigFiles + " " + node.ExpectedFiles);
                     Check("... in one settings node", node.Workflow.Count(n => ExpressionBuilder.Unwrap(n.Value) is ExperimentManifestSettings) == 1, "more than one");
+                    // A workflow saved before version 5 holds the one name as <IngestScript>: it loads as the list and is saved as it.
+                    var oldXml = xml.Replace("<mf:IngestScripts>x, y</mf:IngestScripts>", "<mf:IngestScript>old-name</mf:IngestScript>");
+                    using (var reader = XmlReader.Create(new StringReader(oldXml))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+                    node = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<ExperimentManifest>().Single();
+                    Check("an old <IngestScript> element loads into IngestScripts", node.IngestScripts == "old-name" && node.ConfigFiles == "a.yml", node.IngestScripts + " " + node.ConfigFiles);
+                    copy = new WorkflowBuilder(builder.Workflow.ToInspectableGraph().FromInspectableGraph());
+                    saved = new StringWriter();
+                    using (var writer = XmlWriter.Create(saved, new XmlWriterSettings { Indent = true })) WorkflowBuilder.Serializer.Serialize(writer, copy);
+                    using (var reader = XmlReader.Create(new StringReader(saved.ToString()))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+                    node = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<ExperimentManifest>().Single();
+                    Check("... and is saved as IngestScripts, which a reload keeps, with no IngestScript element left", node.IngestScripts == "old-name" && !System.Text.RegularExpressions.Regex.IsMatch(saved.ToString(), "<(mf:)?IngestScript>") && saved.ToString().Contains("old-name"), saved.ToString());
+                    var beside = xml.Replace("<mf:IngestScripts>x, y</mf:IngestScripts>", "<mf:IngestScript>old-name</mf:IngestScript><mf:IngestScripts>new-a,new-b</mf:IngestScripts>");
+                    using (var reader = XmlReader.Create(new StringReader(beside))) builder = (WorkflowBuilder)WorkflowBuilder.Serializer.Deserialize(reader);
+                    node = builder.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<ExperimentManifest>().Single();
+                    Check("IngestScripts wins over an old IngestScript beside it", node.IngestScripts == "new-a,new-b", node.IngestScripts);
                 }
             }
             finally

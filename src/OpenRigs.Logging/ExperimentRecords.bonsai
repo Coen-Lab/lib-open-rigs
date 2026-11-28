@@ -4,11 +4,12 @@
                  xmlns:hd="clr-namespace:OpenRigs.HarpDevices;assembly=OpenRigs.HarpDevices"
                  xmlns:mf="clr-namespace:OpenRigs.Manifest;assembly=OpenRigs.Manifest"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The experiment's records, the same in every workflow that makes an experiment folder, after everything else: every controller event in WorkflowData_Events (LogControlEvents); every Harp device in rig.yml checked at Start and recorded into the experiment (OpenRigs.HarpDevices RecordHarpDevices, from rig.yml under the workflow's ConfigRoot, ReadLabRig's, read when the workflow is built, so ReadLabRig goes before this include); and manifest.json (OpenRigs.Manifest ExperimentManifest, with the workflow's IngestScript, ExpectedFiles, TrialColumns, schemas\trial-columns.yml by default, blank for a workflow with no trial log, and StreamColumns, each further log's columns file, blank by default). No run input: the manifest's outcome is the controller's phase when the workflow stops. RecordHarpDevices and ExperimentManifest find each device by its subjects published before them, so this include is the workflow's last node but StreamDevices. Rewards are not records: a workflow that gives them includes OpenRigs.Devices Rewards and its RewardValve pieces itself. Needs OpenRigs.HarpDevices and OpenRigs.Manifest in the workflow's environment.</Description>
+  <Description>The experiment's records, the same in every workflow that makes an experiment folder, after everything else: every controller event in WorkflowData_Events (LogControlEvents); every Harp device in rig.yml checked at Start and recorded into the experiment (OpenRigs.HarpDevices RecordHarpDevices, from rig.yml under the workflow's ConfigRoot, ReadLabRig's, read when the workflow is built, so ReadLabRig goes before this include); and manifest.json (OpenRigs.Manifest ExperimentManifest, with the workflow's IngestScripts, ExpectedFiles, TrialColumns, schemas\trial-columns.yml by default, blank for a workflow with no trial log, and StreamColumns, each further log's columns file, blank by default). No run input: the manifest's outcome is the controller's phase when the workflow stops. RecordHarpDevices and ExperimentManifest find each device by its subjects published before them, so this include is the workflow's last node but StreamDevices. Rewards are not records: a workflow that gives them includes OpenRigs.Devices Rewards and its RewardValve pieces itself. Needs OpenRigs.HarpDevices and OpenRigs.Manifest in the workflow's environment.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="IngestScript" Description="The workflow's name, which the overnight copy files the experiment under." />
+        <Property Name="IngestScripts" Description="The server's ingest scripts for this workflow's data, as its registry names them, separated by commas, in the order the server runs them; blank: none." />
+        <Property Name="IngestScript" Description="Before manifest version 5: the one ingest script. Read as IngestScripts." />
         <Property Name="ExpectedFiles" Description="What the experiment must leave, separated by ; (ExperimentManifest's ExpectedFiles): auto, harp and the start of each log's path, with its condition." />
         <Property Name="TrialColumns" Description="The trial columns file copied into the manifest, schemas\trial-columns.yml by default; blank for a workflow with no trial log." />
         <Property Name="StreamColumns" Description="Each further WorkflowData log's columns file copied into the manifest, as Log=path entries separated by ; (WorkflowData_StimulusState=schemas\stimulus-state-columns.yml); blank by default." />
@@ -19,7 +20,7 @@
       </Expression>
       <Expression xsi:type="mf:ExperimentManifest">
         <Name>ExperimentManifest</Name>
-        <mf:IngestScript />
+        <mf:IngestScripts />
         <mf:ExpectedFiles />
         <mf:TrialColumns>schemas\trial-columns.yml</mf:TrialColumns>
         <mf:StreamColumns />

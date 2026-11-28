@@ -126,6 +126,10 @@ namespace OpenRigs.Devices.Tests
             Assert.IsNotNull(records.ArgumentRange);
             var properties = System.ComponentModel.TypeDescriptor.GetProperties(records);
             Assert.IsNotNull(properties["IngestScript"], "ExperimentRecords' workflow did not load");
+            Assert.IsNotNull(properties["IngestScripts"], "ExperimentRecords takes no IngestScripts");
+            // The include above sets the old one-name IngestScript: it reaches ExperimentManifest as IngestScripts, which writes ingest_scripts.
+            var manifestNode = records.Workflow.Select(n => ExpressionBuilder.Unwrap(n.Value)).OfType<OpenRigs.Manifest.ExperimentManifest>().Single();
+            Assert.AreEqual("test", manifestNode.IngestScripts, "the old IngestScript on the include did not reach ExperimentManifest");
             Assert.IsNull(properties["ConfigRoot"], "ExperimentRecords has a ConfigRoot");
         }
 

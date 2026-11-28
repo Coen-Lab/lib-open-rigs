@@ -33,6 +33,11 @@ NAMES_THE_LAB = {
     "fixtures/manifest/v3/refuse/version-2.json": 10,
     "fixtures/manifest/v3/running.json": 9,
     "fixtures/manifest/v3/stopped-not-final.json": 10,
+    "fixtures/rig-yml/B1.yml": 7,  # four rigs' rig.yml as they are on the share, byte for byte: real records
+    "fixtures/rig-yml/B2-both.yml": 6,  # B2 with ZapitDaq's fields beside MATLAB Zapit's
+    "fixtures/rig-yml/B2.yml": 5,
+    "fixtures/rig-yml/G1.yml": 10,
+    "fixtures/rig-yml/G2.yml": 8,
     "fixtures/lab-settings/v1/as-on-k.yml": 1,  # the share's lab.yml as it is, copied byte for byte from its other reader
     "fixtures/lab-settings/v1/extra-key.yml": 1,  # the same set's refused extra key, owner: <a lab member>
     "patches/README.md": 1,
@@ -44,10 +49,13 @@ NAMES_THE_LAB = {
     "src/OpenRigs.LiveView/OpenRigs.LiveView.csproj": 1,
     "src/OpenRigs.Logging/OpenRigs.Logging.csproj": 1,
     "src/OpenRigs.Manifest/OpenRigs.Manifest.csproj": 1,
+    "src/OpenRigs.Opto.ZapitBonsai/OpenRigs.Opto.ZapitBonsai.csproj": 1,
+    "src/OpenRigs.Opto.ZapitMatlab/OpenRigs.Opto.ZapitMatlab.csproj": 1,
     "src/OpenRigs.Streaming/OpenRigs.Streaming.csproj": 1,
     "src/OpenRigs.Trials/OpenRigs.Trials.csproj": 1,
     "src/OpenRigs.Video/OpenRigs.Video.csproj": 1,
-    "src/OpenRigs.Vision/OpenRigs.Vision.csproj": 1,  # the lab's package version, as every lab package's
+    "src/OpenRigs.Vision/OpenRigs.Vision.csproj": 1,
+    "src/OpenRigs.Zapit/OpenRigs.Zapit.csproj": 1,
     "src/open_rigs/rigs/workflow_checks.py": 1,  # the lab's ConfigRoot, which every task's check holds it to
     "tests/rigs/test_workflow_checks.py": 1,
 }

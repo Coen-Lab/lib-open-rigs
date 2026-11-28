@@ -67,7 +67,9 @@ namespace OpenRigs.LiveView
         /// <summary>
         /// The member path to the first IplImage in the data, breadth first and at most three
         /// members deep (Value.Image for a camera's frame paired with its trigger), "it" if the
-        /// data is the image, or null if it holds none.
+        /// data is the image, or null if it holds none. At each level a member named View comes
+        /// before every other: the Zapit camera's frame streams its cropped View, not its Image
+        /// (recorded whole); any device type with a View member is streamed by it.
         /// </summary>
         public static string ImagePath(Type type)
         {
@@ -81,7 +83,8 @@ namespace OpenRigs.LiveView
                 if (depth >= 3) continue;
                 var members = item.Key.GetProperties().Where(p => p.GetIndexParameters().Length == 0)
                     .Select(p => new KeyValuePair<string, Type>(p.Name, p.PropertyType))
-                    .Concat(item.Key.GetFields().Select(f => new KeyValuePair<string, Type>(f.Name, f.FieldType)));
+                    .Concat(item.Key.GetFields().Select(f => new KeyValuePair<string, Type>(f.Name, f.FieldType)))
+                    .OrderBy(m => m.Key == "View" ? 0 : 1);   // a frame's View (the Zapit camera's cropped one) before its Image (recorded whole)
                 foreach (var member in members)
                 {
                     var path = item.Value.Length == 0 ? member.Key : item.Value + "." + member.Key;
@@ -141,6 +144,7 @@ namespace OpenRigs.LiveView
                 { "Interval", XmlConvert.ToString(TimeSpan.FromSeconds(1.0 / Rate)) },
                 { "Width", Width.ToString(CultureInfo.InvariantCulture) },
                 { "Height", Height.ToString(CultureInfo.InvariantCulture) },
+                { "Fit", Name == "Camera-" + LiveViewPlan.ZapitInstance ? "true" : "false" },   // the Zapit camera's whole frame, with black, never cut
                 { "ImagePath", ImagePath ?? string.Empty },
                 { "Channels", ChannelsStream ?? string.Empty },
                 { "AnalogInterval", Recipe.AnalogRate > 0 ? XmlConvert.ToString(TimeSpan.FromSeconds(1.0 / Recipe.AnalogRate)) : string.Empty },
@@ -180,16 +184,17 @@ namespace OpenRigs.LiveView
         /// </summary>
         public const string BalanceInstance = "Balance";
 
+        /// <summary>
+        /// The instance name of the Zapit camera, which OpenRigs.Opto.ZapitBonsai's ZapitCamera opens from rig.yml's zapit block, not
+        /// its camera list: published as Camera-Zapit.Data, it is streamed as the Balance camera is, but only when rig.yml's
+        /// zapit block names its NI device (zapit.device), the rule by which ConnectForTaskZapitDaq opens the camera at all.
+        /// </summary>
+        public const string ZapitInstance = "Zapit";
+
         public static LiveViewPlan Create(string configRoot, Func<string, Type> publishedType)
         {
             var plan = new LiveViewPlan();
-            foreach (var recipe in DeviceRecipe.All.Where(r => !r.Harp))
-            {
-                var name = char.ToUpperInvariant(recipe.Kind[0]) + recipe.Kind.Substring(1) + "-" + BalanceInstance;
-                if (publishedType(name + ".Data") == null) continue;  // none: nothing to say
-                plan.Consider(new RigDevice { Kind = recipe.Kind, Instance = BalanceInstance, Name = name, Settings = new YamlMappingNode() },
-                    publishedType);
-            }
+            plan.ConsiderUnlisted(BalanceInstance, publishedType);
             // The machine name, not rig.yml's two-letter rigId, on purpose: the live-view windows
             // find a rig's streams by the machine they connect to, and rig.yml is read by it too.
             plan.RigId = Environment.GetEnvironmentVariable("COMPUTERNAME") ?? Environment.MachineName;
@@ -209,11 +214,44 @@ namespace OpenRigs.LiveView
             }
             // An empty entry hides its whole kind from RigDevices.Read.
             plan.Notes.AddRange(EmptyRigEntries.Find(RigDevices.PathFor(configRoot), DeviceRecipe.All.Select(r => r.Kind)).Select(e => e + " and none is streamed"));
+            if (RigNamesZapitDevice(RigDevices.PathFor(configRoot)))
+                plan.ConsiderUnlisted(ZapitInstance, publishedType);
+            else if (publishedType("Camera-" + ZapitInstance + ".Data") != null)
+                plan.Skipped.Add("Camera-" + ZapitInstance + ": rig.yml's zapit block names no NI device (zapit.device), so no Zapit camera is opened");
             foreach (var device in devices)
             {
                 plan.Consider(device, publishedType);
             }
             return plan;
+        }
+
+        // A device no rig.yml lists (instance Balance or Zapit), of each kind the workflow publishes it for.
+        void ConsiderUnlisted(string instance, Func<string, Type> publishedType)
+        {
+            foreach (var recipe in DeviceRecipe.All.Where(r => !r.Harp))
+            {
+                var name = char.ToUpperInvariant(recipe.Kind[0]) + recipe.Kind.Substring(1) + "-" + instance;
+                if (publishedType(name + ".Data") == null) continue;  // none: nothing to say
+                Consider(new RigDevice { Kind = recipe.Kind, Instance = instance, Name = name, Settings = new YamlMappingNode() }, publishedType);
+            }
+        }
+
+        // rig.yml's zapit: device: set, as ConnectForTaskZapitDaq's RigHasZapit? reads it.
+        static bool RigNamesZapitDevice(string path)
+        {
+            try
+            {
+                var yaml = new YamlStream();
+                using (var reader = new StreamReader(path)) yaml.Load(reader);
+                var root = yaml.Documents.Count > 0 ? yaml.Documents[0].RootNode as YamlMappingNode : null;
+                YamlNode zapit, device;
+                return root != null && root.Children.TryGetValue(new YamlScalarNode("zapit"), out zapit) && zapit is YamlMappingNode
+                    && ((YamlMappingNode)zapit).Children.TryGetValue(new YamlScalarNode("device"), out device) && RigDevices.Value(device) != null;
+            }
+            catch (Exception)  // read already by RigDevices.Read, which said why
+            {
+                return false;
+            }
         }
 
         void Consider(RigDevice rigDevice, Func<string, Type> publishedType)

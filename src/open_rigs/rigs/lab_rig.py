@@ -20,7 +20,7 @@ from open_rigs.components.harp_boards import BehaviorBoard, HarpStepperDriver
 from open_rigs.components.speakers import EqualisedSpeakerArray
 from open_rigs.components.video import SpinnakerCamera, VideoEncoder
 from open_rigs.components.wiring import BoardWiring
-from open_rigs.components.zapit import ZapitServer
+from open_rigs.components.zapit import Zapit
 from open_rigs.core.rig import Rig
 from open_rigs.devices import CalibratedPulse, HarpTimestampGeneratorGen3, LicketySplit, SpoutPositions
 from open_rigs.devices.behavior_board import PulseOutputs
@@ -73,8 +73,8 @@ class LabRig(Rig):
     lick_spout_default_position: Optional[SpoutPositions] = Field(
         default=None, description="The lick spout stage's in position, in steps, for a mouse with no row in LickSpoutPositions.csv beside rig.yml."
     )
-    zapit: Optional[ZapitServer] = Field(
-        default=None, description="Zapit optogenetics server endpoint; contacted only when the task enables optogenetics."
+    zapit: Optional[Zapit] = Field(
+        default=None, description="Zapit: MATLAB Zapit's server endpoint (contacted only when the task enables optogenetics), ZapitDaq's NI DAQ, laser limits and camera, or both; a rig without Zapit has none."
     )
     video_encoder: Optional[VideoEncoder] = Field(default=None, description="How the cameras' video is encoded; left out: libx264 and the ffmpeg.exe on PATH.")
 

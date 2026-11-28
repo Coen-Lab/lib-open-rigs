@@ -31,12 +31,12 @@ namespace OpenRigs.Manifest
 
     /// <summary>
     /// The manifest's contents and its writes, with no Rx, so a test can drive it on a temp
-    /// folder. The format is FORMAT.md beside this file, version 4.
+    /// folder. The format is FORMAT.md beside this file, version 5.
     /// </summary>
     class ManifestWriter
     {
         public const string FileName = "manifest.json";
-        public const int Version = 4;
+        public const int Version = 5;
 
         /// <summary>The experiment folder's three records, one writer each: this file, the overnight copy's and the server's. None is a file of the experiment.</summary>
         public static readonly string[] RecordFiles = { FileName, "sync.json", "ingest.json" };
@@ -46,16 +46,16 @@ namespace OpenRigs.Manifest
 
         public const string NoControllerNote = "No ExperimentControl running when the experiment folder appeared: no control section, and a workflow that stops before its run ends is recorded as stopped, whatever stopped it.";
 
-        readonly string ingestScript;
+        readonly IList<string> ingestScripts;
         readonly StartSnapshot start;
         readonly ExpectedPlan expected;
         string folder;
         string manifestPath;
         DateTime started;
 
-        public ManifestWriter(string ingestScript, StartSnapshot start, ExpectedPlan expected)
+        public ManifestWriter(IList<string> ingestScripts, StartSnapshot start, ExpectedPlan expected)
         {
-            this.ingestScript = ingestScript;
+            this.ingestScripts = ingestScripts ?? new string[0];
             this.start = start;
             this.expected = expected ?? new ExpectedPlan();
         }
@@ -330,26 +330,49 @@ namespace OpenRigs.Manifest
             catch (DirectoryNotFoundException) { return true; }
         }
 
+        static readonly Regex IngestScriptName = new Regex("^[A-Za-z0-9][A-Za-z0-9_.-]*$");
+
+        /// <summary>
+        /// The ingest scripts' names from a comma-separated setting, in order: blank entries and the
+        /// spaces around a name are dropped. A name the server's registry would refuse (letters, digits,
+        /// _ - and ., starting with a letter or digit) stops the workflow at its start.
+        /// </summary>
+        public static List<string> IngestScriptNames(string setting)
+        {
+            var names = new List<string>();
+            foreach (var part in (setting ?? "").Split(','))
+            {
+                var name = part.Trim();
+                if (name.Length == 0) continue;
+                if (!IngestScriptName.IsMatch(name))
+                {
+                    throw new InvalidOperationException("ExperimentManifest's IngestScripts has \"" + name + "\", which is not a name the server's registry takes: use letters, digits, _, - and ., starting with a letter or digit, separated by commas.");
+                }
+                names.Add(name);
+            }
+            return names;
+        }
+
         void Write(RunEnd end, long? items, ControlExperiment control, DateTime? ended, bool final)
         {
             // A running write carries the stop too (a workflow killed before the stop's own write, which then is the last).
             var stopReason = (end.Outcome == RunEnd.Stopped || end.Outcome == RunEnd.Running) && control != null ? control.StopReason : null;
             var files = FilesSection(folder);
-            var doc = Document(DateTime.UtcNow, ingestScript, WriterSection(), RigSection(), SessionSection(folder), start,
+            var doc = Document(DateTime.UtcNow, ingestScripts, WriterSection(), RigSection(), SessionSection(folder), start,
                 ControlSection(control, LaunchProperty(start.Launch, LaunchIdProperty)),
                 RunSection(end, final, started, ended, items, stopReason),
                 ExpectedSection(expected, files), expected.Notes.Concat(expected.ConditionNotes()).Concat(start.Notes.Cast<string>()), files);
             WriteAtomically(manifestPath, Json.Serialize(doc));
         }
 
-        /// <summary>The manifest from what one write knows, reading no clock, machine or disk, so a test builds the fixtures in fixtures\manifest\v4\ from their inputs.</summary>
-        public static JsonObject Document(DateTime created, string ingestScript, JsonObject writer, JsonObject rig, JsonObject session, StartSnapshot start,
+        /// <summary>The manifest from what one write knows, reading no clock, machine or disk, so a test builds the fixtures in fixtures\manifest\v5\ from their inputs.</summary>
+        public static JsonObject Document(DateTime created, IList<string> ingestScripts, JsonObject writer, JsonObject rig, JsonObject session, StartSnapshot start,
             JsonObject control, JsonObject run, List<object> expected, IEnumerable<string> notes, List<object> files)
         {
             var doc = new JsonObject();
             doc.Add("version", (long)Version);
             doc.Add("created", Iso(created));
-            doc.Add("ingest_script", string.IsNullOrEmpty(ingestScript) ? null : ingestScript);
+            doc.Add("ingest_scripts", (ingestScripts ?? new string[0]).Cast<object>().ToList());
             doc.Add("writer", writer);
             doc.Add("rig", rig);
             doc.Add("session", session);
