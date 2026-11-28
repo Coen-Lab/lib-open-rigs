@@ -158,7 +158,7 @@ namespace OpenRigs.Zapit
                 {
                     Stage = "Refused",
                     Detail = run0.Skip < 0
-                        ? $"ZapitDaq did not point the galvos (Pointed) within {FrameTimeout.TotalSeconds} s (it refuses a Point while Play Condition is armed), so the lines are zeroed and the run is refused: {folder}"
+                        ? $"ZapitDaq did not point the galvos (Pointed) within {FrameTimeout.TotalSeconds} s (it refuses a Point while Play Condition is armed), so the lines are zeroed and the run is refused: {folder}; press Laser Off and run the grid again"
                         : $"no camera frame came within {FrameTimeout.TotalSeconds} s of Pointed, so the lines are zeroed and the run is refused: {folder}",
                     Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
                     Camera = Restore(run0),
@@ -282,7 +282,7 @@ namespace OpenRigs.Zapit
                 Emit(new ZapitSetupStep
                 {
                     Stage = "Refused",
-                    Detail = by + " came during a setup step, so the lines are zeroed and it is refused: " + what,
+                    Detail = by + " came during a setup step: the lines are zeroed and nothing more is saved for " + what,
                     Command = new ZapitDaqCommand { Kind = ZapitDaqCommandKind.Zero },
                     Camera = ended == null ? null : Restore(ended),
                 });
@@ -321,7 +321,7 @@ namespace OpenRigs.Zapit
                 if (aimSent && (e.Kind == ZapitDaqEventKind.Pointed || e.Kind == ZapitDaqEventKind.Refused))
                 {
                     aimSent = false;
-                    if (e.Kind == ZapitDaqEventKind.Refused && aiming)   // a play armed: no beam, so the metric no longer reads Aiming
+                    if (e.Kind == ZapitDaqEventKind.Refused && aiming)   // a play armed: no beam, so the metric does not read Aiming
                     {
                         aiming = false;
                         Emit(new ZapitSetupStep { Aim = true, Stage = "Refused", Detail = e.Detail ?? "ZapitDaq refused the aim" });
@@ -440,7 +440,7 @@ namespace OpenRigs.Zapit
             {
                 var space = text.IndexOfAny(new[] { ' ', '\t' });
                 var head = space < 0 ? text.Substring(1) : text.Substring(1, space - 1);
-                if (head.Length > 0 && head.All(char.IsDigit) && int.TryParse(head, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n > 0)
+                if (int.TryParse(head, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n > 0)
                 {
                     number = n;
                     rest = space < 0 ? "" : text.Substring(space).Trim();

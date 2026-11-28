@@ -317,7 +317,7 @@ def _combination(iti: float | None = 2.5, to_window=0.5, window: float | None = 
 
 
 def test_zapit_trial_seconds_is_the_shortest_trigger_to_trigger_less_the_ramp_down_and_arm_time():
-    # 27 Nov 2026: ZapitDaq's buffer from the standard blocks, OptoLimits' rule (decision-making's _between_trials).
+    # ZapitDaq's buffer from the standard blocks, OptoLimits' rule (decision-making's _between_trials).
     from open_rigs.core.task import zapit_trial_seconds
     # decision-making's own file: 0.1 + 2.5 + (2.5 - 0.1) = 5 s trigger to trigger, less 0.25 s ramp-down and 0.2 s arm time
     assert zapit_trial_seconds([_combination()], 0.25) == (pytest.approx(4.55), "")
@@ -325,6 +325,19 @@ def test_zapit_trial_seconds_is_the_shortest_trigger_to_trigger_less_the_ramp_do
     assert zapit_trial_seconds([_combination(iti=2.0, to_window=0.2, window=1.0)], 0.25) == (pytest.approx(2.75), "")
     # No responseWindowSeconds: the trial ends at the window's opening (TrialEndSeconds)
     assert zapit_trial_seconds([_combination(window=None)], 0.0)[0] == pytest.approx(0.1 + 0.5 + 2.4 - 0.2)
+
+
+@pytest.mark.parametrize("lead, iti, to_window, window, ramp_down, buffer", [
+    (0.1, 2.5, 0.5, 2.0, 0.25, 4.55), (0.1, 2.0, 0.2, 1.0, 0.25, 2.75), (3.2, 3.4, 0.5, 2.0, 0.5, 5.2), (3.3, 3.4, 0.5, 2.0, 0.5, None)])
+def test_zapit_trial_seconds_agrees_with_optolimits(lead, iti, to_window, window, ramp_down, buffer):
+    # The C# rule this copies: OpenRigs.Trials.Tests OptoTests.OptoLimitsGiveTheBuffersPythonsZapitTrialSecondsGives
+    # works out the same buffers for the same cases from OptoLimits (None: LeadProblem refuses the lead).
+    from open_rigs.core.task import zapit_trial_seconds
+    seconds, why = zapit_trial_seconds([_combination(iti=iti, to_window=to_window, window=window, lead=lead)], ramp_down)
+    if buffer is None:
+        assert seconds == 0.0 and "arm time" in why
+    else:
+        assert (seconds, why) == (pytest.approx(buffer), "")
 
 
 def test_zapit_trial_seconds_takes_the_shortest_of_every_combination_a_session_may_draw():
@@ -359,7 +372,7 @@ def test_zapit_trial_seconds_says_why_a_session_cannot_run():
 
 
 def test_zapit_does_not_allow_a_laser_that_runs_until_stopped():
-    # 27 Nov 2026: no laserDurationSeconds and no laserCapSeconds (null, absent or 0) is refused, naming the stage row.
+    # No laserDurationSeconds and no laserCapSeconds (null, absent or 0) is refused, naming the stage row.
     from open_rigs.core.task import zapit_open_ended_laser
     assert zapit_open_ended_laser([_combination()]) == ""
     assert zapit_open_ended_laser([{"optogenetics": {"laserDurationSeconds": 0, "laserCapSeconds": 2.0}}]) == ""  # a cap bounds it

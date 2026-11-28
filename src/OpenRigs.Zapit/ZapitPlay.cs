@@ -69,6 +69,7 @@ namespace OpenRigs.Zapit
                     var variant = bank.Variant(condition, true, power);
                     bank.Cycles(condition, variant, seconds, MaxTrialSeconds);
                 }
+                catch (ZapitMissingCondition why) { No(why.Say("the Zapit waveforms have", "they have")); return; }
                 catch (InvalidOperationException why) { No(Reason(why.Message)); return; }
                 playing = condition;
                 Emit("Arming", request.Trim(), new ZapitDaqCommand
@@ -77,11 +78,10 @@ namespace OpenRigs.Zapit
                 });
             }
 
-            // ZapitBank's refusal as a metric reason: lower case first, no trailing period, and the operator's word
-            // "waveforms" for the bank.
+            // ZapitBank's refusal as a metric reason: lower case first, no trailing period.
             static string Reason(string message)
             {
-                var m = message.Trim().TrimEnd('.').Replace("The Zapit bank has", "The Zapit waveforms have").Replace("; it has ", "; they have ");
+                var m = message.Trim().TrimEnd('.');
                 return m.Length == 0 ? m : char.ToLowerInvariant(m[0]) + m.Substring(1);
             }
 

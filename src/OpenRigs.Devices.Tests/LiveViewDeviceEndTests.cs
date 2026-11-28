@@ -7,17 +7,15 @@ using OpenCV.Net;
 using System;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 using System.Reactive.Linq;
 using System.Text;
 
 namespace OpenRigs.Devices.Tests
 {
     /// <summary>
-    /// A device whose data ends leaves the other devices streamed (28 Nov 2026): on a rig whose rig.yml names zapit.device,
-    /// StreamDevices streams Camera-Zapit, whose data ends at once in a session that opens no Zapit. Its end reached the
-    /// shared VideoMessage and closed it, so no camera's video was sent. The same for the data port: a board whose data ends
+    /// A device whose data ends leaves the other devices streamed: on a rig whose rig.yml names zapit.device,
+    /// StreamDevices streams Camera-Zapit, whose data ends at once in a session that opens no Zapit. Its end must not reach
+    /// the shared VideoMessage and close it, or no camera's video is sent. The same for the data port: a board whose data ends
     /// must not close DataMessage for the other streams. Run here, on ports of their own, with stand-in devices.
     /// </summary>
     [TestClass]
@@ -94,7 +92,7 @@ namespace OpenRigs.Devices.Tests
         {
             for (var attempt = 1; ; attempt++)
             {
-                int dataPort = FreePort(), videoPort = FreePort();
+                int dataPort = TestPorts.Free(), videoPort = TestPorts.Free();
                 var port = onVideo ? videoPort : dataPort;
                 Exception stopped = null;
                 var last = string.Empty;
@@ -112,26 +110,10 @@ namespace OpenRigs.Devices.Tests
                         if (last.Contains(stream)) return;
                     }
                 }
-                if (attempt < 3 && PortTaken(stopped)) continue;
+                if (attempt < 3 && TestPorts.Taken(stopped)) continue;
                 Assert.IsNull(stopped, "the workflow stopped: " + stopped);
                 Assert.Fail("no " + stream + " message in 15 s on port " + port + (last.Length > 0 ? "; last: " + last.Substring(0, Math.Min(200, last.Length)) : ""));
             }
-        }
-
-        internal static bool PortTaken(Exception error)
-        {
-            for (; error != null; error = error.InnerException)
-                if (error is AddressAlreadyInUseException || (error is SocketException socket && socket.SocketErrorCode == SocketError.AddressAlreadyInUse)) return true;
-            return false;
-        }
-
-        internal static int FreePort()
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
         }
     }
 

@@ -368,8 +368,6 @@ def zapit_trial_seconds(combinations, ramp_down_seconds: float) -> tuple[float, 
         return 0.0, f"the Zapit conditions file's largest ramp-down is {ramp:g} s, so the task's Zapit trial buffer cannot be worked out"
     overhead = ramp + ZAPIT_ARM_SECONDS  # OptoLimits.OverheadSeconds
     seconds = max(gap - overhead, 0.0)
-    if not math.isfinite(seconds):
-        return 0.0, "the task's Zapit trial buffer is not a finite number of seconds, so it cannot be worked out"
     if seconds <= 1e-9:
         return 0.0, (f"trialStructure.itiMinSeconds: the shortest laser trigger to the next ({gap:g} s) leaves no Zapit trial buffer "
                      f"after the Zapit conditions file's {ramp:g} s ramp-down and Zapit's {ZAPIT_ARM_SECONDS:g} s arm time: "

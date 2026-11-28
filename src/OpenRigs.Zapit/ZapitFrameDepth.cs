@@ -5,7 +5,7 @@ namespace OpenRigs.Zapit
 {
     /// <summary>
     /// The Zapit camera's frame as 8 bits, whatever the session .pfs's PixelFormat. Bonsai.Pylon gives a Mono12 frame as a
-    /// 16-bit image holding the camera's raw 0-4095 counts, unshifted (measured on B2's acA1920-40um, 27 Nov 2026: every
+    /// 16-bit image holding the camera's raw 0-4095 counts, unshifted (measured on an acA1920-40um: every
     /// pixel equal to the grab's own Mono12 buffer); recording (FfmpegRecording), the live view's JPEG and the setup PNGs
     /// all take 8 bits. A Mono8 frame passes through untouched, so a rig whose .pfs stays Mono8 sees no change.
     /// <para>Session frames are stretched from 0 to StretchTop (the frame's own 97.3rd percentile, at least MinTop counts)
@@ -22,8 +22,8 @@ namespace OpenRigs.Zapit
         public const double Mono12PerMono8 = 16;
 
         /// <summary>The share of the frame, averaged 8 x 8, at or below the stretch's white: the brightest 2.7 % (the head
-        /// bars, ring and glints) go white, so the skull sits near 80 of 255 (B2 at 30 ms, 27 Nov 2026; the brightest
-        /// 8 x 8 average put it near 24).</summary>
+        /// bars, ring and glints) go white, so the skull sits near 80 of 255 (an acA1920-40um at 30 ms; the brightest
+        /// 8 x 8 average puts it near 24).</summary>
         public const double WhitePercentile = 97.3;
 
         /// <summary>The least StretchTop, in counts (about 0.4 % of Mono12's 4095): the stretch's gain is at most 255 / 16, so
@@ -32,8 +32,8 @@ namespace OpenRigs.Zapit
         public const double MinTop = 16;
 
         /// <summary>The 16-bit count a session frame's stretch puts at 255: the frame averaged over 8 x 8 pixels, about what
-        /// the live view shows, at its WhitePercentile, so no glint or noisy pixel sets it (27 Nov 2026: stretched to
-        /// each frame's single brightest pixel, B2's view brightened and dimmed frame to frame).</summary>
+        /// the live view shows, at its WhitePercentile, so no glint or noisy pixel sets it (stretched to
+        /// each frame's single brightest pixel, the view brightens and dims frame to frame).</summary>
         public static double StretchTop(IplImage image)
         {
             if (image.Depth != IplDepth.U16 || image.Channels != 1) return 0;   // ToEightBit refuses it, naming PixelFormat

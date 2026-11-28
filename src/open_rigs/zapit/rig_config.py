@@ -112,8 +112,7 @@ class ZapitRig:
         mw, cv = pair("laserMinMaxMw"), pair("laserMinMaxControlVolts")
         rig = cls(text("device"), text("galvoXChannel"), text("galvoYChannel"), text("laserChannel"),
                   text("ledChannel"), text("photodiodeChannel"), text("triggerChannel"), num("sampleRate"), mw, cv,
-                  num("ceilingMw", positive=False),
-                  num("maxTrialSeconds"),
+                  num("ceilingMw", positive=False), num("maxTrialSeconds"),
                   num("micronsPerPixel"), num("voltsPerPixel"), camera, flag("invertXScanner"),
                   flag("invertYScanner"), blanking)
         return rig

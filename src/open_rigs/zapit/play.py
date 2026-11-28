@@ -1,6 +1,6 @@
 """Play Condition: a condition's real trial before Go, from the loaded bank, as the task's own trials play it.
 
-The sequence is the user's (27 Nov 2026): no new ZapitDaq command. The condition is armed with ZapitDaq's own Arm (the
+The sequence needs no new ZapitDaq command. The condition is armed with ZapitDaq's own Arm (the
 workflow's Zapit-Main.Play, lib-open-rigs ZapitPlay, trial 0), the ZapitTrigger line is raised to start it (Zapit-Main.Trigger
 on, as a trial's trigger raises it; the masking light with it) and cleared once the trial with its ramp has played, then
 every output zeroed (Zapit-Main.LaserOff). A stop (Laser Off, Stop, Go) clears the line and zeroes the outputs at once.
@@ -70,8 +70,8 @@ def plan_play(index: dict, condition: int, ceiling_mw: float, buffer_seconds: fl
     PLAY_DEFAULT_SECONDS, shortened to the most whole scan cycles that fit `buffer_seconds` (the task's trial buffer, open_rigs.core.task.zapit_trial_seconds) with the
     ramp. Raises PlayRefused with the laser disabled (ceilingMw 0), no buffer known, no such condition, no laser-on
     variant, a power above ceilingMw, or no laser that fits."""
-    if isinstance(condition, bool) or type(condition) is not int or condition < 0:
-        raise PlayRefused(f"the condition is {condition!r}, not a whole number of 0 or more")
+    if type(condition) is not int or condition < 1:
+        raise PlayRefused(f"the condition is {condition!r}, not a whole number from 1")
     if not ceiling_mw > 0:
         raise PlayRefused("rig.yml's zapit.ceilingMw is 0 (laser disabled), so there is nothing to play")
     if buffer_seconds is None or not math.isfinite(buffer_seconds) or not buffer_seconds > 0:

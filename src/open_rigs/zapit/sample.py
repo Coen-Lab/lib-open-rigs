@@ -2,14 +2,14 @@
 
 The two points are atlas coordinates [ML, AP] in mm: bregma [0, 0] and the caller's second point [0, ap] on the midline
 (MATLAB Zapit's refAP point, pointer.m refPointsStereotaxic = [0 0; 0 refAP], +AP anterior; the rig app gives it,
-3 mm posterior on 27 Nov 2026). They set the
+3 mm posterior). They set the
 conversion from atlas units to the still (position, rotation and scale), so the second point's distance is in atlas mm,
 scaled to each mouse by where it is clicked, not a skull landmark's (lambda is a Paxinos skull landmark the Allen atlas
-does not define; 27 Nov 2026).
+does not define).
 
 Registration scales the reference to the new image's micronsPerPixel, masks the skull and head-plate, matches ORB
 features, finds the consistent ones with a RANSAC similarity and refits them as rigid (rotation and shift: the scale
-is known from micronsPerPixel, and a free one put a point 100 um off on B2's real pair, audit E F3). The similarity's
+is known from micronsPerPixel, and a free one put a point 100 um off on a real pair of stills). The similarity's
 scale is kept only as the not-the-same-head check. It passes on enough inliers, a small turn and the masked
 correlation of the equalised stills after the move; the limits, and the other tunables, are the constants below.
 """
@@ -24,7 +24,7 @@ from open_rigs.zapit.scanner import ScannerSettings
 
 MIN_INLIERS = 30          # a registration needs at least this many RANSAC inliers ...
 # ... and the equalised stills, the reference moved onto the new one, must correlate at least this inside both masks.
-# B2's real pair 0.91, wrong pairs 0.18-0.23 (audit E); an inlier residual separated nothing (always under RANSAC's).
+# A real pair 0.91, wrong pairs 0.18-0.23; an inlier residual separated nothing (always under RANSAC's).
 MIN_CORRELATION = 0.6
 MAX_ROTATION_DEG = 20.0   # a head-fixed mouse turns a few degrees between sessions; the skull turned 180 deg passed
 MIN_OVERLAP_PX = 1000     # fewer masked pixels in common than this is no overlap to correlate

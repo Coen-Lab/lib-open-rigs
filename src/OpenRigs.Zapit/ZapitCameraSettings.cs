@@ -52,7 +52,7 @@ namespace OpenRigs.Zapit
     }
 
     /// <summary>
-    /// One Zapit camera frame, two ways (a grid run's frames were nearly black in the window, 27 Nov 2026): Image, what
+    /// One Zapit camera frame, two ways (a grid run's frames at Mono8's scale are nearly black in the window): Image, what
     /// the window streams and the mp4 records, always the session's stretched picture, cut to the crop (ZapitFrameDepth.Crop);
     /// Still, what Zapit's setup saves (stills, a grid run's point and background frames), the whole frame, the stretched
     /// picture too except during a grid run, when it is Mono8's scale (counts / 16), which the spot detection's 90 %-of-peak
@@ -128,7 +128,7 @@ namespace OpenRigs.Zapit
 
         /// <summary>The camera did not take the grid run's exposure and gain, or (<paramref name="restore"/>) did not take back its own.</summary>
         public static InvalidOperationException Exposure(string? serialNumber, Exception error, bool restore = false) => new InvalidOperationException(
-            $"The Zapit camera (serial {serialNumber}) did not take " + (restore ? "back its own exposure and gain after the grid" : "the grid's exposure and gain") + $": {error.Message}", error);
+            $"The Zapit camera (serial {serialNumber}) did not take " + (restore ? "back its own exposure and gain after the grid" : "the grid's exposure and gain") + $": {Said(error)} Run the grid again; if it repeats, power-cycle the camera.", error);
     }
 
     /// <summary>

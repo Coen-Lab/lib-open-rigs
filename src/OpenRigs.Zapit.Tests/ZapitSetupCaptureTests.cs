@@ -76,8 +76,8 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual(ZapitDaqCommandKind.Zero, after[0].Command.Kind);
         }
 
-        // Round 3 S2: Laser Off during a grid run ends it, zeroed, the camera's own settings put back: the next frame points
-        // no laser-on Point, and an aim is no longer held for Go to switch off.
+        // Laser Off during a grid run ends it, zeroed, the camera's own settings put back: the next frame points no
+        // laser-on Point, and no aim is held for Go to switch off.
         [TestMethod]
         public void LaserOffDuringAGridRunEndsItWithTheLinesZeroed()
         {
@@ -110,8 +110,8 @@ namespace OpenRigs.Zapit.Tests
             Assert.IsNull(rig.Error);
         }
 
-        // Round 3 S4: a grid run whose first Point ZapitDaq refuses (a play armed) is refused after FrameTimeout, zeroed,
-        // and the next setup step is taken; it no longer waits for a Pointed that never comes.
+        // A grid run whose first Point ZapitDaq refuses (a play armed) is refused after FrameTimeout, zeroed, and the next
+        // setup step is taken, rather than waiting for a Pointed that never comes.
         [TestMethod]
         public void AGridRunWhosePointIsRefusedTimesOutAndTheNextStepIsTaken()
         {
@@ -121,7 +121,7 @@ namespace OpenRigs.Zapit.Tests
             for (int i = 0; i < 100 && rig.Steps.Count < 2; i++) System.Threading.Thread.Sleep(10);
             var refused = rig.Steps.Last();
             StringAssert.StartsWith(refused.ToString(), "Refused ZapitDaq did not point the galvos");
-            StringAssert.EndsWith(refused.Detail, folder);
+            StringAssert.EndsWith(refused.Detail, folder + "; press Laser Off and run the grid again");
             Assert.AreEqual(ZapitDaqCommandKind.Zero, refused.Command.Kind);
             rig.Stills.OnNext(Path.Combine(rig.Pending, "still.png"));
             Assert.AreEqual("Pointing", rig.Steps.Last().Stage);
@@ -143,8 +143,8 @@ namespace OpenRigs.Zapit.Tests
             }
         }
 
-        // Round 4 U2: a skipFrames or backgrounds past int, NaN, fractional or over 100 is refused naming grid.json and the
-        // field; it no longer stops the workflow (an OverflowException) or saves backgrounds until the disk fills.
+        // A skipFrames or backgrounds past int, NaN, fractional or over 100 is refused naming grid.json and the field, so it
+        // neither stops the workflow (an OverflowException) nor saves backgrounds until the disk fills.
         [TestMethod]
         public void AGridsFrameCountsOutOfRangeAreRefusedNamingTheField()
         {
@@ -487,7 +487,7 @@ namespace OpenRigs.Zapit.Tests
         static int[] Values(IplImage image) => Enumerable.Range(0, image.Width).Select(i => (int)image[0, i].Val0).ToArray();
 
         // Mono12 as Bonsai.Pylon gives it (16-bit, raw 0-4095 counts): session frames stretched 0 to the top to 255
-        // (B2's dim view peaks near 46); a grid run's frames are Mono8's scale, counts over 16.
+        // (a dim view peaks near 46); a grid run's frames are Mono8's scale, counts over 16.
         [TestMethod]
         public void Mono12FramesAreStretchedZeroToTheTopAndAGridRunsOver16()
         {
@@ -504,7 +504,7 @@ namespace OpenRigs.Zapit.Tests
         }
 
         // The stretch's top is the frame averaged 8 x 8 at its WhitePercentile: one hot pixel (4000 in a field of 40) is
-        // above it and leaves it at 40 (27 Nov 2026: the view brightened and dimmed with single pixels).
+        // above it and leaves it at 40, so single pixels do not brighten and dim the view.
         [TestMethod]
         public void StretchTopIsAPercentileOfTheFrameAveragedEightByEight()
         {
@@ -527,7 +527,7 @@ namespace OpenRigs.Zapit.Tests
             CollectionAssert.AreEqual(new[] { 48 }, Values(ZapitFrameDepth.ToEightBit(Row(IplDepth.U16, 3), false, ZapitFrameDepth.StretchTop(frame))));   // 3 of 16, not 255
         }
 
-        // The display and the measurement split (27 Nov 2026): a grid run's shown frame is the stretched picture, cut to
+        // The display and the measurement split: a grid run's shown frame is the stretched picture, cut to
         // the crop, while its still stays whole at Mono8's scale for the spot detection; outside a grid run the still is
         // the stretched picture, whole.
         [TestMethod]
@@ -731,7 +731,7 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreSame(raw, said);
         }
 
-        // A crop whose edge plus size overflows an int (x + width wrapped negative, so it "fitted" and cvCopy killed Bonsai)
+        // A crop whose edge plus size overflows an int (x + width wraps negative, so it would "fit" and cvCopy would kill Bonsai)
         // is refused, whole frame shown.
         [TestMethod]
         public void ACropTooFarOutToAddUpIsRefusedNotCut()
@@ -924,7 +924,7 @@ namespace OpenRigs.Zapit.Tests
             Assert.AreEqual(ZapitDaqCommandKind.Zero, other.Steps.Last().Command.Kind);
         }
 
-        // Round 4 W4: an aim ZapitDaq refuses (a play armed) reads Refused with ZapitDaq's reason on the Aim metric, not
+        // An aim ZapitDaq refuses (a play armed) reads Refused with ZapitDaq's reason on the Aim metric, not
         // Aiming, and Go has no beam to switch off.
         [TestMethod]
         public void AnAimZapitDaqRefusesReadsRefused()

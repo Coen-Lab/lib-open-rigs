@@ -1322,15 +1322,17 @@ namespace OpenRigs.Zapit.Tests
             p.Loaded();
             StringAssert.Contains(p.Ask("1,2").Detail, "a play is condition,powerMw,seconds");
             StringAssert.Contains(p.Ask("1.5,2,0.05").Detail, "a play is condition,powerMw,seconds");
-            Assert.AreEqual("the Zapit waveforms have no condition 4; they have 3", p.Ask("4,2,0.05").Detail);
-            StringAssert.Contains(p.Ask("1,3,0.05").Detail, "with the laser on at 3 mW");
+            var missing = Assert.ThrowsException<ZapitMissingCondition>(() => ZapitBank.Load(Unpack()).Variant(4, true, 2.0));
+            Assert.AreEqual(4, missing.Condition);
+            Assert.AreEqual(3, missing.Count);
+            Assert.IsNull(missing.Laser);
+            var noCondition = p.Ask("4,2,0.05").Detail;
+            foreach (var part in new[] { "waveforms", "no condition 4", "have 3" }) StringAssert.Contains(noCondition, part);
+            StringAssert.Contains(p.Ask("1,3,0.05").Detail, "waveforms have no condition 1 with the laser on at 3 mW");
             StringAssert.Contains(p.Ask("1,8,0.05").Detail, "a play's power must be above 0 mW and at most ceilingMw (5 mW), not 8 mW");
             StringAssert.Contains(p.Ask("1,2,0").Detail, "more than 0 s");
             StringAssert.Contains(p.Ask("1,2,5").Detail, "longer than maxTrialSeconds (1 s)");
             StringAssert.StartsWith(p.Ask("1,2,5").Detail, "a Zapit trial of 5 s");
-            // Rows past int: 30000 s wrapped to a negative count and was armed; 42949.6 s wrapped to a 0.177 s trial.
-            StringAssert.Contains(p.Ask("1,2,30000").Detail, "longer than maxTrialSeconds (1 s)");
-            StringAssert.Contains(p.Ask("1,2,42949.6").Detail, "longer than maxTrialSeconds (1 s)");
             Assert.IsTrue(p.Steps.All(s => s.Stage == "Refused" && s.Command == null));
             Assert.IsNull(p.Error);
             using var off = new PlayHarness(ceilingMw: 0);

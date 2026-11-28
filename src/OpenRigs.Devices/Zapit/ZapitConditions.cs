@@ -78,7 +78,7 @@ namespace OpenRigs.Devices.Zapit
                 if (!int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out number))
                 {
                     throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
-                        "The Zapit conditions file '{0}' has a condition stimLocations{1}, a number too large: they must be exactly 1 to N.", path, match.Groups[1].Value));
+                        "The Zapit conditions file '{0}' has a condition stimLocations{1}, a number too large: conditions must be numbered 1, 2, 3 ... by their position in the file.", path, match.Groups[1].Value));
                 }
                 numbers.Add(number);
             }

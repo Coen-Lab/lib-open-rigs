@@ -44,8 +44,9 @@ namespace OpenRigs.Devices.Tests
                 // The shown frame's crop on its own metric too, each request numbered and the number echoed: Cropping #n when
                 // taken, then the camera's answer from its next frame (a 64 x 48 simulated frame): Cropped, Full Frame, or
                 // Refused for one outside the frame or no crop, saying which crop is now in force (the workflow runs on).
+                // The controller answers each request on one thread after the command before it has run through the workflow,
+                // so this status read sees anything the command itself answered; only a frame may answer it.
                 Assert.AreEqual("Cropping #1 16,16,32,16", Command(socket, "Zapit-Main.Crop", "#1 16,16,32,16", "Zapit-Main.Crop", "Cropping"));
-                Thread.Sleep(500);
                 Assert.AreEqual("Cropping #1 16,16,32,16", (string)Ask(socket, new { cmd = "status" })["metrics"]["Zapit-Main.Crop"], "Cropped before any frame");
                 SimulatedZapitCamera.SendFrame();
                 Assert.AreEqual("Cropped #1 16,16,32,16", Command(socket, "Zapit-Main.Crop", null, "Zapit-Main.Crop", "Cropped"));
@@ -128,9 +129,8 @@ namespace OpenRigs.Devices.Tests
                 Assert.AreEqual(2, Points(), "the first point saved, the second pointed");
                 Assert.IsTrue(File.Exists(Path.Combine(folder, "point_0000.png")));
 
-                StringAssert.StartsWith(Command(socket, "Zapit-Main.LaserOff", "", "Zapit-Main.Setup", "Refused "), "Refused Laser Off came during a setup step, so the lines are zeroed and it is refused: " + folder);
-                SimulatedZapitCamera.SendFrame();
-                Thread.Sleep(300);
+                StringAssert.StartsWith(Command(socket, "Zapit-Main.LaserOff", "", "Zapit-Main.Setup", "Refused "), "Refused Laser Off came during a setup step: the lines are zeroed and nothing more is saved for " + folder);
+                SimulatedZapitCamera.SendFrame();   // runs the frame through the setup on this thread, so any Point is recorded on return
                 Assert.AreEqual(2, Points(), "no Point after Laser Off");
                 Assert.IsFalse(File.Exists(Path.Combine(folder, "point_0001.png")));
                 Assert.AreEqual("zapit Zero", RecordedCommands.Seen.Last(s => s.StartsWith("zapit ", StringComparison.Ordinal)));
@@ -150,8 +150,8 @@ namespace OpenRigs.Devices.Tests
         {
             for (var attempt = 1; ; attempt++)
             {
-                var error = RunPiece(LiveViewDeviceEndTests.FreePort(), drive);
-                if (attempt < 3 && LiveViewDeviceEndTests.PortTaken(error)) continue;
+                var error = RunPiece(TestPorts.Free(), drive);
+                if (attempt < 3 && TestPorts.Taken(error)) continue;
                 Assert.IsNull(error, error == null ? "" : error.ToString());
                 return;
             }
@@ -187,7 +187,7 @@ namespace OpenRigs.Devices.Tests
                     JObject status;
                     while (!(bool)(status = Ask(socket, new { cmd = "status" }))["ok"])
                     {
-                        if (LiveViewDeviceEndTests.PortTaken(error)) return error;
+                        if (TestPorts.Taken(error)) return error;
                         if (error != null || clock.Elapsed > TimeSpan.FromSeconds(15)) Assert.Fail("No controller: " + status + "; " + error);
                         Thread.Sleep(100);
                     }
@@ -226,7 +226,10 @@ namespace OpenRigs.Devices.Tests
                 Assert.IsTrue((bool)sent["ok"], name + " refused: " + sent);
             }
             for (var waited = Stopwatch.StartNew(); waited.Elapsed < TimeSpan.FromSeconds(5) && Lines() != expected; Thread.Sleep(50)) { }
-            Thread.Sleep(200);   // and nothing more after it
+            // And nothing more from the command: the controller answers this status only after the command has run through
+            // the workflow. A write a later ZapitDaq event makes has no such barrier; the next call's expected lines, which
+            // hold every write so far, catch it.
+            Ask(socket, new { cmd = "status" });
             return Lines();
         }
 

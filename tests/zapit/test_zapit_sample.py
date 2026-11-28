@@ -54,7 +54,7 @@ def test_clicks_give_the_reference_points():
 
 
 def test_the_second_point_has_no_default_and_no_lambda():
-    """27 Nov 2026: the second point is MATLAB Zapit's refAP midline point, given by the caller; lambda is gone."""
+    """The second point is MATLAB Zapit's refAP midline point, given by the caller, with no default and no lambda."""
     with pytest.raises(TypeError):
         sm.sample_from_clicks([400, 300], [400, 180], SETTINGS)  # type: ignore[call-arg]
     for bad in (0.0, float("nan")):
@@ -160,7 +160,7 @@ B2_CLICKS = ((560, 300), (560, 720))   # bregma, and a second point 420 px (8.1 
     "'Sample registration margin'.",
 )
 def test_the_real_pair_registers_both_ways_and_the_round_trip_lands_within_25_um():
-    """Audit E F3: the free similarity scale (1.019) put the second point 101 um off on the round trip; the rigid refit 19/14."""
+    """The free similarity scale (1.019) put the second point 101 um off on the round trip; the rigid refit 19/14."""
     a, b = b2_still("still_skull_B2.png"), b2_still("still_skull_offcentre_B2.png")
     clicks = sm.sample_from_clicks(*B2_CLICKS, B2, AP)
     ab, ba = sm.register_sample(a, clicks, b, B2), sm.register_sample(b, clicks, a, B2)
